@@ -1,0 +1,33 @@
+{
+    "name": "Daywalker",
+    "dark": false,
+    "background": "#F2F1EE",
+    "surface": "#FFFFFF",
+    "surfaceVariant": "#E7E7E4",
+    "border": "#D3D4D2",
+    "accent": "#3E4C59",
+    "onAccent": "#FFFFFF",
+    "text": "#22262B",
+    "mutedText": "#616A73",
+    "danger": "#B3261E",
+    "font": "Rubik",
+    "fontWeight": "Bold",
+    "textScalePct": 100,
+    "cornerDp": 18,
+    "borderDp": 1,
+    "widget": {
+        "font": null,
+        "textScalePct": null,
+        "bold": null,
+        "italic": null,
+        "underline": null,
+        "background": "#FFFFFF",
+        "opacityPct": 95,
+        "text": null,
+        "mutedText": null,
+        "accent": "#3E4C59",
+        "border": "#D3D4D2",
+        "borderDp": 1,
+        "cornerDp": 24
+    }
+}

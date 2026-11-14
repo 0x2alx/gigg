@@ -1,0 +1,28 @@
+# Demo instance for the documentation's screenshots (dev/demo/README.md). Generic names only.
+user-add dana -admin -name "Dana Rivera"
+user-add sam -name "Sam Okafor"
+user-add scout -agent -name Scout
+user-add atlas -agent -name Atlas
+passwd dana -file /s/demo.pw
+passwd sam -file /s/demo.pw
+workspace-add acme "Acme Ops"
+workspace-add scout Scout
+workspace-add home Home
+workspace-owner acme dana
+workspace-owner home dana
+member acme dana manager
+member scout dana manager
+member home dana manager
+member acme sam member
+member acme scout member
+member acme atlas member
+member scout scout member
+member home sam member
+access scout scout member always_run=allow
+project-add acme platform Platform PLT
+project-add acme website Website WEB
+project-add scout research Research RES
+project-add home house Household HOM
+key-add -user dana -name seed -scopes workspace:read,workspace:write,tasks:read,tasks:write,tasks:delete,comments:read,comments:write,runs:write,projects:write -listeners internal -out /s/dana.token
+key-add -user sam -name seed -scopes workspace:read,tasks:read,tasks:write,comments:read,comments:write -listeners internal -out /s/sam.token
+key-add -user scout -name runner -scopes workspace:read,tasks:read,tasks:write,comments:read,comments:write,runs:write -listeners internal -out /s/scout.token

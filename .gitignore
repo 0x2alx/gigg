@@ -1,0 +1,15 @@
+# Claude Code / sandbox files
+.claude/
+.mcp.json
+CLAUDE.local.md
+# build output
+/out/
+/dist/
+web/dist/*
+!web/dist/.keep
+node_modules/
+*.db
+*.db-wal
+*.db-shm
+.env
+/scratch/

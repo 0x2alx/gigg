@@ -1,0 +1,214 @@
+{
+  "base": "https://gigg-dev:8443",
+  "viewport": [
+    1440,
+    900
+  ],
+  "steps": [
+    {
+      "goto": "/"
+    },
+    {
+      "wait": "input[autocomplete=username]"
+    },
+    {
+      "type": [
+        "input[autocomplete=username]",
+        "ada"
+      ]
+    },
+    {
+      "type": [
+        "input[autocomplete=current-password]",
+        "gigg-dev-password"
+      ]
+    },
+    {
+      "press": "Enter"
+    },
+    {
+      "wait": ".board"
+    },
+    {
+      "eval": "(async () => { const R = String(Date.now() % 100000); localStorage.setItem('scen', R); const H = {'Content-Type':'application/json','X-Gigg-CSRF':'1'}; const j = async (m,u,b) => { const r = await fetch('/api/v1'+u,{method:m,headers:H,body:b?JSON.stringify(b):undefined}); return [r.status, await r.json().catch(()=>null)]; }; const [,ps] = await j('GET','/workspaces/scout/projects'); const p = ps.items[0].id; const [,a] = await j('POST',`/projects/${p}/tasks`,{title:'Scenario parent '+R,checklist:['one','two @ada']}); const [,b] = await j('POST',`/projects/${p}/tasks`,{title:'Scenario blocked '+R}); await j('POST',`/tasks/${b.key}/relations`,{task:a.key,direction:'blocked_by'}); await j('POST',`/projects/${p}/tasks`,{title:'Scenario child',parent_id:a.id}); await j('POST',`/tasks/${a.key}/comments`,{body_md:'hello @ada and @scout'}); window.__k = [a.key, b.key]; return 'ok'; })()",
+      "expect": "ok"
+    },
+    {
+      "goto": "/"
+    },
+    {
+      "wait": ".board"
+    },
+    {
+      "wait": 600
+    },
+    {
+      "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+      "expect": true
+    },
+    {
+      "eval": "[...document.querySelectorAll('.card-open')].some(c => c.innerText.includes('Scenario blocked '+localStorage.getItem('scen')) && c.innerText.includes('🔒'))",
+      "expect": true
+    },
+    {
+      "eval": "[...document.querySelectorAll('.card-open')].some(c => c.innerText.includes('Scenario parent '+localStorage.getItem('scen')) && c.innerText.includes('0/2') && c.innerText.includes('0/1'))",
+      "expect": true
+    },
+    {
+      "shot": "board"
+    },
+    {
+      "eval": "(async () => { const last = [...document.querySelectorAll('.column')].pop(); const name = last.getAttribute('aria-label'); last.querySelector('.column-collapse').click(); await new Promise(r => setTimeout(r, 300)); const c = document.querySelector('.column-collapsed'); return !!c && c.getAttribute('aria-label') === name && c.getBoundingClientRect().width < 60 && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })()",
+      "expect": true
+    },
+    {
+      "shot": "board-collapsed"
+    },
+    {
+      "goto": "/"
+    },
+    {
+      "wait": ".board"
+    },
+    {
+      "eval": "(async () => { const c = document.querySelector('.column-collapsed'); if (!c) return 'not remembered'; c.querySelector('.column-strip').click(); await new Promise(r => setTimeout(r, 300)); return !document.querySelector('.column-collapsed'); })()",
+      "expect": true
+    },
+    {
+      "eval": "([...document.querySelectorAll('button.card-open')].find(c => c.getAttribute('aria-label').includes('Scenario parent '+localStorage.getItem('scen'))).click(), true)",
+      "expect": true
+    },
+    {
+      "wait": "input[aria-label^='Done: ']"
+    },
+    {
+      "eval": "!!document.querySelector('.md .mention')",
+      "expect": true
+    },
+    {
+      "eval": "(async () => { const cb = document.querySelector('input[aria-label^=\"Done: \"]'); cb.click(); await new Promise(r => setTimeout(r, 900)); return document.querySelector('aside.panel').innerText.includes('1/2'); })()",
+      "expect": true
+    },
+    {
+      "shot": "panel"
+    },
+    {
+      "eval": "(() => { const p = document.querySelector('aside.panel'); const order = [...p.querySelectorAll('.tp-desc,.comments,.tsecs,.tp-props,.tp-actions')].map(e => e.className.split(' ')[0]).join(','); return order === 'tp-desc,comments,tsecs,tp-props,tp-actions' && p.querySelector('.comment .avatar').getBoundingClientRect().width > 34; })()",
+      "expect": true
+    },
+    {
+      "eval": "(async () => { document.querySelector('.tp-expand').click(); await new Promise(r => setTimeout(r, 300)); const p = document.querySelector('aside.panel'); const side = document.querySelector('.sidebar').getBoundingClientRect().right; const ok = p.classList.contains('panel-full') && Math.abs(p.getBoundingClientRect().left - side) < 2 && document.querySelector('.tp-side').getBoundingClientRect().top < document.querySelector('.comments').getBoundingClientRect().bottom; return ok; })()",
+      "expect": true
+    },
+    {
+      "shot": "panel-full"
+    },
+    {
+      "eval": "(async () => { document.querySelector('.tp-expand').click(); await new Promise(r => setTimeout(r, 300)); return !document.querySelector('aside.panel').classList.contains('panel-full') && localStorage.getItem('gigg.panel.full') === '0'; })()",
+      "expect": true
+    },
+    {
+      "goto": "/admin/groups"
+    },
+    {
+      "wait": 700
+    },
+    {
+      "eval": "document.body.innerText.includes('Most specific first')",
+      "expect": true
+    },
+    {
+      "goto": "/admin/users"
+    },
+    {
+      "wait": "tr"
+    },
+    {
+      "eval": "(async () => { const r = [...document.querySelectorAll('tr')].find(x => x.textContent.includes('@scout')); [...r.querySelectorAll('button')].find(b => /Permissions/.test(b.textContent)).click(); await new Promise(r => setTimeout(r, 700)); return document.querySelector('[role=dialog]').innerText.includes('Most specific first') && document.querySelector('[role=dialog]').innerText.includes('Member'); })()",
+      "expect": true
+    },
+    {
+      "shot": "permissions"
+    },
+    {
+      "goto": "/"
+    },
+    {
+      "wait": ".board"
+    },
+    {
+      "wait": 1500
+    },
+    {
+      "eval": "(async () => { await fetch('/api/v1/projects/1/tasks', {method:'POST', headers:{'Content-Type':'application/json','X-Gigg-CSRF':'1'}, body: JSON.stringify({title:'Scenario live '+localStorage.getItem('scen')})}); const t0 = Date.now(); while (Date.now() - t0 < 6000 && !document.body.innerText.includes('Scenario live '+localStorage.getItem('scen'))) await new Promise(r => setTimeout(r, 200)); return document.body.innerText.includes('Scenario live '+localStorage.getItem('scen')); })()",
+      "expect": true
+    },
+    {
+      "eval": "([...document.querySelectorAll('button.card-open')].find(c => c.getAttribute('aria-label').includes('Scenario parent '+localStorage.getItem('scen'))).click(), true)",
+      "expect": true
+    },
+    {
+      "wait": "aside.panel"
+    },
+    {
+      "click": ".page-head h1"
+    },
+    {
+      "wait": 400
+    },
+    {
+      "eval": "!document.querySelector('aside.panel')",
+      "expect": true
+    },
+    {
+      "eval": "([...document.querySelectorAll('button.card-open')].find(c => c.getAttribute('aria-label').includes('Scenario parent '+localStorage.getItem('scen'))).click(), true)",
+      "expect": true
+    },
+    {
+      "wait": "textarea[aria-label='Comment']"
+    },
+    {
+      "type": [
+        "textarea[aria-label='Comment']",
+        "unsaved words"
+      ]
+    },
+    {
+      "click": ".page-head h1"
+    },
+    {
+      "wait": 400
+    },
+    {
+      "eval": "!!document.querySelector('aside.panel') && document.querySelector(\"textarea[aria-label='Comment']\").value === 'unsaved words'",
+      "expect": true
+    },
+    {
+      "eval": "!!document.querySelector('[role=toolbar]') && !!document.querySelector('link[rel=manifest]') && !!document.querySelector('link[rel=icon]')",
+      "expect": true
+    },
+    {
+      "shot": "panel-guard"
+    },
+    {
+      "viewport": [
+        375,
+        800
+      ]
+    },
+    {
+      "wait": 500
+    },
+    {
+      "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+      "expect": true
+    },
+    {
+      "eval": "!!document.querySelector('[aria-label=\"Columns\"]')",
+      "expect": true
+    },
+    {
+      "shot": "board-375"
+    }
+  ]
+}

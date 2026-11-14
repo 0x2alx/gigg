@@ -1,0 +1,33 @@
+{
+    "name": "Nightwalker",
+    "dark": true,
+    "background": "#1C2529",
+    "surface": "#253136",
+    "surfaceVariant": "#2F3D43",
+    "border": "#3B4B52",
+    "accent": "#CDFFFB",
+    "onAccent": "#12302E",
+    "text": "#EEF8F7",
+    "mutedText": "#A3B6B8",
+    "danger": "#FF8A80",
+    "font": "Rubik",
+    "fontWeight": "Bold",
+    "textScalePct": 100,
+    "cornerDp": 16,
+    "borderDp": 1,
+    "widget": {
+        "font": null,
+        "textScalePct": null,
+        "bold": null,
+        "italic": null,
+        "underline": null,
+        "background": "#253136",
+        "opacityPct": 92,
+        "text": null,
+        "mutedText": null,
+        "accent": "#CDFFFB",
+        "border": null,
+        "borderDp": 0,
+        "cornerDp": 24
+    }
+}

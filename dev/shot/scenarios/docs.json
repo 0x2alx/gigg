@@ -1,0 +1,387 @@
+{
+ "base": "https://gigg-demo:8443",
+ "viewport": [
+  1440,
+  900
+ ],
+ "waitUntil": "domcontentloaded",
+ "steps": [
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "dana"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "demo-password-2026"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => { const r = await fetch('/api/v1/me/themes-selection', { method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({ selected_id: 'nightwalker', match_system: false }) }); return r.status; })()",
+   "expect": 204
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board .task-card"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "board-all-night",
+   "full": false
+  },
+  {
+   "hover": ".task-card .pill-agent"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "tooltip-night",
+   "full": false
+  },
+  {
+   "goto": "/board?p=1"
+  },
+  {
+   "wait": ".board .task-card"
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions button\")].find(x => x.textContent.includes(\"New task\")); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "[role=dialog] input"
+  },
+  {
+   "type": [
+    "[role=dialog] input",
+    "Rotate the API signing keys"
+   ]
+  },
+  {
+   "wait": 500
+  },
+  {
+   "shot": "task-new-night",
+   "el": "[role=dialog]"
+  },
+  {
+   "goto": "/board?p=3"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions button\")].find(x => x.textContent.includes(\"Recurring\")); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "[role=dialog] .rec-row, [role=dialog] li, [role=dialog] article"
+  },
+  {
+   "wait": 700
+  },
+  {
+   "shot": "recurring-night",
+   "el": "[role=dialog]"
+  },
+  {
+   "goto": "/dashboard"
+  },
+  {
+   "wait": ".dash-card"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "dashboard-night",
+   "full": false
+  },
+  {
+   "goto": "/my"
+  },
+  {
+   "wait": "main, .vw-list-row, h1"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "my-tasks-night",
+   "full": false
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true })); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "input[aria-label=Command]"
+  },
+  {
+   "type": [
+    "input[aria-label=Command]",
+    "rate"
+   ]
+  },
+  {
+   "wait": 700
+  },
+  {
+   "shot": "palette-night",
+   "full": false
+  },
+  {
+   "goto": "/profile"
+  },
+  {
+   "wait": ".profile"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "profile-night",
+   "full": false
+  },
+  {
+   "goto": "/admin/workspaces/1"
+  },
+  {
+   "wait": "form[aria-label='Workspace settings']"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "admin-workspace-night",
+   "full": false
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "click": "h1 .help-button"
+  },
+  {
+   "wait": ".help-body"
+  },
+  {
+   "wait": 900
+  },
+  {
+   "shot": "help-night",
+   "full": false
+  },
+  {
+   "eval": "(async () => { const r = await fetch('/api/v1/me/themes-selection', { method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({ selected_id: 'daywalker', match_system: false }) }); return r.status; })()",
+   "expect": 204
+  },
+  {
+   "goto": "/board?ws=acme&pr=2"
+  },
+  {
+   "wait": ".board .task-card"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "board-filters-day",
+   "full": false
+  },
+  {
+   "goto": "/board/p/1/t/PLT-1"
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "shot": "task-panel-day",
+   "full": false
+  },
+  {
+   "goto": "/board/p/1/t/PLT-4"
+  },
+  {
+   "wait": "section[aria-label='Agent run']"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "(() => { document.querySelector(\"section[aria-label='Agent run']\").scrollIntoView({ block: 'start' }); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 400
+  },
+  {
+   "shot": "agent-run-day",
+   "el": "aside.panel",
+   "margin": 0
+  },
+  {
+   "goto": "/inbox"
+  },
+  {
+   "wait": ".inbox"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "inbox-day",
+   "full": false
+  },
+  {
+   "goto": "/w/acme/table"
+  },
+  {
+   "wait": "table"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "table-day",
+   "full": false
+  },
+  {
+   "goto": "/themes"
+  },
+  {
+   "wait": "h1"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "themes-day",
+   "full": false
+  },
+  {
+   "goto": "/admin/users"
+  },
+  {
+   "wait": "table"
+  },
+  {
+   "eval": "(() => { const row = [...document.querySelectorAll('tr')].find(r => r.textContent.includes('Sam Okafor')); const b = row && [...row.querySelectorAll('button')].find(x => x.textContent.includes('Permissions')); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "[role=dialog]"
+  },
+  {
+   "wait": 900
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll(\"[role=dialog] button\")].find(x => x.textContent.includes(\"Acme Ops\")); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 700
+  },
+  {
+   "shot": "admin-permissions-day",
+   "full": false
+  },
+  {
+   "goto": "/admin/keys"
+  },
+  {
+   "wait": "h1"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "eval": "(() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); for (let n = w.nextNode(); n; n = w.nextNode()) n.nodeValue = n.nodeValue.replace(/\\b(10|172|192)\\.\\d+\\.\\d+\\.\\d+\\b/g, '192.0.2.10'); return true; })()",
+   "expect": true
+  },
+  {
+   "shot": "admin-keys-day",
+   "full": false
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board .task-card"
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions button\")].find(x => x.textContent.includes(\"Trash\")); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": ".trash-item"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "shot": "trash-day",
+   "el": "[role=dialog]"
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "board-mobile-day",
+   "full": false
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "eval": "(async () => { const r = await fetch('/api/v1/me/themes-selection', { method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({ selected_id: 'nightwalker', match_system: false }) }); return r.status; })()",
+   "expect": 204
+  }
+ ]
+}

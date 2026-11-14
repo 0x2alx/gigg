@@ -1,0 +1,10 @@
+# Dev and test instance (dev/e2e.sh, the UI scenarios): an admin and one agent with a runner key.
+# /s holds pw (the admin's dev password, one line) and receives scout.token.
+user-add ada -admin -name Ada
+passwd ada -file /s/pw
+user-add scout -agent -name Scout
+workspace-add scout Scout
+member scout scout member
+status-rename scout waiting "Needs review"
+project-add scout gigg gigg GIG
+key-add -user scout -workspace scout -name runner -scopes workspace:read,tasks:read,tasks:write,comments:read,comments:write,runs:write,profile:write -listeners internal -out /s/scout.token

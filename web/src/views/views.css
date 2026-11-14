@@ -1,0 +1,146 @@
+/* Table view, My tasks and the command palette. Theme variables only; data colours come inline
+   from theme.ts. Prefixes: vw- (views), cp- (command palette). */
+
+.vw-page { display: flex; flex-direction: column; min-width: 0; }
+.vw-narrow { max-width: 60rem; }
+.vw-head-actions { align-items: center; }
+.vw-head-actions a.button { text-decoration: none; display: inline-block; }
+.vw-nowrap { white-space: nowrap; }
+.vw-toggle { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; white-space: nowrap; cursor: pointer; }
+.vw-toggle input { width: auto; margin: 0; }
+
+/* filters */
+.vw-filters {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;
+  padding: 0.5rem; background: var(--low); border: 1px solid var(--faint); border-radius: var(--radius-l);
+}
+.vw-filters select { font-size: 0.85rem; padding: 0.3rem 0.45rem; }
+.vw-search { flex: 1 1 14rem; width: auto; font-size: 0.9rem; padding: 0.3rem 0.55rem; }
+
+/* bulk bar */
+.vw-bulk {
+  position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+  margin-bottom: 0.75rem; padding: 0.5rem 0.65rem; border-radius: var(--radius-l);
+  background: var(--secondary); color: var(--on-secondary); border: 1px solid var(--accent);
+}
+.vw-bulk .count { margin-left: 0; }
+.vw-bulk-label { font-size: 0.85rem; margin-right: 0.35rem; }
+.vw-act { display: inline-flex; gap: 0.3rem; align-items: center; }
+.vw-act select { font-size: 0.85rem; padding: 0.25rem 0.4rem; }
+.vw-bulk-input { width: 9rem; font-size: 0.85rem; padding: 0.25rem 0.45rem; }
+.vw-bulk-clear { margin-left: auto; color: var(--on-secondary); }
+.button.vw-danger-solid { background: var(--danger); color: var(--on-danger); }
+.vw-confirm-keys { margin: 0.25rem 0 1rem; }
+
+.vw-progress { flex-basis: 100%; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; }
+.vw-progress-head { display: flex; justify-content: space-between; align-items: center; }
+.vw-progress-head .icon-button { color: var(--on-secondary); }
+.vw-bar { height: 0.35rem; border-radius: 999px; background: var(--surface); overflow: hidden; }
+.vw-bar > span { display: block; height: 100%; transition: width 0.2s; }
+.vw-errors { list-style: none; margin: 0; padding: 0; max-height: 8rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.2rem; }
+.vw-errors li { display: flex; align-items: center; gap: 0.4rem; background: var(--surface); padding: 0.15rem 0.4rem; border-radius: var(--radius-s); }
+
+/* table */
+.vw-table-card { padding: 0.25rem 0.5rem 0.5rem; overflow-x: auto; }
+.vw-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.vw-table th {
+  text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
+  color: var(--muted); font-weight: var(--weight-heading); padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--faint);
+}
+.vw-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--faint); vertical-align: middle; }
+.vw-table tbody tr { cursor: pointer; }
+.vw-table tbody tr:last-child td { border-bottom: 0; }
+.vw-table tbody tr:hover { background: var(--low); }
+.vw-table tbody tr.vw-on { background: var(--high); }
+.vw-check { width: 1.8rem; }
+.vw-check input { width: auto; margin: 0; cursor: pointer; }
+.vw-sort {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;
+}
+.vw-sort:hover, .vw-sort.on { color: var(--text); }
+.vw-sort-arrow { font-size: 0.65rem; opacity: 0.5; }
+.vw-sort.on .vw-sort-arrow { opacity: 1; color: var(--accent); }
+.vw-title { min-width: 14rem; }
+.vw-title-link { color: var(--text); text-decoration: none; border-left: 3px solid transparent; padding-left: 0.35rem; display: inline-block; }
+.vw-title-link:hover { text-decoration: underline; }
+.vw-chips { display: inline-flex; flex-wrap: wrap; gap: 0.2rem; }
+.vw-people { display: inline-flex; gap: 0.15rem; }
+.vw-empty { color: var(--muted); padding: 1.25rem 0.5rem; text-align: center; }
+.vw-more { display: flex; justify-content: center; padding: 0.5rem 0 0.25rem; }
+
+/* my tasks */
+.vw-group { margin-bottom: 1.1rem; }
+.vw-group-head { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.45rem; font-size: 0.95rem; }
+.vw-group-head .count { margin-left: 0; }
+.vw-list { list-style: none; margin: 0; padding: 0.2rem 0; }
+.vw-list > li + li { border-top: 1px solid var(--faint); }
+.vw-list-row {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; color: var(--text); text-decoration: none;
+  border-left: 3px solid transparent; flex-wrap: wrap;
+}
+.vw-list-row:hover { background: var(--low); }
+.vw-list-title { flex: 1 1 12rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vw-closed { color: var(--muted); text-decoration: line-through; }
+.vw-list-meta { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; justify-content: flex-end; }
+.vw-empty-card { display: flex; align-items: center; gap: 0.75rem; color: var(--muted); }
+.vw-empty-icon {
+  width: 2.2rem; height: 2.2rem; display: grid; place-items: center; font-size: 1.1rem; flex: none;
+  border-radius: var(--radius-m); background: var(--secondary); color: var(--on-secondary);
+}
+
+/* command palette */
+.cp-backdrop { padding-top: 12vh; z-index: 60; }
+.cp {
+  width: min(40rem, 100%); background: var(--surface); border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-xl); overflow: hidden; display: flex; flex-direction: column; max-height: 72vh;
+  box-shadow: 0 1rem 3rem color-mix(in srgb, var(--bg) 60%, transparent);
+}
+.cp-input-row { display: flex; align-items: center; gap: 0.55rem; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--faint); }
+.cp-glyph { color: var(--accent); font-size: 1.05rem; }
+.cp-input { border: 0; background: transparent; font-size: 1rem; padding: 0.25rem 0; flex: 1; outline: none; }
+.cp-spin {
+  width: 0.9rem; height: 0.9rem; border-radius: 50%; flex: none;
+  border: 2px solid var(--faint); border-top-color: var(--accent); animation: cp-spin 0.7s linear infinite;
+}
+@keyframes cp-spin { to { transform: rotate(360deg); } }
+.cp-error { padding: 0.4rem 0.9rem; font-size: 0.85rem; color: var(--danger); border-bottom: 1px solid var(--faint); }
+.cp-list { list-style: none; margin: 0; padding: 0.3rem; overflow-y: auto; flex: 1; }
+.cp-group {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+  padding: 0.55rem 0.55rem 0.2rem;
+}
+.cp-opt {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.42rem 0.55rem; border-radius: var(--radius-m);
+  cursor: pointer; min-width: 0;
+}
+.cp-opt.on { background: var(--secondary); color: var(--on-secondary); }
+.cp-icon { flex: none; min-width: 1.6rem; display: inline-flex; justify-content: center; color: var(--muted); }
+.cp-opt.on .cp-icon { color: inherit; }
+.cp-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; }
+.cp-hint { flex: none; display: inline-flex; gap: 0.25rem; align-items: center; }
+.cp-enter { flex: none; font-size: 0.8rem; opacity: 0.7; }
+.cp-none { color: var(--muted); padding: 0.9rem 0.6rem; font-size: 0.9rem; }
+.cp-foot { display: flex; gap: 0.9rem; padding: 0.45rem 0.8rem; border-top: 1px solid var(--faint); background: var(--low); flex-wrap: wrap; }
+.cp-foot-right { margin-left: auto; }
+.cp-kbd {
+  font-family: inherit; font-size: 0.7rem; padding: 0 0.3rem; border-radius: var(--radius-xs);
+  border: 1px solid var(--faint); background: var(--surface-variant); color: var(--text);
+}
+@media (max-width: 40rem) {
+  .cp-backdrop { padding-top: 1rem; }
+  .cp-foot { display: none; }
+}
+
+/* saved views */
+.vw-save { margin-left: auto; }
+.vw-views { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: -0.25rem 0 0.75rem; }
+.vw-view {
+  display: inline-flex; align-items: center; border: 1px solid var(--faint); border-radius: 999px;
+  background: var(--surface); font-size: 0.82rem; max-width: 100%;
+}
+.vw-view.on { background: var(--secondary); border-color: var(--accent); }
+.vw-view-link { color: var(--text); text-decoration: none; padding: 0.15rem 0.2rem 0.15rem 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vw-view.on .vw-view-link { color: var(--on-secondary); }
+.vw-view-x { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; padding: 0 0.5rem 0 0.25rem; }
+.vw-view-x:hover { color: var(--danger); }

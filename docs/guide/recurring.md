@@ -1,0 +1,37 @@
+# Recurring tasks, templates and schedules
+
+Three separate objects work together:
+
+- A **template** is the content of a task: title, description, priority, labels, assignees, checklist, custom fields and agent run settings. You can also start an ordinary task from a template.
+- A **schedule** is a timing: "every day 09:00–11:00", "every Friday", "the last day of every month". Several recurring tasks can share one.
+- A **recurring task** links one template to one schedule in a project. It has its own start date, end date or maximum count, an overlap rule and a pause switch. The same template can be linked to several schedules, but each template–schedule pair appears only once per project.
+
+![Recurring tasks of a project (Nightwalker theme)](../images/recurring-night.png)
+
+## Making a recurring task
+
+The quickest way: **New task**, fill it in, then set **Repeat**. gigg saves the content as a template, reuses a schedule with exactly the same timing (or makes one) and links the two.
+
+You can also pick an existing **template** and an existing **schedule** in the same form.
+
+## The timing
+
+- **Every N days, weeks** (on chosen weekdays) **or months** (on a day of the month, or the last day).
+- **Window**: when each occurrence may be worked on, for example 09:00 for 2 hours, in a time zone (by default your own, from your profile). An occurrence that nobody starts before its window closes is marked *missed*. Its creator and assignees get a notification.
+- **Create early**: makes each occurrence some minutes before its window opens, so it's visible ahead of time.
+- **Overlap**: when the previous occurrence is still open, **skip** (the default) doesn't create the next one, while **create** makes it anyway.
+
+## Changing things later
+
+- Editing a **template** changes what every recurring task that uses it creates from then on. The same goes for a **schedule** and its timing.
+- When you edit a recurring task, the form tells you who else uses its template and schedule. You can change them in place for everyone, or switch this recurring task to another template or schedule.
+- A template or schedule that's in use can't be deleted. Deleting a recurring task leaves its template and schedule in place.
+- **Pause** on a recurring task stops new occurrences; the ones already made stay.
+
+## Templates
+
+**Templates** on the board lists the templates for the project in view, including those for every project of the workspace. You can create one there, edit it, or start a task from it. A template can be limited to one project or usable in all projects of its workspace.
+
+## Schedules
+
+**Schedules** lists a workspace's timings and how many recurring tasks use each. A schedule named after its timing (the default) is renamed automatically when you change the timing.

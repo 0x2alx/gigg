@@ -1,0 +1,5 @@
+FROM docker.io/library/node:22-alpine
+RUN apk add --no-cache chromium font-noto font-noto-emoji font-noto-symbols ttf-dejavu
+WORKDIR /opt/shot
+RUN npm i --no-fund --no-audit puppeteer-core@23.11.1
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser NODE_PATH=/opt/shot/node_modules

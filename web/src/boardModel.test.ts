@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+import type { Board, Category, Project, Task } from "./api";
+import type { WorkspaceTree } from "./App";
+import { categoryColumns, EMPTY_FILTER, filterQuery, matches, moveToCategory, parseFilter, scope, statusColumns } from "./boardModel";
+
+const task = (id: number, x: Partial<Task> = {}): Task =>
+  ({ id, key: `K-${id}`, title: `task ${id}`, description_md: "", priority: 0, due_at: null, assignees: [], labels: [], status_id: 0, status_name: "", status_category: "todo", ...x }) as Task;
+const status = (id: number, name: string, category: Category, tasks: Task[], color: string | null = null) => ({
+  id,
+  name,
+  category,
+  color,
+  position: id,
+  tasks: tasks.map((t) => ({ ...t, status_id: id, status_name: name, status_category: category })),
+});
+const board = (pid: number, statuses: ReturnType<typeof status>[]): Board => ({ project: { id: pid } as Project, statuses, labels: [] }) as unknown as Board;
+const proj = (id: number) => ({ id, key: "P" + id, name: "p" + id }) as Project;
+const tree: WorkspaceTree[] = [
+  { id: 1, slug: "scout", name: "Scout", role: "member", projects: [proj(1), proj(2)] },
+  { id: 2, slug: "atlas", name: "Atlas", role: "member", projects: [proj(3)] },
+];
+
+describe("board filter", () => {
+  it("round-trips through the URL and ignores junk", () => {
+    const f = { ...EMPTY_FILTER, ws: ["scout", "atlas"], p: [3], a: "me", l: "ops", pr: 2, q: "brief", arch: true };
+    expect(parseFilter(filterQuery(f))).toEqual(f);
+    expect(filterQuery(EMPTY_FILTER)).toBe("");
+    expect(parseFilter("?p=x,0,4&pr=9")).toEqual({ ...EMPTY_FILTER, p: [4] });
+  });
+  it("scopes workspaces and projects; a project outside the chosen workspaces is ignored", () => {
+    expect(scope(tree, EMPTY_FILTER).map((x) => x.project.id)).toEqual([1, 2, 3]);
+    expect(scope(tree, { ...EMPTY_FILTER, ws: ["atlas"] }).map((x) => x.project.id)).toEqual([3]);
+    expect(scope(tree, { ...EMPTY_FILTER, p: [2, 3] }).map((x) => x.project.id)).toEqual([2, 3]);
+    expect(scope(tree, { ...EMPTY_FILTER, ws: ["scout"], p: [3] }).map((x) => x.project.id)).toEqual([1, 2]);
+    expect(scope(tree, { ...EMPTY_FILTER, ws: ["gone"] }).map((x) => x.project.id)).toEqual([1, 2, 3]); // a lost workspace: all
+  });
+  it("matches assignee, label, priority and text", () => {
+    const t = task(1, { assignees: [7], labels: [{ id: 1, name: "Ops", color: null }], priority: 3, title: "Morning brief" });
+    expect(matches(t, { ...EMPTY_FILTER, a: "me" }, 7)).toBe(true);
+    expect(matches(t, { ...EMPTY_FILTER, a: "none" }, 7)).toBe(false);
+    expect(matches(t, { ...EMPTY_FILTER, a: "8" }, 7)).toBe(false);
+    expect(matches(t, { ...EMPTY_FILTER, l: "ops", pr: 3, q: "BRIEF" }, 7)).toBe(true);
+    expect(matches(t, { ...EMPTY_FILTER, pr: 4 }, 7)).toBe(false);
+  });
+});
+
+describe("board columns", () => {
+  const b1 = board(1, [status(11, "To-Do", "todo", [task(1), task(2, { priority: 4 })]), status(12, "Done", "done", []), status(13, "Gone", "cancelled", [task(9)])]);
+  const b2 = board(3, [status(31, "Next", "todo", [task(3, { priority: 4, due_at: 5 })]), status(32, "Done", "done", [task(4)])]);
+  it("one project: its own statuses, cancelled hidden, manual order", () => {
+    const cols = statusColumns(b1, EMPTY_FILTER, 0);
+    expect(cols.map((c) => c.name)).toEqual(["To-Do", "Done"]);
+    expect(cols[0]!.tasks.map((t) => t.id)).toEqual([1, 2]);
+  });
+  it("several: one column per category, named after the status when all agree, priority then due", () => {
+    const cols = categoryColumns([b1, b2], EMPTY_FILTER, 0);
+    expect(cols.map((c) => c.name)).toEqual(["Backlog", "To-Do", "Doing", "Waiting", "Done"]);
+    const todo = cols.find((c) => c.category === "todo")!;
+    expect(todo.tasks.map((t) => t.id)).toEqual([3, 2, 1]);
+    expect(cols.find((c) => c.category === "done")!.name).toBe("Done");
+  });
+  it("moves a task to its project's first status of a category", () => {
+    const boards = new Map([[1, b1]]);
+    const next = moveToCategory(boards, 1, "done")!;
+    expect(next.get(1)!.statuses.find((s) => s.id === 12)!.tasks.map((t) => t.id)).toEqual([1]);
+    expect(moveToCategory(boards, 1, "todo")).toBeNull();
+    expect(moveToCategory(boards, 1, "doing")).toBeNull(); // no doing status in that project
+  });
+});

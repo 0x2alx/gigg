@@ -1,0 +1,352 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  390,
+  844
+ ],
+ "steps": [
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "shot": "m-login"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => { const H = {'Content-Type':'application/json','X-Gigg-CSRF':'1'}; const j = async (m,u,b) => { const r = await fetch('/api/v1'+u,{method:m,headers:H,body:b?JSON.stringify(b):undefined}); return r.json().catch(()=>null); }; const ps = await j('GET','/workspaces/scout/projects'); const p = ps.items[0].id; const a = await j('POST',`/projects/${p}/tasks`,{title:'Mobile parent task with a fairly long title to wrap',priority:3,labels:['ui','mobile'],checklist:['one','two'],description_md:'Some **markdown** text.\\n\\n- a\\n- b'}); await j('POST',`/projects/${p}/tasks`,{title:'Second task',priority:1}); await j('POST',`/tasks/${a.key}/comments`,{body_md:'A comment with @scout'}); return a.key; })()"
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "shot": "m-board"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "click": ".topbar-menu"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "shot": "m-board-menu"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "eval": "document.querySelector('.drawer-backdrop').click(), true"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "!document.querySelector('.drawer-open') && getComputedStyle(document.querySelector('.sidebar')).visibility === 'hidden'",
+   "expect": true
+  },
+  {
+   "click": ".more-menu > button"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "shot": "m-board-more"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "document.querySelector('.card-open').click(), true"
+  },
+  {
+   "wait": "aside.panel"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "shot": "m-panel"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "[...document.querySelectorAll('.page-head .button')].find(b => b.textContent.includes('New task')).click(), true"
+  },
+  {
+   "wait": ".modal"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "m-new-task"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "eval": "(document.querySelector('.more-menu > button').click(), new Promise(r => setTimeout(() => { [...document.querySelectorAll('.menu [role^=menuitem]')].find(b => b.textContent.includes('Schedules')).click(); r(true); }, 200)))"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "shot": "m-schedules"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "eval": "(document.querySelector('.more-menu > button').click(), new Promise(r => setTimeout(() => { [...document.querySelectorAll('.menu [role^=menuitem]')].find(b => b.textContent.includes('Templates')).click(); r(true); }, 200)))"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "shot": "m-templates"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "goto": "/w/scout/table"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-table"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/my"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-my"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/inbox"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-inbox"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/notifications"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-notifications"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/profile"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-profile"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/themes"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-themes"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "eval": "([...document.querySelectorAll('button')].find(x => x.textContent.includes('New theme')).click(), true)"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-theme-editor"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/admin"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-admin"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/admin/workspaces"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-admin-ws"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/admin/workspaces/1"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-admin-ws-detail"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/admin/users"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-admin-users"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/admin/groups"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-admin-groups"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/admin/keys"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-admin-keys"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  },
+  {
+   "goto": "/admin/audit"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "m-admin-audit"
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",
+   "expect": true
+  }
+ ]
+}

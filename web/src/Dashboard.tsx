@@ -1,0 +1,291 @@
+// Dashboard: what the agents' runners did in the last 24 hours, per workspace, against its caps;
+// the pause switch (PAUSE TASKS) and the caps for admins.
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { fmtTime, hasCap } from "./api";
+import { useApp } from "./App";
+import { call } from "./http";
+import { Modal } from "./ui";
+import { HelpButton } from "./help";
+
+export interface RunnerSettings {
+  workspace_id: number;
+  daily_cap: number;
+  night_cap: number;
+  paused_until: number | null;
+  paused_open: boolean;
+  paused_by: number | null;
+  paused_at: number | null;
+  paused: boolean;
+}
+
+export interface RunnerUsage {
+  tasks_24h: number;
+  always_24h: number;
+  optional_24h: number;
+  runs_24h: number;
+  usage_pct_24h: number;
+  usage_pct_7d: number;
+  last_run_at: number | null;
+  cost_usd_7d: number;
+  unmeasured_7d: number;
+}
+
+export interface RunnerState {
+  workspace_id: number;
+  slug: string;
+  name: string;
+  settings: RunnerSettings;
+  usage: RunnerUsage;
+}
+
+export const runnerApi = {
+  list: () => call<{ items: RunnerState[] }>("GET", "/runner"),
+  pause: (workspaces: number[] | undefined, minutes: number) => call<{ items: RunnerState[] }>("POST", "/runner/pause", { ...(workspaces ? { workspaces } : {}), minutes }),
+  resume: (workspaces: number[] | undefined) => call<{ items: RunnerState[] }>("POST", "/runner/resume", workspaces ? { workspaces } : {}),
+  caps: (ws: number, daily_cap: number, night_cap: number) => call<RunnerState>("PATCH", `/workspaces/${ws}/runner`, { daily_cap, night_cap }),
+};
+
+// The pause lengths offered; 0 = until resumed.
+export const PAUSE_CHOICES: { minutes: number; label: string }[] = [
+  { minutes: 60, label: "1 h" },
+  { minutes: 300, label: "5 h" },
+  { minutes: 720, label: "12 h" },
+  { minutes: 1440, label: "24 h" },
+  { minutes: 0, label: "Until I say so" },
+];
+
+// pausedText: "until resumed" or "until <time>".
+export function pausedText(s: Pick<RunnerSettings, "paused_open" | "paused_until">): string {
+  return s.paused_open ? "until resumed" : s.paused_until ? `until ${fmtTime(s.paused_until)}` : "";
+}
+
+// pct: a 0-100 share for a meter (a 0 cap is full).
+export function pct(n: number, cap: number): number {
+  if (cap <= 0) return 100;
+  return Math.max(0, Math.min(100, Math.round((n / cap) * 100)));
+}
+
+export function DashboardPage() {
+  const { me } = useApp();
+  const admin = me.admin;
+  // Pausing: admins, or the pause_runs permission (per workspace).
+  const canPause = (ws: number) => admin || hasCap(me, "pause_runs", ws);
+  const [items, setItems] = useState<RunnerState[] | null>(null);
+  const [err, setErr] = useState("");
+  const [pausing, setPausing] = useState(false);
+  const load = useCallback(() => {
+    runnerApi
+      .list()
+      .then((r) => {
+        setItems(r.items);
+        setErr("");
+      })
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't load the runners."));
+  }, []);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, [load]);
+  const paused = (items ?? []).filter((i) => i.settings.paused);
+  const pausable = (items ?? []).filter((i) => canPause(i.workspace_id));
+  const resumable = paused.filter((i) => canPause(i.workspace_id));
+  const act = (p: Promise<unknown>) =>
+    p.then(load).catch((e: unknown) => setErr(e instanceof Error ? e.message : "That didn't work."));
+
+  return (
+    <div className="dash">
+      <header className="page-head">
+        <div>
+          <h1>Dashboard<HelpButton topic="dashboard" label="Help: the dashboard and agent runs" /></h1>
+          <p className="muted small">Agent task runs in the last 24 hours, per workspace. Always-run tasks run day and night; the others at night, within the usage budget.</p>
+        </div>
+        {pausable.length > 0 && (
+          <button type="button" className="button danger dash-pause" data-tip="Stop agents from starting new tasks, for a while or until resumed. Runs already going finish." onClick={() => setPausing(true)}>
+            ⏸ PAUSE TASKS
+          </button>
+        )}
+      </header>
+      {err && <p className="danger">{err}</p>}
+      {paused.length > 0 && (
+        <div className="banner banner-danger dash-banner" role="status">
+          <strong>⏸ Paused:</strong>{" "}
+          {paused.map((p, i) => (
+            <span key={p.workspace_id}>
+              {i > 0 && ", "}
+              {p.name} {pausedText(p.settings)}
+            </span>
+          ))}
+          {resumable.length > 0 && (
+            <button type="button" className="button secondary small" onClick={() => act(runnerApi.resume(resumable.map((p) => p.workspace_id)))}>
+              ▶ Resume {resumable.length > 1 ? "all" : ""}
+            </button>
+          )}
+        </div>
+      )}
+      {items === null && !err && <p className="muted">Loading…</p>}
+      <div className="dash-cards">
+        {(items ?? []).map((it) => (
+          <RunnerCard key={it.workspace_id} it={it} admin={admin} canPause={canPause(it.workspace_id)} onAct={act} />
+        ))}
+      </div>
+      {pausing && pausable.length > 0 && (
+        <PauseModal
+          items={pausable}
+          onClose={() => setPausing(false)}
+          onPause={(ws, minutes) => {
+            setPausing(false);
+            act(runnerApi.pause(ws, minutes));
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function Meter({ label, n, cap, tip }: { label: string; n: number; cap: number; tip: string }) {
+  const p = pct(n, cap);
+  return (
+    <div className="dash-meter">
+      <div className="dash-meter-head">
+        <span data-tip={tip}>{label}</span>
+        <span className={"small" + (n >= cap ? " danger" : " muted")}>
+          {n} / {cap}
+        </span>
+      </div>
+      <div className="dash-bar" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={cap} aria-valuenow={n}>
+        <span className={"dash-bar-fill" + (n >= cap ? " full" : "")} style={{ width: `${p}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: boolean; canPause: boolean; onAct: (p: Promise<unknown>) => void }) {
+  const { settings: s, usage: u } = it;
+  const [editing, setEditing] = useState(false);
+  const [daily, setDaily] = useState(s.daily_cap);
+  const [night, setNight] = useState(s.night_cap);
+  const save = (e: FormEvent) => {
+    e.preventDefault();
+    setEditing(false);
+    onAct(runnerApi.caps(it.workspace_id, daily, night));
+  };
+  return (
+    <section className={"card dash-card" + (s.paused ? " paused" : "")} aria-label={`Runner of ${it.name}`}>
+      <div className="dash-card-head">
+        <strong>{it.name}</strong>
+        {s.paused ? (
+          <span className="pill pill-danger" data-tip="No new task runs start in this workspace">
+            ⏸ paused {pausedText(s)}
+          </span>
+        ) : (
+          <span className="pill pill-muted" data-tip="The agent's runner may start tasks here (within the caps)">
+            running
+          </span>
+        )}
+        <span className="grow" />
+        {canPause && s.paused && (
+          <button type="button" className="button secondary small" onClick={() => onAct(runnerApi.resume([it.workspace_id]))}>
+            ▶ Resume
+          </button>
+        )}
+      </div>
+      <Meter label="Tasks, last 24 h" n={u.tasks_24h} cap={s.daily_cap} tip="Different tasks started in the last 24 hours, against the daily cap (a task that goes on counts once)" />
+      <Meter
+        label="Budget-dependent (night)"
+        n={u.optional_24h}
+        cap={s.night_cap}
+        tip="Tasks that aren't always-run: they only run when the usage budget allows (at night), against this cap"
+      />
+      <dl className="dash-facts">
+        <dt data-tip="Always-run tasks run whatever the usage budget, day or night (cron-like tasks)">Always-run</dt>
+        <dd>{u.always_24h} task{u.always_24h === 1 ? "" : "s"}</dd>
+        <dt data-tip="Agent sessions started or resumed in the last 24 hours (one task can have several)">Runs</dt>
+        <dd>{u.runs_24h}</dd>
+        <dt>Weekly usage</dt>
+        <dd title="Points of the subscription's weekly meter measured around this workspace's runs (shared meter: approximate)">
+          {u.usage_pct_24h.toFixed(1)}% today · {u.usage_pct_7d.toFixed(1)}% in 7 days
+          {u.unmeasured_7d > 0 && <span className="muted small"> ({u.unmeasured_7d} unmeasured)</span>}
+        </dd>
+        <dt data-tip="What the runs cost in the last 7 days, as the agent reports it (API-equivalent USD)">Cost (7 days)</dt>
+        <dd>${u.cost_usd_7d.toFixed(2)}</dd>
+        <dt>Last run</dt>
+        <dd>{u.last_run_at ? fmtTime(u.last_run_at) : "never"}</dd>
+      </dl>
+      {admin &&
+        (editing ? (
+          <form className="row dash-caps" onSubmit={save}>
+            <label>
+              Tasks / 24 h
+              <input type="number" min={0} max={200} value={daily} onChange={(e) => setDaily(Number(e.target.value))} />
+            </label>
+            <label>
+              of which night
+              <input type="number" min={0} max={200} value={night} onChange={(e) => setNight(Number(e.target.value))} />
+            </label>
+            <button type="submit" className="button small">
+              Save
+            </button>
+            <button type="button" className="button secondary small" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <button type="button" className="link small" data-tip="Admins: the daily task cap and how many of those may depend on the budget" onClick={() => setEditing(true)}>
+            Change caps
+          </button>
+        ))}
+    </section>
+  );
+}
+
+function PauseModal({ items, onClose, onPause }: { items: RunnerState[]; onClose: () => void; onPause: (ws: number[] | undefined, minutes: number) => void }) {
+  const [picked, setPicked] = useState<Set<number>>(new Set(items.map((i) => i.workspace_id)));
+  const [minutes, setMinutes] = useState(1440);
+  const all = picked.size === items.length;
+  const toggle = (id: number) =>
+    setPicked((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  return (
+    <Modal title="Pause task runs" onClose={onClose}>
+      <div className="pause">
+        <p className="muted small">The runners keep firing but start no new task while paused, always-run ones included. A run already going finishes its current step.</p>
+        <button type="button" className="button danger pause-all" onClick={() => onPause(undefined, 1440)}>
+          ⏸ Pause ALL for 24 h
+        </button>
+        <fieldset className="pause-ws">
+          <legend className="field-label">Or choose: workspaces</legend>
+          {items.map((i) => (
+            <label key={i.workspace_id} className="admin-check">
+              <input type="checkbox" checked={picked.has(i.workspace_id)} onChange={() => toggle(i.workspace_id)} />
+              <span>{i.name}</span>
+              {i.settings.paused && <span className="pill pill-danger small">paused {pausedText(i.settings)}</span>}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset className="pause-len">
+          <legend className="field-label">for</legend>
+          <div className="admin-seg" role="radiogroup" aria-label="How long">
+            {PAUSE_CHOICES.map((c) => (
+              <button key={c.minutes} type="button" role="radio" aria-checked={minutes === c.minutes} className={"admin-seg-btn" + (minutes === c.minutes ? " on" : "")} onClick={() => setMinutes(c.minutes)}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <div className="row end">
+          <button type="button" className="button secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="button danger" disabled={picked.size === 0} onClick={() => onPause(all ? undefined : [...picked], minutes)}>
+            ⏸ Pause {all ? "all" : picked.size}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
