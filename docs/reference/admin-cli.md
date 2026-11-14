@@ -113,8 +113,8 @@ gigg admin workspace-add acme "Acme"
 gigg admin workspace-owner <workspace> <username|none>
 ```
 
-Sets or clears the workspace's owner: the user whose picture the sidebar shows next to it. Ownership
-grants no access.
+Sets or clears the workspace's owner: the user whose picture marks the workspace on its chips (board
+filters, task header, tables, dashboard). Ownership grants no access.
 
 ```sh
 gigg admin workspace-owner acme sam
@@ -127,7 +127,8 @@ gigg admin color user|workspace <username|workspace> <#RRGGBB|none>
 ```
 
 Sets or clears the colour of a user or a workspace. The colour tints everything that stands for them:
-workspace chips and badges, the sidebar, avatar rings and the initials of a user without a picture.
+workspace chips and badges (board filters, cards, the task header, tables, the dashboard), avatar rings
+and the initials of a user without a picture.
 `none` goes back to the default colour derived from the name.
 
 ```sh

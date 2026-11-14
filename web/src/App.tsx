@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent as ReactFocusEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { setMentionUsers } from "./markdown";
 import { Link, Redirect, Route, Switch, useLocation, useSearch } from "wouter";
 import { api, ApiError, type Me, type Project, type ThemeState, type User } from "./api";
@@ -131,10 +131,14 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   // phones: the sidebar is a drawer behind a top bar; it closes on navigation, a tap outside or Esc
   const narrow = useNarrow();
   const [drawer, setDrawer] = useState(false);
+  const prefSaves = useRef(new Map<string, Promise<unknown>>());
   // peek: a collapsed sidebar open for as long as the pointer (or the keyboard focus) is on it
   const [peek, setPeek] = useState(false);
   const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(peekTimer.current), []);
+  useEffect(() => {
+    if (narrow) setPeek(false); // back on a wide screen, the rail starts folded
+  }, [narrow]);
   useEffect(() => setDrawer(false), [loc, narrow]);
   useEffect(() => {
     if (!drawer) return;
@@ -266,7 +270,10 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
       else next[key] = value;
       return next;
     });
-    api.patchMe({ preferences: { [key]: gone ? null : value } }).catch(() => undefined);
+    // one key's saves go out one after another, so the last one made is the one the server keeps
+    const prev = prefSaves.current.get(key) ?? Promise.resolve();
+    const next = prev.then(() => api.patchMe({ preferences: { [key]: gone ? null : value } })).catch(() => undefined);
+    prefSaves.current.set(key, next);
   }, []);
 
   const ctx = useMemo<AppCtx | null>(
@@ -282,13 +289,21 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
     clearTimeout(peekTimer.current);
     peekTimer.current = setTimeout(() => setPeek(true), 120);
   };
+  // only a real mouse peeks (a tap on a touch screen would open it over the page it just went to), and
+  // only keyboard focus does (focus put back by a dialog or a popover isn't someone looking at the menu)
+  const pointerIn = (e: ReactPointerEvent<HTMLElement>) => {
+    if (e.pointerType === "mouse") peekIn();
+  };
+  const focusIn = (e: ReactFocusEvent<HTMLElement>) => {
+    if (e.target instanceof HTMLElement && e.target.matches(":focus-visible") && !modalOpen()) peekIn();
+  };
   const peekOut = () => {
     clearTimeout(peekTimer.current);
     peekTimer.current = setTimeout(() => setPeek(false), 220);
   };
   // the pointer leaving doesn't fold it while the keyboard is working in it (a mouse click leaves focus
   // there too, but not :focus-visible); Esc folds it either way
-  const pointerOut = (e: ReactMouseEvent<HTMLElement>) => {
+  const pointerOut = (e: ReactPointerEvent<HTMLElement>) => {
     const f = document.activeElement;
     if (f && e.currentTarget.contains(f) && f.matches(":focus-visible")) return;
     peekOut();
@@ -308,14 +323,16 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
           className="sidebar"
           aria-label="Navigation"
           inert={narrow && !drawer ? true : undefined}
-          onMouseEnter={peekIn}
-          onMouseLeave={pointerOut}
-          onFocus={peekIn}
+          onPointerEnter={pointerIn}
+          onPointerLeave={pointerOut}
+          onFocus={focusIn}
           onBlur={(e) => {
             if (!e.currentTarget.contains(e.relatedTarget as Node | null)) peekOut();
           }}
           onKeyDown={(e) => {
             if (e.key === "Escape" && peek) {
+              e.preventDefault(); // the task panel closes on an Esc nobody else handled
+              e.stopPropagation();
               clearTimeout(peekTimer.current);
               setPeek(false);
             }
@@ -482,4 +499,9 @@ function NavLink({ href, children, prefix, icon, label, collapsed, title }: {
       {children}
     </Link>
   );
+}
+
+// modalOpen: a dialog is up (focus moving behind it, by Tab, isn't someone reaching for the menu)
+function modalOpen(): boolean {
+  return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
 }

@@ -25,7 +25,7 @@ const adminUsage = `gigg admin: first setup and recovery, working directly on th
   gigg admin user-add <username> [-agent] [-admin] [-name "Display Name"]
   gigg admin passwd <username> [-file F]       new password from the terminal, stdin, or a file
   gigg admin workspace-add <slug> <name>       the owner defaults to the user named <slug>, if any
-  gigg admin workspace-owner <workspace> <username|none>   whose picture the sidebar shows next to it
+  gigg admin workspace-owner <workspace> <username|none>   whose picture marks the workspace's chips
   gigg admin color user|workspace <username|workspace> <#RRGGBB|none>   its colour on chips, badges, avatars
   gigg admin member <workspace> <username> <viewer|commenter|member|manager|none>
   gigg admin access <username> <workspace|all> <preset|none> [permission=allow|deny ...]

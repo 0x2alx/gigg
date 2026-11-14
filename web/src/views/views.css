@@ -12,7 +12,7 @@
 /* filters */
 /* filters: one row of 30px controls, no box (like the board's toolbar) */
 .vw-filters { display: flex; flex-wrap: wrap; gap: var(--sp-4); align-items: center; margin-bottom: var(--sp-5); }
-.vw-filters select { height: var(--ctl-h); padding: 0 0.6rem; }
+.vw-filters select { height: var(--ctl-h); padding: 0 1.9rem 0 0.6rem; }
 .vw-search { flex: 0 1 16.5rem; min-width: 11rem; width: auto; height: var(--ctl-h); }
 
 /* bulk bar */
@@ -25,7 +25,7 @@
 .vw-bulk .count { margin-left: 0; color: var(--text); font-weight: var(--weight-strong); background: var(--selected); }
 .vw-bulk-label { font-size: var(--fs-base); margin-right: var(--sp-3); }
 .vw-act { display: inline-flex; gap: var(--sp-3); align-items: center; }
-.vw-act select { font-size: var(--fs-sm); min-height: 1.67rem; padding: 0 0.4rem; }
+.vw-act select { font-size: var(--fs-sm); min-height: 1.67rem; padding: 0 1.7rem 0 0.4rem; background-position: right 0.85rem center, right 0.52rem center; }
 .vw-bulk-input { width: 9rem; font-size: var(--fs-sm); min-height: 1.67rem; padding: 0 0.45rem; }
 .vw-bulk-clear { margin-left: auto; }
 .button.vw-danger-solid { background: var(--danger); color: var(--on-danger); }

@@ -110,6 +110,7 @@ function BellPopover({ anchor, onClose }: { anchor: HTMLElement | null; onClose:
     const ro = new ResizeObserver(place);
     ro.observe(el);
     const side = anchor.closest(".sidebar");
+    if (side) ro.observe(side); // a peeking sidebar widens and folds back: the popover follows its edge
     window.addEventListener("resize", place);
     side?.addEventListener("scroll", place);
     return () => {

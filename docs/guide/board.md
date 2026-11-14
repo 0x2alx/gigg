@@ -85,7 +85,7 @@ The toolbar above the columns narrows the board, in one row:
 
 Under the toolbar, small chips scope the board: **Workspaces** and **Projects**. Click a chip to show only that one; click more chips to add them. **All workspaces** / **All projects** clears the selection. The workspace chips show the workspace's owner picture and colour.
 
-**Filters** at the start of the toolbar folds the filters away: what stays is one line with the filters that are on, each as a chip with **×** to remove it (and **Clear all** when there are several), or just the **Filters** button with nothing set. The number on the button counts the filters that are on. The board remembers whether you folded them; on a phone they start folded.
+**Filters** at the start of the toolbar folds the filters away: what stays is one line with the filters that are on, each as a chip with **×** to remove it (and **Clear all** when there are several), or just the **Filters** button with nothing set. While folded, a number on the button counts the filters that are on. The board remembers whether you folded them; on a phone they start folded.
 
 The filters live in the page address (for example `/board?ws=acme&pr=3`), so you can bookmark or share a filtered board. The board also remembers the last filter you used.
 
@@ -97,7 +97,7 @@ Next to the title (and its **?** help button) the header has three things:
 - **+ New task**: with one project in view it opens the form right away; otherwise it first asks which project.
 - **⋯** (More actions): the less frequent actions.
   - **Recurring**, **Schedules**, **Templates**: see [Recurring tasks](recurring.md).
-  - **Archive done**: archives the tasks in Done (all of them, or those done for 7 or 30+ days). With several projects in view it lists them, all ticked: untick the ones to leave alone, or use **All projects in view**. Archived tasks leave the board and lists but stay searchable, and you can unarchive them from the task.
+  - **Archive done**: archives the tasks in Done (all of them, or those done for 7 or 30+ days). With several projects in view it lists them (ticked when there are up to three, unticked when more): tick the ones to clean up, or use **All projects in view**. It archives every done task of those projects; the assignee, label, priority and search filters don't apply. Archived tasks leave the board and lists but stay searchable, and you can unarchive them from the task.
   - **Trash**: the deleted tasks of the projects in view, most recently changed first, each with **Restore**, which puts it back in its column. Restoring needs the *Delete tasks* permission.
 
 ![The trash (Daywalker theme)](../images/trash-day.png)

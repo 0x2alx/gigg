@@ -82,7 +82,7 @@ a.admin-name:hover { text-decoration: underline; }
 .admin-list-row { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; min-height: 2.5rem; padding: var(--sp-2) var(--sp-2); border-top: 1px solid var(--line); font-size: var(--fs-base); }
 .admin-list > li:first-child.admin-list-row, .admin-list > li:first-child > .admin-list-row { border-top: 0; }
 .admin-list-block { display: flex; flex-direction: column; }
-.admin-list-row select { min-height: 1.67rem; padding: 0 0.4rem; font-size: var(--fs-sm); }
+.admin-list-row select { min-height: 1.67rem; padding: 0 1.7rem 0 0.4rem; font-size: var(--fs-sm); background-position: right 0.85rem center, right 0.52rem center; }
 .admin-add { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--line-strong); flex-wrap: wrap; }
 .admin-add select { width: 100%; }
 .admin-key-input { width: 6rem; }

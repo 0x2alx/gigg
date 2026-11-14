@@ -50,7 +50,7 @@ export const BUILTINS: Theme[] = [
     font: "Oxanium", fontWeight: "Medium", textScalePct: 90, cornerDp: 10, borderDp: 1,
     description: "Deep navy with a cyan accent." },
   { id: "carbon", name: "Carbon", dark: true, background: "#141414", surface: "#2B2B2B", surfaceVariant: "#363636",
-    border: "#404040", accent: "#EE7A64", onAccent: "#1E0B06", text: "#EDEDED", mutedText: "#A3A3A3", danger: "#F0607A", secondary: null,
+    border: "#404040", accent: "#EE7A64", onAccent: "#1E0B06", text: "#EDEDED", mutedText: "#A3A3A3", danger: "#F26A82", secondary: null,
     font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 8, borderDp: 1,
     description: "Neutral charcoal greys with a coral accent; dense, an ops-console feel." },
 ];

@@ -87,7 +87,7 @@ export function WorkspaceChip({ ws, owner }: { ws: { slug: string; name: string;
   return (
     <span className="pill pill-wsc ws-chip" style={{ "--c": c } as CSSProperties} title={`Workspace: ${ws.name}`}>
       {owner ? <Avatar user={owner} size="xs" tip={`Workspace: ${ws.name}`} /> : <span className="dot" style={{ background: c }} aria-hidden="true" />}
-      {ws.name}
+      <span className="ws-chip-name">{ws.name}</span>
     </span>
   );
 }
@@ -146,19 +146,23 @@ export function UserBadge({ user }: { user: Pick<User, "username" | "display_nam
 
 export function Modal({ title, onClose, children, wide, xl, help }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; xl?: boolean; help?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  // onClose through a ref: the focus setup runs once per dialog, not on every render of a caller that
+  // passes a new function each time (that sent the focus back to the first button at each click)
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     (ref.current?.querySelector<HTMLElement>("[autofocus], [data-autofocus]") ??
       ref.current?.querySelector<HTMLElement>("input, textarea, select, button:not(.help-button)"))?.focus();
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") closeRef.current();
     };
     document.addEventListener("keydown", esc);
     return () => {
       document.removeEventListener("keydown", esc);
       prev?.focus();
     };
-  }, [onClose]);
+  }, []);
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={"modal" + (xl ? " modal-xl" : wide ? " modal-wide" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>

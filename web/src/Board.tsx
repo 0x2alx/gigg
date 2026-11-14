@@ -243,8 +243,9 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const archivable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "archive_tasks", x.ws.id));
   const action = (what: ProjectAction | "schedules") => {
     if (what === "archive") {
-      // one dialog for any number of projects: all of those in view are ticked to start with
-      setArchiveDone(archivable.map((x) => x.project.id));
+      // one dialog for any number of projects: up to three in view start ticked; more start unticked, so
+      // one stray click can't archive across every workspace ("All projects in view" is one tick away)
+      setArchiveDone(archivable.length <= 3 ? archivable.map((x) => x.project.id) : []);
     } else if (what === "schedules") {
       if (wsInScope.length === 1) setTimings(wsInScope[0]!.id);
       else setPick("schedules");
@@ -1096,6 +1097,10 @@ function ArchiveDoneModal({ options, initial, onClose, onDone }: {
   // only projects still on offer count (the board's projects can change while the dialog is open)
   const picked = options.map((o) => o.project.id).filter((id) => ticked.includes(id));
   const all = options.length > 0 && picked.length === options.length;
+  const allBox = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (allBox.current) allBox.current.indeterminate = picked.length > 0 && !all;
+  });
   const toggle = (id: number) => setTicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const close = () => {
     if (busy) return; // the loop finishes first
@@ -1122,7 +1127,10 @@ function ArchiveDoneModal({ options, initial, onClose, onDone }: {
   };
   return (
     <Modal title="Archive done tasks" onClose={close}>
-      <p className="small">Archived tasks leave the board and lists; they stay searchable and can be unarchived from the task.</p>
+      <p className="small">
+        Archived tasks leave the board and lists; they stay searchable and can be unarchived from the task. Every done task of the projects ticked is
+        archived: the assignee, label, priority and search filters don't apply here.
+      </p>
       {options.length === 0 ? (
         <p className="muted small">No project in view allows archiving.</p>
       ) : (
@@ -1130,7 +1138,7 @@ function ArchiveDoneModal({ options, initial, onClose, onDone }: {
           <fieldset className="archive-pick">
             <legend className="small muted">Projects</legend>
             <label className="archive-row archive-all">
-              <input type="checkbox" checked={all} onChange={() => setTicked(all ? [] : options.map((o) => o.project.id))} />
+              <input ref={allBox} type="checkbox" checked={all} onChange={() => setTicked(all ? [] : options.map((o) => o.project.id))} />
               <span>All projects in view ({options.length})</span>
             </label>
             {options.map(({ ws, project }) => (
