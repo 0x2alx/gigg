@@ -8,8 +8,8 @@ import { api } from "./api";
 import { useApp } from "./App";
 import { countsChange, onActivity } from "./live";
 import { badgeCount, kindInfo, notificationsApi, notificationText, placePopover, type Notification, type Placement } from "./notifications";
-import { readableOn } from "./theme";
 import { Avatar } from "./ui";
+import { Icon } from "./icons";
 import { errMsg, relTime, taskHref } from "./views/viewsApi";
 import { HelpButton } from "./help";
 
@@ -53,7 +53,7 @@ export function TopBell() {
   const label = unread ? `Notifications, ${unread} unread` : "Notifications";
   return (
     <Link href="/notifications" className="icon-button topbar-bell" aria-label={label} title={label}>
-      🔔
+      <Icon name="bell" />
       {unread > 0 && <span className="count count-alert">{badgeCount(unread)}</span>}
     </Link>
   );
@@ -83,7 +83,7 @@ export function BellButton({ collapsed }: { collapsed: boolean }) {
         aria-label={collapsed ? label : undefined}
       >
         <span className="nav-icon" aria-hidden="true">
-          🔔
+          <Icon name="bell" />
         </span>
         {!collapsed && <span className="nav-label">Notifications</span>}
         {unread > 0 && <span className="count count-alert">{badgeCount(unread)}</span>}
@@ -251,7 +251,7 @@ function NotificationList({ compact, onNavigate }: { compact?: boolean; onNaviga
                 <span className="notif-who">{actor ? <Avatar user={actor} /> : <span className="avatar notif-sys" aria-hidden="true">{k.icon}</span>}</span>
                 <span className="notif-body">
                   <span className="notif-line">
-                    <span className="pill" style={{ background: k.color, color: readableOn(k.color), borderColor: k.color }}>
+                    <span className="pill" style={{ "--c": k.color } as CSSProperties}>
                       {k.icon} {k.label}
                     </span>
                     {n.task_key && <span className="pill pill-key">{n.task_key}</span>}

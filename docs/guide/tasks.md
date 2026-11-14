@@ -19,12 +19,13 @@ Click **New task** on the board. You can also press **Ctrl+K** (⌘K on a Mac) a
 
 ## The task panel
 
-Click a card to open its panel. The **⤢** button widens it, and **✕** or Esc closes it. Every field saves when you change it.
+Click a card to open its panel. The expand button (two diagonal arrows, top right) widens it, and the close button (×) or Esc closes it. Every field saves when you change it.
 
 ![A task's panel (Daywalker theme)](../images/task-panel-day.png)
 
 - **Properties**: workspace, project (move it to another project), status, priority, agent run settings, assignees, dates and the time window, labels, colour.
 - **Description**: click to edit. Markdown, with checkboxes you can tick in place.
+- **Checklist**, **Subtasks**, **Dependencies** and **Fields** are folding sections (click a section's title to fold it):
 - **Checklist**: add, tick, reorder and remove items.
 - **Subtasks**: tasks whose parent is this one. Their progress shows on the parent's card.
 - **Dependencies**: "blocks", "blocked by" and "relates to" links between tasks. A blocked task shows 🔒, and agents leave it alone until its blockers are done.

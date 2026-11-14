@@ -6,11 +6,11 @@ The **Inbox** lists every task in a Waiting status across the workspaces you can
 
 ![The inbox (Daywalker theme)](../images/inbox-day.png)
 
-The sidebar shows how many tasks are waiting.
+The sidebar shows how many tasks are waiting, as a small tinted number beside **Inbox**.
 
 ## Notifications
 
-The bell (🔔) collects what happened to you:
+The bell (**Notifications** in the sidebar) collects what happened to you:
 
 | Kind | When |
 |---|---|
@@ -24,8 +24,8 @@ Click one to open the task. **Mark all read** clears the badge. The full list is
 
 ## Live updates
 
-The dot at the bottom of the sidebar shows the live connection to the server:
+The small dot at the bottom of the sidebar, beside **Log out**, shows the live connection to the server (hover it for the details):
 
-- **live**: changes by others, people or agents, appear within a second or two.
-- **connecting**: reconnecting after a restart or a network blip.
-- **offline**: no connection, still retrying. Pages work, but only update when you act or reload.
+- **Live** (green): changes by others, people or agents, appear within a second or two.
+- **Connecting** (amber): reconnecting after a restart or a network blip.
+- **Offline** (grey): no connection, still retrying. Pages work, but only update when you act or reload.

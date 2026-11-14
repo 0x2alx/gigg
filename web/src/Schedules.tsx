@@ -7,6 +7,7 @@ import { RepeatFields } from "./RepeatFields";
 import { defaultRepeat, describeRule, localTZ, repeatFromRule, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
 import { Modal } from "./ui";
 import { HelpButton } from "./help";
+import { Icon } from "./icons";
 
 // scheduleBody: a schedule's timing from the repeat form.
 export function scheduleBody(name: string, s: RepeatState): ScheduleBody {
@@ -68,7 +69,7 @@ export function SchedulesModal({ ws, canWrite, onClose, onChanged }: {
   }
   const tz = localTZ();
   return (
-    <Modal title="⏱ Schedules" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring tasks" />}>
+    <Modal title="Schedules" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring tasks" />}>
       <p className="muted small">When recurring tasks happen. Pair one with a template in ⟳ Recurring (or with Repeat in a new task); changing a schedule moves every recurring task on it.</p>
       {err && (
         <p className="danger" role="alert">
@@ -82,7 +83,7 @@ export function SchedulesModal({ ws, canWrite, onClose, onChanged }: {
           {items.map((s) => (
             <li key={s.id} className="schedule">
               <div className="schedule-top">
-                <span className="pill pill-accent">⏱</span>
+                <span className="pill pill-accent"><Icon name="clock" /></span>
                 <strong className="schedule-title">{s.name}</strong>
                 {s.tz !== tz && <span className="pill pill-ws">{s.tz}</span>}
               </div>
@@ -112,7 +113,7 @@ export function SchedulesModal({ ws, canWrite, onClose, onChanged }: {
                   ) : (
                     <>
                       <button type="button" className="button secondary small" onClick={() => setEditing(s)} aria-label={`Edit ${s.name}`}>
-                        ✎ Edit
+                        <Icon name="pencil" /> Edit
                       </button>
                       <button
                         type="button"
@@ -122,7 +123,7 @@ export function SchedulesModal({ ws, canWrite, onClose, onChanged }: {
                         title={s.uses > 0 ? "Recurring tasks use this schedule: delete them or give them another schedule first" : undefined}
                         aria-label={`Delete ${s.name}`}
                       >
-                        🗑 Delete
+                        <Icon name="trash" /> Delete
                       </button>
                     </>
                   )}

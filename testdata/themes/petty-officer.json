@@ -12,8 +12,8 @@
     "danger": "#FF5C52",
     "secondary": "#3E6B3A",
     "font": "Michroma",
-    "fontWeight": "Bold",
-    "textScalePct": 100,
+    "fontWeight": "Medium",
+    "textScalePct": 90,
     "cornerDp": 6,
     "borderDp": 1,
     "widget": {

@@ -1,11 +1,12 @@
 // My tasks: everything assigned to me across my workspaces, grouped by when it's due.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "wouter";
 import { type Task } from "../api";
 import { fmtDue } from "../dates";
 import { useApp } from "../App";
 import { CATEGORY_COLOR, colorFor } from "../theme";
-import { Pill, PriorityBadge, StatusBadge } from "../ui";
+import { PriorityIcon, StatusDot } from "../ui";
+import { Icon } from "../icons";
 import { BUCKETS, dueBucket, errMsg, isClosed, taskHref, tasksAcross, type DueBucket } from "./viewsApi";
 import "./views.css";
 import { HelpButton } from "../help";
@@ -64,7 +65,7 @@ export function MyTasks() {
             Include done
           </label>
           <button type="button" className="button secondary small" onClick={load}>
-            ↻ Refresh
+            <Icon name="refresh" /> Refresh
           </button>
         </div>
       </header>
@@ -78,7 +79,7 @@ export function MyTasks() {
       {items !== null && total === 0 && (
         <div className="card vw-empty-card">
           <div className="vw-empty-icon" aria-hidden="true">
-            ✓
+            <Icon name="check" />
           </div>
           <div>Nothing assigned to you{includeDone ? "" : " that's still open"}.</div>
         </div>
@@ -101,19 +102,20 @@ export function MyTasks() {
                 const late = b.id === "overdue" && !isClosed(t.status_category);
                 return (
                   <li key={t.id}>
-                    <Link href={taskHref(tree, t)} className="vw-list-row" style={t.color ? { borderLeftColor: t.color } : undefined}>
-                      <span className="pill pill-key">{t.key}</span>
+                    <Link href={taskHref(tree, t)} className="vw-list-row" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
+                      <span className="vw-key">{t.key}</span>
                       <span className={"vw-list-title" + (isClosed(t.status_category) ? " vw-closed" : "")}>{t.title}</span>
                       <span className="vw-list-meta">
-                        {w && tree.length > 1 && <span className="pill pill-ws">{w.name}</span>}
+                        {w && tree.length > 1 && <span className="vw-meta-text">{w.name}</span>}
                         {p && (
-                          <Pill color={colorFor(p.key, p.color)} title={p.name}>
+                          <span className="proj-tag" title={p.name}>
+                            <span className="dot" style={{ background: colorFor(p.key, p.color) }} aria-hidden="true" />
                             {p.name}
-                          </Pill>
+                          </span>
                         )}
-                        <StatusBadge name={t.status_name} category={t.status_category} />
-                        <PriorityBadge priority={t.priority} />
-                        {t.due_at && <span className={"pill " + (late ? "pill-danger" : "pill-muted")}>⏱ {fmtDue(t.due_at)}</span>}
+                        <StatusDot name={t.status_name} category={t.status_category} />
+                        <PriorityIcon priority={t.priority} />
+                        {t.due_at && <span className={"vw-due" + (late ? " overdue" : "")}>{fmtDue(t.due_at)}</span>}
                       </span>
                     </Link>
                   </li>

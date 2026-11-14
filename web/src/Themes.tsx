@@ -1,7 +1,7 @@
 // The theme screen: gallery, editor with a live preview,
 // colour dialog, import (anything the format accepts, JSON found inside prose), Copy JSON, "make one
 // with AI". Themes are saved on the account (server-sanitised); the selection follows the user.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "./api";
 import { useApp, toTheme } from "./App";
 import {
@@ -10,6 +10,7 @@ import {
 } from "./theme";
 import { Modal } from "./ui";
 import { HelpButton } from "./help";
+import { Icon } from "./icons";
 
 function useToast(): [string, (m: string) => void] {
   const [msg, setMsg] = useState("");
@@ -55,13 +56,13 @@ export function ThemesPage() {
 
   const selected = themes.custom.find((c) => c.id === themes.selectedId) ?? findTheme(themes.selectedId) ?? themes.active;
   const customActions = (t: Theme): CardAction[] => [
-    { icon: "✎", label: "Edit", run: () => setEditing(t) },
-    { icon: "⧉", label: "Duplicate", run: () => duplicate(t) },
+    { icon: <Icon name="pencil" />, label: "Edit", run: () => setEditing(t) },
+    { icon: <Icon name="copy" />, label: "Duplicate", run: () => duplicate(t) },
     { icon: "{ }", label: "Copy JSON", run: () => copy(t) },
-    { icon: "🗑", label: "Delete", run: () => void remove(t), danger: true },
+    { icon: <Icon name="trash" />, label: "Delete", run: () => void remove(t), danger: true },
   ];
   const builtinActions = (t: Theme): CardAction[] => [
-    { icon: "⧉", label: "Duplicate", run: () => duplicate(t) },
+    { icon: <Icon name="copy" />, label: "Duplicate", run: () => duplicate(t) },
     { icon: "{ }", label: "Copy JSON", run: () => copy(t) },
   ];
 
@@ -171,7 +172,7 @@ function fontStack(font: string): string {
 }
 
 interface CardAction {
-  icon: string;
+  icon: ReactNode;
   label: string;
   run: () => void;
   danger?: boolean;
@@ -267,7 +268,7 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
     <div className="theme-editor">
       <div className="editor-bar">
         <button type="button" className="button secondary" onClick={onCancel}>
-          ✕ Cancel
+          <Icon name="x" /> Cancel
         </button>
         <h1>{initial.id ? `Edit ${initial.name}` : "New theme"}</h1>
         <button type="button" className="button" onClick={() => void save()}>

@@ -38,7 +38,7 @@ export function InboxPage() {
           <article key={it.task.id} className="card inbox-item">
             <div className="inbox-head">
               <Link href={`/board/p/${it.task.project_id}/t/${it.task.key}`} className="inbox-title">
-                <span className="pill pill-key">{it.task.key}</span> {it.task.title}
+                <span className="inbox-key">{it.task.key}</span> {it.task.title}
               </Link>
               <div className="chips">
                 <span className="pill pill-ws">{it.workspace}</span>

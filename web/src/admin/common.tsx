@@ -8,11 +8,11 @@ import "./admin.css";
 import { HelpButton } from "../help";
 
 const TABS = [
-  { href: "/workspaces", label: "Workspaces", icon: "▦" },
-  { href: "/users", label: "Users", icon: "☺" },
-  { href: "/groups", label: "Groups", icon: "⛭" },
-  { href: "/keys", label: "Keys", icon: "⚿" },
-  { href: "/audit", label: "Audit", icon: "☰" },
+  { href: "/workspaces", label: "Workspaces", icon: "layers" },
+  { href: "/users", label: "Users", icon: "users" },
+  { href: "/groups", label: "Groups", icon: "shield" },
+  { href: "/keys", label: "Keys", icon: "key" },
+  { href: "/audit", label: "Audit", icon: "list" },
 ];
 
 export const ADMIN_TABS = TABS;

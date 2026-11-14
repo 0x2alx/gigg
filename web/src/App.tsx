@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { setMentionUsers } from "./markdown";
 import { Link, Redirect, Route, Switch, useLocation, useSearch } from "wouter";
 import { api, ApiError, type Me, type Project, type ThemeState, type User } from "./api";
@@ -19,6 +19,7 @@ import { BUILTINS, CATEGORY_COLOR, PRIORITY_COLOR, applyTheme, findTheme, initia
 import { LogoMark } from "./Logo";
 import { useNarrow } from "./narrow";
 import { Avatar } from "./ui";
+import { Icon } from "./icons";
 import { setPreferredTZ } from "./recurrence";
 
 export interface WorkspaceTree {
@@ -283,7 +284,7 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             </Link>
             {narrow ? (
               <button type="button" className="icon-button collapse" onClick={() => setDrawer(false)} aria-label="Close the menu">
-                ✕
+                <Icon name="x" />
               </button>
             ) : (
               <button
@@ -293,18 +294,18 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
                 aria-label={collapsed ? "Open the menu" : "Close the menu"}
                 aria-expanded={!collapsed}
               >
-                {collapsed ? "»" : "«"}
+                <Icon name="sidebar" />
               </button>
             )}
           </div>
           <nav>
-            <NavLink href="/board" icon="▦" label="Board" collapsed={collapsed} />
-            <NavLink href="/dashboard" icon="◫" label="Dashboard" collapsed={collapsed} />
-            <NavLink href="/inbox" icon="✉" label="Inbox" collapsed={collapsed}>
+            <NavLink href="/board" icon={<Icon name="board" />} label="Board" collapsed={collapsed} />
+            <NavLink href="/dashboard" icon={<Icon name="dashboard" />} label="Dashboard" collapsed={collapsed} />
+            <NavLink href="/inbox" icon={<Icon name="inbox" />} label="Inbox" collapsed={collapsed}>
               {inboxCount > 0 && <span className="count count-alert">{inboxCount}</span>}
             </NavLink>
             <BellButton collapsed={collapsed} />
-            <NavLink href="/my" icon="☑" label="My tasks" collapsed={collapsed} />
+            <NavLink href="/my" icon={<Icon name="check" />} label="My tasks" collapsed={collapsed} />
             {savedViews.length > 0 && (
               <div className="nav-sub" role="group" aria-label="Saved views">
                 {savedViews.map((v) => (
@@ -314,22 +315,24 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             )}
           </nav>
           <div className="side-bottom">
-            {me.admin && <NavLink href="/admin" icon="⚙" label="Admin" collapsed={collapsed} />}
+            {me.admin && <NavLink href="/admin" icon={<Icon name="settings" />} label="Admin" collapsed={collapsed} />}
             {me.admin && inAdmin && (
               <div className="nav-sub" role="group" aria-label="Admin sections">
                 {ADMIN_TABS.map((t) => (
-                  <NavLink key={t.href} href={"/admin" + t.href} prefix icon={t.icon} label={t.label} collapsed={collapsed} />
+                  <NavLink key={t.href} href={"/admin" + t.href} prefix icon={<Icon name={t.icon} />} label={t.label} collapsed={collapsed} />
                 ))}
               </div>
             )}
-            <NavLink href="/themes" icon="◐" label="Themes" collapsed={collapsed} />
+            <NavLink href="/themes" icon={<Icon name="theme" />} label="Themes" collapsed={collapsed} />
             <NavLink href="/profile" icon={<Avatar user={me.user} size="xs" />} label={me.user.display_name || me.user.username} collapsed={collapsed} />
             <div className="side-foot">
-              <span className={"live-dot live-" + live} style={live === "off" ? undefined : { color: live === "live" ? CATEGORY_COLOR.done : PRIORITY_COLOR[2] }} role="status" title={LIVE_TITLE[live]} aria-label={LIVE_TITLE[live]}>
-                ●{!collapsed && <span className="live-word">{live === "live" ? "live" : live === "connecting" ? "connecting" : "offline"}</span>}
+              <span className={"live-dot live-" + live} style={live === "off" ? undefined : ({ "--live": live === "live" ? CATEGORY_COLOR.done : PRIORITY_COLOR[2] } as CSSProperties)} role="status" title={LIVE_TITLE[live]} aria-label={LIVE_TITLE[live]}>
+                <span className="live-pip" aria-hidden="true" />
+                {!collapsed && <span className="live-word">{live === "live" ? "Live" : live === "connecting" ? "Connecting" : "Offline"}</span>}
               </span>
               {!collapsed && (
                 <button type="button" className="link logout" onClick={logout}>
+                  <Icon name="logout" />
                   Log out
                 </button>
               )}
@@ -340,7 +343,7 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
           {narrow && (
             <header className="topbar">
               <button type="button" className="icon-button topbar-menu" onClick={() => setDrawer(true)} aria-label="Open the menu" aria-expanded={drawer} aria-controls="sidebar">
-                ☰
+                <Icon name="menu" />
               </button>
               <Link href="/" className="brand topbar-brand" aria-label="gigg home">
                 <LogoMark className="brand-mark" compact />
@@ -412,7 +415,7 @@ function SavedViewLink({ href, label, collapsed, title }: { href: string; label:
   return (
     <Link href={href} className={"nav-item" + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title} aria-label={collapsed ? title : undefined}>
       <span className="nav-icon" aria-hidden="true">
-        ★
+        <Icon name="star" />
       </span>
       {!collapsed && <span className="nav-label">{label}</span>}
     </Link>
@@ -426,7 +429,7 @@ function NavLink({ href, children, prefix, icon, label, collapsed, title }: {
   const active = prefix ? loc === href || loc.startsWith(href + "/") : loc === href;
   return (
     <Link href={href} className={"nav-item" + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title ?? label} aria-label={collapsed ? label : undefined}>
-      <span className="nav-icon">{icon}</span>
+      <span className="nav-icon" aria-hidden="true">{icon}</span>
       {!collapsed && <span className="nav-label">{label}</span>}
       {children}
     </Link>

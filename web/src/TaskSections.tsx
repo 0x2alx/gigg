@@ -5,6 +5,7 @@ import { api, ApiError, type ChecklistItem, type CustomField, type Relation, typ
 import { formatCustom, fromInput, moveAfter, progress, reorder, splitLines, toInput } from "./items";
 import { CATEGORY_COLOR } from "./theme";
 import { Pill, StatusBadge } from "./ui";
+import { Icon } from "./icons";
 
 export const errText = (e: unknown, fallback = "That didn't work.") => (e instanceof ApiError ? e.message : fallback);
 
@@ -15,7 +16,7 @@ export function Section({ title, badges, children, defaultOpen = true, label }: 
     <section className={"tsec" + (open ? " open" : "")} aria-label={label}>
       <button type="button" className="tsec-head" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className="tsec-caret" aria-hidden="true">
-          {open ? "▾" : "▸"}
+          <Icon name={open ? "chevron-down" : "chevron-right"} strokeWidth={2.2} />
         </span>
         <span className="tsec-title">{title}</span>
         {badges}
@@ -99,12 +100,12 @@ export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdi
   return (
     <Section
       label="Checklist"
-      title="☑ Checklist"
+      title="Checklist"
       badges={
         total > 0 && (
           <>
             <ProgressBar done={done} total={total} label="Checklist progress" />
-            <span className={"pill " + (done === total ? "pill-done" : "pill-muted")}>
+            <span className={"tsec-count" + (done === total ? " done" : "")}>
               {done}/{total}
             </span>
           </>
@@ -164,7 +165,7 @@ export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdi
                   }}
                   aria-label={`Delete item: ${it.text}`}
                 >
-                  ✕
+                  <Icon name="x" />
                 </button>
               </span>
             )}
@@ -240,12 +241,12 @@ export function SubtasksSection({ task, wsId, canCreate, onOpen, onChanged }: { 
   return (
     <Section
       label="Subtasks"
-      title="⑂ Subtasks"
+      title="Subtasks"
       badges={
         total > 0 && (
           <>
             <ProgressBar done={done} total={total} label="Subtask progress" />
-            <span className={"pill " + (done === total ? "pill-done" : "pill-muted")}>
+            <span className={"tsec-count" + (done === total ? " done" : "")}>
               {done}/{total} done
             </span>
           </>
@@ -390,11 +391,15 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
   return (
     <Section
       label="Dependencies"
-      title="⛓ Dependencies"
+      title="Dependencies"
       badges={
         <>
-          {!!task.blocked_by && <span className="pill pill-danger">🔒 {task.blocked_by} open</span>}
-          {count > 0 && <span className="pill pill-muted">{count}</span>}
+          {!!task.blocked_by && (
+            <span className="pill pill-danger">
+              <Icon name="lock" /> {task.blocked_by} open
+            </span>
+          )}
+          {count > 0 && <span className="tsec-count">{count}</span>}
         </>
       }
     >
@@ -418,7 +423,7 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
                     </button>
                     {canEdit && (
                       <button type="button" className="icon-button" onClick={() => remove(x)} aria-label={`Remove ${DIR_LABEL[d].slice(2).toLowerCase()} ${x.key}`}>
-                        ✕
+                        <Icon name="x" />
                       </button>
                     )}
                   </li>
@@ -500,7 +505,7 @@ export function CustomFieldsSection({ task, fields, canEdit, onTask }: { task: T
   };
   const set = fields.filter((f) => formatCustom(f, task.custom?.[String(f.id)]) !== "").length;
   return (
-    <Section label="Custom fields" title="⚑ Fields" badges={<span className="pill pill-muted">{set}/{fields.length} set</span>}>
+    <Section label="Custom fields" title="Fields" badges={<span className="tsec-count">{set}/{fields.length} set</span>}>
       {err && (
         <p className="danger small" role="alert">
           {err}

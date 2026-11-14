@@ -5,6 +5,7 @@ import { colorFor } from "../theme";
 import { Avatar, Pill } from "../ui";
 import { adminApi, errMsg, type AdminUser, type AuditItem } from "./adminApi";
 import { ActionPill, AdminPage, Empty, ErrorLine, TimeAgo } from "./common";
+import { Icon } from "../icons";
 
 const PAGE = 100;
 const PREFIXES = ["task", "comment", "run", "key", "user", "member", "workspace", "project", "auth"];
@@ -47,7 +48,7 @@ export function AuditPage() {
       sub="Every change on the instance, newest first."
       actions={
         <button type="button" className="button secondary" onClick={() => page()} disabled={loading}>
-          ↻ Refresh
+          <Icon name="refresh" /> Refresh
         </button>
       }
     >

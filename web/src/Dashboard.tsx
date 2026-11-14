@@ -5,7 +5,9 @@ import { fmtTime, hasCap } from "./api";
 import { useApp } from "./App";
 import { call } from "./http";
 import { Modal } from "./ui";
+import { CATEGORY_COLOR } from "./theme";
 import { HelpButton } from "./help";
+import { Icon } from "./icons";
 
 export interface RunnerSettings {
   workspace_id: number;
@@ -101,15 +103,17 @@ export function DashboardPage() {
           <p className="muted small">Agent task runs in the last 24 hours, per workspace. Always-run tasks run day and night; the others at night, within the usage budget.</p>
         </div>
         {pausable.length > 0 && (
-          <button type="button" className="button danger dash-pause" data-tip="Stop agents from starting new tasks, for a while or until resumed. Runs already going finish." onClick={() => setPausing(true)}>
-            ⏸ PAUSE TASKS
+          <button type="button" className="button secondary dash-pause" data-tip="Stop agents from starting new tasks, for a while or until resumed. Runs already going finish." onClick={() => setPausing(true)}>
+            <Icon name="pause" />
+            Pause tasks
           </button>
         )}
       </header>
       {err && <p className="danger">{err}</p>}
       {paused.length > 0 && (
         <div className="banner banner-danger dash-banner" role="status">
-          <strong>⏸ Paused:</strong>{" "}
+          <Icon name="pause" className="dash-banner-icon" />
+          <strong>Paused:</strong>{" "}
           {paused.map((p, i) => (
             <span key={p.workspace_id}>
               {i > 0 && ", "}
@@ -118,7 +122,7 @@ export function DashboardPage() {
           ))}
           {resumable.length > 0 && (
             <button type="button" className="button secondary small" onClick={() => act(runnerApi.resume(resumable.map((p) => p.workspace_id)))}>
-              ▶ Resume {resumable.length > 1 ? "all" : ""}
+              <Icon name="play" /> Resume {resumable.length > 1 ? "all" : ""}
             </button>
           )}
         </div>
@@ -149,12 +153,12 @@ function Meter({ label, n, cap, tip }: { label: string; n: number; cap: number; 
     <div className="dash-meter">
       <div className="dash-meter-head">
         <span data-tip={tip}>{label}</span>
-        <span className={"small" + (n >= cap ? " danger" : " muted")}>
-          {n} / {cap}
+        <span className={"dash-meter-value" + (n >= cap ? " danger" : "")}>
+          {n} <span className="muted">/ {cap}</span>
         </span>
       </div>
       <div className="dash-bar" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={cap} aria-valuenow={n}>
-        <span className={"dash-bar-fill" + (n >= cap ? " full" : "")} style={{ width: `${p}%` }} />
+        <span className={"dash-bar-fill" + (n >= cap ? " full" : p >= 80 ? " warn" : "")} style={{ width: `${p}%` }} />
       </div>
     </div>
   );
@@ -173,20 +177,22 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
   return (
     <section className={"card dash-card" + (s.paused ? " paused" : "")} aria-label={`Runner of ${it.name}`}>
       <div className="dash-card-head">
-        <strong>{it.name}</strong>
+        <h2 className="dash-card-title">{it.name}</h2>
         {s.paused ? (
-          <span className="pill pill-danger" data-tip="No new task runs start in this workspace">
-            ⏸ paused {pausedText(s)}
+          <span className="dash-state dash-state-paused" data-tip="No new task runs start in this workspace">
+            <span className="dot" aria-hidden="true" />
+            paused {pausedText(s)}
           </span>
         ) : (
-          <span className="pill pill-muted" data-tip="The agent's runner may start tasks here (within the caps)">
+          <span className="dash-state" data-tip="The agent's runner may start tasks here (within the caps)">
+            <span className="dot" style={{ background: CATEGORY_COLOR.done }} aria-hidden="true" />
             running
           </span>
         )}
         <span className="grow" />
         {canPause && s.paused && (
           <button type="button" className="button secondary small" onClick={() => onAct(runnerApi.resume([it.workspace_id]))}>
-            ▶ Resume
+            <Icon name="play" /> Resume
           </button>
         )}
       </div>
@@ -231,9 +237,11 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
             </button>
           </form>
         ) : (
-          <button type="button" className="link small" data-tip="Admins: the daily task cap and how many of those may depend on the budget" onClick={() => setEditing(true)}>
-            Change caps
-          </button>
+          <div className="dash-foot">
+            <button type="button" className="button secondary small" data-tip="Admins: the daily task cap and how many of those may depend on the budget" onClick={() => setEditing(true)}>
+              Change caps
+            </button>
+          </div>
         ))}
     </section>
   );
@@ -255,7 +263,7 @@ function PauseModal({ items, onClose, onPause }: { items: RunnerState[]; onClose
       <div className="pause">
         <p className="muted small">The runners keep firing but start no new task while paused, always-run ones included. A run already going finishes its current step.</p>
         <button type="button" className="button danger pause-all" onClick={() => onPause(undefined, 1440)}>
-          ⏸ Pause ALL for 24 h
+          <Icon name="pause" /> Pause all for 24 h
         </button>
         <fieldset className="pause-ws">
           <legend className="field-label">Or choose: workspaces</legend>
@@ -282,7 +290,7 @@ function PauseModal({ items, onClose, onPause }: { items: RunnerState[]; onClose
             Cancel
           </button>
           <button type="button" className="button danger" disabled={picked.size === 0} onClick={() => onPause(all ? undefined : [...picked], minutes)}>
-            ⏸ Pause {all ? "all" : picked.size}
+            <Icon name="pause" /> Pause {all ? "all" : picked.size}
           </button>
         </div>
       </div>

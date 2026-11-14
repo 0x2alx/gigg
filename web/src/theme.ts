@@ -27,27 +27,27 @@ export interface Theme {
 export const BUILTINS: Theme[] = [
   { id: "clumsy-clanker", name: "Clumsy Clanker", dark: true, background: "#100318", surface: "#1C0A2E", surfaceVariant: "#2A1247",
     border: "#BE5CFF", accent: "#BE5CFF", onAccent: "#16052A", text: "#FFC107", mutedText: "#FE2AFF", danger: "#FF4D6D", secondary: null,
-    font: "Tektur", fontWeight: "Bold", textScalePct: 110, cornerDp: 12, borderDp: 2,
+    font: "Tektur", fontWeight: "Medium", textScalePct: 90, cornerDp: 12, borderDp: 2,
     description: "The signature look: near-black purple, a neon violet edge and accent, amber text, magenta secondary text." },
-  { id: "nightwalker", name: "Nightwalker", dark: true, background: "#1C2529", surface: "#253136", surfaceVariant: "#2F3D43",
-    border: "#3B4B52", accent: "#CDFFFB", onAccent: "#12302E", text: "#EEF8F7", mutedText: "#A3B6B8", danger: "#FF8A80", secondary: null,
-    font: "Rubik", fontWeight: "Bold", textScalePct: 100, cornerDp: 16, borderDp: 1,
-    description: "Slate blue-grey with a pale aqua accent. The default in dark mode." },
-  { id: "daywalker", name: "Daywalker", dark: false, background: "#F2F1EE", surface: "#FFFFFF", surfaceVariant: "#E7E7E4",
-    border: "#D3D4D2", accent: "#3E4C59", onAccent: "#FFFFFF", text: "#22262B", mutedText: "#616A73", danger: "#B3261E", secondary: null,
-    font: "Rubik", fontWeight: "Bold", textScalePct: 100, cornerDp: 18, borderDp: 1,
-    description: "Warm paper and slate. The default in light mode." },
+  { id: "nightwalker", name: "Nightwalker", dark: true, background: "#13161B", surface: "#1A1D24", surfaceVariant: "#232731",
+    border: "#2C313B", accent: "#5967DB", onAccent: "#FFFFFF", text: "#E6E9EF", mutedText: "#9AA3B2", danger: "#FF7A85", secondary: null,
+    font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 8, borderDp: 1,
+    description: "Calm cool slate with an indigo accent. The default in dark mode." },
+  { id: "daywalker", name: "Daywalker", dark: false, background: "#F6F7F9", surface: "#FFFFFF", surfaceVariant: "#EEF0F4",
+    border: "#DCE0E7", accent: "#5967DB", onAccent: "#FFFFFF", text: "#1A1D24", mutedText: "#5A6372", danger: "#C62828", secondary: null,
+    font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 8, borderDp: 1,
+    description: "Clean near-white with soft grey edges and an indigo accent. The default in light mode." },
   { id: "petty-officer", name: "Petty Officer", dark: true, background: "#0C140D", surface: "#141E15", surfaceVariant: "#1E2C1F",
     border: "#3C5A38", accent: "#F0B429", onAccent: "#1A1200", text: "#ECF3EA", mutedText: "#A9BFA2", danger: "#FF5C52", secondary: "#3E6B3A",
-    font: "Michroma", fontWeight: "Bold", textScalePct: 100, cornerDp: 6, borderDp: 1,
+    font: "Michroma", fontWeight: "Medium", textScalePct: 90, cornerDp: 6, borderDp: 1,
     description: "Military green with an amber accent; squared off, thin edges." },
   { id: "high-contrast", name: "High contrast", dark: true, background: "#000000", surface: "#0A0A0A", surfaceVariant: "#1A1A1A",
     border: "#FFFFFF", accent: "#FFE600", onAccent: "#000000", text: "#FFFFFF", mutedText: "#E0E0E0", danger: "#FF5C5C", secondary: null,
-    font: "Phone default", fontWeight: "Bold", textScalePct: 110, cornerDp: 8, borderDp: 2,
-    description: "Black, white and yellow, bigger text, thick borders." },
+    font: "Phone default", fontWeight: "Medium", textScalePct: 90, cornerDp: 8, borderDp: 2,
+    description: "Black, white and yellow, thick borders." },
   { id: "neon", name: "Neon", dark: true, background: "#0A0E14", surface: "#111826", surfaceVariant: "#18213A",
     border: "#26365C", accent: "#00E5FF", onAccent: "#00151A", text: "#E6F7FF", mutedText: "#8FA6C7", danger: "#FF3DCB", secondary: null,
-    font: "Oxanium", fontWeight: "Bold", textScalePct: 100, cornerDp: 10, borderDp: 1,
+    font: "Oxanium", fontWeight: "Medium", textScalePct: 90, cornerDp: 10, borderDp: 1,
     description: "Deep navy with a cyan accent." },
 ];
 
@@ -96,6 +96,20 @@ export function readableOn(bg: string): string {
   return ratio("#FFFFFF", bg) >= ratio("#111111", bg) ? "#FFFFFF" : "#111111";
 }
 
+// Tinted badges (Pill, LabelChip): a 14% tint of the data colour over the surface, with text of the
+// same hue pulled toward the theme's text colour. badgeTextShare is the largest share of the data
+// colour (in percent, at most 55) in that text for which every default data colour, the accent, the
+// danger and the muted colour stay readable (4.5:1 with a small margin) on their tint. Yellow and amber
+// on a light surface are the weak case, so Daywalker ends up lower than the dark themes.
+export const BADGE_TINT = 0.14;
+export function badgeTextShare(t: Pick<Theme, "surface" | "text" | "accent" | "danger" | "mutedText">, extra: string[] = []): number {
+  const colours = [...DATA_COLORS, t.accent, t.danger, t.mutedText, ...extra];
+  for (let share = 55; share > 0; share -= 5) {
+    if (colours.every((c) => ratio(mix(t.text, c, share / 100), mix(t.surface, c, BADGE_TINT)) >= 4.6)) return share;
+  }
+  return 0;
+}
+
 // ---- fonts
 
 const SYSTEM: Record<string, string> = {
@@ -115,13 +129,15 @@ function norm(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function loadFont(family: string): string {
+function loadFont(family: string, fontWeight: Theme["fontWeight"]): string {
   const n = norm(family);
   if (SYSTEM[n]) return SYSTEM[n]!;
   if (!/^[A-Za-z0-9 ]{1,60}$/.test(family)) return SYSTEM.system!;
-  const id = "font-" + n;
+  // The weights the theme actually uses (body and heading) plus 400 (inputs), so Medium loads 400;500;700.
+  const wanted = [...new Set([400, ...WEIGHTS[fontWeight], strongWeight(fontWeight)])].sort((a, b) => a - b).join(";");
+  const id = `font-${n}-${wanted.replace(/;/g, "-")}`;
   if (!document.getElementById(id)) {
-    const weights = SINGLE_WEIGHT.has(n) ? "" : WEIGHT_600.has(n) ? ":wght@600" : ":wght@400;700";
+    const weights = SINGLE_WEIGHT.has(n) ? "" : WEIGHT_600.has(n) ? ":wght@600" : `:wght@${wanted}`;
     const link = document.createElement("link");
     link.id = id;
     link.rel = "stylesheet";
@@ -132,6 +148,13 @@ function loadFont(family: string): string {
 }
 
 const WEIGHTS = { Light: [300, 400], Regular: [400, 500], Medium: [500, 700], Bold: [700, 700] } as const;
+
+// strongWeight: the weight for pills, buttons, column names and headings (--weight-strong): 600, but
+// never lighter than the body and, for a Light theme, only one step above its heading.
+export function strongWeight(w: Theme["fontWeight"]): number {
+  const [body, heading] = WEIGHTS[w];
+  return Math.max(body, heading >= 700 ? 600 : heading + 100);
+}
 
 // applyTheme writes every role as a CSS custom property (components never hard-code colours).
 export function applyTheme(t: Theme): void {
@@ -157,9 +180,11 @@ export function applyTheme(t: Theme): void {
   set("--on-danger", ratio("#FFFFFF", t.danger) >= 3 ? "#FFFFFF" : "#000000");
   set("--r", `${t.cornerDp}px`);
   set("--border-w", `${t.borderDp}px`);
-  set("--font", loadFont(t.font));
+  set("--font", loadFont(t.font, t.fontWeight));
   set("--weight-body", String(WEIGHTS[t.fontWeight][0]));
   set("--weight-heading", String(WEIGHTS[t.fontWeight][1]));
+  set("--weight-strong", String(strongWeight(t.fontWeight)));
+  set("--badge-mix", `${badgeTextShare(t)}%`);
   s.fontSize = `${t.textScalePct}%`;
   s.colorScheme = t.dark ? "dark" : "light";
 }
@@ -217,6 +242,9 @@ export const PRIORITY_COLOR = ["", "#0090FF", "#FFC53D", "#F76B15", "#E5484D"];
 export const SCHEDULE_COLOR = "#8E4EC6";
 export const WINDOW_OPEN_COLOR = "#F76B15";
 
+// every colour the app picks by itself for a badge (labels, workspaces and users by name, statuses, priorities, schedule, window)
+export const DATA_COLORS: string[] = [...new Set([...PALETTE, ...Object.values(CATEGORY_COLOR), ...PRIORITY_COLOR.slice(1), SCHEDULE_COLOR, WINDOW_OPEN_COLOR])];
+
 // =====================================================================================
 // Full spec: parsing, sanitising, contrast, import/export, AI prompt (pure functions).
 // =====================================================================================
@@ -229,7 +257,7 @@ export const ROLE_LABEL: Record<ColourKey, string> = {
   onAccent: "Text on the accent", secondary: "Secondary buttons", text: "Text", mutedText: "Secondary text", danger: "Warnings",
 };
 
-export const BUNDLED_FONTS = ["Audiowide", "Oxanium", "Orbitron", "Michroma", "Tektur", "Rubik", "Rajdhani", "Chakra Petch", "Share Tech Mono",
+export const BUNDLED_FONTS = ["Inter", "Audiowide", "Oxanium", "Orbitron", "Michroma", "Tektur", "Rubik", "Rajdhani", "Chakra Petch", "Share Tech Mono",
   "Nunito", "Comfortaa", "Caveat", "Pacifico", "Playfair Display", "Lora", "Bebas Neue", "Righteous", "Space Grotesk", "Press Start 2P"];
 export const SYSTEM_FONTS = ["Phone default", "Condensed", "Serif", "Mono", "Medium", "Casual", "Cursive", "Small caps"];
 

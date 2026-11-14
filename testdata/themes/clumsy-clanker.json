@@ -11,8 +11,8 @@
     "mutedText": "#FE2AFF",
     "danger": "#FF4D6D",
     "font": "Tektur",
-    "fontWeight": "Bold",
-    "textScalePct": 110,
+    "fontWeight": "Medium",
+    "textScalePct": 90,
     "cornerDp": 12,
     "borderDp": 2,
     "widget": {

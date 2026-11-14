@@ -1,14 +1,15 @@
 // Table view: every task of a workspace (or one project) as a sortable, filterable table with
 // multi-select and bulk actions. Sorting and most filters run on the server; "include done" is
 // applied here because the list API takes a single category.
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type CSSProperties } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { fmtDue } from "../dates";
 import { api, fmtTime, hasCap, priorityNames, type Category, type Tag, type Task } from "../api";
 import { useApp, type WorkspaceTree } from "../App";
 import { assignable } from "../fields";
 import { CATEGORY_COLOR, colorFor } from "../theme";
-import { Avatar, LabelChip, Modal, Pill, PriorityBadge, StatusBadge } from "../ui";
+import { Avatar, LabelChip, Modal, PriorityIcon, StatusDot } from "../ui";
+import { Icon } from "../icons";
 import { ALL_CATEGORIES, errMsg, isClosed, isOverdue, pool, relTime, taskHref, viewsApi, type TaskQuery } from "./viewsApi";
 import { parse, PASSTHROUGH, savedViewsApi, summary, toQuery, toSearch, viewHref, type SavedFilter, type SortKey, type TableFilters } from "./savedViews";
 import "./views.css";
@@ -196,7 +197,7 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
                 Whole workspace
               </Link>
               <Link href={boardHref!} className="button secondary small">
-                ▦ Board
+                <Icon name="board" /> Board
               </Link>
             </>
           ) : (
@@ -341,36 +342,44 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
                       <input type="checkbox" checked={on} onChange={() => toggle(t.id)} aria-label={`Select ${t.key}`} />
                     </td>
                   )}
-                  <td className="vw-nowrap">
-                    <span className="pill pill-key">{t.key}</span>
-                  </td>
+                  <td className="vw-nowrap vw-key">{t.key}</td>
                   <td className="vw-title">
-                    <Link href={href} className="vw-title-link" style={t.color ? { borderLeftColor: t.color } : undefined}>
+                    <Link href={href} className="vw-title-link" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
                       {t.title}
                     </Link>
                   </td>
                   <td className="vw-nowrap">
-                    <StatusBadge name={t.status_name} category={t.status_category} />
+                    <StatusDot name={t.status_name} category={t.status_category} />
                   </td>
                   <td className="vw-nowrap">
-                    <PriorityBadge priority={t.priority} />
+                    {t.priority > 0 && (
+                      <span className="vw-prio">
+                        <PriorityIcon priority={t.priority} />
+                        {priorityNames[t.priority]}
+                      </span>
+                    )}
                   </td>
                   <td>
                     <span className="vw-chips">
-                      {t.labels.map((l) => (
+                      {t.labels.slice(0, 2).map((l) => (
                         <LabelChip key={l.id} label={labels.find((x) => x.id === l.id) ?? l} />
                       ))}
+                      {t.labels.length > 2 && (
+                        <span className="chip-more" data-tip={t.labels.slice(2).map((l) => l.name).join("\n")}>
+                          +{t.labels.length - 2}
+                        </span>
+                      )}
                     </span>
                   </td>
                   <td>
                     <span className="vw-people">
                       {t.assignees.map((id) => {
                         const u = users.get(id);
-                        return u ? <Avatar key={id} user={u} /> : null;
+                        return u ? <Avatar key={id} user={u} size="xs" /> : null;
                       })}
                     </span>
                   </td>
-                  <td className="vw-nowrap">{t.due_at && <span className={"pill " + (isOverdue(t) ? "pill-danger" : "pill-muted")}>⏱ {fmtDue(t.due_at)}</span>}</td>
+                  <td className={"vw-nowrap vw-due" + (t.due_at && isOverdue(t) ? " overdue" : "")}>{t.due_at && fmtDue(t.due_at)}</td>
                   {!project && <td className="vw-nowrap">{p && <ProjectPill project={p} />}</td>}
                   <td className="vw-nowrap muted small vw-updated" data-label="Updated" title={fmtTime(t.updated_at)}>
                     {relTime(t.updated_at)}
@@ -504,9 +513,10 @@ function SortTh({ label, k, sort, onSort }: { label: string; k: SortKey; sort: S
 
 export function ProjectPill({ project }: { project: { key: string; name: string; color: string | null } }) {
   return (
-    <Pill color={colorFor(project.key, project.color)} title={project.name}>
+    <span className="proj-tag" title={project.name}>
+      <span className="dot" style={{ background: colorFor(project.key, project.color) }} aria-hidden="true" />
       {project.key}
-    </Pill>
+    </span>
   );
 }
 

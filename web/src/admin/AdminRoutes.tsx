@@ -5,6 +5,7 @@ import { Link, Route, Switch } from "wouter";
 import { useApp } from "../App";
 import { AuditPage } from "./Audit";
 import { ADMIN_TABS, AdminPage } from "./common";
+import { Icon } from "../icons";
 import { GroupsPage } from "./Groups";
 import { KeysPage } from "./Keys";
 import { UsersPage } from "./Users";
@@ -77,7 +78,7 @@ export function AdminHome() {
         {ADMIN_TABS.map((t) => (
           <Link key={t.href} href={t.href} className="card admin-home-card">
             <span className="admin-home-icon" aria-hidden="true">
-              {t.icon}
+              <Icon name={t.icon} />
             </span>
             <span className="admin-home-title">{t.label}</span>
             <span className="muted small">{BLURB[t.href]}</span>

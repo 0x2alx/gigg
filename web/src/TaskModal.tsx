@@ -16,6 +16,7 @@ import { CustomInput } from "./TaskSections";
 import { defaultRepeat, fmtInstant, localTZ, repeatFromRule, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
 import { Modal } from "./ui";
 import { HelpButton } from "./help";
+import { Icon } from "./icons";
 
 export function TaskModal({ ws, projectId, statuses, labels, schedule, template, repeat: initialRepeat, onClose, onCreated }: {
   ws: WorkspaceTree;
@@ -262,7 +263,7 @@ export function TaskModal({ ws, projectId, statuses, labels, schedule, template,
       <form className="form-grid" onSubmit={submit} aria-label={heading}>
         {!tplMode && templates.length > 0 && (
           <div className="field span2 tpl-pick">
-            <span className="field-label">{editing ? "📋 Template" : "📋 From template"}</span>
+            <span className="field-label">{editing ? "Template" : "From template"}</span>
             <div className="quick-add">
               <select value={picked?.id ?? ""} onChange={(e) => pick(templates.find((t) => t.id === Number(e.target.value)) ?? null)} aria-label="From template">
                 {!editing && <option value="">— blank task —</option>}
@@ -368,7 +369,7 @@ export function TaskModal({ ws, projectId, statuses, labels, schedule, template,
             {schedules.length > 0 && (
               <div className="repeat-row">
                 <label className="inline">
-                  ⏱ Schedule
+                  Schedule
                   <select value={pickedSchedule?.id ?? ""} onChange={(e) => (e.target.value ? pickSchedule(Number(e.target.value)) : setPickedSchedule(null))} aria-label="Schedule">
                     {!editing && <option value="">custom timing</option>}
                     {schedules.map((x) => (
@@ -436,7 +437,7 @@ export function TaskModal({ ws, projectId, statuses, labels, schedule, template,
           <div className="span2 save-tpl">
             {saveAs === null ? (
               <button type="button" className="link small" onClick={() => setSaveAs(title)}>
-                📋 Save as template
+                <Icon name="template" /> Save as template
               </button>
             ) : (
               <div className="quick-add">
@@ -478,10 +479,10 @@ function ScheduleTemplateNote({ schedule: s }: { schedule: Recurrence }) {
   const others = (n: number) => `${n} other recurring task${n === 1 ? "" : "s"}`;
   return (
     <p className="span2 small muted sched-tpl" role="note">
-      📋 Content: template <strong>“{s.template_name}”</strong>
+      <Icon name="template" /> Content: template <strong>“{s.template_name}”</strong>
       {tOthers > 0 && <> (also used by {others(tOthers)}: content changes apply to them too)</>}
       {s.template_created_by !== me.user.id && !hasCap(me, "templates", s.workspace_id) && <> · changing the content needs the Task templates permission</>}
-      <br />⏱ Timing: schedule <strong>“{s.schedule_name}”</strong>
+      <br /><Icon name="clock" /> Timing: schedule <strong>“{s.schedule_name}”</strong>
       {sOthers > 0 && <> (also used by {others(sOthers)}: timing changes move them too)</>}
     </p>
   );

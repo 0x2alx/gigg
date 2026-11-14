@@ -1,10 +1,11 @@
 // The project's task templates (plus the workspace-wide ones): list with badges; new, edit, delete.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { api, ApiError, type Status, type Tag, type Template } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { TaskModal } from "./TaskModal";
 import { Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
+import { Icon } from "./icons";
 
 export function TemplatesModal({ ws, projectId, statuses, labels, canEdit, onClose, onChanged }: {
   ws: WorkspaceTree;
@@ -59,7 +60,7 @@ export function TemplatesModal({ ws, projectId, statuses, labels, canEdit, onClo
   }
 
   return (
-    <Modal title="📋 Templates" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring tasks" />}>
+    <Modal title="Templates" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring tasks" />}>
       {err && (
         <p className="danger" role="alert">
           {err}
@@ -70,9 +71,9 @@ export function TemplatesModal({ ws, projectId, statuses, labels, canEdit, onClo
       {items && items.length > 0 && (
         <ul className="schedules" aria-label="Templates">
           {items.map((t) => (
-            <li key={t.id} className="schedule" style={t.color ? { borderLeftColor: t.color } : undefined}>
+            <li key={t.id} className="schedule" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
               <div className="schedule-top">
-                <span className="pill pill-accent">📋</span>
+                <span className="pill pill-accent"><Icon name="template" /></span>
                 <strong className="schedule-title">{t.name}</strong>
                 {t.project_id === null ? <span className="pill pill-ws">any project</span> : <span className="pill pill-key">{ws.projects.find((p) => p.id === t.project_id)?.key ?? "?"}</span>}
                 <PriorityBadge priority={t.priority} />
@@ -109,7 +110,7 @@ export function TemplatesModal({ ws, projectId, statuses, labels, canEdit, onClo
                   ) : (
                     <>
                       <button type="button" className="button secondary small" onClick={() => setEditing(t)} aria-label={`Edit ${t.name}`}>
-                        ✎ Edit
+                        <Icon name="pencil" /> Edit
                       </button>
                       <button
                         type="button"
@@ -119,7 +120,7 @@ export function TemplatesModal({ ws, projectId, statuses, labels, canEdit, onClo
                         title={(t.recurring ?? 0) > 0 ? "Recurring tasks use this template: delete them or give them another template first" : undefined}
                         aria-label={`Delete ${t.name}`}
                       >
-                        🗑 Delete
+                        <Icon name="trash" /> Delete
                       </button>
                     </>
                   )}

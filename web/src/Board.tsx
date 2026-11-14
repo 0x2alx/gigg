@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { api, ApiError, fmtTime, hasCap, priorityNames, type Board, type Category, type CustomField, type Status, type Tag, type Task } from "./api";
 import { fmtDue } from "./dates";
@@ -27,15 +27,16 @@ import { TemplatesModal } from "./Templates";
 import { TaskModal } from "./TaskModal";
 import { TaskPanel } from "./TaskPanel";
 import { viewsApi } from "./views/viewsApi";
-import { CATEGORY_COLOR, colorFor, readableOn } from "./theme";
-import { Avatar, LabelChip, Modal, MoreMenu, PriorityBadge, TaskBadges } from "./ui";
+import { CATEGORY_COLOR, colorFor } from "./theme";
+import { Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, TaskBadges } from "./ui";
 import { HelpButton } from "./help";
+import { Icon } from "./icons";
 
-// WorkspaceBadge: a workspace's name on its colour (the workspace's own, or the default from its slug).
+// WorkspaceBadge: a workspace's name as a tint of its colour (the workspace's own, or the default from its slug).
 export function WorkspaceBadge({ ws }: { ws: Pick<WorkspaceTree, "slug" | "name" | "color"> }) {
   const c = colorFor(ws.slug, ws.color);
   return (
-    <span className="pill pill-wsc" style={{ background: c, color: readableOn(c) }} title={`Workspace: ${ws.name}`}>
+    <span className="pill pill-wsc" style={{ "--c": c } as CSSProperties} title={`Workspace: ${ws.name}`}>
       {ws.name}
     </span>
   );
@@ -355,6 +356,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
         task={t}
         statuses={openStatuses(b)}
         ws={p.ws}
+        showWs={wsInScope.length > 1}
         labels={b.labels}
         canWrite={write}
         canReorder={write && c.statusId !== undefined && manual}
@@ -387,43 +389,32 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const tplCtx = ctxFor(templates);
   const timingsWs = timings !== null ? tree.find((w) => w.id === timings) : undefined;
 
+  // the board's less frequent actions: the "⋯" menu of the page head (on a phone also the table links)
   const tools = (
     <>
-      <button type="button" role={narrow ? "menuitem" : undefined} className={narrow ? undefined : "button secondary"} data-tip="Tasks that come back on a schedule (a template + a schedule)" onClick={() => action("recurring")}>
-        ⟳ Recurring
+      <button type="button" role="menuitem" data-tip="Tasks that come back on a schedule (a template + a schedule)" onClick={() => action("recurring")}>
+        <Icon name="refresh" />
+        Recurring
       </button>
-      <button type="button" role={narrow ? "menuitem" : undefined} className={narrow ? undefined : "button secondary"} data-tip="Timings (every day 9:00, every Friday…) that recurring tasks share" onClick={() => action("schedules")}>
-        ⏱ Schedules
+      <button type="button" role="menuitem" data-tip="Timings (every day 9:00, every Friday…) that recurring tasks share" onClick={() => action("schedules")}>
+        <Icon name="clock" />
+        Schedules
       </button>
       {wsTemplates && (
-        <button type="button" role={narrow ? "menuitem" : undefined} className={narrow ? undefined : "button secondary"} data-tip="Reusable task contents: start a task or a recurring task from one" onClick={() => action("templates")}>
-          📋 Templates
+        <button type="button" role="menuitem" data-tip="Reusable task contents: start a task or a recurring task from one" onClick={() => action("templates")}>
+          <Icon name="template" />
+          Templates
         </button>
       )}
       {wsArchive && (
-        <button type="button" role={narrow ? "menuitem" : undefined} className={narrow ? undefined : "button secondary"} data-tip="Archive the tasks in Done: they leave the board but stay searchable" onClick={() => action("archive")}>
-          🗄 Archive done
+        <button type="button" role="menuitem" data-tip="Archive the tasks in Done: they leave the board but stay searchable" onClick={() => action("archive")}>
+          <Icon name="archive" />
+          Archive done
         </button>
       )}
-      <button
-        type="button"
-        role={narrow ? "menuitem" : undefined}
-        className={narrow ? undefined : "button secondary"}
-        data-tip="Deleted tasks of the projects in view: restore them from here"
-        onClick={() => setTrash(true)}
-      >
-        🗑 Trash
-      </button>
-      <button
-        type="button"
-        role={narrow ? "menuitemcheckbox" : undefined}
-        aria-checked={narrow ? filter.arch : undefined}
-        aria-pressed={narrow ? undefined : filter.arch}
-        className={narrow ? undefined : "button secondary" + (filter.arch ? " on" : "")}
-        data-tip="Show archived tasks too, greyed out, in their columns"
-        onClick={() => setFilter({ ...filter, arch: !filter.arch })}
-      >
-        {filter.arch ? "🗄 Hide archived" : "🗄 Show archived"}
+      <button type="button" role="menuitem" data-tip="Deleted tasks of the projects in view: restore them from here" onClick={() => setTrash(true)}>
+        <Icon name="trash" />
+        Trash
       </button>
     </>
   );
@@ -431,21 +422,21 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   return (
     <div className="board-page">
       <header className="page-head">
-        <div>
-          <div className="crumb">
-            {wsInScope.length === 1 && <WorkspaceBadge ws={wsInScope[0]!} />}
-            {single && <span className="pill pill-key">{single.project.key}</span>}
-            <span className="muted small">
-              {open} open task{open === 1 ? "" : "s"}
-              {!single && ` · ${inScope.length} projects`}
-            </span>
-          </div>
+        <div className="head-title">
           <h1>
             {single ? single.project.name : "Board"}
             <HelpButton topic="board" label="Help: the board" />
           </h1>
+          <div className="head-sub">
+            {wsInScope.length === 1 && <WorkspaceBadge ws={wsInScope[0]!} />}
+            {single && <span className="key">{single.project.key}</span>}
+            <span className="muted">
+              {open} open task{open === 1 ? "" : "s"}
+              {!single && ` · ${inScope.length} projects`}
+            </span>
+          </div>
         </div>
-        <div className="row head-actions">
+        <div className="head-actions">
           {narrow ? (
             <MoreMenu label="More">
               {wsInScope.map((w) => (
@@ -456,13 +447,16 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
               {tools}
             </MoreMenu>
           ) : (
-            <>
+            <div className="view-switch" role="group" aria-label="View">
+              <span className="vs-item on" aria-current="page">
+                Board
+              </span>
               {wsInScope.length === 1 ? (
-                <Link href={tableHref(wsInScope[0]!)} className="button secondary">
-                  ☰ Table
+                <Link href={tableHref(wsInScope[0]!)} className="vs-item">
+                  Table
                 </Link>
               ) : (
-                <MoreMenu label="Table">
+                <MoreMenu label="Table" className="vs-menu" buttonClass="vs-item">
                   {wsInScope.map((w) => (
                     <Link key={w.id} href={tableHref(w)} role="menuitem">
                       {w.name}
@@ -470,13 +464,17 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                   ))}
                 </MoreMenu>
               )}
-              {tools}
-            </>
+            </div>
           )}
           {anyWrite && (
             <button type="button" className="button" onClick={() => action("new")}>
               + New task
             </button>
+          )}
+          {!narrow && (
+            <MoreMenu label="More actions" icon className="head-more">
+              {tools}
+            </MoreMenu>
           )}
         </div>
       </header>
@@ -530,7 +528,6 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                 key={c.key}
                 className={"column column-collapsed" + (drop?.col === c.key ? " drag-over" : "")}
                 aria-label={c.name}
-                style={{ borderTopColor: colColor(c) }}
                 onDragOver={(e) => dragOver(e, c)}
                 onDrop={(e) => dropOn(e, c)}
                 onDragLeave={(e) => dragLeave(e, c)}
@@ -549,7 +546,6 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
               className={"column" + (drop?.col === c.key ? " drag-over" : "")}
               aria-label={c.name}
               role={narrow ? "tabpanel" : undefined}
-              style={{ borderTopColor: colColor(c) }}
               onDragOver={(e) => dragOver(e, c)}
               onDrop={(e) => dropOn(e, c)}
               onDragLeave={(e) => dragLeave(e, c)}
@@ -649,7 +645,8 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   );
 }
 
-// BoardFilters: workspaces and projects as toggles (none on = all), then assignee, label, priority, text.
+// BoardFilters: one toolbar row (search, assignee, label, priority, the archived toggle, Clear filters) and under it
+// the workspaces and projects as compact toggle chips (none on = all).
 function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
   filter: BoardFilter;
   setFilter: (f: BoardFilter) => void;
@@ -680,71 +677,18 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
     const next = filter.p.includes(id) ? filter.p.filter((x) => x !== id) : [...filter.p, id];
     setFilter({ ...filter, p: next.length === projects.length ? [] : next });
   };
+  const sel = (v: string | number) => (v === "" || v === 0 ? "" : " active");
   const body = (
     <div className="board-filters" role="group" aria-label="Board filters">
-      {tree.length > 1 && (
-        <div className="bf-row" role="group" aria-label="Workspaces">
-          <button
-            type="button"
-            className={"bf-chip" + (filter.ws.length === 0 ? " on" : "")}
-            aria-pressed={filter.ws.length === 0}
-            data-tip="Show every workspace (clears the workspace and project filters)"
-            onClick={() => setFilter({ ...filter, ws: [], p: [] })}
-          >
-            All workspaces
-          </button>
-          {tree.map((w) => {
-            const on = filter.ws.includes(w.slug);
-            const c = colorFor(w.slug, w.color);
-            const owner = w.owner_id != null ? users.get(w.owner_id) : undefined;
-            return (
-              <button
-                key={w.id}
-                type="button"
-                className={"bf-chip bf-ws" + (on ? " on" : "")}
-                aria-pressed={on}
-                data-tip={`${on ? "Hide" : "Show only"} ${w.name}${filter.ws.length && !on ? " (add it to the selection)" : ""}${owner ? `\nOwner: ${owner.display_name || owner.username}` : ""}`}
-                style={on ? { background: c, color: readableOn(c), borderColor: c } : { borderColor: c }}
-                onClick={() => toggleWs(w.slug)}
-              >
-                {owner ? <Avatar user={owner} size="xs" /> : <span className="dot" style={{ background: c }} />}
-                {w.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {projects.length > 1 && (
-        <div className="bf-row" role="group" aria-label="Projects">
-          <button
-            type="button"
-            className={"bf-chip" + (filter.p.length === 0 ? " on" : "")}
-            aria-pressed={filter.p.length === 0}
-            data-tip="Show every project of the workspaces shown"
-            onClick={() => setFilter({ ...filter, p: [] })}
-          >
-            All projects
-          </button>
-          {projects.map(({ w, p }) => {
-            const on = filter.p.includes(p.id);
-            return (
-              <button
-                key={p.id}
-                type="button"
-                className={"bf-chip" + (on ? " on" : "")}
-                aria-pressed={on}
-                data-tip={`${w.name} / ${p.name} (${p.key})\nOne project shown: its own columns and manual order`}
-                onClick={() => toggleP(p.id)}
-              >
-                <span className="dot" style={{ background: colorFor(w.slug, w.color) }} />
-                {p.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
       <div className="bf-row bf-fields">
-        <select aria-label="Assignee" value={filter.a} onChange={(e) => setFilter({ ...filter, a: e.target.value })}>
+        <span className="bf-search">
+          <svg viewBox="0 0 16 16" width="1em" height="1em" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <input type="search" aria-label="Search tasks" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
+        </span>
+        <select className={sel(filter.a)} aria-label="Assignee" value={filter.a} onChange={(e) => setFilter({ ...filter, a: e.target.value })}>
           <option value="">Anyone</option>
           <option value="me">Assigned to me</option>
           <option value="none">Unassigned</option>
@@ -754,7 +698,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
             </option>
           ))}
         </select>
-        <select aria-label="Label" value={filter.l} onChange={(e) => setFilter({ ...filter, l: e.target.value })}>
+        <select className={sel(filter.l)} aria-label="Label" value={filter.l} onChange={(e) => setFilter({ ...filter, l: e.target.value })}>
           <option value="">Any label</option>
           {labelNames.map((l) => (
             <option key={l} value={l}>
@@ -762,7 +706,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
             </option>
           ))}
         </select>
-        <select aria-label="Priority" value={filter.pr} onChange={(e) => setFilter({ ...filter, pr: Number(e.target.value) })}>
+        <select className={sel(filter.pr)} aria-label="Priority" value={filter.pr} onChange={(e) => setFilter({ ...filter, pr: Number(e.target.value) })}>
           <option value={0}>Any priority</option>
           {priorityNames.slice(1).map((n, i) => (
             <option key={n} value={i + 1}>
@@ -770,13 +714,87 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
             </option>
           ))}
         </select>
-        <input type="search" aria-label="Search tasks" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
+        <button
+          type="button"
+          className={"bf-toggle" + (filter.arch ? " on" : "")}
+          aria-pressed={filter.arch}
+          data-tip="Show archived tasks too, greyed out, in their columns"
+          onClick={() => setFilter({ ...filter, arch: !filter.arch })}
+        >
+          <Icon name="archive" />
+          Archived
+        </button>
         {isFiltered(filter) && (
-          <button type="button" className="link" onClick={() => setFilter({ ...EMPTY_FILTER, arch: filter.arch })}>
+          <button type="button" className="link bf-clear" onClick={() => setFilter({ ...EMPTY_FILTER, arch: filter.arch })}>
             Clear filters
           </button>
         )}
       </div>
+      {(tree.length > 1 || projects.length > 1) && (
+        <div className="bf-row bf-scope">
+          {tree.length > 1 && (
+            <div className="bf-group" role="group" aria-label="Workspaces">
+              <button
+                type="button"
+                className={"bf-chip" + (filter.ws.length === 0 ? " on" : "")}
+                aria-pressed={filter.ws.length === 0}
+                data-tip="Show every workspace (clears the workspace and project filters)"
+                onClick={() => setFilter({ ...filter, ws: [], p: [] })}
+              >
+                All workspaces
+              </button>
+              {tree.map((w) => {
+                const on = filter.ws.includes(w.slug);
+                const c = colorFor(w.slug, w.color);
+                const owner = w.owner_id != null ? users.get(w.owner_id) : undefined;
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    className={"bf-chip bf-ws" + (on ? " on" : "")}
+                    aria-pressed={on}
+                    data-tip={`${on ? "Hide" : "Show only"} ${w.name}${filter.ws.length && !on ? " (add it to the selection)" : ""}${owner ? `\nOwner: ${owner.display_name || owner.username}` : ""}`}
+                    style={{ "--c": c } as CSSProperties}
+                    onClick={() => toggleWs(w.slug)}
+                  >
+                    {owner ? <Avatar user={owner} size="xs" /> : <span className="dot" style={{ background: c }} />}
+                    {w.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {projects.length > 1 && (
+            <div className="bf-group" role="group" aria-label="Projects">
+              <button
+                type="button"
+                className={"bf-chip" + (filter.p.length === 0 ? " on" : "")}
+                aria-pressed={filter.p.length === 0}
+                data-tip="Show every project of the workspaces shown"
+                onClick={() => setFilter({ ...filter, p: [] })}
+              >
+                All projects
+              </button>
+              {projects.map(({ w, p }) => {
+                const on = filter.p.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={"bf-chip" + (on ? " on" : "")}
+                    aria-pressed={on}
+                    data-tip={`${w.name} / ${p.name} (${p.key})\nOne project shown: its own columns and manual order`}
+                    onClick={() => toggleP(p.id)}
+                  >
+                    <span className="dot" style={{ background: colorFor(w.slug, w.color) }} />
+                    {p.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
   if (!narrow) return body;
@@ -816,7 +834,7 @@ function TrashModal({ scope: inScope, onClose, onRestored }: { scope: { ws: Work
       })
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : `Couldn't restore ${t.key}.`));
   return (
-    <Modal title="🗑 Trash" onClose={onClose} wide help={<HelpButton topic="board" label="Help: the board (archive and trash)" />}>
+    <Modal title="Trash" onClose={onClose} wide help={<HelpButton topic="board" label="Help: the board (archive and trash)" />}>
       <p className="muted small">Deleted tasks of the projects in view, most recently changed first. Restoring puts a task back where it was.</p>
       {err && (
         <p className="danger small" role="alert">
@@ -862,7 +880,7 @@ function PickModal({ what, options, workspaces, onPick, onClose }: {
   onPick: (id: number) => void;
   onClose: () => void;
 }) {
-  const title = { new: "New task in…", recurring: "⟳ Recurring tasks of…", templates: "📋 Templates for…", archive: "🗄 Archive done tasks in…", schedules: "⏱ Schedules of…" }[what];
+  const title = { new: "New task in…", recurring: "Recurring tasks of…", templates: "Templates for…", archive: "Archive done tasks in…", schedules: "Schedules of…" }[what];
   return (
     <Modal title={title} onClose={onClose}>
       <div className="pick-list">
@@ -902,7 +920,7 @@ function ArchiveDoneModal({ projectId, onClose, onDone }: { projectId: number; o
       .finally(() => setBusy(false));
   };
   return (
-    <Modal title="🗄 Archive done tasks" onClose={onClose}>
+    <Modal title="Archive done tasks" onClose={onClose}>
       <p className="small">Archived tasks leave the board and lists; they stay searchable and can be unarchived from the task.</p>
       <div className="archive-days" role="radiogroup" aria-label="Done for at least">
         {[0, 7, 30].map((d) => (
@@ -921,17 +939,19 @@ function ArchiveDoneModal({ projectId, onClose, onDone }: { projectId: number; o
           Cancel
         </button>
         <button type="button" className="button" onClick={go} disabled={busy}>
-          🗄 Archive
+          <Icon name="archive" />
+          Archive
         </button>
       </div>
     </Modal>
   );
 }
 
-function Card({ task, statuses, ws, labels, canWrite, canReorder, statusLabel, dragging, first, last, onDragStart, onDragEnd, onReorder, onOpen, onChanged, fields }: {
+function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, statusLabel, dragging, first, last, onDragStart, onDragEnd, onReorder, onOpen, onChanged, fields }: {
   task: Task;
   statuses: Status[];
   ws: WorkspaceTree;
+  showWs: boolean; // several workspaces in view: name the task's workspace
   labels: Tag[];
   canWrite: boolean;
   canReorder: boolean; // a manual order exists (one project in view)
@@ -973,10 +993,19 @@ function Card({ task, statuses, ws, labels, canWrite, canReorder, statusLabel, d
   const creator = users.get(task.created_by);
   const labelFor = (l: Tag) => labels.find((x) => x.id === l.id) ?? l;
   const showDue = task.due_at && task.due_at !== task.not_after; // a window's end is shown by its own badge
+  const assignees = task.assignees.map((id) => users.get(id)).filter((u): u is NonNullable<typeof u> => !!u);
+  const nameOf = (u: { username: string; display_name: string }) => u.display_name || u.username;
+  const shownLabels = task.labels.slice(0, 2);
+  const moreLabels = task.labels.slice(2);
+  // who: the assignees, stacked; the creator only when there are no assignees, or a person handed the task to an agent
+  const handOff = !!creator && creator.kind !== "agent" && assignees.some((u) => u.kind === "agent");
+  const createdBy = creator ? `Created by ${nameOf(creator)}` : "";
+  const assigneeTip = (u: { username: string; display_name: string; kind: string }) => `Assigned to ${nameOf(u)}${u.kind === "agent" ? " (agent)" : ""}${createdBy ? `\n${createdBy}` : ""}`;
+  const wsColor = colorFor(ws.slug, ws.color);
   return (
     <article
-      className={"task-card" + (dragging ? " dragging" : "") + (task.missed_at ? " missed" : "") + (task.archived_at ? " archived" : "") + (task.blocked_by ? " blocked" : "")}
-      style={task.color ? { borderLeftColor: task.color } : undefined}
+      className={"task-card" + (dragging ? " dragging" : "") + (task.missed_at ? " missed" : "") + (task.archived_at ? " archived" : "") + (task.blocked_by ? " blocked" : "") + (task.color ? " colored" : "")}
+      style={task.color ? ({ "--card-c": task.color } as CSSProperties) : undefined}
       data-task-id={task.id}
       draggable={canWrite}
       onDragStart={(e) => {
@@ -989,18 +1018,22 @@ function Card({ task, statuses, ws, labels, canWrite, canReorder, statusLabel, d
     >
       <button type="button" className="card-open" onClick={onOpen} aria-label={`${task.key} ${task.title}`}>
         <div className="card-top">
-          <WorkspaceBadge ws={ws} />
-          <span className="pill pill-key">{task.key}</span>
+          <PriorityIcon priority={task.priority} />
+          <span className="key">{task.key}</span>
+          {showWs && (
+            <span className="card-ws" data-tip={`Workspace: ${ws.name}`}>
+              <span className="dot" style={{ background: wsColor }} />
+              {ws.name}
+            </span>
+          )}
           {statusLabel && (
-            <span className="pill pill-muted" data-tip={`Its project's status: ${statusLabel}`}>
+            <span className="card-status" data-tip={`Its project's status: ${statusLabel}`}>
               {statusLabel}
             </span>
           )}
-          <PriorityBadge priority={task.priority} />
-          <TaskBadges task={task} items fields={fields} />
           {!!task.archived_at && (
             <span className="pill pill-muted" data-tip="Archived: hidden from the board and lists; unarchive it from the task">
-              🗄 archived
+              <Icon name="archive" /> archived
             </span>
           )}
           {task.resume_requested_at && task.status_category === "todo" && (
@@ -1012,32 +1045,26 @@ function Card({ task, statuses, ws, labels, canWrite, canReorder, statusLabel, d
         <div className="card-title">{task.title}</div>
         {task.labels.length > 0 && (
           <div className="chips">
-            {task.labels.map((l) => (
+            {shownLabels.map((l) => (
               <LabelChip key={l.id} label={labelFor(l)} />
             ))}
+            {moreLabels.length > 0 && (
+              <span className="chip-more" data-tip={moreLabels.map((l) => l.name).join("\n")}>
+                +{moreLabels.length}
+              </span>
+            )}
           </div>
         )}
         <div className="card-foot">
-          <span className="people">
-            {creator && <Avatar user={creator} />}
-            {task.assignees.length > 0 && (
-              <span className="arrow" data-tip="Created by → assigned to">
-                →
-              </span>
-            )}
-            {task.assignees.map((id) => {
-              const u = users.get(id);
-              return u ? <Avatar key={id} user={u} /> : null;
-            })}
-          </span>
           <span className="meta">
+            <TaskBadges task={task} items fields={fields} />
             {showDue && (
-              <span className={"pill " + (overdue ? "pill-danger" : "pill-muted")} data-tip={overdue ? "Overdue" : "Due"}>
+              <span className={"meta-item" + (overdue ? " meta-overdue" : "")} data-tip={overdue ? "Overdue" : "Due"}>
                 ⏱ {fmtDue(task.due_at)}
               </span>
             )}
             {task.comment_count > 0 && (
-              <span className="pill pill-muted" data-tip={`${task.comment_count} comment${task.comment_count === 1 ? "" : "s"}`}>
+              <span className="meta-item" data-tip={`${task.comment_count} comment${task.comment_count === 1 ? "" : "s"}`}>
                 💬 {task.comment_count}
               </span>
             )}
@@ -1047,11 +1074,24 @@ function Card({ task, statuses, ws, labels, canWrite, canReorder, statusLabel, d
               </span>
             )}
             {task.cost_usd_total > 0 && (
-              <span className="pill pill-muted" data-tip="What the agent's runs on it cost so far (API-equivalent USD, as reported by the agent)">
+              <span className="meta-item" data-tip="What the agent's runs on it cost so far (API-equivalent USD, as reported by the agent)">
                 ${task.cost_usd_total.toFixed(2)}
               </span>
             )}
           </span>
+          {(assignees.length > 0 || creator) && (
+            <span className="people">
+              {(assignees.length === 0 || handOff) && creator && (
+                <span className="creator">
+                  <Avatar user={creator} size="xs" tip={`${createdBy}${assignees.length ? " → assigned to " + assignees.map(nameOf).join(", ") : " (unassigned)"}`} />
+                  {assignees.length > 0 && <Icon name="chevron-right" strokeWidth={2.2} />}
+                </span>
+              )}
+              {assignees.map((u) => (
+                <Avatar key={u.id} user={u} size="xs" tip={assigneeTip(u)} />
+              ))}
+            </span>
+          )}
         </div>
       </button>
       {canWrite && (

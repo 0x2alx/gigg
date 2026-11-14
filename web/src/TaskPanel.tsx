@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { api, ApiError, fmtTime, hasCap, priorityNames, resumeCommand, type Comment, type CustomField, type Recurrence, type Run, type Status, type Tag, type Task, type User } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, assignable } from "./fields";
@@ -11,6 +11,7 @@ import { CATEGORY_COLOR } from "./theme";
 import { EffortSelect, ModelInput, ToolsInput } from "./runsettings";
 import { Avatar, LabelChip, Pill, PriorityBadge, StatusBadge, TaskBadges, UserBadge } from "./ui";
 import { HelpButton } from "./help";
+import { Icon } from "./icons";
 
 const kindBadge: Record<Comment["kind"], [string, string] | null> = {
   comment: null,
@@ -214,7 +215,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     return (
       <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "")} aria-label="Task">
         <button type="button" className="icon-button close" onClick={onClose} aria-label="Close">
-          ✕
+          <Icon name="x" />
         </button>
         <p className={err ? "danger" : "muted"}>{err || "Loading…"}</p>
       </aside>
@@ -237,19 +238,19 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   };
 
   return (
-    <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "")} aria-label={`Task ${task.key}`} style={task.color ? { borderLeftColor: task.color } : undefined}>
+    <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "")} aria-label={`Task ${task.key}`} style={task.color ? ({ "--panel-c": task.color } as CSSProperties) : undefined}>
       <div className="tp-top">
-        <span className="pill pill-key">{task.key}</span>
+        <span className="tp-key">{task.key}</span>
         <div className="tp-badges">
           <StatusBadge name={task.status_name} category={task.status_category} color={status?.color} />
           <PriorityBadge priority={task.priority} />
           <TaskBadges task={task} />
           {!!task.blocked_by && (
             <span className="pill pill-danger" title="Agents won't pick it up until its blockers are done">
-              🔒 Blocked by {task.blocked_by} open
+              <Icon name="lock" /> Blocked by {task.blocked_by} open
             </span>
           )}
-          {!!task.archived_at && <span className="pill pill-muted">🗄 archived</span>}
+          {!!task.archived_at && <span className="pill pill-muted"><Icon name="archive" /> archived</span>}
           {task.deleted && <span className="pill pill-danger">in trash</span>}
         </div>
         <button
@@ -260,10 +261,10 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           aria-label={full ? "Back to the side panel" : "Expand to the full view"}
           title={full ? "Back to the side panel" : "Expand to the full view"}
         >
-          {full ? "⤡" : "⤢"}
+          <Icon name={full ? "shrink" : "expand"} />
         </button>
         <button type="button" className="icon-button close" onClick={onClose} aria-label="Close" title="Close (Esc)">
-          ✕
+          <Icon name="x" />
         </button>
       </div>
       {err && (
@@ -273,17 +274,17 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       )}
       {!!task.archived_at && (
         <div className="banner banner-muted" role="status">
-          🗄 Archived {fmtTime(task.archived_at)}: hidden from the board and lists.
+          <Icon name="archive" /> Archived {fmtTime(task.archived_at)}: hidden from the board and lists.
           {can("archive_tasks") && (
             <button type="button" className="button secondary small" onClick={() => act(api.unarchiveTask(task.id))}>
-              ↺ Unarchive
+              <Icon name="undo" /> Unarchive
             </button>
           )}
         </div>
       )}
       {!!task.blocked_by && (
         <div className="banner banner-danger" role="status">
-          🔒 Blocked by {task.blocked_by} open task{task.blocked_by === 1 ? "" : "s"}: agents won't pick it up until {task.blocked_by === 1 ? "it is" : "they are"} done.
+          <Icon name="lock" /> Blocked by {task.blocked_by} open task{task.blocked_by === 1 ? "" : "s"}: agents won't pick it up until {task.blocked_by === 1 ? "it is" : "they are"} done.
         </div>
       )}
 
@@ -297,7 +298,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                 <h2 className="panel-title">{task.title}</h2>
                 {canWrite && (
                   <button type="button" className="icon-button" aria-label="Edit title and description" title="Edit title and description" onClick={() => setEditing("text")}>
-                    ✎
+                    <Icon name="pencil" />
                   </button>
                 )}
               </div>
@@ -318,7 +319,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           {(creator || task.assignees.length > 0) && (
             <div className="tp-people" aria-label="People">
               {creator && <Avatar user={creator} size="l" />}
-              {task.assignees.length > 0 && <span className="arrow" aria-hidden="true">→</span>}
+              {task.assignees.length > 0 && <span className="arrow" aria-hidden="true"><Icon name="arrow-right" /></span>}
               {task.assignees.map((id) => {
                 const u = users.get(id);
                 return u ? <Avatar key={id} user={u} size="l" /> : null;
@@ -446,7 +447,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                     {task.assignees.length === 0 && <span className="muted">nobody</span>}
                     {canWrite && (
                       <button type="button" className="icon-button" aria-label="Edit assignees" onClick={() => setEditing("assignees")}>
-                        ✎
+                        <Icon name="pencil" />
                       </button>
                     )}
                   </div>
@@ -519,7 +520,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                     {task.labels.length === 0 && <span className="muted">none</span>}
                     {canWrite && (
                       <button type="button" className="icon-button" aria-label="Edit labels" onClick={() => setEditing("labels")}>
-                        ✎
+                        <Icon name="pencil" />
                       </button>
                     )}
                   </div>
@@ -583,26 +584,26 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           {canWrite && (
             <div className="tp-actions">
               <button type="button" className="button secondary" onClick={() => act(api.cloneTask(task.id), (t) => onMoved(t))}>
-                ⧉ Clone
+                <Icon name="copy" /> Clone
               </button>
               {can("archive_tasks") &&
                 !task.deleted &&
                 (task.archived_at ? (
                   <button type="button" className="button secondary" onClick={() => act(api.unarchiveTask(task.id))}>
-                    ↺ Unarchive
+                    <Icon name="undo" /> Unarchive
                   </button>
                 ) : (
                   <button type="button" className="button secondary" onClick={() => act(api.archiveTask(task.id))}>
-                    🗄 Archive
+                    <Icon name="archive" /> Archive
                   </button>
                 ))}
               {task.deleted ? (
                 <button type="button" className="button secondary" onClick={() => act(api.restoreTask(task.id))}>
-                  ↺ Restore
+                  <Icon name="undo" /> Restore
                 </button>
               ) : (
                 <button type="button" className="button danger-button" onClick={() => act(api.deleteTask(task.id))}>
-                  🗑 Delete
+                  <Icon name="trash" /> Delete
                 </button>
               )}
             </div>

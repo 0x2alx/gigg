@@ -81,7 +81,7 @@
   },
   {
    "shot": "task-new-night",
-   "el": "[role=dialog]"
+   "full": false
   },
   {
    "goto": "/board?p=3"
@@ -90,7 +90,14 @@
    "wait": ".board"
   },
   {
-   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions button\")].find(x => x.textContent.includes(\"Recurring\")); if (!b) return false; b.click(); return true; })()",
+   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions .head-more > button\")].find(x => x.textContent.includes(\"\\u22ef\")); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll(\".head-more .menu button\")].find(x => x.textContent.includes(\"Recurring\")); if (!b) return false; b.click(); return true; })()",
    "expect": true
   },
   {
@@ -341,7 +348,14 @@
    "wait": ".board .task-card"
   },
   {
-   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions button\")].find(x => x.textContent.includes(\"Trash\")); if (!b) return false; b.click(); return true; })()",
+   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions .head-more > button\")].find(x => x.textContent.includes(\"\\u22ef\")); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll(\".head-more .menu button\")].find(x => x.textContent.includes(\"Trash\")); if (!b) return false; b.click(); return true; })()",
    "expect": true
   },
   {

@@ -1,5 +1,5 @@
 // The project's recurring tasks (a template on a schedule): rule, next occurrence, counts; pause, edit, delete.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { api, ApiError, fmtDate, recurrenceBody, type Recurrence, type Status, type Tag } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { describeRule, fmtInstant, localTZ } from "./recurrence";
@@ -7,6 +7,7 @@ import { TaskModal } from "./TaskModal";
 import { SCHEDULE_COLOR } from "./theme";
 import { Avatar, LabelChip, Modal, Pill, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
+import { Icon } from "./icons";
 
 export function RecurringModal({ ws, projectId, statuses, labels, canWrite, highlight, onClose, onChanged }: {
   ws: WorkspaceTree;
@@ -93,7 +94,7 @@ export function RecurringModal({ ws, projectId, statuses, labels, canWrite, high
 
   const tz = localTZ();
   return (
-    <Modal title="⟳ Recurring tasks" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring tasks" />}>
+    <Modal title="Recurring tasks" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring tasks" />}>
       {err && (
         <p className="danger" role="alert">
           {err}
@@ -104,7 +105,7 @@ export function RecurringModal({ ws, projectId, statuses, labels, canWrite, high
       {items && items.length > 0 && (
         <ul className="schedules" ref={listRef} aria-label="Recurring tasks">
           {items.map((r) => (
-            <li key={r.id} data-schedule={r.id} className={"schedule" + (r.id === highlight ? " flash highlighted" : "") + (r.paused ? " paused" : "")} style={r.color ? { borderLeftColor: r.color } : undefined}>
+            <li key={r.id} data-schedule={r.id} className={"schedule" + (r.id === highlight ? " flash highlighted" : "") + (r.paused ? " paused" : "")} style={r.color ? ({ "--row-c": r.color } as CSSProperties) : undefined}>
               <div className="schedule-top">
                 <Pill color={SCHEDULE_COLOR} title="Recurring">
                   ⟳
@@ -134,12 +135,12 @@ export function RecurringModal({ ws, projectId, statuses, labels, canWrite, high
                 {r.lead_minutes > 0 && <span className="pill pill-muted">{r.lead_minutes} min early</span>}
                 {r.overlap === "create" && <span className="pill pill-muted">overlap</span>}
                 <span className="pill pill-muted" title="The schedule (timing) it runs on">
-                  ⏱ {r.schedule_name}
+                  <Icon name="clock" /> {r.schedule_name}
                   {r.schedule_uses > 1 ? ` · ×${r.schedule_uses}` : ""}
                 </span>
                 {(r.template_name !== r.title || r.template_uses > 1) && (
                   <span className="pill pill-muted" title="The template its tasks are made from">
-                    📋 {r.template_name}
+                    <Icon name="template" /> {r.template_name}
                     {r.template_uses > 1 ? ` · ×${r.template_uses}` : ""}
                   </span>
                 )}
@@ -167,13 +168,14 @@ export function RecurringModal({ ws, projectId, statuses, labels, canWrite, high
                   ) : (
                     <>
                       <button type="button" className="button secondary small" disabled={busy === r.id} onClick={() => togglePause(r)} aria-label={`${r.paused ? "Resume" : "Pause"} ${r.title}`}>
-                        {r.paused ? "▶ Resume" : "⏸ Pause"}
+                        <Icon name={r.paused ? "play" : "pause"} />
+                        {r.paused ? "Resume" : "Pause"}
                       </button>
                       <button type="button" className="button secondary small" onClick={() => setEditing(r)} aria-label={`Edit ${r.title}`}>
-                        ✎ Edit
+                        <Icon name="pencil" /> Edit
                       </button>
                       <button type="button" className="button danger-button small" onClick={() => setConfirm(r.id)} aria-label={`Delete ${r.title}`}>
-                        🗑 Delete
+                        <Icon name="trash" /> Delete
                       </button>
                     </>
                   )}
