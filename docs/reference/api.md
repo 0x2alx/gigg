@@ -270,7 +270,7 @@ in [access.md](access.md).
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/me` | Your profile. |
-| PATCH | `/me` | Change your display name, description, colour, preferences. `preferences` is merged by top-level key: each key given replaces that preference, `null` removes it, the others stay. |
+| PATCH | `/me` | Change your display name, description, colour, preferences. `preferences` is merged by top-level key: each key given replaces that preference, `null` removes it, the others stay (leaving a key out no longer removes it). |
 | GET | `/me/keys` | Keys acting as you. |
 | POST | `/me/keys` | Create a key acting as you (never wider than the credential used). |
 | POST | `/me/keys/{id}/rotate` | Replace one of your keys' secret. |

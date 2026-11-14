@@ -54,6 +54,11 @@ func TestPreferencesMerge(t *testing.T) {
 	if strings.Contains(string(out), `"sidebar"`) || !strings.Contains(string(out), `"board_filter":"l=bug"`) {
 		t.Fatalf("null removes: %s", out)
 	}
+	code, out, _ = e.req("PATCH", "/me", `{"preferences":{}}`, e.ada())
+	e.ok(code, out, 200)
+	if !strings.Contains(string(out), `"board_filter":"l=bug"`) {
+		t.Fatalf("empty object changed something: %s", out)
+	}
 	code, out, _ = e.req("PATCH", "/me", `{"preferences":["not","an","object"]}`, e.ada())
 	if code != 400 && code != 422 {
 		t.Fatalf("array accepted: %d %s", code, out)

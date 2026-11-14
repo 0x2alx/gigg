@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { setMentionUsers } from "./markdown";
 import { Link, Redirect, Route, Switch, useLocation, useSearch } from "wouter";
 import { api, ApiError, type Me, type Project, type ThemeState, type User } from "./api";
@@ -257,9 +257,16 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
 
   // setPref: one key at a time; the server merges it into the stored preferences, so another tab saving
   // its own key can't put back an old value of this one (a stale "sidebar: open" did exactly that)
+  // (undefined or null removes the key: sent as null, since JSON drops undefined)
   const setPref = useCallback((key: string, value: unknown) => {
-    setPrefs((p) => ({ ...p, [key]: value }));
-    api.patchMe({ preferences: { [key]: value } }).catch(() => undefined);
+    const gone = value === undefined || value === null;
+    setPrefs((p) => {
+      const next = { ...p };
+      if (gone) delete next[key];
+      else next[key] = value;
+      return next;
+    });
+    api.patchMe({ preferences: { [key]: gone ? null : value } }).catch(() => undefined);
   }, []);
 
   const ctx = useMemo<AppCtx | null>(
@@ -279,6 +286,13 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
     clearTimeout(peekTimer.current);
     peekTimer.current = setTimeout(() => setPeek(false), 220);
   };
+  // the pointer leaving doesn't fold it while the keyboard is working in it (a mouse click leaves focus
+  // there too, but not :focus-visible); Esc folds it either way
+  const pointerOut = (e: ReactMouseEvent<HTMLElement>) => {
+    const f = document.activeElement;
+    if (f && e.currentTarget.contains(f) && f.matches(":focus-visible")) return;
+    peekOut();
+  };
   const first = ctx.tree.find((w) => w.projects.length > 0);
   const logout = () => {
     api.logout().finally(onLogout);
@@ -295,10 +309,16 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
           aria-label="Navigation"
           inert={narrow && !drawer ? true : undefined}
           onMouseEnter={peekIn}
-          onMouseLeave={peekOut}
+          onMouseLeave={pointerOut}
           onFocus={peekIn}
           onBlur={(e) => {
             if (!e.currentTarget.contains(e.relatedTarget as Node | null)) peekOut();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && peek) {
+              clearTimeout(peekTimer.current);
+              setPeek(false);
+            }
           }}
         >
           <div className="side-top">
@@ -320,7 +340,6 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
                   setPref("sidebar", pinnedShut ? "open" : "collapsed");
                 }}
                 aria-label={pinnedShut ? "Keep the menu open" : "Collapse the menu (it opens while you point at it)"}
-                aria-pressed={!pinnedShut}
                 title={pinnedShut ? "Keep the menu open" : "Collapse the menu: it opens while you point at it"}
               >
                 <Icon name="sidebar" />

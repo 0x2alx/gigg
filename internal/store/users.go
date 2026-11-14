@@ -213,25 +213,27 @@ func PatchUser(ctx context.Context, q Q, a Actor, id, expect int64, p UserPatch)
 		if json.Unmarshal(*p.Preferences, &in) != nil || in == nil || len(*p.Preferences) > 16384 {
 			return nil, Invalid("preferences must be a JSON object under 16 KiB")
 		}
-		cur := map[string]json.RawMessage{}
-		if len(u.Preferences) > 0 {
-			_ = json.Unmarshal(u.Preferences, &cur) // stored by this function: always an object
-			if cur == nil {
-				cur = map[string]json.RawMessage{}
+		if len(in) > 0 { // {} changes nothing
+			cur := map[string]json.RawMessage{}
+			if len(u.Preferences) > 0 {
+				_ = json.Unmarshal(u.Preferences, &cur) // stored by this function: always an object
+				if cur == nil {
+					cur = map[string]json.RawMessage{}
+				}
 			}
-		}
-		for k, v := range in {
-			if string(v) == "null" {
-				delete(cur, k)
-			} else {
-				cur[k] = v
+			for k, v := range in {
+				if string(v) == "null" {
+					delete(cur, k)
+				} else {
+					cur[k] = v
+				}
 			}
+			b, _ := json.Marshal(cur)
+			if len(b) > 16384 {
+				return nil, Invalid("preferences must be a JSON object under 16 KiB")
+			}
+			set("preferences", string(b))
 		}
-		b, _ := json.Marshal(cur)
-		if len(b) > 16384 {
-			return nil, Invalid("preferences must be a JSON object under 16 KiB")
-		}
-		set("preferences", string(b))
 	}
 	if p.IsAdmin != nil {
 		set("is_admin", *p.IsAdmin)

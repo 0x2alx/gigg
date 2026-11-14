@@ -695,7 +695,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       {pick && (
         <PickModal
           what={pick}
-          options={pick === "schedules" ? [] : inScope.filter((x) => (pick === "templates" ? hasCap(me, "templates", x.ws.id) : pick === "archive" ? canWriteIn(x.ws) && hasCap(me, "archive_tasks", x.ws.id) : pick === "new" ? canWriteIn(x.ws) : true))}
+          options={pick === "schedules" ? [] : inScope.filter((x) => (pick === "templates" ? hasCap(me, "templates", x.ws.id) : pick === "archive" ? archivable.includes(x) : pick === "new" ? canWriteIn(x.ws) : true))}
           workspaces={wsInScope}
           onPick={(id) => (pick === "schedules" ? (setPick(null), setTimings(id)) : runAction(pick, id))}
           onClose={() => {
@@ -840,7 +840,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
   );
   if (shut) {
     return (
-      <div className="board-filters bf-folded" role="group" aria-label="Board filters (folded)">
+      <div className="board-filters bf-folded" id="board-filters" role="group" aria-label="Board filters (folded)">
         <div className="bf-row">
           {foldButton}
           {active.map((x) => (
@@ -1089,34 +1089,39 @@ function ArchiveDoneModal({ options, initial, onClose, onDone }: {
   onDone: (n: number) => void;
 }) {
   const [days, setDays] = useState(7);
-  const [picked, setPicked] = useState<number[]>(initial);
+  const [ticked, setTicked] = useState<number[]>(initial);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const total = useRef(0); // archived so far, over a failed attempt and its retry
+  // only projects still on offer count (the board's projects can change while the dialog is open)
+  const picked = options.map((o) => o.project.id).filter((id) => ticked.includes(id));
   const all = options.length > 0 && picked.length === options.length;
-  const toggle = (id: number) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const toggle = (id: number) => setTicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const close = () => {
+    if (busy) return; // the loop finishes first
+    if (total.current > 0) onDone(total.current); // a partial run that was given up: still refresh and say so
+    onClose();
+  };
   const go = async () => {
     setBusy(true);
     setErr("");
-    let total = 0;
-    const done: string[] = [];
     for (const { project } of options.filter((o) => picked.includes(o.project.id))) {
       try {
-        total += (await api.archiveDone(project.id, days)).archived;
-        done.push(project.key);
+        total.current += (await api.archiveDone(project.id, days)).archived;
+        setTicked((p) => p.filter((x) => x !== project.id)); // done: a retry skips it
       } catch (e: unknown) {
         const why = e instanceof ApiError ? e.message : "it failed";
-        setErr(`Couldn't archive in ${project.key}: ${why}.${done.length ? ` Done in ${done.join(", ")} (${total} archived).` : ""}`);
+        setErr(`Couldn't archive in ${project.key}: ${why}.${total.current ? ` ${total.current} archived so far; the projects done are unticked.` : ""}`);
         setBusy(false);
-        if (total > 0) onDone(total);
         return;
       }
     }
     setBusy(false);
-    onDone(total);
+    onDone(total.current);
     onClose();
   };
   return (
-    <Modal title="Archive done tasks" onClose={onClose}>
+    <Modal title="Archive done tasks" onClose={close}>
       <p className="small">Archived tasks leave the board and lists; they stay searchable and can be unarchived from the task.</p>
       {options.length === 0 ? (
         <p className="muted small">No project in view allows archiving.</p>
@@ -1125,7 +1130,7 @@ function ArchiveDoneModal({ options, initial, onClose, onDone }: {
           <fieldset className="archive-pick">
             <legend className="small muted">Projects</legend>
             <label className="archive-row archive-all">
-              <input type="checkbox" checked={all} onChange={() => setPicked(all ? [] : options.map((o) => o.project.id))} />
+              <input type="checkbox" checked={all} onChange={() => setTicked(all ? [] : options.map((o) => o.project.id))} />
               <span>All projects in view ({options.length})</span>
             </label>
             {options.map(({ ws, project }) => (
@@ -1152,7 +1157,7 @@ function ArchiveDoneModal({ options, initial, onClose, onDone }: {
         </p>
       )}
       <div className="row end">
-        <button type="button" className="button secondary" onClick={onClose}>
+        <button type="button" className="button secondary" onClick={close} disabled={busy}>
           Cancel
         </button>
         <button type="button" className="button" onClick={() => void go()} disabled={busy || picked.length === 0}>
