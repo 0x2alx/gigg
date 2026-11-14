@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Comment is Markdown text on a task.
@@ -358,6 +359,15 @@ func RunProgress(ctx context.Context, q Q, r *Run, pct *int64, note string) (*Ru
 	return GetRun(ctx, q, r.ID)
 }
 
+// RecentRunProgressEvent reports whether a run.progress activity entry for this run was written
+// within the last `within`.
+func RecentRunProgressEvent(ctx context.Context, q Q, runID int64, within time.Duration) (bool, error) {
+	var n int64
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT at FROM activity WHERE entity_type = 'run' AND entity_id = ?
+		AND action = 'run.progress' ORDER BY id DESC LIMIT 1) WHERE at > ?`, runID, Now()-within.Milliseconds()).Scan(&n)
+	return n > 0, err
+}
+
 // RunEvent is one timeline entry.
 type RunEvent struct {
 	ID   int64  `json:"id"`
@@ -583,6 +593,9 @@ func ClaimTask(ctx context.Context, q Q, a Actor, ws int64, c Claim) (*Task, err
 func ResumeTask(ctx context.Context, q Q, a Actor, t *Task, comment string) (*Task, error) {
 	if t.Deleted {
 		return nil, Conflict("the task is in the trash")
+	}
+	if t.ArchivedAt != nil {
+		return nil, Conflict("the task is archived; unarchive it first")
 	}
 	if strings.TrimSpace(comment) != "" {
 		if _, err := AddComment(ctx, q, a, t, "resume_request", comment, nil); err != nil {

@@ -393,6 +393,20 @@ func TestRunnerFlow(t *testing.T) {
 	if acts := e.allChanges("current", k, 100); acts[len(acts)-1].Action != "run.progress" {
 		t.Fatalf("progress note not in the feed: %s", acts[len(acts)-1].Action)
 	}
+	// a burst of progress is one event per run every few seconds; a bare heartbeat is none
+	code, out, _ = e.req("POST", fmt.Sprintf("/runs/%d/progress", rd.ID), `{"pct":70}`, k)
+	e.ok(code, out, 200)
+	code, out, _ = e.req("POST", fmt.Sprintf("/runs/%d/progress", rd.ID), `{}`, k)
+	e.ok(code, out, 200)
+	n := 0
+	for _, it := range e.allChanges("current", k, 100) {
+		if it.Action == "run.progress" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("%d run.progress events, want 1", n)
+	}
 	code, out, _ = e.req("POST", fmt.Sprintf("/runs/%d/finish", rd.ID),
 		`{"status":"needs_human","report_md":"Siren or **chime**?","comment_kind":"question","move_to_category":"waiting","cost_usd":0.44,"num_turns":6,"transcript_path":"/home/x/.claude/projects/p/`+sid+`.jsonl"}`, k)
 	e.ok(code, out, 200)
@@ -847,5 +861,51 @@ func TestCSRFOtherAllowedName(t *testing.T) {
 		if got := post(c.host, c.origin); got != c.want {
 			t.Errorf("host %s origin %s: %d, want %d", c.host, c.origin, got, c.want)
 		}
+	}
+}
+
+// TestQuestionOnWaitingCards: a waiting task carries the agent's latest question or report until
+// someone answers it; archived tasks can't be resumed.
+func TestQuestionOnWaitingCards(t *testing.T) {
+	e := newEnv(t)
+	scout := e.key("scout")
+	code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"]), `{"title":"Pick a colour"}`, scout)
+	e.ok(code, out, 201)
+	var tk store.Task
+	_ = json.Unmarshal(out, &tk)
+	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/move", `{"category":"waiting"}`, scout)
+	e.ok(code, out, 200)
+	question := func() *store.QuestionBrief {
+		t.Helper()
+		code, out, _ := e.req("GET", fmt.Sprintf("/projects/%d/tasks", tk.ProjectID), "", e.ada())
+		e.ok(code, out, 200)
+		var l TaskList
+		_ = json.Unmarshal(out, &l)
+		for _, x := range l.Items {
+			if x.ID == tk.ID {
+				return x.Question
+			}
+		}
+		t.Fatal("task missing")
+		return nil
+	}
+	if q := question(); q != nil {
+		t.Fatalf("question before any comment: %+v", q)
+	}
+	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/comments", `{"body_md":"Blue or green?","kind":"report"}`, scout)
+	e.ok(code, out, 201)
+	if q := question(); q == nil || q.Text != "Blue or green?" {
+		t.Fatalf("report as the question: %+v", q)
+	}
+	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/comments", `{"body_md":"green"}`, e.ada())
+	e.ok(code, out, 201)
+	if q := question(); q != nil {
+		t.Fatalf("answered question still shown: %+v", q)
+	}
+	csrf := map[string]string{"X-Gigg-CSRF": "1"}
+	code, out, _ = e.reqH("POST", "/tasks/"+tk.Key+"/archive", "", e.ada(), csrf)
+	e.ok(code, out, 200)
+	if code, out, _ := e.req("POST", "/tasks/"+tk.Key+"/resume", `{}`, e.ada()); code != 409 {
+		t.Fatalf("resume of an archived task: %d %s", code, out)
 	}
 }

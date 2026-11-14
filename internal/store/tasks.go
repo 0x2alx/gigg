@@ -330,8 +330,9 @@ func fillRuns(ctx context.Context, q Q, ts []*Task) error {
 	return rows.Err()
 }
 
-// AttachQuestions sets Question on the waiting tasks: their latest question comment, cut short.
-// Callers check the comments:read scope first.
+// AttachQuestions sets Question on the waiting tasks whose latest comment is an agent's question or
+// report (what the Inbox shows), cut short. A later comment by anyone (an answer, a resume request)
+// means it has been dealt with. Callers check the comments:read scope first.
 func AttachQuestions(ctx context.Context, q Q, ts []*Task) error {
 	byID := map[int64]*Task{}
 	ids := []int64{}
@@ -345,7 +346,8 @@ func AttachQuestions(ctx context.Context, q Q, ts []*Task) error {
 		return nil
 	}
 	rows, err := q.QueryContext(ctx, `SELECT c.id, c.task_id, c.author_id, c.created_at, substr(c.body_md, 1, ?) FROM comments c
-		WHERE c.id IN (SELECT max(id) FROM comments WHERE task_id IN (`+placeholders(len(ids))+`) AND kind = 'question' AND deleted_at IS NULL GROUP BY task_id)`,
+		WHERE c.id IN (SELECT max(id) FROM comments WHERE task_id IN (`+placeholders(len(ids))+`) AND kind != 'system' AND deleted_at IS NULL GROUP BY task_id)
+		AND c.kind IN ('question', 'report')`,
 		append([]any{questionBriefLen + 1}, int64Args(ids)...)...)
 	if err != nil {
 		return err

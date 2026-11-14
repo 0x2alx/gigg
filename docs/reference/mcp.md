@@ -12,8 +12,9 @@ gigg serves the Model Context Protocol so agents can use the board as a set of t
 | Request body limit | 1 MiB |
 
 Requests without a key get 401 with `WWW-Authenticate: Bearer realm="gigg"`. A request that sends an
-`Origin` header is refused (403) unless it equals the origin of `GIGG_PUBLIC_URL`; command-line MCP
-clients normally send no `Origin`. The key's listener and network restrictions, rate limit and scopes
+`Origin` header is refused (403) unless it is the origin of `GIGG_PUBLIC_URL` or the very host and port
+the request was sent to (when that host is an allowed host); without `GIGG_PUBLIC_URL` any `Origin` is
+refused. Command-line MCP clients normally send no `Origin`. The key's listener and network restrictions, rate limit and scopes
 apply as for the REST API, and the `Host` header must be an allowed host.
 
 Claude Code:

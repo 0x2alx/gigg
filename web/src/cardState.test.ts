@@ -19,6 +19,9 @@ describe("cardState", () => {
     expect(cardState({ status_category: "waiting", resume_requested_at: null, last_run: run("needs_human"), question: q })?.label).toBe("Needs answer");
     expect(cardState({ status_category: "waiting", resume_requested_at: null })).toBeNull();
   });
+  it("archived tasks show no state", () => {
+    expect(cardState({ status_category: "doing", resume_requested_at: null, last_run: run("error"), archived_at: 5 })).toBeNull();
+  });
   it("a failed last run shows until the task is closed", () => {
     expect(cardState({ status_category: "doing", resume_requested_at: null, last_run: run("timeout") })?.label).toBe("Timed out");
     expect(cardState({ status_category: "done", resume_requested_at: null, last_run: run("error") })).toBeNull();
@@ -40,5 +43,6 @@ describe("plainText", () => {
     expect(plainText("Siren or **chime**?")).toBe("Siren or chime?");
     expect(plainText("## Which one\n- [x] `a`\n- see [docs](https://x.y)")).toBe("Which one a see docs");
     expect(plainText("snake_case_name stays")).toBe("snake_case_name stays");
+    expect(plainText("*one* and _two_ and __three__, 2 * 3 * 4")).toBe("one and two and three, 2 * 3 * 4");
   });
 });

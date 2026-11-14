@@ -55,11 +55,11 @@ A card shows what its agent is doing, as a small badge in the top row and, for s
 | Badge | Block | Meaning |
 |---|---|---|
 | **Running** · 4m 12s (green) | the agent, its model, a progress bar and its latest progress note | An agent is working on it now; the time counts up |
-| **Needs answer** | the agent's question, up to three lines | The task waits for a person: open it and answer, then **Resume** |
+| **Needs answer** | the agent's question, up to three lines | The task is in Waiting and its latest comment is the agent's question or report: open it and answer, then **Resume**. Your answer clears the badge |
 | **Failed**, **Timed out** or **Interrupted** (red) | a red block at the foot of the card, with the reason and **Retry** | The agent's last run didn't finish. **Retry** resumes its session: the task goes back to To-Do and the runner continues on its next pass |
 | **Resume queued** | none | Someone asked the agent to continue its session |
 
-The progress note appears when the agent reports progress (the `report_progress` MCP tool or the runner's progress call) and updates live.
+The progress bar and note appear when the agent reports progress (the `report_progress` MCP tool or the runner's progress call) and update live. Archived cards show no agent state. Collapsing a column moves the keyboard focus to its button above the board, and expanding it moves the focus back to the column's name.
 
 The avatars at the bottom right are the people assigned to the task, overlapping. When there is no assignee, the creator is shown; when a person handed the task to an agent, the creator appears as a smaller picture before the agent. Hover an avatar to see who created the task and who it is assigned to. Agents have square-ish avatars.
 

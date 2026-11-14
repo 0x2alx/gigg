@@ -232,6 +232,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     s.delete("new");
     const rest = s.toString();
     navigate(loc + (rest ? "?" + rest : ""), { replace: true });
+    setNewIn(null);
     if (inScope.length === 1) setAdding(inScope[0]!.project.id);
     else if (inScope.length > 1) setPick("new");
   }, [search, loc, navigate, inScope]);
@@ -239,12 +240,15 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const collapseKey = single ? single.project.id : 0;
   const [collapsed, setCollapsed] = useState<number[]>(() => loadCollapsed(collapseKey));
   useEffect(() => setCollapsed(loadCollapsed(collapseKey)), [collapseKey]);
-  const toggleCollapsed = (id: number) =>
+  const toggleCollapsed = (id: number) => {
     setCollapsed((cur) => {
       const next = toggleId(cur, id);
       saveCollapsed(collapseKey, next);
       return next;
     });
+    // the clicked control goes away: keep the keyboard where the column went (its chip, or its header)
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-col-focus="${id}"]`)?.focus());
+  };
 
   const allTasks = useMemo(() => [...boards.values()].flatMap((b) => b.statuses.flatMap((s) => s.tasks)), [boards]);
   const taskById = (id: number) => allTasks.find((t) => t.id === id);
@@ -333,12 +337,12 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     setDrag(null);
     setDrop(null);
   };
-  const dragOver = (e: DragEvent<HTMLElement>, c: BoardColumn) => {
+  const dragOver = (e: DragEvent<HTMLElement>, c: BoardColumn, atEnd = false) => {
     if (drag === null) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     let index = -1;
-    if (manual) {
+    if (manual && !atEnd) {
       const cards = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-task-id]")].filter((el) => Number(el.dataset.taskId) !== drag);
       index = cards.findIndex((el) => {
         const r = el.getBoundingClientRect();
@@ -581,7 +585,8 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
               aria-expanded={false}
               data-tip={`Show the ${c.name} column${drag !== null ? " (or drop the card here)" : ""}`}
               onClick={() => toggleCollapsed(c.id)}
-              onDragOver={(e) => dragOver(e, c)}
+              data-col-focus={c.id}
+              onDragOver={(e) => dragOver(e, c, true)}
               onDrop={(e) => dropOn(e, c)}
               onDragLeave={(e) => dragLeave(e, c)}
             >
@@ -592,7 +597,8 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           ))}
         </div>
       )}
-      <div className="board" style={{ gridTemplateColumns: `repeat(${openCols.length}, minmax(0, 1fr))` }}>
+      {openCols.length === 0 && closedCols.length > 0 && <p className="muted">Every column is collapsed: click one above to show it.</p>}
+      <div className="board" style={{ gridTemplateColumns: `repeat(${Math.max(1, openCols.length)}, minmax(0, 1fr))` }}>
         {openCols.map((c) => {
           const others = c.tasks.filter((t) => t.id !== drag);
           const line = drop?.col === c.key ? drop.index : -1;
@@ -608,10 +614,14 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
               onDrop={(e) => dropOn(e, c)}
               onDragLeave={(e) => dragLeave(e, c)}
             >
-              <h2 className="column-head">
-                <StageIcon category={c.category} color={colColor(c)} />
-                <span className="column-name">{c.name}</span>
-                <span className="count-pill">{c.tasks.length}</span>
+              <div className="column-head">
+                <h2 className="column-title" tabIndex={-1} data-col-focus={c.id}>
+                  <StageIcon category={c.category} color={colColor(c)} />
+                  <span className="column-name">{c.name}</span>
+                  <span className="count-pill" aria-label={`${c.tasks.length} task${c.tasks.length === 1 ? "" : "s"}`}>
+                    {c.tasks.length}
+                  </span>
+                </h2>
                 <span className="column-tools">
                   {addHere && (
                     <button type="button" className="icon-button" aria-label={`New task in ${c.name}`} onClick={() => addIn(c)}>
@@ -624,7 +634,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                     </button>
                   )}
                 </span>
-              </h2>
+              </div>
               <div className="cards">
                 {c.tasks.map((t, i) => {
                   if (t.id !== drag) k++;
@@ -659,7 +669,10 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           options={pick === "schedules" ? [] : inScope.filter((x) => (pick === "templates" ? hasCap(me, "templates", x.ws.id) : pick === "archive" ? canWriteIn(x.ws) && hasCap(me, "archive_tasks", x.ws.id) : pick === "new" ? canWriteIn(x.ws) : true))}
           workspaces={wsInScope}
           onPick={(id) => (pick === "schedules" ? (setPick(null), setTimings(id)) : runAction(pick, id))}
-          onClose={() => setPick(null)}
+          onClose={() => {
+            setPick(null);
+            setNewIn(null);
+          }}
         />
       )}
       {addCtx && (
@@ -1137,6 +1150,14 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
   const worker = run ? users.get(run.worker_user_id) : undefined;
   const asker = task.question ? users.get(task.question.author_id) : undefined;
   const [retrying, setRetrying] = useState(false);
+  // the button's name replaces its contents for screen readers: say the agent state there too
+  const cardLabel = [
+    `${task.key} ${task.title}`,
+    state && (running && run ? `${state.label} for ${elapsed(now - run.started_at)}${run.progress_note ? `: ${run.progress_note}` : ""}` : state.label),
+    state?.kind === "answer" && task.question ? plainText(task.question.text) : "",
+  ]
+    .filter(Boolean)
+    .join(". ");
   const retry = () => {
     setRetrying(true);
     setErr("");
@@ -1160,7 +1181,7 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
       }}
       onDragEnd={onDragEnd}
     >
-      <button type="button" className="card-open" onClick={onOpen} aria-label={`${task.key} ${task.title}`}>
+      <button type="button" className="card-open" onClick={onOpen} aria-label={cardLabel}>
         <div className="card-top">
           <PriorityIcon priority={task.priority} />
           {state && (

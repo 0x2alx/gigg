@@ -111,8 +111,8 @@ returns the same body as `GET /auth/me`.
 A cookie-authenticated request with a method other than GET, HEAD or OPTIONS must:
 
 1. not carry `Sec-Fetch-Site` other than `same-origin`;
-2. carry an `Origin` that is this server's: the public URL's origin, or exactly the scheme, host and
-   port the request was sent to when that host is an allowed host (a server reached by both its IP and
+2. carry an `Origin` that is this server's: the public URL's origin, or an origin with exactly the host
+   and port the request was sent to when that host is an allowed host (a server reached by both its IP and
    a `.local` name works under either). Without `GIGG_PUBLIC_URL`, an origin whose host is an allowed
    host;
 3. have `Content-Type: application/json` or `application/merge-patch+json`, **or** carry an
@@ -404,8 +404,9 @@ optionally prefixed with `-` for descending), `limit`, `cursor`.
 Every task carries `last_run` (absent when it never ran): its latest run in brief (`id`, `status`,
 `worker_user_id`, `started_at`, `heartbeat_at`, `ended_at`, `model`, `progress_pct`, `progress_note`,
 `error_reason`). In task lists and on the board (`GET /projects/{p}/board`), a task in a Waiting status
-also carries `question` when the caller has `comments:read`: the latest question comment (`comment_id`,
-`author_id`, `created_at`, `text`: its Markdown cut to 280 characters).
+also carries `question` when the caller has `comments:read` and the task's latest comment is a
+`question` or `report` (what the Inbox shows; a later comment by anyone, such as an answer, clears it):
+`comment_id`, `author_id`, `created_at`, `text` (its Markdown cut to 280 characters).
 
 ### comments
 

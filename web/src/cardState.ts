@@ -12,9 +12,10 @@ export interface CardState {
 
 const FAILED: Record<string, string> = { error: "Failed", timeout: "Timed out", interrupted: "Interrupted" };
 
-type CardTask = Pick<Task, "status_category" | "resume_requested_at" | "last_run" | "question">;
+type CardTask = Pick<Task, "status_category" | "resume_requested_at" | "last_run" | "question" | "archived_at">;
 
 export function cardState(t: CardTask): CardState | null {
+  if (t.archived_at) return null; // archived: out of the agents' way, nothing to act on
   const r = t.last_run;
   const closed = t.status_category === "done" || t.status_category === "cancelled";
   if (r?.status === "running") return { kind: "running", label: "Running", tip: "An agent is working on it now" };
@@ -42,10 +43,11 @@ export function plainText(md: string): string {
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/`([^`]*)`/g, "$1")
+    // no lookbehind here: Safari before 16.4 can't parse it, and that would break the whole bundle
     .replace(/(\*\*|~~)(.+?)\1/g, "$2")
-    .replace(/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, "$1")
-    .replace(/(?<!\w)__(.+?)__(?!\w)/g, "$1")
-    .replace(/(?<!\w)_(?!\s)(.+?)(?<!\s)_(?!\w)/g, "$1")
+    .replace(/(^|[^\w*])\*([^*\s](?:[^*]*[^*\s])?)\*(?!\w)/g, "$1$2")
+    .replace(/(^|\W)__([^_]+?)__(?!\w)/g, "$1$2")
+    .replace(/(^|\W)_([^_\s](?:[^_]*[^_\s])?)_(?!\w)/g, "$1$2")
     .replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, "")
     .replace(/\s+/g, " ")
     .trim();

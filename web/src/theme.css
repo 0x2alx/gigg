@@ -196,9 +196,10 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   border-radius: var(--radius-l);
   display: flex; flex-direction: column; min-width: 0;
 }
-.column-head {
-  display: flex; align-items: center; gap: var(--sp-3); min-height: 2.6rem; padding: 0 0.45rem 0 0.75rem;
-  font-size: var(--fs-base); font-weight: var(--weight-strong);
+.column-head { display: flex; align-items: center; gap: var(--sp-3); min-height: 2.6rem; padding: 0 0.45rem 0 0.75rem; }
+.column-title {
+  display: flex; align-items: center; gap: var(--sp-3); min-width: 0; margin: 0;
+  font-size: var(--fs-base); font-weight: var(--weight-strong); outline-offset: 2px;
 }
 .stage-icon { flex: none; font-size: 0.95rem; }
 .column-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -213,7 +214,10 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .column-tools .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
 .column-tools .icon-button:hover { color: var(--text); }
 .column:not(:hover):not(:focus-within) .column-tools { opacity: 0; }
-@media (hover: none) { .column .column-tools { opacity: 1 !important; } }
+@media (hover: none) {
+  .column .column-tools { opacity: 1 !important; }
+  .column-tools .icon-button { width: 2.25rem; height: 2.25rem; } /* a finger-sized target */
+}
 .cards { --card-gap: var(--sp-3); padding: 0 var(--sp-3) var(--sp-3); display: flex; flex-direction: column; gap: var(--card-gap); }
 .column-add {
   display: inline-flex; align-items: center; gap: 0.35rem; align-self: flex-start; padding: 0.3rem 0.45rem; margin-top: -0.1rem;
