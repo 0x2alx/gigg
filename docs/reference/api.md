@@ -404,9 +404,10 @@ optionally prefixed with `-` for descending), `limit`, `cursor`.
 Every task carries `last_run` (absent when it never ran): its latest run in brief (`id`, `status`,
 `worker_user_id`, `started_at`, `heartbeat_at`, `ended_at`, `model`, `progress_pct`, `progress_note`,
 `error_reason`). In task lists and on the board (`GET /projects/{p}/board`), a task in a Waiting status
-also carries `question` when the caller has `comments:read` and the task's latest comment is a
-`question` or `report` (what the Inbox shows; a later comment by anyone, such as an answer, clears it):
-`comment_id`, `author_id`, `created_at`, `text` (its Markdown cut to 280 characters).
+also carries `question` when the caller has `comments:read`: the task's latest `question` or `report`
+comment, until someone other than its author comments after it (an answer clears it; the author's own
+follow-ups don't): `comment_id`, `author_id`, `created_at`, `kind` (`question` or `report`), `text` (its
+Markdown cut to 280 characters).
 
 ### comments
 

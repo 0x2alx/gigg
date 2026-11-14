@@ -96,14 +96,15 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     if (taskId === null) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const on = (e: Event) => {
-      const d = (e as CustomEvent<{ workspaceId?: number; item?: { entity_type?: string; entity_id?: number | null; data?: unknown } }>).detail;
+      const d = (e as CustomEvent<{ workspaceId?: number; item?: { action?: string; entity_type?: string; entity_id?: number | null; data?: unknown } }>).detail;
       const it = d?.item;
       if (!it) return;
       const data = (it.data ?? {}) as { task_id?: unknown };
       const hit = (it.entity_id === taskId && (!it.entity_type || it.entity_type === "task")) || data.task_id === taskId;
       if (!hit) return;
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => loadRef.current(), 400);
+      // a progress note changes the runs only; anything else reloads the task, its comments and runs
+      timer = setTimeout(() => (it.action === "run.progress" ? api.runs(taskId).then((r) => setRuns(r.items), () => undefined) : loadRef.current()), 400);
     };
     window.addEventListener("gigg:activity", on);
     return () => {

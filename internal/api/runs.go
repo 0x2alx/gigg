@@ -141,7 +141,7 @@ type InboxItem struct {
 }
 
 // progressEventEvery: at most one run.progress event per run in this time (tests shorten it).
-var progressEventEvery = 5 * time.Second
+var progressEventEvery = 15 * time.Second
 
 func (a *API) registerRuns() {
 	huma.Register(a.h, huma.Operation{OperationID: "list-task-runs", Method: "GET", Path: "/tasks/{id}/runs", Tags: []string{"runs"},
@@ -218,21 +218,12 @@ func (a *API) registerRuns() {
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			var err error
 			r, err = store.RunProgress(ctx, tx, r, in.Body.Pct, in.Body.Note)
-			if err != nil || (in.Body.Note == "" && in.Body.Pct == nil) {
-				return err
-			}
-			// a note or a percentage is news for open boards (their cards show both); a bare heartbeat
-			// isn't, and a chatty worker is coalesced to one event per run every few seconds
-			recent, err := store.RecentRunProgressEvent(ctx, tx, r.ID, progressEventEvery)
-			if err != nil || recent {
-				return err
-			}
-			t, err := store.GetTask(ctx, tx, r.TaskID)
 			if err != nil {
 				return err
 			}
-			_, err = store.Activity(ctx, tx, p.Actor(), &t.WorkspaceID, &t.ProjectID, "run.progress", "run", r.ID, map[string]any{"task_id": t.ID})
-			return err
+			// open boards show the percentage and the note: tell them when either changed, at most once
+			// per run every few seconds (a later call, even a bare heartbeat, sends what was held back)
+			return store.RunProgressEvent(ctx, tx, p.Actor(), r, progressEventEvery)
 		})
 		if err != nil {
 			return nil, err

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"regexp"
 	"strings"
 	"time"
@@ -359,14 +360,44 @@ func RunProgress(ctx context.Context, q Q, r *Run, pct *int64, note string) (*Ru
 	return GetRun(ctx, q, r.ID)
 }
 
-// RecentRunProgressEvent reports whether a run.progress activity entry for this run was written
-// within the last `within`.
-func RecentRunProgressEvent(ctx context.Context, q Q, runID int64, within time.Duration) (bool, error) {
-	var n int64
-	err := q.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT at FROM activity WHERE entity_type = 'run' AND entity_id = ?
-		AND action = 'run.progress' ORDER BY id DESC LIMIT 1) WHERE at > ?`, runID, Now()-within.Milliseconds()).Scan(&n)
-	return n > 0, err
+// RunProgressEvent logs a run.progress activity entry when the run's percentage or note differ from
+// what the last entry announced and that entry is at least `every` old. The entry carries only the
+// task id and a signature of the progress (boards read the values from the task), so the activity
+// table never holds the note's text. Old entries are pruned by housekeeping.
+func RunProgressEvent(ctx context.Context, q Q, a Actor, r *Run, every time.Duration) error {
+	h := fnv.New32a()
+	if r.ProgressNote != nil {
+		h.Write([]byte(*r.ProgressNote))
+	}
+	pct := int64(-1)
+	if r.ProgressPct != nil {
+		pct = *r.ProgressPct
+	}
+	sig := fmt.Sprintf("%d:%08x", pct, h.Sum32())
+	var at int64
+	var last string
+	err := q.QueryRowContext(ctx, `SELECT at, COALESCE(json_extract(data, '$.sig'), '') FROM activity
+		WHERE entity_type = 'run' AND entity_id = ? AND action = 'run.progress' ORDER BY id DESC LIMIT 1`, r.ID).Scan(&at, &last)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		if r.ProgressNote == nil && r.ProgressPct == nil {
+			return nil // nothing to show yet
+		}
+	case err != nil:
+		return err
+	case last == sig || Now()-at < every.Milliseconds():
+		return nil
+	}
+	t, err := GetTask(ctx, q, r.TaskID)
+	if err != nil {
+		return err
+	}
+	_, err = Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "run.progress", "run", r.ID, map[string]any{"task_id": t.ID, "sig": sig})
+	return err
 }
+
+// progressEventKeep: run.progress entries are only news; housekeeping drops them after this.
+const progressEventKeep = 24 * time.Hour
 
 // RunEvent is one timeline entry.
 type RunEvent struct {

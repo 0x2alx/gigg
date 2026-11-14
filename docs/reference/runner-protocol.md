@@ -155,7 +155,8 @@ POST /runs/{id}/progress   {"pct": 40, "note": "tests pass, writing docs"}
 Updates the run's heartbeat. `pct` (0-100) and `note` (up to 2 KiB) are optional; when either is given
 it is added to the run's timeline (`GET /runs/{id}`). Both show on the task's board card
 (`last_run.progress_pct`, `last_run.progress_note`), and open boards hear of them through a
-`run.progress` event (at most one per run every 5 seconds). Answers 409 once the run has ended. An agent
+`run.progress` event: at most one per run every 15 seconds, and a later call (even a bare heartbeat)
+sends what was held back. These events are pruned after a day and left out of the task's history. Answers 409 once the run has ended. An agent
 inside the run can report progress itself with the MCP tool `report_progress` (it finds the task's
 running run).
 

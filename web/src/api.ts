@@ -150,6 +150,7 @@ export interface QuestionBrief {
   comment_id: number;
   author_id: number;
   created_at: number;
+  kind: "question" | "report";
   text: string; // Markdown, at most 280 characters
 }
 

@@ -168,6 +168,18 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   dragRef.current = drag;
   const loadRef = useRef(load);
   loadRef.current = load;
+  const movesInFlight = useRef(0);
+  // patchTask: put a freshly fetched task in place on the board (same status: same column, same order)
+  const patchRef = useRef((t: Task) => {
+    void t;
+  });
+  patchRef.current = (t: Task) =>
+    setBoards((cur) => {
+      const b = cur.get(t.project_id);
+      if (!b || !b.statuses.some((s) => s.tasks.some((x) => x.id === t.id && x.status_id === t.status_id))) return cur;
+      const nb = { ...b, statuses: b.statuses.map((s) => ({ ...s, tasks: s.tasks.map((x) => (x.id === t.id ? t : x)) })) };
+      return new Map(cur).set(t.project_id, nb);
+    });
   useEffect(() => {
     const ids = new Set(wsKey ? wsKey.split(",").map(Number) : []);
     if (taskPid) {
@@ -176,16 +188,31 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     }
     let timer: ReturnType<typeof setTimeout> | null = null;
     const fire = () => {
-      if (dragRef.current !== null) {
+      // never mid-drag, nor while a move is on its way (a reload answered first would undo it on screen)
+      if (dragRef.current !== null || movesInFlight.current > 0) {
         timer = setTimeout(fire, 400);
         return;
       }
       timer = null;
       loadRef.current();
     };
+    // progress of a running agent changes one card: fetch that task alone (debounced per task)
+    const progress = new Map<number, ReturnType<typeof setTimeout>>();
     const on = (e: Event) => {
-      const d = (e as CustomEvent<{ workspaceId?: number }>).detail;
+      const d = (e as CustomEvent<{ workspaceId?: number; item?: { action?: string; data?: unknown } }>).detail;
       if (d?.workspaceId === undefined || !ids.has(d.workspaceId)) return;
+      const tid = (d.item?.data as { task_id?: unknown } | undefined)?.task_id;
+      if (d.item?.action === "run.progress" && typeof tid === "number") {
+        clearTimeout(progress.get(tid));
+        progress.set(
+          tid,
+          setTimeout(() => {
+            progress.delete(tid);
+            api.task(tid).then((t) => patchRef.current(t), () => undefined);
+          }, 400),
+        );
+        return;
+      }
       if (timer) clearTimeout(timer);
       timer = setTimeout(fire, 400);
     };
@@ -193,6 +220,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     return () => {
       window.removeEventListener("gigg:activity", on);
       if (timer) clearTimeout(timer);
+      progress.forEach((t) => clearTimeout(t));
     };
   }, [wsKey, taskPid, projOf]);
 
@@ -260,8 +288,11 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       const key = allTasks.find((t) => t.id === taskId)?.key ?? "the task";
       setBoards(next);
       setMoveErr("");
+      movesInFlight.current++;
+      loadSeq.current++; // a load already on its way predates the move: drop its answer
       api
         .moveTask(taskId, body)
+        .finally(() => movesInFlight.current--)
         .then(() => changed())
         .catch((e: unknown) => {
           setBoards(before);
@@ -567,7 +598,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
             </Link>
           )}
           {pulse.failed > 0 && (
-            <span className="pulse-item pulse-failed" data-tip="Tasks whose agent's last run failed, timed out or was interrupted: Retry on the card resumes it">
+            <span className="pulse-item pulse-failed" tabIndex={0} data-tip="Tasks whose agent's last run failed, timed out or was interrupted: Retry on the card resumes it">
               <Icon name="alert" />
               {pulse.failed} failed
             </span>
@@ -1041,6 +1072,9 @@ function ArchiveDoneModal({ projectId, onClose, onDone }: { projectId: number; o
   );
 }
 
+// the icon of a card's agent state (running has its pulsing dot): a cue that doesn't depend on colour
+const STATE_ICON = { running: "play", queued: "refresh", answer: "question", failed: "alert" } as const;
+
 // useNow: the time, re-read every `every` ms while it is non-zero (a running card's clock).
 function useNow(every: number): number {
   const [now, setNow] = useState(() => Date.now());
@@ -1153,7 +1187,7 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
   // the button's name replaces its contents for screen readers: say the agent state there too
   const cardLabel = [
     `${task.key} ${task.title}`,
-    state && (running && run ? `${state.label} for ${elapsed(now - run.started_at)}${run.progress_note ? `: ${run.progress_note}` : ""}` : state.label),
+    state && (running && run?.progress_note ? `${state.label}: ${run.progress_note}` : state.label), // no clock: the name would change every second
     state?.kind === "answer" && task.question ? plainText(task.question.text) : "",
   ]
     .filter(Boolean)
@@ -1186,7 +1220,7 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
           <PriorityIcon priority={task.priority} />
           {state && (
             <span className={"run-badge run-" + state.kind} data-tip={state.tip}>
-              {running && <span className="pulse-dot" aria-hidden="true" />}
+              {running ? <span className="pulse-dot" aria-hidden="true" /> : <Icon name={STATE_ICON[state.kind]} />}
               {state.label}
               {running && run && <span className="mono">· {elapsed(now - run.started_at)}</span>}
             </span>
@@ -1245,7 +1279,7 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
         {state?.kind === "answer" && task.question && (
           <div className="card-ask">
             <span className="card-ask-label">
-              <Icon name="question" /> {asker ? `${nameOf(asker)} asks` : "Question"}
+              <Icon name="question" /> {task.question.kind === "question" ? (asker ? `${nameOf(asker)} asks` : "Question") : asker ? `${nameOf(asker)} reports` : "Report"}
             </span>
             <p>{plainText(task.question.text)}</p>
           </div>
@@ -1294,7 +1328,18 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
             </span>
           </div>
           {canWrite && (
-            <button type="button" className="button small" disabled={retrying} onClick={retry} data-tip="Resume the agent's session: the task goes back to To-Do and its runner continues on its next pass">
+            <button
+              type="button"
+              className="button small"
+              disabled={retrying}
+              onClick={retry}
+              aria-label={`Retry ${task.key}`}
+              data-tip={
+                task.session_id
+                  ? "Resume the agent's session: the task goes back to To-Do and its runner continues on its next pass"
+                  : "Back to To-Do: the agent's runner starts it again on its next pass"
+              }
+            >
               <Icon name="refresh" /> Retry
             </button>
           )}

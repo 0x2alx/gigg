@@ -5,7 +5,7 @@ import type { RunBrief } from "./api";
 const run = (status: RunBrief["status"]): RunBrief => ({
   id: 1, status, worker_user_id: 2, started_at: 0, heartbeat_at: 0, ended_at: null, model: null, progress_pct: null, progress_note: null, error_reason: null,
 });
-const q = { comment_id: 1, author_id: 2, created_at: 0, text: "Siren or **chime**?" };
+const q = { comment_id: 1, author_id: 2, created_at: 0, kind: "question" as const, text: "Siren or **chime**?" };
 
 describe("cardState", () => {
   it("running wins over everything", () => {

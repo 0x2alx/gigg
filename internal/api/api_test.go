@@ -407,6 +407,23 @@ func TestRunnerFlow(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("%d run.progress events, want 1", n)
 	}
+	// once the window has passed, the next call (even a bare heartbeat) sends what was held back, once
+	old := progressEventEvery
+	progressEventEvery = 0
+	for i := 0; i < 2; i++ {
+		code, out, _ = e.req("POST", fmt.Sprintf("/runs/%d/progress", rd.ID), `{}`, k)
+		e.ok(code, out, 200)
+	}
+	progressEventEvery = old
+	n = 0
+	for _, it := range e.allChanges("current", k, 100) {
+		if it.Action == "run.progress" {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("%d run.progress events after the held-back one, want 2", n)
+	}
 	code, out, _ = e.req("POST", fmt.Sprintf("/runs/%d/finish", rd.ID),
 		`{"status":"needs_human","report_md":"Siren or **chime**?","comment_kind":"question","move_to_category":"waiting","cost_usd":0.44,"num_turns":6,"transcript_path":"/home/x/.claude/projects/p/`+sid+`.jsonl"}`, k)
 	e.ok(code, out, 200)
@@ -894,8 +911,14 @@ func TestQuestionOnWaitingCards(t *testing.T) {
 	}
 	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/comments", `{"body_md":"Blue or green?","kind":"report"}`, scout)
 	e.ok(code, out, 201)
-	if q := question(); q == nil || q.Text != "Blue or green?" {
+	if q := question(); q == nil || q.Text != "Blue or green?" || q.Kind != "report" {
 		t.Fatalf("report as the question: %+v", q)
+	}
+	// the agent's own follow-up doesn't answer it
+	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/comments", `{"body_md":"(either is fine)"}`, scout)
+	e.ok(code, out, 201)
+	if q := question(); q == nil || q.Text != "Blue or green?" {
+		t.Fatalf("question gone after its author's follow-up: %+v", q)
 	}
 	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/comments", `{"body_md":"green"}`, e.ada())
 	e.ok(code, out, 201)

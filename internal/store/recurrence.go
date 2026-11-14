@@ -604,6 +604,10 @@ func (s *Store) Housekeeping(ctx context.Context, now int64) (JanitorResult, err
 	if _, err := s.W.ExecContext(ctx, "DELETE FROM idempotency_keys WHERE created_at < ?", now-24*3600*1000); err != nil {
 		res.Errors = append(res.Errors, "idempotency purge: "+err.Error())
 	}
+	if _, err := s.W.ExecContext(ctx, `DELETE FROM activity WHERE entity_type = 'run' AND action = 'run.progress' AND at < ?`,
+		now-progressEventKeep.Milliseconds()); err != nil {
+		res.Errors = append(res.Errors, "progress events purge: "+err.Error())
+	}
 	if n, err := closeStaleRuns(ctx, s, now); err != nil {
 		res.Errors = append(res.Errors, "stale runs: "+err.Error())
 	} else {

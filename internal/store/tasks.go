@@ -64,7 +64,7 @@ type Task struct {
 	AllowedTools      []string       `json:"allowed_tools" doc:"Tool allowlist for the runner's claude -p (permission rules); empty = the runner's usual mode"`
 	Version           int64          `json:"version"`
 	LastRun           *RunBrief      `json:"last_run,omitempty" doc:"The task's latest run, in brief (absent when it has none)"`
-	Question          *QuestionBrief `json:"question,omitempty" doc:"Waiting tasks in lists, with the comments:read scope: the latest question, in brief"`
+	Question          *QuestionBrief `json:"question,omitempty" doc:"Waiting tasks in lists and on the board, with the comments:read scope: the latest question or report nobody else has answered, in brief"`
 }
 
 // RunBrief is a task's latest run as a card shows it.
@@ -86,7 +86,8 @@ type QuestionBrief struct {
 	CommentID int64  `json:"comment_id"`
 	AuthorID  int64  `json:"author_id"`
 	CreatedAt int64  `json:"created_at"`
-	Text      string `json:"text" doc:"The question's Markdown, at most 280 characters"`
+	Kind      string `json:"kind" doc:"question or report"`
+	Text      string `json:"text" doc:"The comment's Markdown, at most 280 characters"`
 }
 
 const questionBriefLen = 280
@@ -330,9 +331,9 @@ func fillRuns(ctx context.Context, q Q, ts []*Task) error {
 	return rows.Err()
 }
 
-// AttachQuestions sets Question on the waiting tasks whose latest comment is an agent's question or
-// report (what the Inbox shows), cut short. A later comment by anyone (an answer, a resume request)
-// means it has been dealt with. Callers check the comments:read scope first.
+// AttachQuestions sets Question on the waiting tasks: their latest question or report comment, cut
+// short, until someone other than its author comments after it (an answer, a resume request). Callers
+// check the comments:read scope first.
 func AttachQuestions(ctx context.Context, q Q, ts []*Task) error {
 	byID := map[int64]*Task{}
 	ids := []int64{}
@@ -345,10 +346,15 @@ func AttachQuestions(ctx context.Context, q Q, ts []*Task) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	rows, err := q.QueryContext(ctx, `SELECT c.id, c.task_id, c.author_id, c.created_at, substr(c.body_md, 1, ?) FROM comments c
-		WHERE c.id IN (SELECT max(id) FROM comments WHERE task_id IN (`+placeholders(len(ids))+`) AND kind != 'system' AND deleted_at IS NULL GROUP BY task_id)
-		AND c.kind IN ('question', 'report')`,
-		append([]any{questionBriefLen + 1}, int64Args(ids)...)...)
+	// per task, the newest question/report through the (task_id, id) index, newest first, stopping at the first
+	vals := strings.TrimSuffix(strings.Repeat("(?),", len(ids)), ",")
+	args := append(int64Args(ids), questionBriefLen+1)
+	rows, err := q.QueryContext(ctx, `WITH w(tid) AS (VALUES `+vals+`),
+		qs AS (SELECT (SELECT x.id FROM comments x WHERE x.task_id = w.tid AND x.kind IN ('question', 'report') AND x.deleted_at IS NULL
+			ORDER BY x.id DESC LIMIT 1) AS id FROM w)
+		SELECT c.id, c.task_id, c.author_id, c.created_at, c.kind, substr(c.body_md, 1, ?) FROM comments c JOIN qs ON qs.id = c.id
+		WHERE NOT EXISTS (SELECT 1 FROM comments y WHERE y.task_id = c.task_id AND y.id > c.id AND y.author_id != c.author_id
+			AND y.kind != 'system' AND y.deleted_at IS NULL)`, args...)
 	if err != nil {
 		return err
 	}
@@ -356,7 +362,7 @@ func AttachQuestions(ctx context.Context, q Q, ts []*Task) error {
 	for rows.Next() {
 		var qb QuestionBrief
 		var tid int64
-		if err := rows.Scan(&qb.CommentID, &tid, &qb.AuthorID, &qb.CreatedAt, &qb.Text); err != nil {
+		if err := rows.Scan(&qb.CommentID, &tid, &qb.AuthorID, &qb.CreatedAt, &qb.Kind, &qb.Text); err != nil {
 			return err
 		}
 		if r := []rune(qb.Text); len(r) > questionBriefLen {
