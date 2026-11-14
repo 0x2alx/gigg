@@ -17,7 +17,8 @@ def click_text(sel, text):
 
 
 def page(path, wait, shot, settle=1800, **kw):
-    s = [{"goto": path}, {"wait": wait}, {"wait": settle}]
+    # wait for the live connection too, so the sidebar's footer says Live rather than Connecting
+    s = [{"goto": path}, {"wait": wait}, {"wait": settle}, {"wait": ".live-dot.live-live"}, {"wait": 300}]
     if kw.get("el"):
         s.append({"eval": "(() => { document.querySelector(%s).scrollIntoView({ block: 'center' }); return true; })()" % json.dumps(kw["el"]), "expect": True})
         s.append({"wait": 400})
@@ -34,10 +35,11 @@ steps = [
     {"type": ["input[autocomplete=current-password]", "demo-password-2026"]},
     {"press": "Enter"},
     {"wait": ".board"},
+    {"wait": 6000},  # the container's network settles once at the start (Chromium: ERR_NETWORK_CHANGED)
     # ---- Nightwalker
     theme("nightwalker"),
     *page("/board", ".board .task-card", "board-all-night"),
-    {"hover": ".task-card .pill-agent"},
+    {"hover": ".task-card .run-badge"},
     {"wait": 800},
     {"shot": "tooltip-night", "full": False},
     {"goto": "/board?p=1"},

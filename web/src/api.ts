@@ -129,6 +129,28 @@ export interface Task {
   checklist_done?: number;
   blocked_by?: number; // open tasks blocking this one
   custom?: Record<string, unknown> | null; // custom field values by field id
+  last_run?: RunBrief; // the latest run, in brief
+  question?: QuestionBrief; // waiting tasks on the board and in lists: the latest question
+}
+
+export interface RunBrief {
+  id: number;
+  status: "running" | "done" | "needs_human" | "error" | "timeout" | "interrupted" | "parked";
+  worker_user_id: number;
+  started_at: number;
+  heartbeat_at: number;
+  ended_at: number | null;
+  model: string | null;
+  progress_pct: number | null;
+  progress_note: string | null;
+  error_reason: string | null;
+}
+
+export interface QuestionBrief {
+  comment_id: number;
+  author_id: number;
+  created_at: number;
+  text: string; // Markdown, at most 280 characters
 }
 
 export interface Relation {

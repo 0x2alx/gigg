@@ -22,6 +22,3 @@ export function saveCollapsed(projectId: number, ids: number[]): void {
 
 export const toggleId = (ids: number[], id: number): number[] => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
 
-// The board's grid: a collapsed column is a narrow strip, the others share the rest.
-export const boardColumns = (statusIds: number[], collapsed: number[]): string =>
-  statusIds.map((id) => (collapsed.includes(id) ? "2.6rem" : "minmax(0, 1fr)")).join(" ");

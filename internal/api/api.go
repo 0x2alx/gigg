@@ -316,6 +316,24 @@ func unsafeMethod(m string) bool {
 	return m != http.MethodGet && m != http.MethodHead && m != http.MethodOptions
 }
 
+// originOK: a browser request's Origin is this server's. With GIGG_PUBLIC_URL that is the public URL, or
+// the very host:port the request was sent to when that name is an allowed host (so a server reached by
+// both its IP and its .local name works under either; the host check has already refused other
+// names). Without a public URL, any allowed host name.
+func (a *API) originOK(r *http.Request, origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return false
+	}
+	if !a.cfg.AllowedHosts[strings.ToLower(u.Hostname())] {
+		return false
+	}
+	if a.cfg.PublicURL == nil {
+		return true
+	}
+	return strings.EqualFold(origin, a.cfg.PublicURL.Scheme+"://"+a.cfg.PublicURL.Host) || strings.EqualFold(u.Host, r.Host)
+}
+
 // csrfCheck: cookie-authenticated writes must come from our own origin, as JSON (or with the
 // X-Gigg-CSRF header for uploads).
 func (a *API) csrfCheck(r *http.Request) string {
@@ -326,12 +344,7 @@ func (a *API) csrfCheck(r *http.Request) string {
 	if origin == "" {
 		return "Missing Origin header."
 	}
-	if a.cfg.PublicURL != nil {
-		want := a.cfg.PublicURL.Scheme + "://" + a.cfg.PublicURL.Host
-		if !strings.EqualFold(origin, want) {
-			return "Origin not allowed."
-		}
-	} else if u, err := url.Parse(origin); err != nil || !a.cfg.AllowedHosts[strings.ToLower(u.Hostname())] {
+	if !a.originOK(r, origin) {
 		return "Origin not allowed."
 	}
 	ct := r.Header.Get("Content-Type")

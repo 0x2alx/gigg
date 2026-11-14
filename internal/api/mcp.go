@@ -25,7 +25,7 @@ func (a *API) MCPHandler() http.Handler {
 	h := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server { return a.mcpServer(r) },
 		&mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, DisableLocalhostProtection: true, MaxRequestBodyBytes: 1 << 20})
 	return a.authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if o := r.Header.Get("Origin"); o != "" && (a.cfg.PublicURL == nil || !strings.EqualFold(o, a.cfg.PublicURL.Scheme+"://"+a.cfg.PublicURL.Host)) {
+		if o := r.Header.Get("Origin"); o != "" && (a.cfg.PublicURL == nil || !a.originOK(r, o)) {
 			writeProblem(w, fail(403, "forbidden", "Origin not allowed for MCP."))
 			return
 		}

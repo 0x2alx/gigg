@@ -372,6 +372,27 @@ func TestRunnerFlow(t *testing.T) {
 	_ = json.Unmarshal(out, &rd)
 	code, out, _ = e.req("POST", fmt.Sprintf("/runs/%d/progress", rd.ID), `{"pct":50,"note":"drafting"}`, k)
 	e.ok(code, out, 200)
+	// lists carry the latest run in brief (a board card shows it), and the progress note is live news
+	findIn := func(path string, c cred) *store.Task {
+		t.Helper()
+		code, out, _ := e.req("GET", path, "", c)
+		e.ok(code, out, 200)
+		var l TaskList
+		_ = json.Unmarshal(out, &l)
+		for _, x := range l.Items {
+			if x.ID == t1.ID {
+				return x
+			}
+		}
+		t.Fatalf("%s: task %s missing", path, t1.Key)
+		return nil
+	}
+	if lt := findIn("/workspaces/current/tasks", k); lt.LastRun == nil || lt.LastRun.Status != "running" || lt.LastRun.ProgressNote == nil || *lt.LastRun.ProgressNote != "drafting" {
+		t.Fatalf("last_run in list: %+v", lt.LastRun)
+	}
+	if acts := e.allChanges("current", k, 100); acts[len(acts)-1].Action != "run.progress" {
+		t.Fatalf("progress note not in the feed: %s", acts[len(acts)-1].Action)
+	}
 	code, out, _ = e.req("POST", fmt.Sprintf("/runs/%d/finish", rd.ID),
 		`{"status":"needs_human","report_md":"Siren or **chime**?","comment_kind":"question","move_to_category":"waiting","cost_usd":0.44,"num_turns":6,"transcript_path":"/home/x/.claude/projects/p/`+sid+`.jsonl"}`, k)
 	e.ok(code, out, 200)
@@ -379,6 +400,13 @@ func TestRunnerFlow(t *testing.T) {
 	_ = json.Unmarshal(out, &fr)
 	if fr.Task.StatusCategory != "waiting" || fr.Run.Status != "needs_human" || fr.Task.CostUSDTotal != 0.44 {
 		t.Fatalf("finish: %s", out)
+	}
+	if lt := findIn(fmt.Sprintf("/workspaces/%d/tasks", t1.WorkspaceID), e.ada()); lt.Question == nil || lt.Question.Text != "Siren or **chime**?" || lt.LastRun.Status != "needs_human" {
+		t.Fatalf("question in list: %+v", lt.Question)
+	}
+	code, out, _ = e.req("GET", fmt.Sprintf("/projects/%d/board", t1.ProjectID), "", e.ada())
+	if code != 200 || !bytes.Contains(out, []byte(`"text":"Siren or **chime**?"`)) {
+		t.Fatalf("board without the question: %d %s", code, out)
 	}
 	// inbox shows the question to ada
 	code, out, _ = e.req("GET", "/inbox", "", e.ada())
@@ -657,7 +685,7 @@ func TestReviewFixes(t *testing.T) {
 	if code, _, _ := e.req("GET", "/workspaces/current/activity", "", rk); code != 403 {
 		t.Errorf("workspace activity without comments:read: %d", code)
 	}
-	for _, p := range []string{"/inbox", "/workspaces/current/tasks?q=secret+comment"} {
+	for _, p := range []string{"/inbox", "/workspaces/current/tasks?q=secret+comment", "/workspaces/current/tasks"} {
 		code, out, _ := e.req("GET", p, "", rk)
 		if code != 200 || bytes.Contains(out, []byte("secret comment")) || bytes.Contains(out, []byte("scout secret task")) && strings.Contains(p, "q=") {
 			t.Errorf("GET %s leaked comment text: %d %s", p, code, out)
@@ -786,5 +814,38 @@ func TestThemesAndAvatar(t *testing.T) {
 	// atlas can't see scout's picture (not a co-member)
 	if code, _, _ := e.req("GET", fmt.Sprintf("/users/%d/avatar", e.ids["scout.user"]), "", e.key("atlas")); code != 404 {
 		t.Fatalf("cross-workspace avatar: %d", code)
+	}
+}
+
+// TestCSRFOtherAllowedName: a server reached under another allowed name (its IP, a .local name) accepts
+// a page served from that same name, but not a page of one name writing to the other.
+func TestCSRFOtherAllowedName(t *testing.T) {
+	e := newEnv(t)
+	p := fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"])
+	post := func(host, origin string) int {
+		r := httptest.NewRequest("POST", "https://"+host+Prefix+p, strings.NewReader(`{"title":"x"}`))
+		r.Header.Set("Content-Type", "application/json")
+		r.AddCookie(&http.Cookie{Name: "__Host-gigg_session", Value: e.cookie})
+		r.Header.Set("Origin", origin)
+		r = r.WithContext(WithInfo(r.Context(), RequestInfo{Listener: "main", RequestID: "test"}))
+		w := httptest.NewRecorder()
+		e.h.ServeHTTP(w, r)
+		return w.Code
+	}
+	for _, c := range []struct {
+		host, origin string
+		want         int
+	}{
+		{"localhost:8443", "https://localhost:8443", 201}, // the other allowed name, same origin
+		{"board.example", "https://board.example", 201},   // the public URL
+		{"localhost:8443", "https://board.example", 201},  // the public URL's page, sent to the other name
+		{"board.example", "https://localhost:8443", 403},  // a page on the other name writing to the public one
+		{"evil.example", "https://evil.example", 403},     // not an allowed host
+		{"localhost:8443", "https://localhost:9999", 403}, // same name, another port
+		{"localhost:8443", "ftp://localhost:8443", 403},   // not a web origin
+	} {
+		if got := post(c.host, c.origin); got != c.want {
+			t.Errorf("host %s origin %s: %d, want %d", c.host, c.origin, got, c.want)
+		}
 	}
 }

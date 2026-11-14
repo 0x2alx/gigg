@@ -178,17 +178,17 @@ export function TaskBadges({ task, now = Date.now(), items, fields }: {
     <>
       {items && !!task.blocked_by && (
         <span className="pill pill-danger" title={`Blocked by ${task.blocked_by} open task${task.blocked_by === 1 ? "" : "s"}: agents won't pick it up`}>
-          🔒 {task.blocked_by}
+          <Icon name="lock" strokeWidth={2.2} /> {task.blocked_by}
         </span>
       )}
       {items && ck > 0 && (
         <span className={quiet(task.checklist_done === ck)} title="Checklist">
-          ☑ {task.checklist_done ?? 0}/{ck}
+          <Icon name="checklist" /> {task.checklist_done ?? 0}/{ck}
         </span>
       )}
       {items && st > 0 && (
         <span className={quiet(task.subtask_done === st)} title="Subtasks done">
-          ⑂ {task.subtask_done ?? 0}/{st}
+          <Icon name="subtasks" /> {task.subtask_done ?? 0}/{st}
         </span>
       )}
       {items &&
@@ -199,8 +199,8 @@ export function TaskBadges({ task, now = Date.now(), items, fields }: {
           </Pill>
         ))}
       {!!task.recurrence_id && (
-        <Pill color={SCHEDULE_COLOR} title="Made by a schedule">
-          ⟳
+        <Pill color={SCHEDULE_COLOR} title="Made by a recurring task">
+          <Icon name="refresh" />
         </Pill>
       )}
       {!!task.missed_at && (
@@ -211,10 +211,12 @@ export function TaskBadges({ task, now = Date.now(), items, fields }: {
       {w &&
         (w.state === "open" ? (
           <Pill color={WINDOW_OPEN_COLOR} title="Agents can claim it until the window closes">
-            ◷ {w.text}
+            <Icon name="clock" /> {w.text}
           </Pill>
         ) : (
-          <span className={items ? "meta-item" : "pill pill-muted"}>◷ {w.text}</span>
+          <span className={items ? "meta-item" : "pill pill-muted"}>
+            <Icon name="clock" /> {w.text}
+          </span>
         ))}
     </>
   );

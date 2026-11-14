@@ -31,6 +31,9 @@
    "wait": ".board"
   },
   {
+   "wait": 6000
+  },
+  {
    "eval": "(async () => { const r = await fetch('/api/v1/me/themes-selection', { method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({ selected_id: 'nightwalker', match_system: false }) }); return r.status; })()",
    "expect": 204
   },
@@ -44,11 +47,17 @@
    "wait": 1800
   },
   {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
+  },
+  {
    "shot": "board-all-night",
    "full": false
   },
   {
-   "hover": ".task-card .pill-agent"
+   "hover": ".task-card .run-badge"
   },
   {
    "wait": 800
@@ -120,6 +129,12 @@
    "wait": 1800
   },
   {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
+  },
+  {
    "shot": "dashboard-night",
    "full": false
   },
@@ -131,6 +146,12 @@
   },
   {
    "wait": 1800
+  },
+  {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
   },
   {
    "shot": "my-tasks-night",
@@ -172,6 +193,12 @@
    "wait": 1800
   },
   {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
+  },
+  {
    "shot": "profile-night",
    "full": false
   },
@@ -183,6 +210,12 @@
   },
   {
    "wait": 1800
+  },
+  {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
   },
   {
    "shot": "admin-workspace-night",
@@ -221,6 +254,12 @@
    "wait": 1800
   },
   {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
+  },
+  {
    "shot": "board-filters-day",
    "full": false
   },
@@ -232,6 +271,12 @@
   },
   {
    "wait": 1200
+  },
+  {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
   },
   {
    "shot": "task-panel-day",
@@ -268,6 +313,12 @@
    "wait": 1800
   },
   {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
+  },
+  {
    "shot": "inbox-day",
    "full": false
   },
@@ -281,6 +332,12 @@
    "wait": 1800
   },
   {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
+  },
+  {
    "shot": "table-day",
    "full": false
   },
@@ -292,6 +349,12 @@
   },
   {
    "wait": 1800
+  },
+  {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
   },
   {
    "shot": "themes-day",
@@ -382,6 +445,12 @@
   },
   {
    "wait": 1800
+  },
+  {
+   "wait": ".live-dot.live-live"
+  },
+  {
+   "wait": 300
   },
   {
    "shot": "board-mobile-day",

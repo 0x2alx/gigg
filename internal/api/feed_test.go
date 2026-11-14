@@ -399,3 +399,46 @@ func TestEventsPermissionsAndCap(t *testing.T) {
 		t.Fatalf("atlas's own stream: %d", code)
 	}
 }
+
+// TestEventsHTTP2DeadlineCleared: over HTTP/2 a write deadline left armed after a write resets the
+// stream when it expires (Chrome: ERR_HTTP2_PROTOCOL_ERROR). With pings slower than the deadline the
+// stream must survive several pings and end cleanly at its lifetime.
+func TestEventsHTTP2DeadlineCleared(t *testing.T) {
+	e := newEnv(t)
+	oldPing, oldWrite, oldLife := feedPing, feedWrite, feedLifetime
+	feedPing, feedWrite, feedLifetime = 150*time.Millisecond, 50*time.Millisecond, 800*time.Millisecond
+	t.Cleanup(func() { feedPing, feedWrite, feedLifetime = oldPing, oldWrite, oldLife })
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		e.h.ServeHTTP(w, r.WithContext(WithInfo(r.Context(), RequestInfo{Listener: "internal", RequestID: "h2"})))
+	}))
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	t.Cleanup(e.a.StopStreams)
+
+	req, _ := http.NewRequest("GET", srv.URL+Prefix+"/workspaces/current/events", nil)
+	for k, v := range bearer(e.keys["scout"]) {
+		req.Header.Set(k, v)
+	}
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.ProtoMajor != 2 || resp.StatusCode != 200 {
+		t.Fatalf("proto %s, status %d", resp.Proto, resp.StatusCode)
+	}
+	pings := 0
+	sc := bufio.NewScanner(resp.Body)
+	for sc.Scan() {
+		if sc.Text() == ": ping" {
+			pings++
+		}
+	}
+	if err := sc.Err(); err != nil {
+		t.Fatalf("stream broke after %d pings: %v", pings, err)
+	}
+	if pings < 3 {
+		t.Fatalf("only %d pings before the stream ended", pings)
+	}
+}

@@ -98,6 +98,11 @@ images and connections from the same origin only; Google Fonts unless `GIGG_REMO
 `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Resource-Policy: same-origin`. API
 responses carry `Cache-Control: no-store`. Every response has an `X-Request-Id` header.
 
+gigg registers no service worker. It still serves `/sw.js` and `/service-worker.js`: each removes
+itself and the caches of whatever app registered it. A browser that kept another app's service worker
+for the same address (for example a board that ran there before gigg) fetches that script when it
+checks for updates, so it cleans itself up on its own.
+
 ## Logs
 
 The server logs JSON lines to standard output: one line per request (listener, method, path,

@@ -333,6 +333,9 @@ func (a *API) registerTasks() {
 			f.Projects = []int64{in.Project}
 		}
 		ts, more, err := store.ListTasks(ctx, a.st.R, f)
+		if err == nil && p.HasScope("comments:read") {
+			err = store.AttachQuestions(ctx, a.st.R, ts)
+		}
 		if err != nil {
 			return nil, storeErr(err)
 		}
@@ -358,6 +361,9 @@ func (a *API) registerTasks() {
 		f.Projects = []int64{pr.ID}
 		f.SearchComments = p.HasScope("comments:read")
 		ts, more, err := store.ListTasks(ctx, a.st.R, f)
+		if err == nil && p.HasScope("comments:read") {
+			err = store.AttachQuestions(ctx, a.st.R, ts)
+		}
 		if err != nil {
 			return nil, storeErr(err)
 		}

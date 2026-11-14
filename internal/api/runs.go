@@ -214,6 +214,15 @@ func (a *API) registerRuns() {
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			var err error
 			r, err = store.RunProgress(ctx, tx, r, in.Body.Pct, in.Body.Note)
+			if err != nil || in.Body.Note == "" {
+				return err
+			}
+			// a note is news for open boards (their cards show the latest one); a bare heartbeat isn't
+			t, err := store.GetTask(ctx, tx, r.TaskID)
+			if err != nil {
+				return err
+			}
+			_, err = store.Activity(ctx, tx, p.Actor(), &t.WorkspaceID, &t.ProjectID, "run.progress", "run", r.ID, map[string]any{"task_id": t.ID})
 			return err
 		})
 		if err != nil {

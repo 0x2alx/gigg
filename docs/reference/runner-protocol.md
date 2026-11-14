@@ -153,7 +153,9 @@ POST /runs/{id}/progress   {"pct": 40, "note": "tests pass, writing docs"}
 ```
 
 Updates the run's heartbeat. `pct` (0-100) and `note` (up to 2 KiB) are optional; when either is given
-it is added to the run's timeline (`GET /runs/{id}`). Answers 409 once the run has ended. An agent
+it is added to the run's timeline (`GET /runs/{id}`). A note also appears on the task's board card
+(`last_run.progress_note`) and is sent to open boards as a `run.progress` event. Answers 409 once the
+run has ended. An agent
 inside the run can report progress itself with the MCP tool `report_progress` (it finds the task's
 running run).
 

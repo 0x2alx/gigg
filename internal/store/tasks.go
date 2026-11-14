@@ -63,7 +63,33 @@ type Task struct {
 	AlwaysRun         bool           `json:"always_run" doc:"Worked whatever the usage budget, day or night (within the task cap and pauses)"`
 	AllowedTools      []string       `json:"allowed_tools" doc:"Tool allowlist for the runner's claude -p (permission rules); empty = the runner's usual mode"`
 	Version           int64          `json:"version"`
+	LastRun           *RunBrief      `json:"last_run,omitempty" doc:"The task's latest run, in brief (absent when it has none)"`
+	Question          *QuestionBrief `json:"question,omitempty" doc:"Waiting tasks in lists, with the comments:read scope: the latest question, in brief"`
 }
+
+// RunBrief is a task's latest run as a card shows it.
+type RunBrief struct {
+	ID           int64   `json:"id"`
+	Status       string  `json:"status"`
+	WorkerUserID int64   `json:"worker_user_id"`
+	StartedAt    int64   `json:"started_at"`
+	HeartbeatAt  int64   `json:"heartbeat_at"`
+	EndedAt      *int64  `json:"ended_at"`
+	Model        *string `json:"model"`
+	ProgressPct  *int64  `json:"progress_pct"`
+	ProgressNote *string `json:"progress_note"`
+	ErrorReason  *string `json:"error_reason"`
+}
+
+// QuestionBrief is the latest question on a waiting task, cut to a card's length.
+type QuestionBrief struct {
+	CommentID int64  `json:"comment_id"`
+	AuthorID  int64  `json:"author_id"`
+	CreatedAt int64  `json:"created_at"`
+	Text      string `json:"text" doc:"The question's Markdown, at most 280 characters"`
+}
+
+const questionBriefLen = 280
 
 // TaskTag is a label as shown on a task.
 type TaskTag struct {
@@ -172,6 +198,9 @@ func fill(ctx context.Context, q Q, ts []*Task) error {
 		byID[tid].Custom[strconv.FormatInt(fid, 10)] = v
 	}
 	rows.Close()
+	if err := fillRuns(ctx, q, ts); err != nil {
+		return err
+	}
 	rows, err = q.QueryContext(ctx, `SELECT task_id, project_key || '-' || number FROM task_aliases WHERE task_id IN (`+in+`)`, int64Args(ids)...)
 	if err != nil {
 		return err
@@ -266,6 +295,78 @@ type TaskFilter struct {
 }
 
 // ListTasks returns tasks matching f.
+// fillRuns attaches each task's latest run, in brief.
+func fillRuns(ctx context.Context, q Q, ts []*Task) error {
+	byRun := map[int64]*Task{}
+	runs := []int64{}
+	for _, t := range ts {
+		if t.LastRunID != nil {
+			byRun[*t.LastRunID] = t
+			runs = append(runs, *t.LastRunID)
+		}
+	}
+	if len(runs) == 0 {
+		return nil
+	}
+	rows, err := q.QueryContext(ctx, `SELECT id, status, worker_user_id, started_at, heartbeat_at, ended_at, model, progress_pct, progress_note, error_reason
+		FROM runs WHERE id IN (`+placeholders(len(runs))+`)`, int64Args(runs)...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r RunBrief
+		var ended, pct sql.NullInt64
+		var model, note, reason sql.NullString
+		if err := rows.Scan(&r.ID, &r.Status, &r.WorkerUserID, &r.StartedAt, &r.HeartbeatAt, &ended, &model, &pct, &note, &reason); err != nil {
+			return err
+		}
+		r.EndedAt, r.ProgressPct = ptrInt(ended), ptrInt(pct)
+		r.Model, r.ProgressNote, r.ErrorReason = ptrStr(model), ptrStr(note), ptrStr(reason)
+		if t := byRun[r.ID]; t != nil {
+			t.LastRun = &r
+		}
+	}
+	return rows.Err()
+}
+
+// AttachQuestions sets Question on the waiting tasks: their latest question comment, cut short.
+// Callers check the comments:read scope first.
+func AttachQuestions(ctx context.Context, q Q, ts []*Task) error {
+	byID := map[int64]*Task{}
+	ids := []int64{}
+	for _, t := range ts {
+		if t.StatusCategory == "waiting" {
+			byID[t.ID] = t
+			ids = append(ids, t.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := q.QueryContext(ctx, `SELECT c.id, c.task_id, c.author_id, c.created_at, substr(c.body_md, 1, ?) FROM comments c
+		WHERE c.id IN (SELECT max(id) FROM comments WHERE task_id IN (`+placeholders(len(ids))+`) AND kind = 'question' AND deleted_at IS NULL GROUP BY task_id)`,
+		append([]any{questionBriefLen + 1}, int64Args(ids)...)...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var qb QuestionBrief
+		var tid int64
+		if err := rows.Scan(&qb.CommentID, &tid, &qb.AuthorID, &qb.CreatedAt, &qb.Text); err != nil {
+			return err
+		}
+		if r := []rune(qb.Text); len(r) > questionBriefLen {
+			qb.Text = string(r[:questionBriefLen-1]) + "…"
+		}
+		if t := byID[tid]; t != nil {
+			t.Question = &qb
+		}
+	}
+	return rows.Err()
+}
+
 func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 	where := []string{"t.workspace_id = ?"}
 	args := []any{f.WorkspaceID}

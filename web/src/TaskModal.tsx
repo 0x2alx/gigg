@@ -18,10 +18,11 @@ import { Modal } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
-export function TaskModal({ ws, projectId, statuses, labels, schedule, template, repeat: initialRepeat, onClose, onCreated }: {
+export function TaskModal({ ws, projectId, statuses, labels, schedule, template, repeat: initialRepeat, initialStatus, onClose, onCreated }: {
   ws: WorkspaceTree;
   projectId: number;
   statuses: Status[];
+  initialStatus?: number; // a new task starts in this status (the column its "+" was clicked in)
   labels: Tag[];
   schedule?: Recurrence; // edit this schedule
   template?: Template | "new"; // edit (or create) a template instead of a task
@@ -50,7 +51,9 @@ export function TaskModal({ ws, projectId, statuses, labels, schedule, template,
   const [title, setTitle] = useState(schedule?.title ?? tpl?.title ?? "");
   const [description, setDescription] = useState(schedule?.description_md ?? tpl?.description_md ?? "");
   const [priority, setPriority] = useState(schedule?.priority ?? tpl?.priority ?? 0);
-  const [status, setStatus] = useState<number>(statuses.find((s) => s.category === "todo")?.id ?? statuses[0]?.id ?? 0);
+  const [status, setStatus] = useState<number>(
+    (initialStatus !== undefined && statuses.some((s) => s.id === initialStatus) ? initialStatus : undefined) ?? statuses.find((s) => s.category === "todo")?.id ?? statuses[0]?.id ?? 0,
+  );
   const [taskLabels, setTaskLabels] = useState<string[]>(schedule?.labels ?? tpl?.labels ?? []);
   const [assignees, setAssignees] = useState<number[]>(schedule?.assignees ?? tpl?.assignees ?? []);
   const [due, setDue] = useState<number | null>(null);

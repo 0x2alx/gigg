@@ -11,7 +11,16 @@ The board shows the tasks of every workspace and project you can see, in one pla
 
 Cancelled tasks don't appear on the board. Use the table view to see them.
 
-Each column header shows the column's colour dot, its name and the number of tasks. Click the **‹** that appears when you hover over the header (or tab to it) to collapse the column to a narrow strip (the board remembers this per browser). Click the strip to open it again. On a phone, the columns are tabs above the cards, and the filters fold away under **Filters**.
+Each column header shows the stage as a small ring in the column's colour (dashed for Backlog, empty for To-Do, half full for Doing, with a pause bar for Waiting, filled with a check for Done), the column's name and its number of tasks. Hovering over the header (or tabbing to it) shows two buttons on the right:
+
+- **+**: a new task in this column. With several projects in view it first asks which project, and the task starts in that project's first status of the stage.
+- **Collapse** (two arrows pointing in): the column leaves the board and becomes a small button above it, with its name and count. Click the button to bring the column back. The board remembers collapsed columns per browser. You can drop a card on a collapsed column's button too.
+
+Each column also ends with **+ New task** (except Done). On a phone, the columns are tabs above the cards, and the filters fold away under **Filters**.
+
+### Agent activity
+
+When agents are at work on the tasks in view, a line under the filters sums it up: how many tasks are **running**, how many **need an answer** (the agent asked a question; the link opens the [Inbox](inbox.md)), how many **failed**, and how many have a resume queued.
 
 ![The board on a phone (Daywalker theme)](../images/board-mobile-day.png)
 
@@ -19,26 +28,38 @@ Each column header shows the column's colour dot, its name and the number of tas
 
 A card is quiet on purpose: a hairline border, the title first, a few facts under it. Hover over (or long-press) any mark to see its tooltip.
 
-- **Top row:** the priority as an icon (three bars for Low, Medium and High, a square with "!" for Urgent; High and Urgent are coloured), the task's key (`KEY-12`: the project's key and the task's number) in grey, and, when several workspaces are in view, the task's workspace (a dot in its colour and its name). When the column is a stage and the task's own status is named differently (for example "Needs review"), that status follows in grey.
+- **Top row:** the priority as an icon (three bars for Low, Medium and High, a square with "!" for Urgent; High and Urgent are coloured), the agent state if there is one (see below), and, when several workspaces are in view, the task's workspace (a dot in its colour and its name). When the column is a stage and the task's own status is named differently (for example "Needs review"), that status follows in grey. The task's key (`KEY-12`: the project's key and the task's number) sits at the right, small; the card's **⋯** takes its place when you hover.
 - **Title:** up to two lines.
-- **Labels:** up to two, as tinted chips; "+3" stands for the rest (hover to list them).
-- **Bottom row:** facts as small grey text, then the people.
+- **Due date and labels:** the due date as a small outlined chip with a calendar (red when overdue), then up to two labels as tinted chips; "+3" stands for the rest (hover to list them).
+- **Agent block** (only when there is something to show, see below).
+- **Bottom row:** facts as small grey icons and numbers, then the people.
 - **The task's colour:** a coloured stripe on the card's left edge appears only when the task has a colour. A card that is blocked or missed has a red border, and an archived card a dashed one.
 - **⋯** (top right, shown when you hover the card or tab to it, and always on a touch screen): move the card (see below).
 
 | Mark | Meaning |
 |---|---|
-| 🔒 n (red) | Blocked by n open tasks; agents won't pick it up until they're done |
-| ☑ 2/5 | Checklist progress |
-| ⑂ 1/3 | Subtasks done |
-| ⟳ | Made by a recurring task |
-| ◷ window / missed (red) | The time window it may be started in; missed if it closed untouched |
-| ⏱ date | Due date (red when overdue) |
-| 💬 n | Comments |
-| agent | An agent has worked on it (it has an agent session) |
+| padlock n (red) | Blocked by n open tasks; agents won't pick it up until they're done |
+| checklist 2/5 | Checklist progress |
+| branches 1/3 | Subtasks done |
+| circling arrows | Made by a recurring task |
+| clock window / missed (red) | The time window it may be started in; missed if it closed untouched |
+| speech bubble n | Comments |
+| robot | An agent has worked on it (it has an agent session) |
 | $0.42 | What the agent's runs cost so far |
-| resume queued | Someone asked the agent to continue its session |
 | a tinted chip | A custom field value (select or checkbox) |
+
+### Agent state
+
+A card shows what its agent is doing, as a small badge in the top row and, for some states, a block under the title:
+
+| Badge | Block | Meaning |
+|---|---|---|
+| **Running** · 4m 12s (green) | the agent, its model, a progress bar and its latest progress note | An agent is working on it now; the time counts up |
+| **Needs answer** | the agent's question, up to three lines | The task waits for a person: open it and answer, then **Resume** |
+| **Failed**, **Timed out** or **Interrupted** (red) | a red block at the foot of the card, with the reason and **Retry** | The agent's last run didn't finish. **Retry** resumes its session: the task goes back to To-Do and the runner continues on its next pass |
+| **Resume queued** | none | Someone asked the agent to continue its session |
+
+The progress note appears when the agent reports progress (the `report_progress` MCP tool or the runner's progress call) and updates live.
 
 The avatars at the bottom right are the people assigned to the task, overlapping. When there is no assignee, the creator is shown; when a person handed the task to an agent, the creator appears as a smaller picture before the agent. Hover an avatar to see who created the task and who it is assigned to. Agents have square-ish avatars.
 

@@ -600,6 +600,9 @@ func (a *API) registerWorkspaces() {
 			return nil, err
 		}
 		ts, _, err := store.ListTasks(ctx, a.st.R, store.TaskFilter{WorkspaceID: pr.WorkspaceID, Projects: []int64{pr.ID}, Limit: 500})
+		if err == nil && p.HasScope("comments:read") {
+			err = store.AttachQuestions(ctx, a.st.R, ts) // a waiting card shows the agent's question
+		}
 		if err != nil {
 			return nil, err
 		}

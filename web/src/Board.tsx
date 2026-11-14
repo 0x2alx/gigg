@@ -17,7 +17,7 @@ import {
   type BoardColumn,
   type BoardFilter,
 } from "./boardModel";
-import { boardColumns, loadCollapsed, saveCollapsed, toggleId } from "./collapse";
+import { loadCollapsed, saveCollapsed, toggleId } from "./collapse";
 import { applyMove, reorderIndex, type MoveBody } from "./dnd";
 import { useNarrow } from "./narrow";
 import { setMentionUsers } from "./markdown";
@@ -31,6 +31,7 @@ import { CATEGORY_COLOR, colorFor } from "./theme";
 import { Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, TaskBadges } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
+import { cardState, elapsed, plainText } from "./cardState";
 
 // WorkspaceBadge: a workspace's name as a tint of its colour (the workspace's own, or the default from its slug).
 export function WorkspaceBadge({ ws }: { ws: Pick<WorkspaceTree, "slug" | "name" | "color"> }) {
@@ -102,6 +103,8 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const [activeCol, setActiveCol] = useState<string | null>(null);
   const [pick, setPick] = useState<ProjectAction | "schedules" | null>(null);
   const [adding, setAdding] = useState<number | null>(null);
+  // a column's "+": the new task starts in that column (its status, or its stage's first status in the picked project)
+  const [newIn, setNewIn] = useState<{ category: Category; statusId?: number } | null>(null);
   const [recurring, setRecurring] = useState<{ pid: number; highlight?: number } | null>(null);
   const [templates, setTemplates] = useState<number | null>(null);
   const [archiveDone, setArchiveDone] = useState<number | null>(null);
@@ -298,6 +301,19 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const open = columns.filter((c) => c.category !== "done").reduce((n, c) => n + c.tasks.length, 0);
   const active = columns.find((c) => c.key === activeCol) ?? columns.find((c) => c.category === "todo") ?? columns[0];
   const shown = narrow && active ? [active] : columns;
+  // collapsed columns leave the grid and become small chips above it (wide screens; a phone shows one column)
+  const openCols = narrow ? shown : shown.filter((c) => !collapsed.includes(c.id));
+  const closedCols = narrow ? [] : shown.filter((c) => collapsed.includes(c.id));
+  // the agent side of the tasks in view, in one line above the columns
+  const pulse = { running: 0, answer: 0, failed: 0, queued: 0, total: 0 };
+  for (const c of columns)
+    for (const t of c.tasks) {
+      const st = cardState(t);
+      if (st) {
+        pulse[st.kind]++;
+        pulse.total++;
+      }
+    }
   const archivedIn = (c: BoardColumn) =>
     archived
       .filter((t) => (c.statusId !== undefined ? t.status_id === c.statusId : t.status_category === c.category))
@@ -345,7 +361,16 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const dragLeave = (e: DragEvent<HTMLElement>, c: BoardColumn) => {
     if (drop?.col === c.key && !e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null);
   };
-  const colColor = (c: BoardColumn) => c.color ?? CATEGORY_COLOR[c.category];
+  const colColor = (c: BoardColumn): string => c.color ?? CATEGORY_COLOR[c.category] ?? "var(--muted)";
+  // a column's "+": one project in view opens the form in that status; several ask which project first
+  const writable = inScope.filter((x) => canWriteIn(x.ws));
+  const canAddIn = (c: BoardColumn) => writable.length > 0 && c.category !== "cancelled";
+  const addIn = (c: BoardColumn) => {
+    setNewIn({ category: c.category, statusId: c.statusId });
+    if (single) runAction("new", single.project.id);
+    else if (writable.length === 1) runAction("new", writable[0]!.project.id);
+    else setPick("new");
+  };
   const cardFor = (t: Task, c: BoardColumn, i: number, archivedCard: boolean) => {
     const p = projOf(t.project_id);
     const b = boards.get(t.project_id);
@@ -467,7 +492,14 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
             </div>
           )}
           {anyWrite && (
-            <button type="button" className="button" onClick={() => action("new")}>
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                setNewIn(null);
+                action("new");
+              }}
+            >
               + New task
             </button>
           )}
@@ -516,30 +548,56 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           ))}
         </div>
       )}
-      <div className="board" style={{ gridTemplateColumns: narrow ? `repeat(${shown.length}, minmax(0, 1fr))` : boardColumns(shown.map((c) => c.id), collapsed) }}>
-        {shown.map((c) => {
+      {pulse.total > 0 && (
+        <div className="board-pulse" role="status" aria-label="Agent activity on this board">
+          {pulse.running > 0 && (
+            <span className="pulse-item pulse-running">
+              <span className="pulse-dot" aria-hidden="true" />
+              {pulse.running} running
+            </span>
+          )}
+          {pulse.answer > 0 && (
+            <Link href="/inbox" className="pulse-item pulse-answer" data-tip="Tasks whose agent asked a question: answer them from the Inbox or the task">
+              <Icon name="question" />
+              {pulse.answer} need{pulse.answer === 1 ? "s" : ""} an answer
+            </Link>
+          )}
+          {pulse.failed > 0 && (
+            <span className="pulse-item pulse-failed" data-tip="Tasks whose agent's last run failed, timed out or was interrupted: Retry on the card resumes it">
+              <Icon name="alert" />
+              {pulse.failed} failed
+            </span>
+          )}
+          {pulse.queued > 0 && <span className="pulse-item">{pulse.queued} resume queued</span>}
+        </div>
+      )}
+      {!narrow && closedCols.length > 0 && (
+        <div className="collapsed-row" role="group" aria-label="Collapsed columns">
+          {closedCols.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              className={"collapsed-chip" + (drop?.col === c.key ? " drag-over" : "")}
+              aria-expanded={false}
+              data-tip={`Show the ${c.name} column${drag !== null ? " (or drop the card here)" : ""}`}
+              onClick={() => toggleCollapsed(c.id)}
+              onDragOver={(e) => dragOver(e, c)}
+              onDrop={(e) => dropOn(e, c)}
+              onDragLeave={(e) => dragLeave(e, c)}
+            >
+              <StageIcon category={c.category} color={colColor(c)} />
+              <span className="collapsed-chip-name">{c.name}</span>
+              <span className="count-pill">{c.tasks.length}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="board" style={{ gridTemplateColumns: `repeat(${openCols.length}, minmax(0, 1fr))` }}>
+        {openCols.map((c) => {
           const others = c.tasks.filter((t) => t.id !== drag);
           const line = drop?.col === c.key ? drop.index : -1;
           let k = -1;
-          if (!narrow && collapsed.includes(c.id)) {
-            // collapsed: a narrow strip with the name and count; still a drop target (cards go last)
-            return (
-              <section
-                key={c.key}
-                className={"column column-collapsed" + (drop?.col === c.key ? " drag-over" : "")}
-                aria-label={c.name}
-                onDragOver={(e) => dragOver(e, c)}
-                onDrop={(e) => dropOn(e, c)}
-                onDragLeave={(e) => dragLeave(e, c)}
-              >
-                <button type="button" className="column-strip" aria-expanded={false} title={`Expand ${c.name}`} onClick={() => toggleCollapsed(c.id)}>
-                  <span className="count">{c.tasks.length}</span>
-                  <span className="dot" style={{ background: colColor(c) }} />
-                  <span className="column-strip-name">{c.name}</span>
-                </button>
-              </section>
-            );
-          }
+          const addHere = canAddIn(c);
           return (
             <section
               key={c.key}
@@ -551,14 +609,21 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
               onDragLeave={(e) => dragLeave(e, c)}
             >
               <h2 className="column-head">
-                <span className="dot" style={{ background: colColor(c) }} />
+                <StageIcon category={c.category} color={colColor(c)} />
                 <span className="column-name">{c.name}</span>
-                <span className="count">{c.tasks.length}</span>
-                {!narrow && (
-                  <button type="button" className="icon-button column-collapse" aria-expanded={true} aria-label={`Collapse ${c.name}`} title={`Collapse ${c.name}`} onClick={() => toggleCollapsed(c.id)}>
-                    ‹
-                  </button>
-                )}
+                <span className="count-pill">{c.tasks.length}</span>
+                <span className="column-tools">
+                  {addHere && (
+                    <button type="button" className="icon-button" aria-label={`New task in ${c.name}`} onClick={() => addIn(c)}>
+                      <Icon name="plus" strokeWidth={2} />
+                    </button>
+                  )}
+                  {!narrow && (
+                    <button type="button" className="icon-button" aria-expanded={true} aria-label={`Collapse ${c.name}: it becomes a small button above the board`} onClick={() => toggleCollapsed(c.id)}>
+                      <Icon name="shrink" />
+                    </button>
+                  )}
+                </span>
               </h2>
               <div className="cards">
                 {c.tasks.map((t, i) => {
@@ -578,6 +643,11 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                 ))}
                 {manual && c.statusId !== undefined && line === others.length && <div className="drop-line" aria-hidden="true" />}
                 {c.tasks.length === 0 && <div className="empty">{drag !== null ? "Drop here" : "Nothing here"}</div>}
+                {addHere && c.category !== "done" && (
+                  <button type="button" className="column-add" onClick={() => addIn(c)}>
+                    <Icon name="plus" strokeWidth={2} /> New task
+                  </button>
+                )}
               </div>
             </section>
           );
@@ -593,7 +663,18 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
         />
       )}
       {addCtx && (
-        <TaskModal ws={addCtx.ws} projectId={addCtx.project.id} statuses={openStatuses(addCtx.board)} labels={addCtx.board.labels} onClose={() => setAdding(null)} onCreated={changed} />
+        <TaskModal
+          ws={addCtx.ws}
+          projectId={addCtx.project.id}
+          statuses={openStatuses(addCtx.board)}
+          labels={addCtx.board.labels}
+          initialStatus={newIn ? (newIn.statusId ?? openStatuses(addCtx.board).find((s) => s.category === newIn.category)?.id) : undefined}
+          onClose={() => {
+            setAdding(null);
+            setNewIn(null);
+          }}
+          onCreated={changed}
+        />
       )}
       {recCtx && (
         <RecurringModal
@@ -947,6 +1028,53 @@ function ArchiveDoneModal({ projectId, onClose, onDone }: { projectId: number; o
   );
 }
 
+// useNow: the time, re-read every `every` ms while it is non-zero (a running card's clock).
+function useNow(every: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!every) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), every);
+    return () => clearInterval(id);
+  }, [every]);
+  return every ? now : Date.now();
+}
+
+// StageIcon: a column's stage as a small ring in its colour: dashed (backlog), empty (to do),
+// half full (doing), with a pause bar (waiting), filled with a check (done), crossed (cancelled).
+function StageIcon({ category, color }: { category: Category; color: string }) {
+  return (
+    <svg className="stage-icon" viewBox="0 0 16 16" width="1em" height="1em" aria-hidden="true" style={{ color }}>
+      {category === "backlog" && <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeDasharray="2.4 2" />}
+      {category === "todo" && <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" />}
+      {category === "doing" && (
+        <>
+          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M8 4a4 4 0 0 1 0 8z" fill="currentColor" />
+        </>
+      )}
+      {category === "waiting" && (
+        <>
+          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M6.6 5.6v4.8M9.4 5.6v4.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </>
+      )}
+      {category === "done" && (
+        <>
+          <circle cx="8" cy="8" r="7" fill="currentColor" />
+          <path d="m5 8.2 2 2 4-4.2" fill="none" stroke="var(--surface)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+      {category === "cancelled" && (
+        <>
+          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <path d="m5.8 5.8 4.4 4.4M10.2 5.8l-4.4 4.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, statusLabel, dragging, first, last, onDragStart, onDragEnd, onReorder, onOpen, onChanged, fields }: {
   task: Task;
   statuses: Status[];
@@ -1002,9 +1130,25 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
   const createdBy = creator ? `Created by ${nameOf(creator)}` : "";
   const assigneeTip = (u: { username: string; display_name: string; kind: string }) => `Assigned to ${nameOf(u)}${u.kind === "agent" ? " (agent)" : ""}${createdBy ? `\n${createdBy}` : ""}`;
   const wsColor = colorFor(ws.slug, ws.color);
+  const state = cardState(task);
+  const run = task.last_run;
+  const running = state?.kind === "running";
+  const now = useNow(running ? 1000 : 0);
+  const worker = run ? users.get(run.worker_user_id) : undefined;
+  const asker = task.question ? users.get(task.question.author_id) : undefined;
+  const [retrying, setRetrying] = useState(false);
+  const retry = () => {
+    setRetrying(true);
+    setErr("");
+    api
+      .resumeTask(task.id, "")
+      .then(() => onChanged())
+      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Retry failed."))
+      .finally(() => setRetrying(false));
+  };
   return (
     <article
-      className={"task-card" + (dragging ? " dragging" : "") + (task.missed_at ? " missed" : "") + (task.archived_at ? " archived" : "") + (task.blocked_by ? " blocked" : "") + (task.color ? " colored" : "")}
+      className={"task-card" + (state ? " state-" + state.kind : "") + (dragging ? " dragging" : "") + (task.missed_at ? " missed" : "") + (task.archived_at ? " archived" : "") + (task.blocked_by ? " blocked" : "") + (task.color ? " colored" : "")}
       style={task.color ? ({ "--card-c": task.color } as CSSProperties) : undefined}
       data-task-id={task.id}
       draggable={canWrite}
@@ -1019,7 +1163,13 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
       <button type="button" className="card-open" onClick={onOpen} aria-label={`${task.key} ${task.title}`}>
         <div className="card-top">
           <PriorityIcon priority={task.priority} />
-          <span className="key">{task.key}</span>
+          {state && (
+            <span className={"run-badge run-" + state.kind} data-tip={state.tip}>
+              {running && <span className="pulse-dot" aria-hidden="true" />}
+              {state.label}
+              {running && run && <span className="mono">· {elapsed(now - run.started_at)}</span>}
+            </span>
+          )}
           {showWs && (
             <span className="card-ws" data-tip={`Workspace: ${ws.name}`}>
               <span className="dot" style={{ background: wsColor }} />
@@ -1036,15 +1186,16 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
               <Icon name="archive" /> archived
             </span>
           )}
-          {task.resume_requested_at && task.status_category === "todo" && (
-            <span className="pill pill-accent" data-tip="Resume requested: the agent's runner continues its previous session on its next pass">
-              resume queued
-            </span>
-          )}
+          <span className="key card-key">{task.key}</span>
         </div>
         <div className="card-title">{task.title}</div>
-        {task.labels.length > 0 && (
+        {(task.labels.length > 0 || showDue) && (
           <div className="chips">
+            {showDue && (
+              <span className={"fact-chip" + (overdue ? " fact-overdue" : "")} data-tip={overdue ? "Overdue" : "Due"}>
+                <Icon name="calendar" /> {fmtDue(task.due_at)}
+              </span>
+            )}
             {shownLabels.map((l) => (
               <LabelChip key={l.id} label={labelFor(l)} />
             ))}
@@ -1055,26 +1206,44 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
             )}
           </div>
         )}
+        {running && run && (
+          <div className="card-run">
+            <div className="card-run-head">
+              {worker && <Avatar user={worker} size="xs" />}
+              <span className="card-run-who">{worker ? nameOf(worker) : "Agent"}</span>
+              {run.model && <span className="card-run-model mono">{run.model}</span>}
+            </div>
+            {run.progress_pct !== null && (
+              <div className="card-run-bar" role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={run.progress_pct}>
+                <span style={{ width: `${run.progress_pct}%` }} />
+              </div>
+            )}
+            {run.progress_note && <div className="card-run-note mono">› {run.progress_note}</div>}
+          </div>
+        )}
+        {state?.kind === "answer" && task.question && (
+          <div className="card-ask">
+            <span className="card-ask-label">
+              <Icon name="question" /> {asker ? `${nameOf(asker)} asks` : "Question"}
+            </span>
+            <p>{plainText(task.question.text)}</p>
+          </div>
+        )}
         <div className="card-foot">
           <span className="meta">
             <TaskBadges task={task} items fields={fields} />
-            {showDue && (
-              <span className={"meta-item" + (overdue ? " meta-overdue" : "")} data-tip={overdue ? "Overdue" : "Due"}>
-                ⏱ {fmtDue(task.due_at)}
-              </span>
-            )}
             {task.comment_count > 0 && (
               <span className="meta-item" data-tip={`${task.comment_count} comment${task.comment_count === 1 ? "" : "s"}`}>
-                💬 {task.comment_count}
+                <Icon name="comment" /> {task.comment_count}
               </span>
             )}
-            {task.session_id && (
-              <span className="pill pill-agent" data-tip="An agent has worked on it: it has an agent session (see Runs in the task)">
-                agent
+            {task.session_id && !running && (
+              <span className="meta-item" data-tip="An agent has worked on it: it has an agent session (see Runs in the task)">
+                <Icon name="bot" />
               </span>
             )}
             {task.cost_usd_total > 0 && (
-              <span className="meta-item" data-tip="What the agent's runs on it cost so far (API-equivalent USD, as reported by the agent)">
+              <span className="meta-item mono" data-tip="What the agent's runs on it cost so far (API-equivalent USD, as reported by the agent)">
                 ${task.cost_usd_total.toFixed(2)}
               </span>
             )}
@@ -1094,6 +1263,22 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
           )}
         </div>
       </button>
+      {state?.kind === "failed" && run && (
+        <div className="card-fail">
+          <div className="card-fail-text">
+            <Icon name="alert" />
+            <span>
+              <b>{state.label}</b>
+              {run.error_reason ? `: ${run.error_reason}` : ""}
+            </span>
+          </div>
+          {canWrite && (
+            <button type="button" className="button small" disabled={retrying} onClick={retry} data-tip="Resume the agent's session: the task goes back to To-Do and its runner continues on its next pass">
+              <Icon name="refresh" /> Retry
+            </button>
+          )}
+        </div>
+      )}
       {canWrite && (
         <div className="card-menu" ref={ref}>
           <button type="button" className="icon-button" aria-label={`Move ${task.key}`} aria-expanded={menu} onClick={() => setMenu(!menu)}>

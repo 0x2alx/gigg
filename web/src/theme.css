@@ -24,6 +24,8 @@
   --radius-xl: calc(var(--r) * 1.5);
   --border-w: 2px;
   --font: system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --ok: #30a46c; /* a running agent (the same green in every theme; text uses it mixed toward --text) */
   --weight-body: 500;
   --weight-heading: 700;
   --weight-strong: 600; /* pills, buttons, column names, headings: set per theme by applyTheme */
@@ -187,35 +189,57 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .board-page { display: flex; flex-direction: column; }
 /* Columns share the width and are as tall as their cards (the page scrolls, not the columns). */
 .board { display: grid; gap: var(--sp-5); align-items: start; overflow-x: clip; }
+/* a column is a lane one step off the page, without a frame; its cards sit one step lighter */
 .column {
   background: var(--low);
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   border-radius: var(--radius-l);
   display: flex; flex-direction: column; min-width: 0;
 }
 .column-head {
-  display: flex; align-items: center; gap: var(--sp-4); min-height: 2.5rem; padding: 0 0.55rem 0 0.8rem;
+  display: flex; align-items: center; gap: var(--sp-3); min-height: 2.6rem; padding: 0 0.45rem 0 0.75rem;
   font-size: var(--fs-base); font-weight: var(--weight-strong);
 }
-.column-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.column-head .count {
-  margin-left: 0; padding: 0; background: none; color: var(--muted); border-radius: 0;
-  font-size: var(--fs-sm); font-weight: var(--weight-body); font-variant-numeric: tabular-nums;
+.stage-icon { flex: none; font-size: 0.95rem; }
+.column-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a count right after a name: a small quiet pill */
+.count-pill {
+  flex: none; min-width: 1.35rem; padding: 0 0.35rem; border-radius: 999px; text-align: center;
+  background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted);
+  font-family: var(--mono); font-size: var(--fs-xs); font-weight: var(--weight-body); line-height: 1.55; font-variant-numeric: tabular-nums;
 }
-.cards { --card-gap: var(--sp-3); padding: 0 var(--sp-4) var(--sp-4); display: flex; flex-direction: column; gap: var(--card-gap); }
-/* a collapsed column: a narrow strip, name written top to bottom; click to expand */
-.column-collapse { flex: none; width: 1.7rem; height: 1.7rem; font-size: 1rem; color: var(--muted); transition: opacity 0.12s ease-out; }
-.column:not(:hover):not(:focus-within) .column-collapse { opacity: 0; }
-@media (hover: none) { .column .column-collapse { opacity: 1 !important; } }
-.column-collapsed { align-self: stretch; min-height: 12rem; }
-.column-strip {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); width: 100%;
-  padding: 0.65rem 0 0.8rem; background: none; border: 0; color: var(--text); font: inherit; font-size: var(--fs-base); font-weight: var(--weight-strong); cursor: pointer;
-  border-radius: var(--radius-l);
+/* the column's tools (new task, collapse) show on hover and keyboard focus, and always on touch screens */
+.column-tools { margin-left: auto; display: inline-flex; gap: 0.1rem; transition: opacity 0.12s ease-out; }
+.column-tools .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
+.column-tools .icon-button:hover { color: var(--text); }
+.column:not(:hover):not(:focus-within) .column-tools { opacity: 0; }
+@media (hover: none) { .column .column-tools { opacity: 1 !important; } }
+.cards { --card-gap: var(--sp-3); padding: 0 var(--sp-3) var(--sp-3); display: flex; flex-direction: column; gap: var(--card-gap); }
+.column-add {
+  display: inline-flex; align-items: center; gap: 0.35rem; align-self: flex-start; padding: 0.3rem 0.45rem; margin-top: -0.1rem;
+  background: none; border: 0; border-radius: var(--radius-s); color: var(--muted); font: inherit; font-size: var(--fs-sm); cursor: pointer;
 }
-.column-strip .count { background: none; padding: 0; color: var(--muted); font-weight: var(--weight-body); font-variant-numeric: tabular-nums; }
-.column-strip:hover, .column-strip:focus-visible { background: var(--hover); }
-.column-strip-name { writing-mode: vertical-rl; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 20rem; }
+.column-add:hover, .column-add:focus-visible { color: var(--text); background: var(--hover); }
+/* collapsed columns: small chips above the board (stage, name, count); click one to bring the column back */
+.collapsed-row { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: 0 0 var(--sp-4); }
+.collapsed-chip {
+  display: inline-flex; align-items: center; gap: var(--sp-3); height: 1.9rem; padding: 0 0.55rem 0 0.6rem;
+  background: var(--low); border: 1px dashed var(--line-strong); border-radius: var(--radius-m);
+  color: var(--text); font: inherit; font-size: var(--fs-sm); font-weight: var(--weight-strong); cursor: pointer;
+}
+.collapsed-chip:hover, .collapsed-chip:focus-visible { background: var(--hover); border-style: solid; }
+.collapsed-chip.drag-over { border-color: var(--accent); border-style: solid; background: var(--high); }
+.collapsed-chip-name { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the agent side of the board in one line: running, waiting for an answer, failed */
+.board-pulse { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-5); margin: calc(-1 * var(--sp-3)) 0 var(--sp-4); font-size: var(--fs-sm); color: var(--muted); }
+.pulse-item { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--muted); text-decoration: none; }
+a.pulse-item:hover { color: var(--text); }
+.pulse-running { color: var(--text); }
+.pulse-answer .ico { color: var(--accent); }
+.pulse-failed { color: var(--danger); }
+.pulse-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ok); flex: none; animation: gigg-pulse 1.6s ease-in-out infinite; }
+@keyframes gigg-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .pulse-dot { animation: none; } }
 .empty { color: var(--muted); font-size: var(--fs-sm); padding: 0.3rem 0.2rem; }
 
 /* a card: hairline border, a coloured stripe only when the task has a colour, a shadow only while dragged */
@@ -233,8 +257,64 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit;
   padding: 0.6rem 0.7rem 0.6rem 0.8rem; cursor: pointer; border-radius: var(--radius-m);
 }
-.card-top { display: flex; gap: 0.1rem 0.5rem; align-items: center; flex-wrap: wrap; min-height: 1.3rem; padding-right: 1.7rem; }
+.card-top { display: flex; gap: 0.1rem 0.5rem; align-items: center; flex-wrap: wrap; min-height: 1.3rem; }
 .key { font-size: var(--fs-sm); color: var(--muted); font-weight: var(--weight-body); font-variant-numeric: tabular-nums; }
+/* the key sits top right, small and monospaced; the card's ⋯ takes its place on hover */
+.card-key { margin-left: auto; font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.01em; }
+.task-card:has(> .card-menu):hover .card-key, .task-card:has(> .card-menu):focus-within .card-key { visibility: hidden; }
+/* touch screens: the ⋯ is always there, so the key moves left of it instead */
+@media (hover: none) {
+  .task-card:has(> .card-menu) .card-top { padding-right: 1.6rem; }
+  .task-card:has(> .card-menu):hover .card-key, .task-card:has(> .card-menu):focus-within .card-key { visibility: visible; }
+}
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+/* the agent state of a card: a small uppercase badge in the state's colour */
+.run-badge {
+  --c: var(--muted);
+  display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap;
+  font-size: var(--fs-xs); font-weight: var(--weight-strong); letter-spacing: 0.04em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--c) var(--badge-mix), var(--text));
+}
+.run-badge .mono { text-transform: none; letter-spacing: 0; font-weight: var(--weight-body); color: var(--muted); }
+.run-running { --c: var(--ok); }
+.run-queued { --c: var(--accent); }
+.run-answer { --c: var(--accent); }
+.run-failed { --c: var(--danger); }
+/* facts as small bordered chips with an icon (the due date) */
+.fact-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; padding: 0 0.4rem; line-height: 1.6;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-s); color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
+}
+.fact-overdue { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); font-weight: var(--weight-strong); }
+/* a running run inside its card: who, which model, the latest progress note */
+.card-run {
+  display: flex; flex-direction: column; gap: 0.3rem; padding: 0.45rem 0.55rem; border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--text) 4%, var(--bg)); border: 1px solid var(--line);
+}
+.card-run-head { display: flex; align-items: center; gap: 0.4rem; min-width: 0; font-size: var(--fs-sm); }
+.card-run-who { font-weight: var(--weight-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-run-model { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.card-run-bar { height: 3px; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); overflow: hidden; }
+.card-run-bar > span { display: block; height: 100%; background: var(--ok); border-radius: inherit; }
+.card-run-note { color: var(--muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a question the agent asked, on its waiting card */
+.card-ask {
+  display: flex; flex-direction: column; gap: 0.2rem; padding: 0.45rem 0.55rem; border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.card-ask-label { display: inline-flex; align-items: center; gap: 0.3rem; font-size: var(--fs-xs); font-weight: var(--weight-strong); color: color-mix(in srgb, var(--accent) var(--badge-mix), var(--text)); }
+.card-ask p { margin: 0; font-size: var(--fs-sm); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+/* a run that failed: a red block at the card's foot, with Retry */
+.card-fail {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); margin: 0 0.6rem 0.6rem 0.7rem; padding: 0.4rem 0.45rem 0.4rem 0.55rem;
+  border-radius: var(--radius-s); background: color-mix(in srgb, var(--danger) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  font-size: var(--fs-sm);
+}
+.card-fail-text { display: flex; align-items: flex-start; gap: 0.35rem; min-width: 0; color: var(--text); }
+.card-fail-text .ico { color: var(--danger); margin-top: 0.15em; }
+.card-fail-text > span { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.card-fail .button { flex: none; }
+.task-card.state-running { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
 .card-ws, .card-status { display: inline-flex; align-items: center; gap: 0.3rem; font-size: var(--fs-sm); color: var(--muted); min-width: 0; max-width: 100%; }
 .card-ws { max-width: 9rem; overflow: hidden; white-space: nowrap; }
 .card-title {
@@ -262,7 +342,7 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 /* quiet facts: icon and number in muted text, no box */
 .meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.6rem; flex: 1 1 auto; min-width: 0; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .meta:empty { display: none; }
-.meta-item { white-space: nowrap; }
+.meta-item { white-space: nowrap; display: inline-flex; align-items: center; gap: 0.25rem; }
 .meta-done { color: var(--text); }
 .meta-overdue { color: var(--danger); font-weight: var(--weight-strong); }
 .card-menu { position: absolute; top: 0.25rem; right: 0.25rem; transition: opacity 0.12s ease-out; }

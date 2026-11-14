@@ -268,6 +268,15 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 	defer ping.Stop()
 	defer life.Stop()
 	admin := p.IsInstanceAdmin()
+	// write sends one batch under a deadline (a reader that stops reading doesn't pin the stream) and
+	// clears it again: over HTTP/2 a deadline left armed resets the stream when it expires, even with
+	// nothing pending, and Chrome reports ERR_HTTP2_PROTOCOL_ERROR between pings.
+	write := func(f func() error) bool {
+		_ = rc.SetWriteDeadline(time.Now().Add(feedWrite))
+		ok := f() == nil && rc.Flush() == nil
+		_ = rc.SetWriteDeadline(time.Time{})
+		return ok
+	}
 	// send writes every new visible entry; false ends the stream.
 	send := func() bool {
 		for {
@@ -281,15 +290,16 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 			if !admin {
 				redactDeleted(items)
 			}
-			for _, it := range items {
-				b, _ := json.Marshal(it)
-				_ = rc.SetWriteDeadline(time.Now().Add(feedWrite))
-				if _, err := fmt.Fprintf(w, "id: %d\nevent: activity\ndata: %s\n\n", it.ID, b); err != nil {
-					return false
+			if len(items) > 0 && !write(func() error {
+				for _, it := range items {
+					b, _ := json.Marshal(it)
+					if _, err := fmt.Fprintf(w, "id: %d\nevent: activity\ndata: %s\n\n", it.ID, b); err != nil {
+						return err
+					}
+					after = it.ID
 				}
-				after = it.ID
-			}
-			if len(items) > 0 && rc.Flush() != nil {
+				return nil
+			}) {
 				return false
 			}
 			if len(items) < 200 {
@@ -309,8 +319,7 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 		case <-life.C:
 			return
 		case <-ping.C:
-			_ = rc.SetWriteDeadline(time.Now().Add(feedWrite))
-			if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil || rc.Flush() != nil {
+			if !write(func() error { _, err := fmt.Fprint(w, ": ping\n\n"); return err }) {
 				return
 			}
 		case <-poll.C:
