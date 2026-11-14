@@ -19,7 +19,7 @@ Click **New task** on the board. You can also press **Ctrl+K** (⌘K on a Mac) a
 
 ## The task panel
 
-Click a card to open its panel. The expand button (two diagonal arrows, top right) widens it, and the close button (×) or Esc closes it. Every field saves when you change it.
+Click a card to open its panel. Its top line shows the workspace (its owner's picture and name, in its colour), the task's key, its status and its badges. The expand button (two diagonal arrows, top right) widens it, and the close button (×) or Esc closes it. Every field saves when you change it.
 
 ![A task's panel (Daywalker theme)](../images/task-panel-day.png)
 

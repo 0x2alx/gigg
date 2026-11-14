@@ -4,6 +4,7 @@ import { api, ApiError, fmtTime, hasCap, priorityNames, type Board, type Categor
 import { fmtDue } from "./dates";
 import { useApp, type WorkspaceTree } from "./App";
 import {
+  activeFilters,
   CATEGORY_LABEL,
   categoryColumns,
   EMPTY_FILTER,
@@ -29,19 +30,12 @@ import { TaskPanel } from "./TaskPanel";
 import { viewsApi } from "./views/viewsApi";
 import { CATEGORY_COLOR, colorFor } from "./theme";
 import { Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, TaskBadges } from "./ui";
+import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 import { cardState, elapsed, plainText } from "./cardState";
 
-// WorkspaceBadge: a workspace's name as a tint of its colour (the workspace's own, or the default from its slug).
-export function WorkspaceBadge({ ws }: { ws: Pick<WorkspaceTree, "slug" | "name" | "color"> }) {
-  const c = colorFor(ws.slug, ws.color);
-  return (
-    <span className="pill pill-wsc" style={{ "--c": c } as CSSProperties} title={`Workspace: ${ws.name}`}>
-      {ws.name}
-    </span>
-  );
-}
+
 
 const openStatuses = (b: Board): Status[] => b.statuses.filter((s) => s.category !== "cancelled");
 const canWriteIn = (ws: WorkspaceTree) => ws.role !== "viewer" && ws.role !== "commenter";
@@ -107,7 +101,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const [newIn, setNewIn] = useState<{ category: Category; statusId?: number } | null>(null);
   const [recurring, setRecurring] = useState<{ pid: number; highlight?: number } | null>(null);
   const [templates, setTemplates] = useState<number | null>(null);
-  const [archiveDone, setArchiveDone] = useState<number | null>(null);
+  const [archiveDone, setArchiveDone] = useState<number[] | null>(null);
   const [timings, setTimings] = useState<number | null>(null);
   const [trash, setTrash] = useState(false);
   const narrow = useNarrow();
@@ -244,10 +238,14 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     if (what === "new") setAdding(pid);
     else if (what === "recurring") setRecurring({ pid });
     else if (what === "templates") setTemplates(pid);
-    else setArchiveDone(pid);
+    else setArchiveDone([pid]);
   }, []);
+  const archivable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "archive_tasks", x.ws.id));
   const action = (what: ProjectAction | "schedules") => {
-    if (what === "schedules") {
+    if (what === "archive") {
+      // one dialog for any number of projects: all of those in view are ticked to start with
+      setArchiveDone(archivable.map((x) => x.project.id));
+    } else if (what === "schedules") {
       if (wsInScope.length === 1) setTimings(wsInScope[0]!.id);
       else setPick("schedules");
     } else if (single) runAction(what, single.project.id);
@@ -745,7 +743,12 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
         />
       )}
       {archiveDone !== null && (
-        <ArchiveDoneModal projectId={archiveDone} onClose={() => setArchiveDone(null)} onDone={(n) => changed(n === 0 ? "Nothing to archive" : `Archived ${n} done task${n === 1 ? "" : "s"}`)} />
+        <ArchiveDoneModal
+          options={archivable}
+          initial={archiveDone}
+          onClose={() => setArchiveDone(null)}
+          onDone={(n) => changed(n === 0 ? "Nothing to archive" : `Archived ${n} done task${n === 1 ? "" : "s"}`)}
+        />
       )}
       {trash && <TrashModal scope={inScope} onClose={() => setTrash(false)} onRestored={(key) => changed(`Restored ${key}`)} />}
       {panel && taskKey && panelBoard && (
@@ -780,7 +783,12 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
   people: { id: number; username: string; display_name: string }[];
   narrow: boolean;
 }) {
-  const { users } = useApp();
+  const { users, prefs, setPref } = useApp();
+  // folded: one line with the filters that are on (removable), or just the Filters button. On wide screens the
+  // choice is saved; on a phone the row starts folded each time.
+  const [narrowOpen, setNarrowOpen] = useState(false);
+  const shut = narrow ? !narrowOpen : prefs.board_filters === "folded";
+  const fold = (v: boolean) => (narrow ? setNarrowOpen(!v) : setPref("board_filters", v ? "folded" : "open"));
   const [text, setText] = useState(filter.q);
   useEffect(() => setText(filter.q), [filter.q]);
   const filterRef = useRef(filter);
@@ -803,9 +811,60 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
     setFilter({ ...filter, p: next.length === projects.length ? [] : next });
   };
   const sel = (v: string | number) => (v === "" || v === 0 ? "" : " active");
-  const body = (
-    <div className="board-filters" role="group" aria-label="Board filters">
+  const active = activeFilters(filter, {
+    ws: (slug) => {
+      const w = tree.find((x) => x.slug === slug);
+      return w && { name: w.name, color: colorFor(w.slug, w.color) };
+    },
+    project: (id) => tree.flatMap((w) => w.projects).find((p) => p.id === id)?.name,
+    user: (id) => {
+      const u = users.get(id);
+      return u && (u.display_name || u.username);
+    },
+    priority: (n) => priorityNames[n] ?? String(n),
+  });
+  const foldButton = (
+    <button
+      type="button"
+      className={"bf-fold" + (shut && active.length ? " on" : "")}
+      aria-expanded={!shut}
+      aria-controls="board-filters"
+      data-tip={shut ? "Show the filters" : "Fold the filters: only those that are on stay in view"}
+      onClick={() => fold(!shut)}
+    >
+      <Icon name="settings" />
+      Filters
+      {shut && active.length > 0 && <span className="count">{active.length}</span>}
+      <Icon name={shut ? "chevron-right" : "chevron-down"} />
+    </button>
+  );
+  if (shut) {
+    return (
+      <div className="board-filters bf-folded" role="group" aria-label="Board filters (folded)">
+        <div className="bf-row">
+          {foldButton}
+          {active.map((x) => (
+            <span key={x.key} className={"bf-active" + (x.color ? " bf-active-c" : "")} style={x.color ? ({ "--c": x.color } as CSSProperties) : undefined}>
+              {x.color && <span className="dot" style={{ background: x.color }} aria-hidden="true" />}
+              {x.label}
+              <button type="button" className="bf-active-x" aria-label={`Remove the filter ${x.label}`} onClick={() => setFilter(x.without)}>
+                <Icon name="x" />
+              </button>
+            </span>
+          ))}
+          {active.length > 1 && (
+            <button type="button" className="link bf-clear" onClick={() => setFilter({ ...EMPTY_FILTER })}>
+              Clear all
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="board-filters" id="board-filters" role="group" aria-label="Board filters">
       <div className="bf-row bf-fields">
+        {foldButton}
         <span className="bf-search">
           <svg viewBox="0 0 16 16" width="1em" height="1em" aria-hidden="true">
             <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -922,13 +981,6 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
       )}
     </div>
   );
-  if (!narrow) return body;
-  return (
-    <details className="board-filters-wrap" open={isFiltered(filter) || undefined}>
-      <summary>Filters{isFiltered(filter) ? " (on)" : ""}</summary>
-      {body}
-    </details>
-  );
 }
 
 // TrashModal: the deleted tasks of the projects in view, newest first, each with Restore (for people
@@ -1028,25 +1080,65 @@ function PickModal({ what, options, workspaces, onPick, onClose }: {
   );
 }
 
-function ArchiveDoneModal({ projectId, onClose, onDone }: { projectId: number; onClose: () => void; onDone: (n: number) => void }) {
+// ArchiveDoneModal: archive the done tasks of the projects ticked (all those in view to start with), one call
+// per project; a failure stops there and says which projects were done.
+function ArchiveDoneModal({ options, initial, onClose, onDone }: {
+  options: { ws: WorkspaceTree; project: { id: number; key: string; name: string } }[];
+  initial: number[];
+  onClose: () => void;
+  onDone: (n: number) => void;
+}) {
   const [days, setDays] = useState(7);
+  const [picked, setPicked] = useState<number[]>(initial);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const go = () => {
+  const all = options.length > 0 && picked.length === options.length;
+  const toggle = (id: number) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const go = async () => {
     setBusy(true);
     setErr("");
-    api
-      .archiveDone(projectId, days)
-      .then((r) => {
-        onDone(r.archived);
-        onClose();
-      })
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't archive."))
-      .finally(() => setBusy(false));
+    let total = 0;
+    const done: string[] = [];
+    for (const { project } of options.filter((o) => picked.includes(o.project.id))) {
+      try {
+        total += (await api.archiveDone(project.id, days)).archived;
+        done.push(project.key);
+      } catch (e: unknown) {
+        const why = e instanceof ApiError ? e.message : "it failed";
+        setErr(`Couldn't archive in ${project.key}: ${why}.${done.length ? ` Done in ${done.join(", ")} (${total} archived).` : ""}`);
+        setBusy(false);
+        if (total > 0) onDone(total);
+        return;
+      }
+    }
+    setBusy(false);
+    onDone(total);
+    onClose();
   };
   return (
     <Modal title="Archive done tasks" onClose={onClose}>
       <p className="small">Archived tasks leave the board and lists; they stay searchable and can be unarchived from the task.</p>
+      {options.length === 0 ? (
+        <p className="muted small">No project in view allows archiving.</p>
+      ) : (
+        options.length > 1 && (
+          <fieldset className="archive-pick">
+            <legend className="small muted">Projects</legend>
+            <label className="archive-row archive-all">
+              <input type="checkbox" checked={all} onChange={() => setPicked(all ? [] : options.map((o) => o.project.id))} />
+              <span>All projects in view ({options.length})</span>
+            </label>
+            {options.map(({ ws, project }) => (
+              <label key={project.id} className="archive-row">
+                <input type="checkbox" checked={picked.includes(project.id)} onChange={() => toggle(project.id)} />
+                <WorkspaceBadge ws={ws} />
+                <span className="pill pill-key">{project.key}</span>
+                <span>{project.name}</span>
+              </label>
+            ))}
+          </fieldset>
+        )
+      )}
       <div className="archive-days" role="radiogroup" aria-label="Done for at least">
         {[0, 7, 30].map((d) => (
           <button key={d} type="button" role="radio" aria-checked={days === d} className={"assignee" + (days === d ? " on" : "")} onClick={() => setDays(d)}>
@@ -1063,9 +1155,9 @@ function ArchiveDoneModal({ projectId, onClose, onDone }: { projectId: number; o
         <button type="button" className="button secondary" onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className="button" onClick={go} disabled={busy}>
+        <button type="button" className="button" onClick={() => void go()} disabled={busy || picked.length === 0}>
           <Icon name="archive" />
-          Archive
+          {picked.length > 1 ? `Archive in ${picked.length} projects` : "Archive"}
         </button>
       </div>
     </Modal>

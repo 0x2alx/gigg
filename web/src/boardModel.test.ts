@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Category, Project, Task } from "./api";
 import type { WorkspaceTree } from "./App";
-import { categoryColumns, EMPTY_FILTER, filterQuery, matches, moveToCategory, parseFilter, scope, statusColumns } from "./boardModel";
+import { activeFilters, categoryColumns, EMPTY_FILTER, filterQuery, matches, moveToCategory, parseFilter, scope, statusColumns } from "./boardModel";
 
 const task = (id: number, x: Partial<Task> = {}): Task =>
   ({ id, key: `K-${id}`, title: `task ${id}`, description_md: "", priority: 0, due_at: null, assignees: [], labels: [], status_id: 0, status_name: "", status_category: "todo", ...x }) as Task;
@@ -65,5 +65,24 @@ describe("board columns", () => {
     expect(next.get(1)!.statuses.find((s) => s.id === 12)!.tasks.map((t) => t.id)).toEqual([1]);
     expect(moveToCategory(boards, 1, "todo")).toBeNull();
     expect(moveToCategory(boards, 1, "doing")).toBeNull(); // no doing status in that project
+  });
+});
+
+describe("activeFilters", () => {
+  const names = {
+    ws: (s: string) => (s === "acme" ? { name: "Acme", color: "#E5484D" } : undefined),
+    project: (id: number) => (id === 7 ? "Platform" : undefined),
+    user: (id: number) => (id === 3 ? "Sam" : undefined),
+    priority: (n: number) => ["None", "Low", "Medium", "High", "Urgent"][n]!,
+  };
+  it("is empty without filters", () => expect(activeFilters(EMPTY_FILTER, names)).toEqual([]));
+  it("lists each filter with the filter minus that one", () => {
+    const f = { ...EMPTY_FILTER, ws: ["acme"], p: [7], a: "3", l: "bug", pr: 3, q: "login", arch: true };
+    const got = activeFilters(f, names);
+    expect(got.map((x) => x.label)).toEqual(["Acme", "Platform", "“login”", "Assigned to Sam", "Label: bug", "High or higher", "Archived shown"]);
+    expect(got[0]!.color).toBe("#E5484D");
+    expect(got[0]!.without.ws).toEqual([]);
+    expect(got[3]!.without).toEqual({ ...f, a: "" });
+    expect(activeFilters({ ...EMPTY_FILTER, pr: 4, a: "none" }, names).map((x) => x.label)).toEqual(["Unassigned", "Urgent"]);
   });
 });

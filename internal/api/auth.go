@@ -132,7 +132,7 @@ type mePatchIn struct {
 		DisplayName Opt[string]          `json:"display_name,omitempty" maxLength:"64"`
 		Description Opt[string]          `json:"description,omitempty" maxLength:"200"`
 		Color       Opt[string]          `json:"color,omitempty" doc:"#RRGGBB or null"`
-		Preferences Opt[json.RawMessage] `json:"preferences,omitempty" doc:"Display preferences (JSON object)"`
+		Preferences Opt[json.RawMessage] `json:"preferences,omitempty" doc:"Display preferences (JSON object), merged by top-level key: a key given replaces that preference, null removes it, keys left out stay"`
 	}
 }
 

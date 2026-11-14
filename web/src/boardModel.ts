@@ -57,6 +57,36 @@ export function filterQuery(f: BoardFilter): string {
 
 export const isFiltered = (f: BoardFilter) => filterQuery({ ...f, arch: false }) !== "";
 
+// ActiveFilter: one filter that is on, as a removable chip of the folded filter row; `without` is the
+// filter with just this one taken off.
+export interface ActiveFilter {
+  key: string;
+  label: string;
+  color?: string;
+  without: BoardFilter;
+}
+
+export function activeFilters(
+  f: BoardFilter,
+  names: { ws: (slug: string) => { name: string; color?: string } | undefined; project: (id: number) => string | undefined; user: (id: number) => string | undefined; priority: (n: number) => string },
+): ActiveFilter[] {
+  const out: ActiveFilter[] = [];
+  for (const slug of f.ws) {
+    const w = names.ws(slug);
+    out.push({ key: "ws:" + slug, label: w?.name ?? slug, color: w?.color, without: { ...f, ws: f.ws.filter((s) => s !== slug) } });
+  }
+  for (const id of f.p) out.push({ key: "p:" + id, label: names.project(id) ?? `Project ${id}`, without: { ...f, p: f.p.filter((x) => x !== id) } });
+  if (f.q) out.push({ key: "q", label: `“${f.q}”`, without: { ...f, q: "" } });
+  if (f.a) {
+    const who = f.a === "me" ? "Assigned to me" : f.a === "none" ? "Unassigned" : `Assigned to ${names.user(Number(f.a)) ?? "someone"}`;
+    out.push({ key: "a", label: who, without: { ...f, a: "" } });
+  }
+  if (f.l) out.push({ key: "l", label: `Label: ${f.l}`, without: { ...f, l: "" } });
+  if (f.pr) out.push({ key: "pr", label: f.pr === 4 ? names.priority(4) : `${names.priority(f.pr)} or higher`, without: { ...f, pr: 0 } });
+  if (f.arch) out.push({ key: "arch", label: "Archived shown", without: { ...f, arch: false } });
+  return out;
+}
+
 export interface ScopedProject {
   ws: WorkspaceTree;
   project: Project;

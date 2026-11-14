@@ -9,6 +9,7 @@ import { useApp, type WorkspaceTree } from "../App";
 import { assignable } from "../fields";
 import { CATEGORY_COLOR, colorFor } from "../theme";
 import { Avatar, LabelChip, Modal, PriorityIcon, StatusDot } from "../ui";
+import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
 import { ALL_CATEGORIES, errMsg, isClosed, isOverdue, pool, relTime, taskHref, viewsApi, type TaskQuery } from "./viewsApi";
 import { parse, PASSTHROUGH, savedViewsApi, summary, toQuery, toSearch, viewHref, type SavedFilter, type SortKey, type TableFilters } from "./savedViews";
@@ -178,7 +179,7 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
       <header className="page-head">
         <div>
           <div className="crumb">
-            <span className="pill pill-ws">{ws.name}</span>
+            <WorkspaceBadge ws={ws} />
             {project && <span className="pill pill-key">{project.key}</span>}
             <span className="muted small">
               {rows === null ? "Loading…" : `${visible.length}${cursor ? "+" : ""} tasks`}
@@ -473,7 +474,7 @@ function SaveView({ ws, query, existing, onClose, onSaved }: {
           <input value={name} required maxLength={60} placeholder="e.g. Urgent ops" onChange={(e) => setName(e.target.value)} />
         </label>
         <div className="span2 vw-chips">
-          <span className="pill pill-ws">{ws.name}</span>
+          <WorkspaceBadge ws={ws} />
           {query.project && <span className="pill pill-key">{ws.projects.find((p) => String(p.id) === query.project)?.key ?? "project"}</span>}
           {chips.length ? chips.map((c) => <span key={c} className="pill pill-muted">{c}</span>) : <span className="muted small">no filters: every open task</span>}
           {query.sort && <span className="pill pill-muted">sort {query.sort}</span>}

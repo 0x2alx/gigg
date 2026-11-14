@@ -131,6 +131,10 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   // phones: the sidebar is a drawer behind a top bar; it closes on navigation, a tap outside or Esc
   const narrow = useNarrow();
   const [drawer, setDrawer] = useState(false);
+  // peek: a collapsed sidebar open for as long as the pointer (or the keyboard focus) is on it
+  const [peek, setPeek] = useState(false);
+  const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(peekTimer.current), []);
   useEffect(() => setDrawer(false), [loc, narrow]);
   useEffect(() => {
     if (!drawer) return;
@@ -251,12 +255,11 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
     };
   }, [reloadInbox]);
 
+  // setPref: one key at a time; the server merges it into the stored preferences, so another tab saving
+  // its own key can't put back an old value of this one (a stale "sidebar: open" did exactly that)
   const setPref = useCallback((key: string, value: unknown) => {
-    setPrefs((p) => {
-      const next = { ...p, [key]: value };
-      api.patchMe({ preferences: next }).catch(() => undefined);
-      return next;
-    });
+    setPrefs((p) => ({ ...p, [key]: value }));
+    api.patchMe({ preferences: { [key]: value } }).catch(() => undefined);
   }, []);
 
   const ctx = useMemo<AppCtx | null>(
@@ -265,7 +268,17 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   );
   if (!ctx) return <div className="center muted">Loading…</div>;
 
-  const collapsed = !narrow && prefs.sidebar === "collapsed"; // the drawer always shows labels
+  const pinnedShut = !narrow && prefs.sidebar === "collapsed"; // the drawer always shows labels
+  const collapsed = pinnedShut && !peek; // labels hidden: the icon rail
+  const peekIn = () => {
+    if (!pinnedShut) return;
+    clearTimeout(peekTimer.current);
+    peekTimer.current = setTimeout(() => setPeek(true), 120);
+  };
+  const peekOut = () => {
+    clearTimeout(peekTimer.current);
+    peekTimer.current = setTimeout(() => setPeek(false), 220);
+  };
   const first = ctx.tree.find((w) => w.projects.length > 0);
   const logout = () => {
     api.logout().finally(onLogout);
@@ -274,9 +287,20 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   const inAdmin = loc === "/admin" || loc.startsWith("/admin/");
   return (
     <Ctx.Provider value={ctx}>
-      <div className={"shell" + (collapsed ? " collapsed" : "") + (narrow ? " narrow" : "") + (drawer ? " drawer-open" : "")}>
+      <div className={"shell" + (pinnedShut ? " collapsed" : "") + (collapsed ? " rail" : "") + (pinnedShut && peek ? " peek" : "") + (narrow ? " narrow" : "") + (drawer ? " drawer-open" : "")}>
         {narrow && drawer && <div className="drawer-backdrop" onClick={() => setDrawer(false)} aria-hidden="true" />}
-        <aside id="sidebar" className="sidebar" aria-label="Navigation" inert={narrow && !drawer ? true : undefined}>
+        <aside
+          id="sidebar"
+          className="sidebar"
+          aria-label="Navigation"
+          inert={narrow && !drawer ? true : undefined}
+          onMouseEnter={peekIn}
+          onMouseLeave={peekOut}
+          onFocus={peekIn}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) peekOut();
+          }}
+        >
           <div className="side-top">
             <Link href="/" className="brand" aria-label={collapsed ? "gigg home" : undefined} title={collapsed ? "gigg" : undefined}>
               <LogoMark className="brand-mark" compact />
@@ -290,9 +314,14 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
               <button
                 type="button"
                 className="icon-button collapse"
-                onClick={() => setPref("sidebar", collapsed ? "open" : "collapsed")}
-                aria-label={collapsed ? "Open the menu" : "Close the menu"}
-                aria-expanded={!collapsed}
+                onClick={() => {
+                  clearTimeout(peekTimer.current);
+                  setPeek(false);
+                  setPref("sidebar", pinnedShut ? "open" : "collapsed");
+                }}
+                aria-label={pinnedShut ? "Keep the menu open" : "Collapse the menu (it opens while you point at it)"}
+                aria-pressed={!pinnedShut}
+                title={pinnedShut ? "Keep the menu open" : "Collapse the menu: it opens while you point at it"}
               >
                 <Icon name="sidebar" />
               </button>

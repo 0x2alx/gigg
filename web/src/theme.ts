@@ -1,4 +1,4 @@
-// Themes in gigg's theme JSON format: the six built-ins, applying a theme to the page, saving the
+// Themes in gigg's theme JSON format: the seven built-ins, applying a theme to the page, saving the
 // choice on the user; the editor, custom themes, import/export and the AI prompt build on these helpers.
 
 export interface Theme {
@@ -49,6 +49,10 @@ export const BUILTINS: Theme[] = [
     border: "#26365C", accent: "#00E5FF", onAccent: "#00151A", text: "#E6F7FF", mutedText: "#8FA6C7", danger: "#FF3DCB", secondary: null,
     font: "Oxanium", fontWeight: "Medium", textScalePct: 90, cornerDp: 10, borderDp: 1,
     description: "Deep navy with a cyan accent." },
+  { id: "carbon", name: "Carbon", dark: true, background: "#141414", surface: "#2B2B2B", surfaceVariant: "#363636",
+    border: "#404040", accent: "#EE7A64", onAccent: "#1E0B06", text: "#EDEDED", mutedText: "#A3A3A3", danger: "#F0607A", secondary: null,
+    font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 8, borderDp: 1,
+    description: "Neutral charcoal greys with a coral accent; dense, an ops-console feel." },
 ];
 
 const RETIRED: Record<string, string> = { graphite: "nightwalker", daylight: "daywalker", signature: "clumsy-clanker" };

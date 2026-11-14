@@ -120,6 +120,21 @@ grants no access.
 gigg admin workspace-owner acme sam
 ```
 
+### color
+
+```
+gigg admin color user|workspace <username|workspace> <#RRGGBB|none>
+```
+
+Sets or clears the colour of a user or a workspace. The colour tints everything that stands for them:
+workspace chips and badges, the sidebar, avatar rings and the initials of a user without a picture.
+`none` goes back to the default colour derived from the name.
+
+```sh
+gigg admin color workspace acme "#E5484D"
+gigg admin color user sam none
+```
+
 ### member
 
 ```

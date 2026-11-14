@@ -6,6 +6,7 @@ import { fmtDue } from "../dates";
 import { useApp } from "../App";
 import { CATEGORY_COLOR, colorFor } from "../theme";
 import { PriorityIcon, StatusDot } from "../ui";
+import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
 import { BUCKETS, dueBucket, errMsg, isClosed, taskHref, tasksAcross, type DueBucket } from "./viewsApi";
 import "./views.css";
@@ -106,7 +107,7 @@ export function MyTasks() {
                       <span className="vw-key">{t.key}</span>
                       <span className={"vw-list-title" + (isClosed(t.status_category) ? " vw-closed" : "")}>{t.title}</span>
                       <span className="vw-list-meta">
-                        {w && tree.length > 1 && <span className="vw-meta-text">{w.name}</span>}
+                        {w && tree.length > 1 && <WorkspaceBadge ws={w} />}
                         {p && (
                           <span className="proj-tag" title={p.name}>
                             <span className="dot" style={{ background: colorFor(p.key, p.color) }} aria-hidden="true" />

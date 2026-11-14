@@ -81,6 +81,17 @@ export function LabelChip({ label, onRemove }: { label: Tag; onRemove?: () => vo
   );
 }
 
+// WorkspaceChip: a workspace as a pill tinted in its colour, led by its owner's picture (or a dot in its colour).
+export function WorkspaceChip({ ws, owner }: { ws: { slug: string; name: string; color?: string | null }; owner?: User }) {
+  const c = colorFor(ws.slug, ws.color);
+  return (
+    <span className="pill pill-wsc ws-chip" style={{ "--c": c } as CSSProperties} title={`Workspace: ${ws.name}`}>
+      {owner ? <Avatar user={owner} size="xs" tip={`Workspace: ${ws.name}`} /> : <span className="dot" style={{ background: c }} aria-hidden="true" />}
+      {ws.name}
+    </span>
+  );
+}
+
 // Avatar sizes: xs (20px) for cards and dense rows, s (default, 24px) for lists, l (32px) for comments
 // and the task header, m (48px) for profile pages. People are round, agents rounded squares; the agent
 // mark (a small robot head on the lower right) shows from s up, the shape says it at xs.
@@ -89,7 +100,11 @@ export function Avatar({ user, size, tip }: { user: Pick<User, "username" | "dis
   const sz = (size && size !== "s" ? " avatar-" + size : "") + (user.kind === "agent" ? " avatar-agent" : "");
   if (user.has_avatar && user.id) {
     return (
-      <span className={"avatar avatar-img" + sz} title={tip ?? `${user.display_name || user.username}${user.kind === "agent" ? " (agent)" : ""}`}>
+      <span
+        className={"avatar avatar-img" + sz + (user.color ? " avatar-ring" : "")}
+        style={user.color ? ({ "--ring": user.color } as CSSProperties) : undefined}
+        title={tip ?? `${user.display_name || user.username}${user.kind === "agent" ? " (agent)" : ""}`}
+      >
         <img src={avatarURL(user.id, user.version)} alt="" />
         {user.kind === "agent" && <AgentMark />}
       </span>

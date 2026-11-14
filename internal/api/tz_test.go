@@ -37,3 +37,25 @@ func TestTimeZoneDefaults(t *testing.T) {
 		t.Fatalf("junk preference: %s", out)
 	}
 }
+
+// TestPreferencesMerge: PATCH /me merges preferences by top-level key, so two tabs each saving their own
+// key don't undo each other; null removes a key.
+func TestPreferencesMerge(t *testing.T) {
+	e := newEnv(t)
+	code, out, _ := e.req("PATCH", "/me", `{"preferences":{"sidebar":"collapsed","board_filter":"a=me"}}`, e.ada())
+	e.ok(code, out, 200)
+	code, out, _ = e.req("PATCH", "/me", `{"preferences":{"board_filter":"l=bug"}}`, e.ada())
+	e.ok(code, out, 200)
+	if !strings.Contains(string(out), `"sidebar":"collapsed"`) || !strings.Contains(string(out), `"board_filter":"l=bug"`) {
+		t.Fatalf("merge: %s", out)
+	}
+	code, out, _ = e.req("PATCH", "/me", `{"preferences":{"sidebar":null}}`, e.ada())
+	e.ok(code, out, 200)
+	if strings.Contains(string(out), `"sidebar"`) || !strings.Contains(string(out), `"board_filter":"l=bug"`) {
+		t.Fatalf("null removes: %s", out)
+	}
+	code, out, _ = e.req("PATCH", "/me", `{"preferences":["not","an","object"]}`, e.ada())
+	if code != 400 && code != 422 {
+		t.Fatalf("array accepted: %d %s", code, out)
+	}
+}

@@ -1,11 +1,11 @@
 // Dashboard: what the agents' runners did in the last 24 hours, per workspace, against its caps;
 // the pause switch (PAUSE TASKS) and the caps for admins.
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { fmtTime, hasCap } from "./api";
 import { useApp } from "./App";
 import { call } from "./http";
-import { Modal } from "./ui";
-import { CATEGORY_COLOR } from "./theme";
+import { Avatar, Modal } from "./ui";
+import { CATEGORY_COLOR, colorFor } from "./theme";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
@@ -165,6 +165,9 @@ function Meter({ label, n, cap, tip }: { label: string; n: number; cap: number; 
 }
 
 function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: boolean; canPause: boolean; onAct: (p: Promise<unknown>) => void }) {
+  const { tree, users } = useApp();
+  const ws = tree.find((w) => w.id === it.workspace_id);
+  const owner = ws?.owner_id != null ? users.get(ws.owner_id) : undefined;
   const { settings: s, usage: u } = it;
   const [editing, setEditing] = useState(false);
   const [daily, setDaily] = useState(s.daily_cap);
@@ -175,9 +178,16 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
     onAct(runnerApi.caps(it.workspace_id, daily, night));
   };
   return (
-    <section className={"card dash-card" + (s.paused ? " paused" : "")} aria-label={`Runner of ${it.name}`}>
+    <section
+      className={"card dash-card" + (s.paused ? " paused" : "") + (ws ? " dash-card-ws" : "")}
+      style={ws ? ({ "--c": colorFor(ws.slug, ws.color) } as CSSProperties) : undefined}
+      aria-label={`Runner of ${it.name}`}
+    >
       <div className="dash-card-head">
-        <h2 className="dash-card-title">{it.name}</h2>
+        <h2 className="dash-card-title">
+          {owner ? <Avatar user={owner} size="xs" /> : ws && <span className="dot" style={{ background: colorFor(ws.slug, ws.color) }} aria-hidden="true" />}
+          {it.name}
+        </h2>
         {s.paused ? (
           <span className="dash-state dash-state-paused" data-tip="No new task runs start in this workspace">
             <span className="dot" aria-hidden="true" />

@@ -207,11 +207,31 @@ func PatchUser(ctx context.Context, q Q, a Actor, id, expect int64, p UserPatch)
 		}
 	}
 	if p.Preferences != nil {
-		var m map[string]any
-		if json.Unmarshal(*p.Preferences, &m) != nil || len(*p.Preferences) > 16384 {
+		// a merge of top-level keys: each key given replaces that preference, null removes it, the rest stay.
+		// Two tabs (or two clients) each changing their own key then can't undo each other's change.
+		var in map[string]json.RawMessage
+		if json.Unmarshal(*p.Preferences, &in) != nil || in == nil || len(*p.Preferences) > 16384 {
 			return nil, Invalid("preferences must be a JSON object under 16 KiB")
 		}
-		set("preferences", string(*p.Preferences))
+		cur := map[string]json.RawMessage{}
+		if len(u.Preferences) > 0 {
+			_ = json.Unmarshal(u.Preferences, &cur) // stored by this function: always an object
+			if cur == nil {
+				cur = map[string]json.RawMessage{}
+			}
+		}
+		for k, v := range in {
+			if string(v) == "null" {
+				delete(cur, k)
+			} else {
+				cur[k] = v
+			}
+		}
+		b, _ := json.Marshal(cur)
+		if len(b) > 16384 {
+			return nil, Invalid("preferences must be a JSON object under 16 KiB")
+		}
+		set("preferences", string(b))
 	}
 	if p.IsAdmin != nil {
 		set("is_admin", *p.IsAdmin)

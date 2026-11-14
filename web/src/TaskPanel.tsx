@@ -10,6 +10,7 @@ import { describeRule } from "./recurrence";
 import { CATEGORY_COLOR } from "./theme";
 import { EffortSelect, ModelInput, ToolsInput } from "./runsettings";
 import { Avatar, LabelChip, Pill, PriorityBadge, StatusBadge, TaskBadges, UserBadge } from "./ui";
+import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
@@ -241,7 +242,10 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   return (
     <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "")} aria-label={`Task ${task.key}`} style={task.color ? ({ "--panel-c": task.color } as CSSProperties) : undefined}>
       <div className="tp-top">
-        <span className="tp-key">{task.key}</span>
+        <WorkspaceBadge ws={ws} />
+        <span className="pill pill-key tp-key" title={`Task key ${task.key}`}>
+          {task.key}
+        </span>
         <div className="tp-badges">
           <StatusBadge name={task.status_name} category={task.status_category} color={status?.color} />
           <PriorityBadge priority={task.priority} />

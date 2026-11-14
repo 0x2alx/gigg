@@ -26,6 +26,7 @@ const adminUsage = `gigg admin: first setup and recovery, working directly on th
   gigg admin passwd <username> [-file F]       new password from the terminal, stdin, or a file
   gigg admin workspace-add <slug> <name>       the owner defaults to the user named <slug>, if any
   gigg admin workspace-owner <workspace> <username|none>   whose picture the sidebar shows next to it
+  gigg admin color user|workspace <username|workspace> <#RRGGBB|none>   its colour on chips, badges, avatars
   gigg admin member <workspace> <username> <viewer|commenter|member|manager|none>
   gigg admin access <username> <workspace|all> <preset|none> [permission=allow|deny ...]
                                                set the user's access rule there (replaces it)
@@ -174,6 +175,34 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 			}
 			if _, err = store.PatchWorkspace(ctx, tx, a, w.ID, 0, store.WorkspacePatch{OwnerID: &owner}); err == nil {
 				fmt.Fprintf(os.Stderr, "owner of %s: %s\n", w.Slug, args[1])
+			}
+			return err
+		})
+	case "color":
+		if len(args) != 3 || (args[0] != "user" && args[0] != "workspace") {
+			return errors.New("usage: color user|workspace <username|workspace> <#RRGGBB|none>")
+		}
+		var c *string
+		if args[2] != "none" {
+			c = &args[2]
+		}
+		return st.Tx(ctx, func(tx *sql.Tx) error {
+			if args[0] == "user" {
+				u, err := store.GetUserByName(ctx, tx, args[1])
+				if err != nil {
+					return fmt.Errorf("user %s: %w", args[1], err)
+				}
+				if _, err = store.PatchUser(ctx, tx, a, u.ID, 0, store.UserPatch{Color: &c}); err == nil {
+					fmt.Fprintf(os.Stderr, "colour of user %s: %s\n", u.Username, args[2])
+				}
+				return err
+			}
+			w, err := store.GetWorkspaceBySlug(ctx, tx, args[1])
+			if err != nil {
+				return fmt.Errorf("workspace %s: %w", args[1], err)
+			}
+			if _, err = store.PatchWorkspace(ctx, tx, a, w.ID, 0, store.WorkspacePatch{Color: &c}); err == nil {
+				fmt.Fprintf(os.Stderr, "colour of workspace %s: %s\n", w.Slug, args[2])
 			}
 			return err
 		})

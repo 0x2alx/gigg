@@ -2,6 +2,8 @@
 
 The board shows the tasks of every workspace and project you can see, in one place. Open it from **Board** in the sidebar.
 
+The sidebar button at its top (a square with a bar) collapses the sidebar to a strip of icons, or keeps it open. While it is collapsed, pointing at the strip (or tabbing into it) opens it over the page, and it folds back when the pointer leaves. The choice is saved on your account.
+
 ![The board across several workspaces (Nightwalker theme)](../images/board-all-night.png)
 
 ## Columns
@@ -16,7 +18,7 @@ Each column header shows the stage as a small ring in the column's colour (dashe
 - **+**: a new task in this column. With several projects in view it first asks which project, and the task starts in that project's first status of the stage.
 - **Collapse** (two arrows pointing in): the column leaves the board and becomes a small button above it, with its name and count. Click the button to bring the column back. The board remembers collapsed columns per browser. You can drop a card on a collapsed column's button too.
 
-Each column also ends with **+ New task** (except Done). On a phone, the columns are tabs above the cards, and the filters fold away under **Filters**.
+Each column also ends with **+ New task** (except Done). On a phone, the columns are tabs above the cards, and the filters start folded under **Filters**.
 
 ### Agent activity
 
@@ -83,6 +85,8 @@ The toolbar above the columns narrows the board, in one row:
 
 Under the toolbar, small chips scope the board: **Workspaces** and **Projects**. Click a chip to show only that one; click more chips to add them. **All workspaces** / **All projects** clears the selection. The workspace chips show the workspace's owner picture and colour.
 
+**Filters** at the start of the toolbar folds the filters away: what stays is one line with the filters that are on, each as a chip with **×** to remove it (and **Clear all** when there are several), or just the **Filters** button with nothing set. The number on the button counts the filters that are on. The board remembers whether you folded them; on a phone they start folded.
+
 The filters live in the page address (for example `/board?ws=acme&pr=3`), so you can bookmark or share a filtered board. The board also remembers the last filter you used.
 
 ## The buttons at the top
@@ -93,9 +97,9 @@ Next to the title (and its **?** help button) the header has three things:
 - **+ New task**: with one project in view it opens the form right away; otherwise it first asks which project.
 - **⋯** (More actions): the less frequent actions.
   - **Recurring**, **Schedules**, **Templates**: see [Recurring tasks](recurring.md).
-  - **Archive done**: archives the tasks in Done (all of them, or those done for 7 or 30+ days). Archived tasks leave the board and lists but stay searchable, and you can unarchive them from the task.
+  - **Archive done**: archives the tasks in Done (all of them, or those done for 7 or 30+ days). With several projects in view it lists them, all ticked: untick the ones to leave alone, or use **All projects in view**. Archived tasks leave the board and lists but stay searchable, and you can unarchive them from the task.
   - **Trash**: the deleted tasks of the projects in view, most recently changed first, each with **Restore**, which puts it back in its column. Restoring needs the *Delete tasks* permission.
 
 ![The trash (Daywalker theme)](../images/trash-day.png)
 
-Actions that act on one project (Recurring, Templates, Archive done, New task) ask which project when several are in view. Schedules asks which workspace. On a phone, **⋯ More** holds the Table links and these actions, and the archived toggle sits in the **Filters** fold.
+Actions that act on one project (Recurring, Templates, New task) ask which project when several are in view. Schedules asks which workspace. On a phone, **⋯ More** holds the Table links and these actions, and the archived toggle sits in the **Filters** fold.

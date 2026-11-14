@@ -15,7 +15,7 @@ import (
 )
 
 // Builtin ids are reserved: a custom theme can't use them.
-var Builtin = map[string]bool{"clumsy-clanker": true, "nightwalker": true, "daywalker": true, "petty-officer": true, "high-contrast": true, "neon": true}
+var Builtin = map[string]bool{"clumsy-clanker": true, "nightwalker": true, "daywalker": true, "petty-officer": true, "high-contrast": true, "neon": true, "carbon": true}
 
 // Retired ids map to current ones.
 var Retired = map[string]string{"graphite": "nightwalker", "daylight": "daywalker", "signature": "clumsy-clanker"}
