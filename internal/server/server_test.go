@@ -142,3 +142,24 @@ func TestPanicIsContained(t *testing.T) {
 		t.Fatalf("panic response: %d %s", w.Code, w.Body)
 	}
 }
+
+// Un-hashed files carry an ETag, so a browser's revalidation is a 304 instead of the whole file.
+func TestStaticETag(t *testing.T) {
+	s, cfg := newTestServer(t)
+	main := s.Handler(cfg.Listeners[0])
+	first := do(main, "GET", "localhost", "/")
+	tag := first.Header().Get("ETag")
+	if tag == "" || first.Code != 200 {
+		t.Fatalf("no ETag on index.html (%d)", first.Code)
+	}
+	r := httptest.NewRequest("GET", "http://localhost/w/scout/board", nil)
+	r.Header.Set("If-None-Match", tag)
+	w := httptest.NewRecorder()
+	main.ServeHTTP(w, r)
+	if w.Code != http.StatusNotModified || w.Body.Len() != 0 {
+		t.Fatalf("revalidation: %d with %d bytes", w.Code, w.Body.Len())
+	}
+	if do(main, "GET", "localhost", "/assets/app-1.js").Header().Get("ETag") != "" {
+		t.Error("hashed assets need no ETag")
+	}
+}

@@ -163,6 +163,7 @@ Errors are RFC 9457 `application/problem+json` with a stable `code`:
 | 409 | `conflict` | State conflict (e.g. run already ended, cap reached, name taken). |
 | 409 | `ambiguous_key` | Task key matches several of your workspaces. |
 | 409 | `idempotency_in_progress` | A request with this `Idempotency-Key` is still running. |
+| 409 | `idempotency_unreplayable` | The request with this `Idempotency-Key` already ran, but its answer was too large to keep. |
 | 412 | `version_conflict` | `If-Match` doesn't match the current version. |
 | 413 | `too_large` | Request body too large. |
 | 415 | `unsupported_media_type` | |
@@ -173,6 +174,7 @@ Errors are RFC 9457 `application/problem+json` with a stable `code`:
 | 429 | `rate_limited` | Rate limit hit. |
 | 429 | `too_many_streams` | Too many open event streams. |
 | 500 | `internal` | Server error. |
+| 503 | `unavailable` | The database failed while checking the credential (not a logout). Comes with `Retry-After`; try again. |
 
 ### Versions, ETag and If-Match
 
@@ -196,9 +198,10 @@ Any authenticated `POST` may carry `Idempotency-Key` (1-200 printable ASCII char
 - The same key with a different request (method, path, query or body) answers 422
   `idempotency_mismatch`. A repeat while the first is still running answers 409
   `idempotency_in_progress`.
-- Not stored: responses with status 500 or above, response bodies over 256 KiB, and anything beyond
-  2000 stored responses per principal. Request bodies over 4 MiB are refused (413) when the header is
-  set.
+- Not stored: responses with status 500 or above (the request didn't complete, so a repeat runs it
+  again) and anything beyond 2000 stored responses per principal. A response body over 256 KiB isn't
+  stored either, but the key is: a repeat answers 409 `idempotency_unreplayable` instead of running
+  the request a second time. Request bodies over 4 MiB are refused (413) when the header is set.
 - Ignored on routes that carry credentials: paths under `/auth/`, `/keys`, `/me/keys`, `/users`,
   paths containing `/password` and paths ending in `/rotate`.
 
@@ -239,7 +242,9 @@ in-process API calls, each counted against the key.
 as `text/event-stream`, with the same visibility as the change feed (viewer, and the scopes
 `workspace:read`, `tasks:read`, `comments:read`):
 
-- each entry is `event: activity`, `id: <activity id>`, `data: <activity item JSON>`;
+- each entry is `event: activity`, `id: <activity id>`, `data: <activity item JSON>`; entries the
+  caller made carry `request_id` (the `X-Request-Id` of the request behind them), so a client can
+  recognise the echo of its own writes; other people's entries never do (the change feed works the same);
 - it starts after `Last-Event-ID`, else after `?after_id=` (an id or `latest`), else from now;
 - the stream begins with `retry: 3000`, sends a `: ping` comment every 25 s, and ends after 2 minutes;
   clients reconnect with `Last-Event-ID` (and are authenticated again);

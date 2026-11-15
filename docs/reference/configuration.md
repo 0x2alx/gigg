@@ -21,7 +21,7 @@ variables are read by `gigg serve`, `gigg healthcheck` and `gigg admin`. An inva
 | `GIGG_BACKUP_TZ` | `GIGG_DEFAULT_TZ` | IANA time zone `GIGG_BACKUP_AT` is read in. |
 | `GIGG_STALE_RUN_HOURS` | `6` | A run that sends no heartbeat (start or progress) for this many hours (1-168) is closed as `interrupted` by the server's housekeeping. |
 | `GIGG_BACKUP_KEEP` | `7` | How many nightly snapshots to keep (1-365). |
-| `GIGG_REMOTE_FONTS` | on | `off` removes Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`) from the Content-Security-Policy, so the UI loads no remote fonts. Any other value leaves them allowed. |
+| `GIGG_REMOTE_FONTS` | on | The 20 fonts the theme editor offers are bundled, so pages never contact Google on their own; another Google Fonts family loads only after someone presses **Load from Google Fonts** on the Themes page (kept per browser). `off` removes Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`) from the Content-Security-Policy and hides that button. Any other value leaves them allowed. |
 
 Time zones: a schedule always stores its own zone. When a request names none, gigg uses the creator's
 time zone preference (set in Profile, stored as `timezone` in the user's preferences), else

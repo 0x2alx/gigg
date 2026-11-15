@@ -2,27 +2,19 @@
 // filters). Same transport rules as api.ts: session cookie, same-origin JSON, X-Gigg-CSRF on every
 // call, If-Match when a version is given; huma's validation details are folded into the message.
 import { ApiError, noteStatus } from "./api";
+import { request } from "./transport";
 
 export async function call<T>(method: string, path: string, body?: unknown, version?: number): Promise<T> {
-  const headers: Record<string, string> = { "X-Gigg-CSRF": "1" };
-  const init: RequestInit = { method, credentials: "same-origin", headers };
-  if (body !== undefined) {
-    headers["Content-Type"] = "application/json";
-    init.body = JSON.stringify(body);
-  }
-  if (version) headers["If-Match"] = `"${version}"`;
-  const r = await fetch("/api/v1" + path, init);
+  const r = await request(method, path, { body, headers: version ? { "If-Match": `"${version}"` } : undefined });
   if (r.status === 204) return undefined as T;
-  const ct = r.headers.get("Content-Type") ?? "";
-  const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) {
     noteStatus(r.status, path);
-    const d = data as { code?: string; detail?: string; errors?: { message?: string; location?: string }[] };
+    const d = (r.data ?? {}) as { code?: string; detail?: string; errors?: { message?: string; location?: string }[] };
     const first = d.errors?.[0];
     const extra = first?.message ? ` (${first.location ? first.location.replace(/^body\./, "") + ": " : ""}${first.message})` : "";
     throw new ApiError(r.status, d.code ?? "error", (d.detail ?? r.statusText) + extra);
   }
-  return data as T;
+  return r.data as T;
 }
 
 // compact drops undefined and null top-level fields: huma rejects explicit nulls where a field is optional.

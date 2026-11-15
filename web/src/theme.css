@@ -108,6 +108,12 @@ textarea { border-radius: var(--radius-m); padding-inline: 0.6rem; }
 :where(input, textarea, select):where(:hover:not(:disabled, :focus)) { border-color: color-mix(in srgb, var(--text) 38%, var(--surface)); }
 :where(input, textarea, select):where(:focus) { border-color: var(--accent); }
 input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.85; }
+/* read-only (disabled) fields look it: flat, dimmed, no hover */
+input:disabled:not([type="checkbox"], [type="radio"], [type="range"]), textarea:disabled, select:disabled {
+  cursor: not-allowed; color: var(--muted); border-style: dashed; border-color: var(--line-strong);
+  background: transparent;
+}
+input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.5; cursor: not-allowed; }
 select { width: auto; max-width: 100%; }
 /* our own chevron with room on its right: the native arrow sits on the border in some browsers */
 /* element weight, after the shared field rule: component rules still override it (they keep room on the right) */
@@ -120,6 +126,7 @@ select {
   background-repeat: no-repeat;
 }
 select[multiple], select[size] { appearance: auto; -webkit-appearance: auto; background-image: none; padding-right: 0.6rem; }
+select:disabled { background-image: none; }
 @media (forced-colors: active) { select { appearance: auto; -webkit-appearance: auto; background-image: none; } }
 textarea { resize: vertical; line-height: 1.45; }
 input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
@@ -256,6 +263,11 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   .column-head .stage-icon { display: none; }
   .column-head { padding-left: 0.5rem; gap: var(--sp-2); }
   .column-tools .icon-button { width: 1.7rem; }
+}
+/* narrower still (five columns at tablet width): the name gets the whole row, the tools the next one */
+@container col (max-width: 11rem) {
+  .column-head { flex-wrap: wrap; row-gap: 0; padding-top: 0.35rem; }
+  .column-title { flex: 1 1 100%; }
 }
 .column-tools { margin-left: auto; display: inline-flex; gap: 0.1rem; transition: opacity 0.12s ease-out; }
 .column-tools .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
@@ -649,6 +661,8 @@ a.pulse-item:hover { color: var(--text); }
 .preview-brand { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 1.1em; border-radius: 0.4rem; }
 .preview-logo { width: 1.35rem; height: 1.55rem; }
 .preview-card { padding: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.preview-lane { padding: 0.6rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.preview-minicard { padding: 0.45rem 0.6rem; }
 .preview-input, .preview-chip { padding: 0.25rem 0.7rem; }
 .preview-button { padding: 0.35rem 0.9rem; font-weight: 700; }
 .flash { animation: flash 0.6s ease-out; }
@@ -665,6 +679,10 @@ a.pulse-item:hover { color: var(--text); }
 .swatch.auto { color: var(--text); font-size: 0.75rem; font-weight: 700; }
 .swatch.custom { background: var(--surface-variant); color: var(--text); font-size: 0.75rem; }
 .font-picker { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.font-consent { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.6rem 0.75rem;
+  border: var(--border-w) solid var(--border); border-radius: var(--radius-m); background: var(--surface-variant); flex-basis: 100%; }
+.font-consent p { margin: 0; flex: 1 1 18rem; }
+.themes > .font-consent { margin: 0 0 1rem; }
 .font-opt {
   background: transparent; color: var(--text); border: 1px solid var(--line-strong); border-radius: var(--radius-s);
   padding: 0.2rem 0.55rem; cursor: pointer; font-size: var(--fs-base);
@@ -792,6 +810,10 @@ label.check input { width: auto; accent-color: var(--accent); }
 /* checklist, subtasks, dependencies, fields: flat sections under a hairline, a small uppercase header
    row (chevron, title, quiet count) that folds them */
 .tsecs { display: flex; flex-direction: column; margin: 0 0 var(--sp-5); }
+.history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.history li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); line-height: 1.35; }
+.history li > span { min-width: 0; overflow-wrap: anywhere; }
+.history time { flex: none; white-space: nowrap; }
 .tsec { border-top: 1px solid var(--line); min-width: 0; }
 .tsec-head {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); width: 100%; min-height: 2.2rem; text-align: left;
@@ -1156,8 +1178,11 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   .narrow .admin-table td.admin-actions { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: flex-start; }
   .narrow .admin-table td[data-label]::before, .narrow .vw-table td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: 0.8rem; }
   .narrow .admin-table .num { text-align: left; }
-  .narrow .vw-table td.vw-title { flex: 1 1 80%; order: -1; font-size: 1rem; }
-  .narrow .vw-table td.vw-check { order: -2; }
+  /* first line: checkbox, title, key on the right (always there, whatever else the row holds) */
+  .narrow .vw-table td.vw-title { flex: 1 1 calc(100% - 8rem); min-width: 0; order: -2; font-size: 1rem; }
+  .narrow .vw-table td.vw-check { order: -3; }
+  .narrow .vw-table td.vw-key { order: -1; margin-left: auto; align-self: flex-start; padding-top: 0.15rem; }
+  .narrow .vw-search { flex: 1 1 100%; min-width: 0; }
   .narrow .admin-table-card, .narrow .vw-table-card { overflow-x: visible; }
   .narrow .vw-table td:empty { display: none; }
   .narrow .vw-table td.vw-check { width: auto; padding-right: 0.2rem; }

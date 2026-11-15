@@ -35,6 +35,7 @@ type Server struct {
 	log   *slog.Logger
 	ui    fs.FS // built web UI (index.html, assets/...)
 	api   *api.API
+	etags sync.Map // static file path -> ETag
 }
 
 // New builds a server. ui is the embedded web build (web.Dist with "dist" stripped).

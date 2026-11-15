@@ -87,6 +87,11 @@ a.admin-name:hover { text-decoration: underline; }
 .admin-list-row select { min-height: 1.67rem; padding: 0 1.7rem 0 0.4rem; font-size: var(--fs-sm); background-position: right 0.85rem center, right 0.52rem center; }
 .admin-add { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--line-strong); flex-wrap: wrap; }
 .admin-add select { width: 100%; }
+/* phones: the user picker gets the whole first line, role and the button share the second */
+@media (max-width: 720px) {
+  .admin-add > label.grow { flex: 1 1 100%; }
+  .admin-add > label:not(.grow) { flex: 1 1 auto; }
+}
 .admin-key-input { width: 6rem; }
 .admin-statuses {
   margin: 0.25rem 0 0.6rem 1.25rem; padding: 0.5rem 0.75rem; background: var(--low);

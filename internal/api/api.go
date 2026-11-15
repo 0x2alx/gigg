@@ -244,6 +244,17 @@ func WithInfo(ctx context.Context, i RequestInfo) context.Context {
 	return context.WithValue(ctx, infoKey{}, i)
 }
 
+// whyUnavailable: keyPrincipal's reason when the database, not the key, failed.
+const whyUnavailable = "unavailable"
+
+// unavailable answers 503 with Retry-After for a lookup that failed in the database.
+func unavailable(w http.ResponseWriter, requestID string) {
+	p := fail(503, "unavailable", "The server couldn't check your login just now; try again.")
+	p.RequestID = requestID
+	w.Header().Set("Retry-After", "1")
+	writeProblem(w, p)
+}
+
 func writeProblem(w http.ResponseWriter, p *Problem) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -272,6 +283,11 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 				return
 			}
 			p, why := a.keyPrincipal(ctx, tok, req)
+			if why == whyUnavailable {
+				a.log.Error("key lookup failed", "listener", req.Listener, "request_id", req.RequestID)
+				unavailable(w, req.RequestID)
+				return
+			}
 			if p == nil {
 				a.log.Info("key refused", "reason", why, "listener", req.Listener, "ip", req.IP, "request_id", req.RequestID)
 				unauth("Invalid, expired or revoked key, or not usable here.")
@@ -288,7 +304,11 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 		if c, err := r.Cookie(a.cookieName()); err == nil && a.listener(req.Listener).UI {
 			p, err := a.sessionPrincipal(ctx, c.Value, req)
 			if err != nil {
+				// a database error is not a logged-out user: 503, so the page retries instead of
+				// sending the user to the login page
 				a.log.Error("session lookup", "err", err)
+				unavailable(w, req.RequestID)
+				return
 			}
 			if p != nil {
 				if unsafeMethod(r.Method) {
@@ -362,6 +382,9 @@ func (a *API) keyPrincipal(ctx context.Context, tok string, req access.Request) 
 	k, err := store.KeyByPrefix(ctx, a.st.R, prefix)
 	if err != nil {
 		auth.TokenMatches(tok, make([]byte, 32)) // same work either way
+		if !errors.Is(err, store.ErrNotFound) {
+			return nil, whyUnavailable
+		}
 		return nil, "unknown prefix"
 	}
 	if !auth.TokenMatches(tok, k.SecretHash) {
@@ -389,12 +412,15 @@ func (a *API) keyPrincipal(ctx context.Context, tok string, req access.Request) 
 		}
 	}
 	u, err := store.GetUser(ctx, a.st.R, k.UserID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return nil, whyUnavailable
+	}
 	if err != nil || u.Disabled {
 		return nil, "user disabled"
 	}
 	p, err := access.Load(ctx, a.st.R, u, k, 0, req)
 	if err != nil {
-		return nil, "load"
+		return nil, whyUnavailable
 	}
 	_ = store.TouchKey(ctx, a.st.W, k.ID, req.Listener, req.IP)
 	return p, ""
@@ -412,6 +438,9 @@ func (a *API) sessionPrincipal(ctx context.Context, tok string, req access.Reque
 		return nil, err
 	}
 	u, err := store.GetUser(ctx, a.st.R, s.UserID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return nil, err
+	}
 	if err != nil || u.Disabled || u.Kind != "human" {
 		return nil, nil
 	}

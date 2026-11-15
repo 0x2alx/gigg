@@ -932,3 +932,19 @@ func TestQuestionOnWaitingCards(t *testing.T) {
 		t.Fatalf("resume of an archived task: %d %s", code, out)
 	}
 }
+
+// A database failure while checking a session or a key is a 503 (try again), never a 401: the web
+// page sends a user to the login page on a 401.
+func TestAuthLookupFailureIs503(t *testing.T) {
+	e := newEnv(t)
+	e.st.Close()
+	for name, c := range map[string]cred{"session": e.ada(), "key": e.key("scout")} {
+		code, out, h := e.req("GET", "/auth/me", "", c)
+		if code != 503 {
+			t.Fatalf("%s: status %d, want 503: %s", name, code, out)
+		}
+		if h.Get("Retry-After") == "" {
+			t.Fatalf("%s: no Retry-After", name)
+		}
+	}
+}

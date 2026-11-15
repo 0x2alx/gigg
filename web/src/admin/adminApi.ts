@@ -1,6 +1,7 @@
 // Admin client: the instance-admin endpoints (workspaces, members, projects, statuses, users, keys,
 // audit). Same transport rules as ../api.ts: session cookie, same-origin JSON, X-Gigg-CSRF on every
 // call. PATCH bodies are JSON merge patch (null clears); If-Match carries the version we last saw.
+import { request } from "../transport";
 import { ApiError, noteStatus, type Category } from "../api";
 
 export type Role = "viewer" | "commenter" | "member" | "manager";
@@ -141,39 +142,24 @@ export const SCOPE_GROUPS: { name: string; scopes: string[] }[] = [
 ];
 
 async function call<T>(method: string, path: string, body?: unknown, version?: number): Promise<T> {
-  // X-Gigg-CSRF on every call: a cross-site page can't set a custom header without a CORS preflight.
-  const headers: Record<string, string> = { "X-Gigg-CSRF": "1" };
-  const init: RequestInit = { method, credentials: "same-origin", headers };
-  if (body !== undefined) {
-    headers["Content-Type"] = "application/json";
-    init.body = JSON.stringify(body);
-  }
-  if (version) headers["If-Match"] = `"${version}"`;
-  const r = await fetch("/api/v1" + path, init);
+  const r = await request(method, path, { body, headers: version ? { "If-Match": `"${version}"` } : undefined });
   if (r.status === 204) return undefined as T;
-  const ct = r.headers.get("Content-Type") ?? "";
-  const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) {
     noteStatus(r.status, path);
-    const d = data as { code?: string; detail?: string; errors?: { message?: string; location?: string }[] };
+    const d = (r.data ?? {}) as { code?: string; detail?: string; errors?: { message?: string; location?: string }[] };
     // huma's validation errors carry the useful part in errors[]
     const first = d.errors?.[0];
     const extra = first?.message ? ` (${first.location ? first.location.replace(/^body\./, "") + ": " : ""}${first.message})` : "";
     throw new ApiError(r.status, d.code ?? "error", (d.detail ?? r.statusText) + extra);
   }
-  return data as T;
+  return r.data as T;
 }
 
-// upload sends a raw body (an image) with its own content type, plus the CSRF header.
+// upload sends a raw body (an image) with its own content type.
 async function upload(method: string, path: string, body: Blob): Promise<void> {
-  const r = await fetch("/api/v1" + path, {
-    method,
-    credentials: "same-origin",
-    headers: { "X-Gigg-CSRF": "1", "Content-Type": body.type || "image/png" },
-    body,
-  });
+  const r = await request(method, path, { raw: body.type ? body : new Blob([body], { type: "image/png" }) });
   if (!r.ok) {
-    const d = (await r.json().catch(() => ({}))) as { code?: string; detail?: string };
+    const d = (r.data ?? {}) as { code?: string; detail?: string };
     throw new ApiError(r.status, d.code ?? "error", d.detail ?? r.statusText);
   }
 }

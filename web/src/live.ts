@@ -6,6 +6,7 @@
 // good (an HTTP error such as 401/429) or keeps failing, we close it and retry with a backoff,
 // resuming after the last id seen.
 import { useEffect, useState } from "react";
+import { invalidate, noteEvent } from "./transport";
 
 export const ACTIVITY_EVENT = "gigg:activity";
 export const MAX_STREAMS = 8;
@@ -21,6 +22,7 @@ export interface ActivityItem {
   entity_id: number | null;
   project_id: number | null;
   data: unknown;
+  request_id?: string; // only on this user's own entries
 }
 
 export interface ActivityDetail {
@@ -89,13 +91,17 @@ function stream(ws: { id: number; slug: string }, report: (s: LiveState) => void
       }
       try {
         const item = JSON.parse(me.data) as ActivityItem;
+        // empty the shared read cache first (unless it's this tab's own echo), so the screens that
+        // react to the event fetch fresh answers
+        noteEvent(item.request_id);
         window.dispatchEvent(new CustomEvent<ActivityDetail>(ACTIVITY_EVENT, { detail: { workspaceId: ws.id, item } }));
       } catch {
-        // a malformed message is skipped
+        invalidate(); // a malformed message is skipped, but something changed
       }
     });
     src.onerror = () => {
       failures++;
+      invalidate(); // events may be missed until the stream is back: trust nothing cached
       // CONNECTING: the browser retries by itself (retry: 3000) — fine for the 10-minute stream end.
       // CLOSED (HTTP error) or repeated failures: take over with a growing delay.
       if (src.readyState === EventSource.CLOSED || failures >= 3) {

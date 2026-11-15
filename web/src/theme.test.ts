@@ -3,7 +3,7 @@ import clumsy from "../../testdata/themes/clumsy-clanker.json";
 import daywalker from "../../testdata/themes/daywalker.json";
 import nightwalker from "../../testdata/themes/nightwalker.json";
 import petty from "../../testdata/themes/petty-officer.json";
-import { BUILTINS, contrastProblems, findTheme, firstJSON, fromObject, importText, nearestPassing, parseColour, ratio, sane, themeJSON, type Theme } from "./theme";
+import { BUILTINS, contrastProblems, findTheme, firstJSON, fixFor, fromObject, importText, nearestPassing, parseColour, ratio, sane, themeJSON, type Theme } from "./theme";
 
 const current = BUILTINS[1]!;
 const byName = (n: string) => BUILTINS.find((t) => t.name.toLowerCase() === n.toLowerCase() || t.id === n.toLowerCase()) ?? findTheme(n);
@@ -99,6 +99,22 @@ describe("import", () => {
 });
 
 describe("contrast fixes", () => {
+  it("Fix never makes another warning on the same colour worse", () => {
+    // the QA case: dark grey secondary text on a dark card, blue board columns
+    const t = { ...byName("nightwalker")!, mutedText: "#3E4C59", laneColor: "#0090FF" } as Theme;
+    const before = contrastProblems(t).find((p) => p.label.startsWith("Secondary text on the board columns"))!;
+    const fixed = { ...t, mutedText: fixFor(t, "mutedText") };
+    const after = contrastProblems(fixed);
+    expect(after.find((p) => p.label.startsWith("Secondary text on cards"))).toBeUndefined();
+    const lane = after.find((p) => p.label.startsWith("Secondary text on the board columns"));
+    if (lane) expect(lane.have).toBeGreaterThanOrEqual(before.have);
+  });
+  it("warns when a status chip blends into the columns, and Fix moves the column colour", () => {
+    const t = { ...byName("nightwalker")!, laneColor: "#0090FF" } as Theme;
+    expect(contrastProblems(t).some((p) => p.label.includes("To-Do status chip"))).toBe(true);
+    const fixed = { ...t, laneColor: fixFor(t, "laneColor") };
+    expect(contrastProblems(fixed).filter((p) => p.fg === "laneColor")).toEqual([]);
+  });
   it("nearestPassing reaches the minimum", () => {
     const fixed = nearestPassing("#777777", "#808080", 4.5);
     expect(ratio(fixed, "#808080")).toBeGreaterThanOrEqual(4.5);

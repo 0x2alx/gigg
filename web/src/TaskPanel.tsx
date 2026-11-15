@@ -6,6 +6,7 @@ import { DEFAULT_DUE_TIME, DEFAULT_START_TIME } from "./dates";
 import { Markdown, setMentionUsers } from "./markdown";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { ChecklistSection, CustomFieldsSection, DependenciesSection, SubtasksSection } from "./TaskSections";
+import { HistorySection } from "./TaskHistory";
 import { describeRule } from "./recurrence";
 import { CATEGORY_COLOR } from "./theme";
 import { EffortSelect, ModelInput, ToolsInput } from "./runsettings";
@@ -387,6 +388,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
             <SubtasksSection task={task} wsId={ws.id} canCreate={can("create_tasks") && !task.deleted} onOpen={onMoved} onChanged={onChanged} />
             <DependenciesSection task={task} wsId={ws.id} canEdit={can("relations")} onTask={onTask} onOpen={onMoved} />
             <CustomFieldsSection task={task} fields={fields} canEdit={canWrite} onTask={onTask} />
+            <HistorySection key={task.id} task={task} />
           </div>
           <div className="tp-props">
             <PropGroup title="Details">

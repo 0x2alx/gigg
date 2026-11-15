@@ -1,5 +1,6 @@
 // Themes in gigg's theme JSON format: the seven built-ins, applying a theme to the page, saving the
 // choice on the user; the editor, custom themes, import/export and the AI prompt build on these helpers.
+import { BUNDLED_FONTS, bundledFamily, googleOk, loadGoogleFont, norm, validFamily } from "./fonts";
 
 export interface Theme {
   id: string;
@@ -44,8 +45,8 @@ export const BUILTINS: Theme[] = [
     description: "The signature look: near-black purple, a neon violet edge and accent, amber text, magenta secondary text." },
   { id: "nightwalker", name: "Nightwalker", dark: true, background: "#1A2226", surface: "#253136", surfaceVariant: "#2F3D43",
     border: "#2D393E", accent: "#CDFFFB", onAccent: "#12302E", text: "#EEF8F7", mutedText: "#A3B6B8", danger: "#FF8A80", secondary: null,
-    font: "Rubik", fontWeight: "Medium", textScalePct: 93, cornerDp: 9, borderDp: 1, controlShape: "pill",
-    description: "Slate blue-grey with a pale aqua accent, pill buttons. The default in dark mode." },
+    font: "Oxanium", fontWeight: "Bold", textScalePct: 93, cornerDp: 9, borderDp: 1,
+    description: "Slate blue-grey with a pale aqua accent, square buttons and bold Oxanium. The default in dark mode." },
   { id: "daywalker", name: "Daywalker", dark: false, background: "#ECECE6", surface: "#FBF9F3", surfaceVariant: "#F3F0E8",
     border: "#E2DFD6", accent: "#5967DB", onAccent: "#FFFFFF", text: "#1A1D24", mutedText: "#5A6170", danger: "#C62828", secondary: null,
     font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 12, borderDp: 1, controlShape: "pill", laneColor: "#E3E2DA",
@@ -138,29 +139,28 @@ const SYSTEM: Record<string, string> = {
   mono: "monospace",
   casual: '"Comic Sans MS", cursive',
   cursive: "cursive",
+  medium: "system-ui, sans-serif",
+  smallcaps: "system-ui, sans-serif",
 };
 const SINGLE_WEIGHT = new Set(["audiowide", "michroma", "sharetechmono", "pacifico", "bebasneue", "righteous", "pressstart2p"]);
-const WEIGHT_600 = new Set(["rajdhani", "chakrapetch"]);
 
-function norm(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+// missingFontFor: the theme's font when it is neither bundled nor a system font and Google Fonts
+// aren't allowed in this browser (the page then uses the system font; Themes offers the button).
+export function missingFontFor(t: Pick<Theme, "font">): string | null {
+  const f = t.font;
+  if (SYSTEM[norm(f)] || bundledFamily(f) || !validFamily(f) || googleOk()) return null;
+  return f;
 }
 
 function loadFont(family: string, fontWeight: Theme["fontWeight"]): string {
   const n = norm(family);
   if (SYSTEM[n]) return SYSTEM[n]!;
-  if (!/^[A-Za-z0-9 ]{1,60}$/.test(family)) return SYSTEM.system!;
+  const bundled = bundledFamily(family);
+  if (bundled) return `"${bundled}", system-ui, sans-serif`;
+  if (!validFamily(family) || !googleOk()) return SYSTEM.system!;
   // The weights the theme actually uses (body and heading) plus 400 (inputs), so Medium loads 400;500;700.
   const wanted = [...new Set([400, ...WEIGHTS[fontWeight], strongWeight(fontWeight)])].sort((a, b) => a - b).join(";");
-  const id = `font-${n}-${wanted.replace(/;/g, "-")}`;
-  if (!document.getElementById(id)) {
-    const weights = SINGLE_WEIGHT.has(n) ? "" : WEIGHT_600.has(n) ? ":wght@600" : `:wght@${wanted}`;
-    const link = document.createElement("link");
-    link.id = id;
-    link.rel = "stylesheet";
-    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}${weights}&display=swap`;
-    document.head.appendChild(link);
-  }
+  loadGoogleFont(family, SINGLE_WEIGHT.has(n) ? "" : `:wght@${wanted}`);
   return `"${family}", system-ui, sans-serif`;
 }
 
@@ -290,8 +290,7 @@ export function colourOf(t: Theme, k: ColourKey): string {
   return t[k];
 }
 
-export const BUNDLED_FONTS = ["Inter", "Audiowide", "Oxanium", "Orbitron", "Michroma", "Tektur", "Rubik", "Rajdhani", "Chakra Petch", "Share Tech Mono",
-  "Nunito", "Comfortaa", "Caveat", "Pacifico", "Playfair Display", "Lora", "Bebas Neue", "Righteous", "Space Grotesk", "Press Start 2P"];
+export { BUNDLED_FONTS };
 export const SYSTEM_FONTS = ["Phone default", "Condensed", "Serif", "Mono", "Medium", "Casual", "Cursive", "Small caps"];
 
 // parseColour: #RGB, #RGBA, #RRGGBB, #AARRGGBB (alpha first), bare, any case, or an ARGB integer
@@ -367,33 +366,109 @@ export function themeJSON(t: Theme): string {
 // ---- contrast (spec section 4)
 
 export interface Problem {
-  fg: ColourKey;
-  bg: ColourKey;
+  fg: ColourKey; // the colour the editor's Fix changes
+  bg: ColourKey | string; // the other side: a role, or a fixed data colour (#RRGGBB)
   label: string;
   need: number;
   have: number;
+  kind: "contrast" | "distance"; // a contrast ratio, or how different two fills look
 }
 
 export function secondaryOf(t: Theme): string {
   return t.secondary ?? mix(t.accent, t.surface, t.dark ? 0.72 : 0.82);
 }
 
-export function contrastProblems(t: Theme): Problem[] {
-  const pairs: [ColourKey, ColourKey, number, string][] = [
+// CHIP_ON_LANE: the least perceptual distance (OKLab) between a status chip's fill and the board
+// column it sits on, so the chip stays visible. Brightness contrast alone isn't the right test here:
+// a grey chip on a blue column of the same brightness is plain to see, the same blue isn't.
+const CHIP_ON_LANE = 0.1;
+
+function oklab(hexColour: string): [number, number, number] {
+  const lin = rgb(hexColour).map((v) => {
+    const c = v / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  const [r, g, b] = lin;
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+}
+
+// colourDistance: how different two colours look (OKLab; 0 = the same, about 0.02 = barely visible).
+export function colourDistance(a: string, b: string): number {
+  const x = oklab(a);
+  const y = oklab(b);
+  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+}
+const CATEGORY_NAME: Record<string, string> = { backlog: "Backlog", todo: "To-Do", doing: "Doing", waiting: "Waiting", done: "Done", cancelled: "Cancelled" };
+
+// a check: [the colour Fix changes, the other side, the minimum, the warning, how it's measured]
+type Check = [ColourKey, ColourKey | string, number, string, ("contrast" | "distance")?];
+
+// contrastChecks: every pair the editor checks. The first colour of each pair is the one Fix changes.
+function contrastChecks(t: Theme): Check[] {
+  const checks: Check[] = [
     ["text", "background", 4.5, "Text on the background is hard to read"],
     ["text", "surface", 4.5, "Text on cards is hard to read"],
     ["mutedText", "surface", 3, "Secondary text on cards is hard to read"],
     ["onAccent", "accent", 4.5, "Text on the accent is hard to read"],
     ["accent", "background", 3, "The accent doesn't stand out from the background"],
   ];
-  if (t.secondary) pairs.push(["text", "secondary", 4.5, "Text on secondary buttons is hard to read"]);
-  // on the columns sit muted text ("Nothing here", "+ New task", counts); listed lane first, so the editor's
-  // Fix adjusts the column colour, not the app's secondary text
-  if (t.laneColor) pairs.push(["laneColor", "mutedText", 3, "Secondary text on the board columns is hard to read"]);
-  const col = (k: ColourKey) => colourOf(t, k);
-  return pairs
-    .map(([fg, bg, need, label]) => ({ fg, bg, need, label, have: ratio(col(fg), col(bg)) }))
+  if (t.secondary) checks.push(["text", "secondary", 4.5, "Text on secondary buttons is hard to read"]);
+  // on the columns sit muted text ("Nothing here", "+ New task", counts) and the status chips; the
+  // lane comes first, so Fix adjusts the column colour, not the app's secondary text
+  if (t.laneColor) {
+    checks.push(["laneColor", "mutedText", 3, "Secondary text on the board columns is hard to read"]);
+    for (const [cat, c] of Object.entries(CATEGORY_COLOR)) {
+      checks.push(["laneColor", c, CHIP_ON_LANE, `The ${CATEGORY_NAME[cat] ?? cat} status chip blends into the board columns`, "distance"]);
+    }
+  }
+  return checks;
+}
+
+function side(t: Theme, k: ColourKey | string): string {
+  return k.startsWith("#") ? k : colourOf(t, k as ColourKey);
+}
+
+function measure(t: Theme, [fg, bg, , , how]: Check): number {
+  return how === "distance" ? colourDistance(side(t, fg), side(t, bg)) : ratio(side(t, fg), side(t, bg));
+}
+
+export function contrastProblems(t: Theme): Problem[] {
+  return contrastChecks(t)
+    .map((c) => ({ fg: c[0], bg: c[1], need: c[2], label: c[3], kind: c[4] ?? "contrast", have: measure(t, c) }))
     .filter((p) => p.have < p.need);
+}
+
+// fixFor: a new value for one colour that passes every check it takes part in (on either side),
+// changed as little as possible: a 5% step toward white or black at a time. When no blend passes
+// them all, the one that fails the fewest (then the one closest to passing) wins. Fixing one
+// warning therefore never quietly makes another one on the same colour worse.
+export function fixFor(t: Theme, key: ColourKey): string {
+  const start = colourOf(t, key);
+  const checks = contrastChecks(t).filter(([fg, bg]) => fg === key || bg === key);
+  const score = (c: string) => {
+    const tt = { ...t, [key]: c } as Theme;
+    let fails = 0;
+    let worst = Infinity;
+    for (const c of checks) {
+      const r = measure(tt, c) / c[2];
+      if (r < 1) fails++;
+      worst = Math.min(worst, r);
+    }
+    return { fails, worst };
+  };
+  let best = { c: start, ...score(start) };
+  for (let i = 1; i <= 20; i++) {
+    for (const target of ["#FFFFFF", "#000000"]) {
+      const c = mix(start, target, i * 0.05);
+      const sc = score(c);
+      if (sc.fails === 0) return c;
+      if (sc.fails < best.fails || (sc.fails === best.fails && sc.worst > best.worst)) best = { c, ...sc };
+    }
+  }
+  return best.c;
 }
 
 // nearestPassing: blend fg toward black (light bg) or white (dark bg) in 5% steps (up to 20).

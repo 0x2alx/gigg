@@ -2,24 +2,17 @@
 // filters, cursor paging, cross-workspace fan-out and a small concurrency pool for bulk actions.
 import { ApiError, noteStatus, type Category, type Task } from "../api";
 import type { WorkspaceTree } from "../App";
+import { request } from "../transport";
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  // same rules as api.ts: same-origin cookie plus the X-Gigg-CSRF header on every call
-  const init: RequestInit = { method, credentials: "same-origin", headers: { "X-Gigg-CSRF": "1" } };
-  if (body !== undefined) {
-    (init.headers as Record<string, string>)["Content-Type"] = "application/json";
-    init.body = JSON.stringify(body);
-  }
-  const r = await fetch("/api/v1" + path, init);
+  const r = await request(method, path, { body });
   if (r.status === 204) return undefined as T;
-  const ct = r.headers.get("Content-Type") ?? "";
-  const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) {
     noteStatus(r.status, path);
-    const d = data as { code?: string; detail?: string };
+    const d = (r.data ?? {}) as { code?: string; detail?: string };
     throw new ApiError(r.status, d.code ?? "error", d.detail ?? r.statusText);
   }
-  return data as T;
+  return r.data as T;
 }
 
 export interface TaskQuery {

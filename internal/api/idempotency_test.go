@@ -171,3 +171,26 @@ func TestIdempotencyInProgressAndExpiry(t *testing.T) {
 		t.Fatalf("%d idempotency rows left after housekeeping", n)
 	}
 }
+
+// An answer too big to keep isn't replayed, but its key is kept: the repeat gets a 409 instead of
+// running the request a second time.
+func TestIdempotencyOversizeAnswerRunsOnce(t *testing.T) {
+	e := newEnv(t)
+	old := idemMaxResponse
+	idemMaxResponse = 64
+	defer func() { idemMaxResponse = old }()
+	task := e.ids["scout.task"]
+	path := fmt.Sprintf("/tasks/%d/comments", task)
+	idem := map[string]string{"Idempotency-Key": "big-1"}
+	before := e.commentCount(task)
+
+	code, body, _ := e.reqH("POST", path, `{"body_md":"a comment whose answer is over 64 bytes"}`, e.key("scout"), idem)
+	e.ok(code, body, 201)
+	code, out, h := e.reqH("POST", path, `{"body_md":"a comment whose answer is over 64 bytes"}`, e.key("scout"), idem)
+	if code != 409 || !strings.Contains(string(out), "idempotency_unreplayable") || h.Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("repeat: %d %q %s", code, h.Get("Idempotent-Replayed"), out)
+	}
+	if n := e.commentCount(task); n != before+1 {
+		t.Fatalf("comments %d, want %d (the repeat must not run)", n, before+1)
+	}
+}

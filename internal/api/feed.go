@@ -72,7 +72,7 @@ func (a *API) registerFeed() {
 			if err != nil {
 				return nil, err
 			}
-			items, err := a.activityAfter(ctx, where, args, after, limit+1)
+			items, err := a.activityAfter(ctx, where, args, after, limit+1, p.User.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -137,10 +137,11 @@ func (a *API) feedLatest(ctx context.Context, where string, args []any) (int64, 
 	return id.Int64, err
 }
 
-// activityAfter reads the log oldest first, after an id.
-func (a *API) activityAfter(ctx context.Context, where string, args []any, afterID int64, limit int) ([]ActivityItem, error) {
+// activityAfter reads the log oldest first, after an id. Entries the viewer caused carry their
+// request id, so a page can tell its own changes (already applied) from everyone else's.
+func (a *API) activityAfter(ctx context.Context, where string, args []any, afterID int64, limit int, viewer int64) ([]ActivityItem, error) {
 	args = append(append([]any{}, args...), afterID)
-	rows, err := a.st.R.QueryContext(ctx, `SELECT id, at, actor_user_id, key_id, listener, action, entity_type, entity_id, project_id, data
+	rows, err := a.st.R.QueryContext(ctx, `SELECT id, at, actor_user_id, key_id, listener, action, entity_type, entity_id, project_id, data, request_id
 		FROM activity WHERE (`+where+`) AND id > ? ORDER BY id ASC LIMIT `+strconv.Itoa(limit), args...)
 	if err != nil {
 		return nil, err
@@ -150,11 +151,14 @@ func (a *API) activityAfter(ctx context.Context, where string, args []any, after
 	for rows.Next() {
 		var it ActivityItem
 		var actor, key, ent, proj sql.NullInt64
-		var data string
-		if err := rows.Scan(&it.ID, &it.At, &actor, &key, &it.Listener, &it.Action, &it.EntityType, &ent, &proj, &data); err != nil {
+		var data, reqID string
+		if err := rows.Scan(&it.ID, &it.At, &actor, &key, &it.Listener, &it.Action, &it.EntityType, &ent, &proj, &data, &reqID); err != nil {
 			return nil, err
 		}
 		it.ActorID, it.KeyID, it.EntityID, it.ProjectID = nullPtr(actor), nullPtr(key), nullPtr(ent), nullPtr(proj)
+		if actor.Valid && actor.Int64 == viewer {
+			it.RequestID = reqID
+		}
 		_ = json.Unmarshal([]byte(data), &it.Data)
 		out = append(out, it)
 	}
@@ -280,7 +284,7 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 	// send writes every new visible entry; false ends the stream.
 	send := func() bool {
 		for {
-			items, err := a.activityAfter(ctx, where, args, after, 200)
+			items, err := a.activityAfter(ctx, where, args, after, 200, p.User.ID)
 			if err != nil {
 				if ctx.Err() == nil {
 					a.log.Error("events", "err", err)

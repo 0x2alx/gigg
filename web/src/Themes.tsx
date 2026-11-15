@@ -5,13 +5,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "./api";
 import { useApp, toTheme } from "./App";
 import {
-  BUILTINS, BUNDLED_FONTS, COLOUR_KEYS, ROLE_LABEL, SYSTEM_FONTS, aiPrompt, contrastProblems, findTheme, importText, mix, nearestPassing,
-  colourOf as roleColour, laneOf, logoOf, parseColour, ratio, readableOn, sane, secondaryOf, themeJSON, type ColourKey, type Theme,
+  BUILTINS, BUNDLED_FONTS, CATEGORY_COLOR, COLOUR_KEYS, ROLE_LABEL, SYSTEM_FONTS, aiPrompt, contrastProblems, findTheme, fixFor, importText, missingFontFor, mix,
+  colourOf as roleColour, laneBorderOf, laneOf, logoOf, parseColour, ratio, readableOn, sane, secondaryOf, themeJSON, type ColourKey, type Theme,
 } from "./theme";
 import { Modal } from "./ui";
 import { LogoMark } from "./Logo";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
+import { FONTS_ALLOWED_EVENT, allowGoogle, bundledFamily, googleOk, loadGoogleFont, remoteFonts, validFamily } from "./fonts";
 
 function useToast(): [string, (m: string) => void] {
   const [msg, setMsg] = useState("");
@@ -28,6 +29,8 @@ function useToast(): [string, (m: string) => void] {
 
 export function ThemesPage() {
   const { themes } = useApp();
+  useFontsAllowed();
+  const missing = missingFontFor(themes.active);
   const [editing, setEditing] = useState<Theme | null>(null);
   const [importing, setImporting] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -87,6 +90,7 @@ export function ThemesPage() {
           </button>
         </div>
       </header>
+      {missing && <GoogleConsent font={missing} />}
 
       <section className="card tg-current" aria-label="Current theme">
         <span className="tg-current-tile" aria-hidden="true">
@@ -191,7 +195,57 @@ export function ThemesPage() {
 }
 
 function fontStack(font: string): string {
-  return font === "Phone default" || SYSTEM_FONTS.includes(font) ? "system-ui, sans-serif" : `"${font}", system-ui, sans-serif`;
+  if (font === "Phone default" || SYSTEM_FONTS.includes(font)) return "system-ui, sans-serif";
+  const b = bundledFamily(font);
+  if (b) return `"${b}", system-ui, sans-serif`;
+  return googleOk() ? `"${font}", system-ui, sans-serif` : "system-ui, sans-serif";
+}
+
+// useFontsAllowed re-renders when Google Fonts get allowed in this browser.
+function useFontsAllowed(): boolean {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    const on = () => setN((n) => n + 1);
+    window.addEventListener(FONTS_ALLOWED_EVENT, on);
+    return () => window.removeEventListener(FONTS_ALLOWED_EVENT, on);
+  }, []);
+  return googleOk();
+}
+
+// GoogleConsent: the one way a font gigg doesn't bundle gets loaded. Nothing contacts Google until
+// someone presses the button; the choice is kept in this browser.
+function GoogleConsent({ font }: { font?: string }) {
+  if (!remoteFonts()) {
+    return (
+      <div className="font-consent" role="note">
+        <p className="small">
+          {font ? <>This theme uses <strong>{font}</strong>, which isn't bundled with gigg, so the page shows your system font instead. </> : null}
+          This server allows only the 20 fonts that come with gigg.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="font-consent" role="note">
+      <p className="small">
+        {font ? (
+          <>
+            This theme uses <strong>{font}</strong>, which isn't bundled with gigg, so the page shows your system font instead.
+          </>
+        ) : (
+          <>The 20 fonts above come with gigg. Any other family loads from Google Fonts.</>
+        )}{" "}
+        Loading from Google Fonts means your browser contacts Google, which sees your IP address.
+      </p>
+      <button
+        type="button"
+        className="button secondary"
+        onClick={allowGoogle}
+      >
+        Load from Google Fonts
+      </button>
+    </div>
+  );
 }
 
 interface CardAction {
@@ -285,9 +339,10 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
   const colourOf = (k: ColourKey) => roleColour(t, k);
   const auto = (k: ColourKey) => (k === "secondary" && t.secondary === null) || (k === "laneColor" && !t.laneColor) || (k === "laneBorder" && !t.laneBorder) || (k === "logoColor" && !t.logoColor);
   const save = () => onSave(sane(t)).catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't save the theme."));
+  const fontsAllowed = useFontsAllowed();
   useEffect(() => {
-    for (const f of BUNDLED_FONTS) loadPreviewFont(f);
-  }, []);
+    if (fontsAllowed) loadPreviewFont(t.font);
+  }, [fontsAllowed, t.font]);
 
   return (
     <div className="theme-editor">
@@ -361,7 +416,9 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
                 {f}
               </button>
             ))}
-            {moreFonts ? (
+            {moreFonts && !fontsAllowed ? (
+              <GoogleConsent />
+            ) : moreFonts ? (
               <input autoFocus placeholder="Any Google Fonts family, e.g. Roboto Slab" defaultValue={BUNDLED_FONTS.includes(t.font) || SYSTEM_FONTS.includes(t.font) ? "" : t.font}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -428,8 +485,9 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
             <ul className="problems">
               {problems.map((p) => (
                 <li key={p.label}>
-                  <span className="danger">{p.label}</span> <span className="muted small">({p.have.toFixed(1)}:1, needs {p.need}:1)</span>{" "}
-                  <button type="button" className="button small" onClick={() => set({ [p.fg]: nearestPassing(colourOf(p.fg), colourOf(p.bg), p.need) } as Partial<Theme>, p.fg)}>
+                  <span className="danger">{p.label}</span>{" "}
+                  {p.kind === "contrast" && <span className="muted small">({p.have.toFixed(1)}:1, needs {p.need}:1)</span>}{" "}
+                  <button type="button" className="button small" aria-label={`Fix: ${p.label}`} onClick={() => set({ [p.fg]: fixFor(t, p.fg) } as Partial<Theme>, p.fg)}>
                     Fix
                   </button>
                 </li>
@@ -457,15 +515,10 @@ function dedupe(cs: string[]): string[] {
   return [...new Set(cs.map((c) => c.toUpperCase()))];
 }
 
+// loadPreviewFont: a font the editor shows that gigg doesn't bundle (only once Google Fonts are allowed).
 function loadPreviewFont(f: string) {
-  if (SYSTEM_FONTS.includes(f) || !/^[A-Za-z0-9 ]{1,60}$/.test(f)) return;
-  const id = "font-" + f.toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (document.getElementById(id)) return;
-  const link = document.createElement("link");
-  link.id = id;
-  link.rel = "stylesheet";
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, "+")}&display=swap`;
-  document.head.appendChild(link);
+  if (SYSTEM_FONTS.includes(f) || bundledFamily(f) || !validFamily(f) || !googleOk()) return;
+  loadGoogleFont(f);
 }
 
 // The pinned preview: a mock screen in the edited theme. Labels match the editor rows; the element
@@ -510,6 +563,30 @@ function Preview({ t, flash }: { t: Theme; flash: string }) {
             Secondary buttons
           </span>
         </div>
+      </div>
+      <div
+        className={"preview-lane" + hl("laneColor") + hl("laneBorder")}
+        style={{ background: laneOf(t), border: `${Math.max(1, t.borderDp)}px solid ${laneBorderOf(t) ?? "transparent"}`, borderRadius: r }}
+        title="Board columns"
+      >
+        <div className="preview-row">
+          <span className="preview-row" style={{ justifyContent: "flex-start" }}>
+            {(["todo", "doing"] as const).map((c) => (
+              <span key={c} className="preview-chip" style={{ background: CATEGORY_COLOR[c], color: readableOn(CATEGORY_COLOR[c]!), borderRadius: t.controlShape === "pill" ? 999 : r / 2 }}>
+                {c === "todo" ? "To-Do" : "Doing"}
+              </span>
+            ))}
+          </span>
+          <span className={hl("mutedText")} style={{ color: t.mutedText }}>
+            Board columns
+          </span>
+        </div>
+        <div className="preview-minicard" style={{ background: t.surface, border: `${t.borderDp}px solid ${t.border}`, borderRadius: r }}>
+          A card on a column
+        </div>
+        <span className={hl("mutedText")} style={{ color: t.mutedText }}>
+          + New task
+        </span>
       </div>
     </div>
   );

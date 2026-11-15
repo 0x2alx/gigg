@@ -1,5 +1,6 @@
 // Thin client for gigg's REST API. The browser authenticates with the session cookie; every write
 // is same-origin JSON, which is what the server's CSRF rules expect.
+import { request } from "./transport";
 
 export type Category = "backlog" | "todo" | "doing" | "waiting" | "done" | "cancelled";
 
@@ -45,6 +46,7 @@ export interface Me {
   admin: boolean;
   workspaces: WorkspaceAccess[];
   capabilities?: string[]; // permissions held in at least one workspace
+  remote_fonts?: boolean; // the server allows Google Fonts (GIGG_REMOTE_FONTS)
 }
 
 // hasCap: whether this account may use a feature, in workspace ws when given (permissions are per
@@ -428,24 +430,17 @@ export function noteStatus(status: number, path: string) {
   if (status === 401 && path !== "/auth/login" && path !== "/auth/me") window.dispatchEvent(new Event(SIGNED_OUT));
 }
 
+// call: one API call through the shared transport (session cookie, CSRF header, shared reads,
+// retries; see transport.ts).
 async function call<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
-  // X-Gigg-CSRF on every call: body-less writes (logout, restore) carry no JSON content type, and a
-  // cross-site page can't set a custom header without a CORS preflight, which gigg never grants.
-  const init: RequestInit = { method, credentials: "same-origin", headers: { ...headers, "X-Gigg-CSRF": "1" } };
-  if (body !== undefined) {
-    (init.headers as Record<string, string>)["Content-Type"] = "application/json";
-    init.body = JSON.stringify(body);
-  }
-  const r = await fetch("/api/v1" + path, init);
+  const r = await request(method, path, { body, headers });
   if (r.status === 204) return undefined as T;
-  const ct = r.headers.get("Content-Type") ?? "";
-  const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) {
     noteStatus(r.status, path);
-    const d = data as { code?: string; detail?: string };
+    const d = (r.data ?? {}) as { code?: string; detail?: string };
     throw new ApiError(r.status, d.code ?? "error", d.detail ?? r.statusText);
   }
-  return data as T;
+  return r.data as T;
 }
 
 export const api = {
@@ -484,9 +479,9 @@ export const api = {
   selectTheme: (selected_id: string | null, match_system: boolean) =>
     call<void>("PUT", "/me/themes-selection", selected_id ? { selected_id, match_system } : { match_system }),
   putAvatar: async (file: Blob) => {
-    const r = await fetch("/api/v1/me/avatar", { method: "PUT", credentials: "same-origin", headers: { "X-Gigg-CSRF": "1", "Content-Type": file.type || "image/png" }, body: file });
+    const r = await request("PUT", "/me/avatar", { raw: file.type ? file : new Blob([file], { type: "image/png" }) });
     if (!r.ok) {
-      const d = (await r.json().catch(() => ({}))) as { code?: string; detail?: string };
+      const d = (r.data ?? {}) as { code?: string; detail?: string };
       throw new ApiError(r.status, d.code ?? "error", d.detail ?? r.statusText);
     }
   },
@@ -510,11 +505,13 @@ export const api = {
   relations: (id: number) => call<{ items: Relation[] }>("GET", `/tasks/${id}/relations`),
   addRelation: (id: number, task: string, direction: RelationDirection) => call<Task>("POST", `/tasks/${id}/relations`, { task, direction }),
   removeRelation: (id: number, task: number | string, direction: RelationDirection) =>
-    call<Task>("DELETE", `/tasks/${id}/relations?${new URLSearchParams({ task: String(task), direction })}`),
+    call<Task | undefined>("DELETE", `/tasks/${id}/relations?${new URLSearchParams({ task: String(task), direction })}`).then((t) => t ?? call<Task>("GET", `/tasks/${id}`)),
   checklist: (id: number) => call<{ items: ChecklistItem[] }>("GET", `/tasks/${id}/checklist`),
   addChecklist: (id: number, items: string[]) => call<Task>("POST", `/tasks/${id}/checklist`, { items }),
   patchChecklist: (id: number, item: number, body: { text?: string; done?: boolean; after?: number }) => call<Task>("PATCH", `/tasks/${id}/checklist/${item}`, body),
-  deleteChecklist: (id: number, item: number) => call<Task>("DELETE", `/tasks/${id}/checklist/${item}`),
+  // a repeated delete whose first try got through comes back empty (see transport.ts): fetch the task
+  deleteChecklist: (id: number, item: number) =>
+    call<Task | undefined>("DELETE", `/tasks/${id}/checklist/${item}`).then((t) => t ?? call<Task>("GET", `/tasks/${id}`)),
   archiveTask: (id: number) => call<Task>("POST", `/tasks/${id}/archive`),
   unarchiveTask: (id: number) => call<Task>("POST", `/tasks/${id}/unarchive`),
   archiveDone: (p: number, older_than_days: number, category?: "done" | "cancelled") =>

@@ -25,6 +25,7 @@ type MeBody struct {
 	Listener   string            `json:"listener"`
 	// Capabilities: the permissions held in at least one workspace (see GET /permissions).
 	Capabilities []string `json:"capabilities"`
+	RemoteFonts  bool     `json:"remote_fonts" doc:"Whether pages may load fonts gigg doesn't bundle from Google Fonts (GIGG_REMOTE_FONTS)"`
 }
 
 // WorkspaceAccess is a workspace in reach and the caller's role there.
@@ -59,7 +60,7 @@ func (a *API) meBody(ctx context.Context, p *access.Principal) (*MeBody, error) 
 	if err != nil {
 		return nil, err
 	}
-	b := &MeBody{User: p.User, Admin: p.IsInstanceAdmin(), Workspaces: []WorkspaceAccess{}, Listener: p.Req.Listener}
+	b := &MeBody{User: p.User, Admin: p.IsInstanceAdmin(), Workspaces: []WorkspaceAccess{}, Listener: p.Req.Listener, RemoteFonts: a.cfg.RemoteFonts}
 	for _, w := range ws {
 		if !p.SeesWorkspace(w.ID) {
 			continue

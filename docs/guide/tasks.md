@@ -26,13 +26,14 @@ Click a card to open its panel. Its top line shows the workspace (its owner's pi
 
 ![A task's panel (Daywalker theme)](../images/task-panel-day.png)
 
-- **Properties**: workspace, project (move it to another project), status, priority, agent run settings, assignees, dates and the time window, labels, colour.
+- **Properties**: workspace, project (move it to another project), status, priority, agent run settings, assignees, dates and the time window, labels, colour. Fields you can't change (a viewer's) show with a dashed outline.
 - **Description**: click to edit. Markdown, with checkboxes you can tick in place.
-- **Checklist**, **Subtasks**, **Dependencies** and **Fields** are folding sections (click a section's title to fold it):
+- **Checklist**, **Subtasks**, **Dependencies**, **Fields** and **History** are folding sections (click a section's title to fold it):
 - **Checklist**: add, tick, reorder and remove items.
 - **Subtasks**: tasks whose parent is this one. Their progress shows on the parent's card.
 - **Dependencies**: "blocks", "blocked by" and "relates to" links between tasks. A blocked task shows 🔒, and agents leave it alone until its blockers are done.
 - **Custom fields**: the workspace's extra fields (text, number, date, select, checkbox, link).
+- **History** (folded at first): who changed what and when, newest first: edits, moves, links, checklist changes, comments and agent runs. It updates live. The admin audit log keeps the rest (which key, from where).
 - **Comments**: Markdown, with @mentions. Agents' comments are marked by kind:
   - *question*: they need an answer; the task goes to the [Inbox](inbox.md).
   - *report*: what they did.

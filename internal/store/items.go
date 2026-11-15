@@ -262,7 +262,7 @@ func ArchiveTask(ctx context.Context, q Q, a Actor, t *Task, archive bool) (*Tas
 	return GetTask(ctx, q, t.ID)
 }
 
-// ArchiveDone archives a project's done/cancelled tasks finished before `before`; returns how many.
+// ArchiveDone archives a project's done/cancelled tasks finished at or before `before`; returns how many.
 // category "done" or "cancelled" limits it to that one; "" takes both.
 func ArchiveDone(ctx context.Context, q Q, a Actor, p *Project, before int64, category string) (int, error) {
 	cats := []any{"done", "cancelled"}
@@ -274,7 +274,7 @@ func ArchiveDone(ctx context.Context, q Q, a Actor, p *Project, before int64, ca
 		return 0, Invalid("category must be done or cancelled")
 	}
 	rows, err := q.QueryContext(ctx, `SELECT t.id FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.project_id = ? AND t.archived_at IS NULL
-		AND t.deleted_at IS NULL AND s.category IN (?, ?) AND COALESCE(t.done_at, t.updated_at) < ? LIMIT 5000`, p.ID, cats[0], cats[1], before)
+		AND t.deleted_at IS NULL AND s.category IN (?, ?) AND COALESCE(t.done_at, t.updated_at) <= ? LIMIT 5000`, p.ID, cats[0], cats[1], before)
 	if err != nil {
 		return 0, err
 	}

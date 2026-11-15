@@ -22,6 +22,7 @@ import { useNarrow } from "./narrow";
 import { Avatar } from "./ui";
 import { Icon } from "./icons";
 import { setPreferredTZ } from "./recurrence";
+import { FONTS_ALLOWED_EVENT, setRemoteFonts } from "./fonts";
 
 export interface WorkspaceTree {
   id: number;
@@ -74,13 +75,36 @@ export function useApp(): AppCtx {
 
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  // only a 401 means "not logged in"; anything else (the server restarting, a database blip, no
+  // network) keeps the page waiting and asks again, 2 s doubling up to 30 s
+  const [unreachable, setUnreachable] = useState(false);
+  const retry = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const load = useCallback(() => {
-    api
-      .me()
-      .then(setMe)
-      .catch(() => setMe(null));
+    let attempt = 0;
+    const once = () => {
+      api.me().then(
+        (m) => {
+          setUnreachable(false);
+          setMe(m);
+        },
+        (e: unknown) => {
+          if (e instanceof ApiError && e.status === 401) {
+            setUnreachable(false);
+            setMe(null);
+            return;
+          }
+          setUnreachable(true);
+          retry.current = setTimeout(once, Math.min(30_000, 2000 * 2 ** attempt++));
+        },
+      );
+    };
+    clearTimeout(retry.current);
+    once();
   }, []);
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+    return () => clearTimeout(retry.current);
+  }, [load]);
   // a call answered 401: check the session; gone, back to the login page with a word why
   const [ended, setEnded] = useState(false);
   const signedIn = useRef(false); // calls still failing after a logout aren't a session that ended
@@ -104,7 +128,12 @@ export function App() {
     return () => window.removeEventListener(SIGNED_OUT, out);
   }, []);
 
-  if (me === undefined) return <div className="center muted">Loading…</div>;
+  if (me === undefined)
+    return (
+      <div className="center muted" role="status">
+        {unreachable ? "Can't reach the server. Trying again…" : "Loading…"}
+      </div>
+    );
   if (me === null) return <Login onDone={() => (setEnded(false), load())} ended={ended} />;
   return <Shell key={me.user.id} me={me} onLogout={() => setMe(null)} />;
 }
@@ -215,11 +244,21 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
     return { custom, selectedId: selected.id, matchSystem, active, select, setMatchSystem: (on: boolean) => select(selected.id, on), reload: reloadThemes };
   }, [themeState, prefs.theme, systemDark, reloadThemes]);
 
-  // the account's theme wins over the local first-paint cache
+  // the account's theme wins over the local first-paint cache; applied again once Google Fonts are
+  // allowed (a theme with a font gigg doesn't bundle then gets it)
+  const [fontsAllowed, setFontsAllowed] = useState(0);
+  useEffect(() => {
+    const on = () => setFontsAllowed((n) => n + 1);
+    window.addEventListener(FONTS_ALLOWED_EVENT, on);
+    return () => window.removeEventListener(FONTS_ALLOWED_EVENT, on);
+  }, []);
+  const remoteFonts = me.remote_fonts !== false;
+  // set while rendering, not in an effect: the pages below read it as they render, before effects run
+  setRemoteFonts(remoteFonts);
   useEffect(() => {
     applyTheme(themes.active);
     rememberTheme(themes.active);
-  }, [themes.active]);
+  }, [themes.active, fontsAllowed, remoteFonts]);
 
   const reloadMe = useCallback(() => {
     api

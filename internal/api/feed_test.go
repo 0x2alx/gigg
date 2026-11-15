@@ -442,3 +442,49 @@ func TestEventsHTTP2DeadlineCleared(t *testing.T) {
 		t.Fatalf("only %d pings before the stream ended", pings)
 	}
 }
+
+// The change feed names the request behind an entry only for the viewer's own entries, so a page
+// can skip the echoes of its own writes without learning anything about anyone else's.
+func TestFeedOwnRequestID(t *testing.T) {
+	e := newEnv(t)
+	path := fmt.Sprintf("/tasks/%d/comments", e.ids["scout.task"])
+	code, out, _ := e.req("POST", path, `{"body_md":"mine"}`, e.ada())
+	e.ok(code, out, 201)
+	// another principal writes through the API too, so its entry has a request id to leak
+	code, out, _ = e.req("POST", path, `{"body_md":"theirs"}`, e.key("scout"))
+	e.ok(code, out, 201)
+	own, others := 0, 0
+	for _, it := range e.feed("/workspaces/scout/changes?after_id=0&limit=500", e.ada()).Items {
+		if it.ActorID != nil && *it.ActorID == e.ids["ada"] {
+			// the fixtures were written straight to the store, without a request
+			if it.RequestID == "test" {
+				own++
+			}
+			continue
+		}
+		if it.Action == "comment.created" {
+			others++
+		}
+		if it.RequestID != "" {
+			t.Fatalf("someone else's entry %d (%s) shows request id %q", it.ID, it.Action, it.RequestID)
+		}
+	}
+	if own == 0 {
+		t.Fatal("the comment ada just wrote carries no request id")
+	}
+	if others == 0 {
+		t.Fatal("the scout key's comment isn't in ada's feed: the leak check checked nothing")
+	}
+	seen := 0
+	for _, it := range e.feed("/workspaces/current/changes?after_id=0&limit=500", e.key("scout")).Items {
+		if it.ActorID != nil && *it.ActorID == e.ids["ada"] {
+			seen++
+			if it.RequestID != "" {
+				t.Fatalf("ada's entry %d leaks its request id to the scout key", it.ID)
+			}
+		}
+	}
+	if seen == 0 {
+		t.Fatal("none of ada's entries is in the scout key's feed: the leak check checked nothing")
+	}
+}

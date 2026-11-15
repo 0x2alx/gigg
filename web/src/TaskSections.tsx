@@ -10,8 +10,12 @@ import { Icon } from "./icons";
 export const errText = (e: unknown, fallback = "That didn't work.") => (e instanceof ApiError ? e.message : fallback);
 
 // Section: a compact collapsible block with a title row of badges.
-export function Section({ title, badges, children, defaultOpen = true, label }: { title: string; badges?: ReactNode; children: ReactNode; defaultOpen?: boolean; label: string }) {
-  const [open, setOpen] = useState(defaultOpen);
+export function Section({ title, badges, children, defaultOpen = true, label, onOpenChange }: { title: string; badges?: ReactNode; children: ReactNode; defaultOpen?: boolean; label: string; onOpenChange?: (open: boolean) => void }) {
+  const [open, setOpenState] = useState(defaultOpen);
+  const setOpen = (v: boolean) => {
+    setOpenState(v);
+    onOpenChange?.(v);
+  };
   return (
     <section className={"tsec" + (open ? " open" : "")} aria-label={label}>
       <button type="button" className="tsec-head" aria-expanded={open} onClick={() => setOpen(!open)}>

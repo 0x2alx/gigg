@@ -21,13 +21,17 @@ import (
 // Idempotency-Key on POST: an authenticated caller that sends the header gets the stored response
 // back (with Idempotent-Replayed: true) when it repeats the same request within 24 h, instead of
 // the request running twice. The same key with a different request is a 422; a repeat while the
-// first is still running is a 409. Responses with status >= 500 or bodies over 256 KiB aren't kept, nor anything from routes that carry credentials.
+// first is still running is a 409. Responses with status >= 500 aren't kept (the request didn't
+// complete, so running it again is right), nor anything from routes that carry credentials. A
+// response over 256 KiB isn't kept either, but its key is: a repeat gets a 409
+// idempotency_unreplayable instead of running the request a second time.
 const (
-	idemTTL         = 24 * 3600 * 1000 // ms; Housekeeping deletes older rows
-	idemMaxBody     = 4 << 20          // request bodies buffered for hashing (above every route's own limit)
-	idemMaxResponse = 256 << 10
-	idemMaxRows     = 2000 // per principal per day; beyond that responses aren't kept
+	idemTTL     = 24 * 3600 * 1000 // ms; Housekeeping deletes older rows
+	idemMaxBody = 4 << 20          // request bodies buffered for hashing (above every route's own limit)
+	idemMaxRows = 2000             // per principal per day; beyond that responses aren't kept
 )
+
+var idemMaxResponse = 256 << 10 // a variable so tests can lower it
 
 // secretBearing routes take or return credentials (passwords, key tokens, session cookies): never
 // stored for replay, and their bodies never hashed into the table.
@@ -137,7 +141,7 @@ func (a *API) idempotent(next http.Handler) http.Handler {
 		if rec.status == 0 {
 			rec.status = http.StatusOK
 		}
-		if rec.status >= 500 || rec.over {
+		if rec.status >= 500 {
 			return
 		}
 		// the request already ran: store even if the client has gone (the retry is what this is for)
@@ -148,9 +152,15 @@ func (a *API) idempotent(next http.Handler) http.Handler {
 			return
 		}
 		hd := w.Header()
-		b, _ := json.Marshal(idemStored{ContentType: hd.Get("Content-Type"), ETag: hd.Get("ETag"), Location: hd.Get("Location"), Body: rec.buf.Bytes()})
+		status, stored := rec.status, idemStored{ContentType: hd.Get("Content-Type"), ETag: hd.Get("ETag"), Location: hd.Get("Location"), Body: rec.buf.Bytes()}
+		if rec.over {
+			// too big to keep: remember that it ran, so a repeat doesn't run it again
+			pb, _ := json.Marshal(fail(409, "idempotency_unreplayable", "This request already ran, but its answer was too large to keep; reload to see the result."))
+			status, stored = http.StatusConflict, idemStored{ContentType: "application/problem+json", Body: append(pb, '\n')}
+		}
+		b, _ := json.Marshal(stored)
 		if _, err := a.st.W.ExecContext(ctx, `INSERT OR REPLACE INTO idempotency_keys (principal, key, request_hash, status, response, created_at) VALUES (?,?,?,?,?,?)`,
-			who, key, hash, rec.status, b, store.Now()); err != nil {
+			who, key, hash, status, b, store.Now()); err != nil {
 			a.log.Error("idempotency store", "err", err)
 		}
 	})

@@ -115,3 +115,5 @@ gigg is in daily use, but young. The API is versioned (`/api/v1`). Database migr
 ## License
 
 gigg is free software under the [GNU Affero General Public License v3.0](LICENSE): you may use, change and share it, and if you run a modified version as a network service, you must offer its source to the people using it. Contributions are welcome under the [contributor license agreement](CLA.md) (see [CONTRIBUTING](CONTRIBUTING.md)), which also lets the maintainer offer gigg under other terms, such as a hosted or commercial edition.
+
+The fonts bundled with the web UI are under the SIL Open Font License 1.1; their notices are in [web/public/fonts-licenses.txt](web/public/fonts-licenses.txt), which every server also serves at `/fonts-licenses.txt`.

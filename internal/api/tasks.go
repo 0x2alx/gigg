@@ -298,6 +298,9 @@ type ActivityItem struct {
 	EntityID   *int64 `json:"entity_id"`
 	ProjectID  *int64 `json:"project_id"`
 	Data       any    `json:"data"`
+	// RequestID: the request that made the entry, only on the event stream and the change feed and
+	// only for the viewer's own entries.
+	RequestID string `json:"request_id,omitempty"`
 }
 
 type activityOut struct {
