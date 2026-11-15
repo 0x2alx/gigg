@@ -13,7 +13,7 @@
 /* filters: one row of 30px controls, no box (like the board's toolbar) */
 .vw-filters { display: flex; flex-wrap: wrap; gap: var(--sp-4); align-items: center; margin-bottom: var(--sp-5); }
 .vw-filters select { height: var(--ctl-h); padding: 0 1.9rem 0 0.6rem; }
-.vw-search { flex: 0 1 16.5rem; min-width: 11rem; width: auto; height: var(--ctl-h); }
+.vw-search { flex: 0 1 20rem; min-width: 11rem; width: auto; height: var(--ctl-h); }
 
 /* bulk bar */
 /* the bulk bar floats over the table while rows are selected */

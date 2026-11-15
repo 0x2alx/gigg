@@ -1,7 +1,7 @@
 // Admin client: the instance-admin endpoints (workspaces, members, projects, statuses, users, keys,
 // audit). Same transport rules as ../api.ts: session cookie, same-origin JSON, X-Gigg-CSRF on every
 // call. PATCH bodies are JSON merge patch (null clears); If-Match carries the version we last saw.
-import { ApiError, type Category } from "../api";
+import { ApiError, noteStatus, type Category } from "../api";
 
 export type Role = "viewer" | "commenter" | "member" | "manager";
 export const ROLES: Role[] = ["viewer", "commenter", "member", "manager"];
@@ -154,6 +154,7 @@ async function call<T>(method: string, path: string, body?: unknown, version?: n
   const ct = r.headers.get("Content-Type") ?? "";
   const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) {
+    noteStatus(r.status, path);
     const d = data as { code?: string; detail?: string; errors?: { message?: string; location?: string }[] };
     // huma's validation errors carry the useful part in errors[]
     const first = d.errors?.[0];

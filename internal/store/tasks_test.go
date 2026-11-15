@@ -324,3 +324,28 @@ func TestTaskOrder(t *testing.T) {
 		t.Error("taskOrder(bogus): want an error")
 	}
 }
+
+func TestSearchByKey(t *testing.T) {
+	f := newFixture(t)
+	a := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "first"})
+	f.task(t, NewTask{ProjectID: f.p1.ID, Title: "second"})
+	for _, q := range []string{a.Key, strings.ToLower(a.Key), " " + a.Key} {
+		ts, _, err := ListTasks(f.ctx, f.s.R, TaskFilter{WorkspaceID: f.ws.ID, Q: q, SearchComments: true})
+		if err != nil || len(ts) != 1 || ts[0].ID != a.ID {
+			t.Errorf("q=%q: got %d tasks, %v; want %s", q, len(ts), err, a.Key)
+		}
+	}
+	if ts, _, _ := ListTasks(f.ctx, f.s.R, TaskFilter{WorkspaceID: f.ws.ID, Q: "sec"}); len(ts) != 1 {
+		t.Errorf("text search: got %d tasks, want 1", len(ts))
+	}
+	// moved to another project: its old key still finds it
+	old := a.Key
+	f.tx(t, func(tx *sql.Tx) error {
+		_, err := MoveTask(f.ctx, tx, f.a, a, a.Version, Move{ProjectID: &f.p2.ID})
+		return err
+	})
+	ts, _, err := ListTasks(f.ctx, f.s.R, TaskFilter{WorkspaceID: f.ws.ID, Q: old})
+	if err != nil || len(ts) != 1 || ts[0].ID != a.ID {
+		t.Errorf("old key %s: got %d tasks, %v", old, len(ts), err)
+	}
+}

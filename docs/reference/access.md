@@ -23,15 +23,15 @@ same workspace: without it, it counts as not held.
 | `comment` | Basics | Write comments and edit or delete your own. |
 | `edit_tasks` | Tasks | Change, move and assign tasks; claim tasks and report runs (agents). |
 | `create_tasks` | Tasks | Create one-off tasks, clone tasks, and create tasks from templates (with `edit_tasks`). |
-| `delete_tasks` | Tasks | Move tasks to the trash and restore them. |
-| `archive_tasks` | Tasks | Archive and unarchive tasks. |
-| `relations` | Tasks | Add and remove blocking/related links between tasks. |
-| `checklists` | Tasks | Add, tick and remove checklist items. |
+| `delete_tasks` | Tasks | Move tasks to the trash and restore them (with `edit_tasks`). |
+| `archive_tasks` | Tasks | Archive and unarchive tasks (with `edit_tasks`). |
+| `relations` | Tasks | Add and remove blocking/related links between tasks (with `edit_tasks`). |
+| `checklists` | Tasks | Add, tick and remove checklist items (with `edit_tasks`). An override alone doesn't give a viewer these: the admin page marks it "needs Edit tasks". |
 | `always_run` | Runner | Mark tasks to run whatever the usage budget. The task caps and pauses still apply. |
 | `allowed_tools` | Runner | Give tasks (templates, recurring tasks) the list of tools the agent runner may use for them, and change tasks that have one. |
 | `pause_runs` | Runner | Pause and resume new agent task runs; with an all-workspaces rule, in every workspace at once. Changing the caps stays with admins. |
-| `schedules` | Planning | Create, change, pause and stop recurring tasks and schedules. |
-| `templates` | Planning | Create, change and delete task templates (using one only needs `create_tasks`). |
+| `schedules` | Planning | Create, change, pause and stop recurring tasks and schedules (recurring tasks also need `edit_tasks`, and `create_tasks` to make their tasks). |
+| `templates` | Planning | Create, change and delete task templates, with `edit_tasks` (using one only needs `create_tasks`). |
 | `custom_fields` | Planning | Define the workspace's custom fields. |
 | `saved_filters` | Planning | Save personal filtered views. |
 | `manage_workspace` | Admin | Projects, statuses (columns), labels, workspace settings, and other people's comments. |

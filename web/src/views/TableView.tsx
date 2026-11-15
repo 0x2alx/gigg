@@ -12,6 +12,7 @@ import { CATEGORY_COLOR, colorFor } from "../theme";
 import { Avatar, LabelChip, Modal, PriorityIcon, StatusDot } from "../ui";
 import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
+import { CATEGORY_LABEL } from "../boardModel";
 import { ALL_CATEGORIES, errMsg, isClosed, isOverdue, pool, relTime, taskHref, viewsApi, type TaskQuery } from "./viewsApi";
 import { compareTasks } from "./tableSort";
 import { PlaceFilter } from "../places";
@@ -277,7 +278,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           <option value="">Any status</option>
           {ALL_CATEGORIES.map((c) => (
             <option key={c} value={c}>
-              {cap(c)}
+              {CATEGORY_LABEL[c]}
             </option>
           ))}
         </select>
@@ -627,11 +628,11 @@ function BulkBar({ tasks, labels, candidates, onClear, onDone }: {
       <span className="count big">{n}</span>
       <span className="vw-bulk-label">selected</span>
       <Act label="Move to">
-        <select value="" disabled={busy} aria-label="Move selected to status category" onChange={(e) => e.target.value && run({ kind: "move", category: e.target.value as Category }, `Moving to ${e.target.value}`)}>
+        <select value="" disabled={busy} aria-label="Move selected to status category" onChange={(e) => e.target.value && run({ kind: "move", category: e.target.value as Category }, `Moving to ${CATEGORY_LABEL[e.target.value as Category] ?? e.target.value}`)}>
           <option value="">Status…</option>
           {ALL_CATEGORIES.map((c) => (
             <option key={c} value={c}>
-              {cap(c)}
+              {CATEGORY_LABEL[c]}
             </option>
           ))}
         </select>
@@ -786,8 +787,4 @@ async function apply(t: Task, op: Op): Promise<unknown> {
       return api.patchTask(t.id, { assignees: op.kind === "assign" ? [...cur.assignees, op.user] : cur.assignees.filter((id) => id !== op.user) });
     }
   }
-}
-
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }

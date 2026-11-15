@@ -25,10 +25,13 @@ export function InboxPage() {
     <div className="inbox">
       <header className="page-head">
         <div>
-          <h1>Inbox<HelpButton topic="inbox" label="Help: inbox and notifications" /></h1>
+          <h1>
+            Inbox
+            {items && items.length > 0 && <span className="count count-alert big">{items.length}</span>}
+            <HelpButton topic="inbox" label="Help: inbox and notifications" />
+          </h1>
           <p className="muted small">Tasks waiting for you, oldest question first.</p>
         </div>
-        {items && <span className="count count-alert big">{items.length}</span>}
       </header>
       {err && <p className="danger">{err}</p>}
       {items && items.length === 0 && <p className="muted">Nothing is waiting for you.</p>}

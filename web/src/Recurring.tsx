@@ -166,10 +166,13 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                 {r.ends_on && <span className="pill pill-muted">until {fmtDate(r.ends_on)}</span>}
                 {r.lead_minutes > 0 && <span className="pill pill-muted">{r.lead_minutes} min early</span>}
                 {r.overlap === "create" && <span className="pill pill-muted">overlap</span>}
-                <span className="pill pill-muted" title="The schedule (timing) it runs on">
-                  <Icon name="clock" /> {r.schedule_name}
-                  {r.schedule_uses > 1 ? ` · ×${r.schedule_uses}` : ""}
-                </span>
+                {/* the schedule, unless it is just the rule shown above (a schedule named after its timing, used once) */}
+                {(r.schedule_name !== describeRule(r) || r.schedule_uses > 1) && (
+                  <span className="pill pill-muted" title="The schedule (timing) it runs on">
+                    <Icon name="clock" /> {r.schedule_name}
+                    {r.schedule_uses > 1 ? ` · ×${r.schedule_uses}` : ""}
+                  </span>
+                )}
                 {(r.template_name !== r.title || r.template_uses > 1) && (
                   <span className="pill pill-muted" title="The template its tasks are made from">
                     <Icon name="template" /> {r.template_name}

@@ -421,6 +421,13 @@ export class ApiError extends Error {
   }
 }
 
+// signedOut: a 401 outside the login calls means the session ended (expired, logged out elsewhere, the
+// account disabled): the app goes back to the login page (App listens for this event).
+export const SIGNED_OUT = "gigg:signed-out";
+export function noteStatus(status: number, path: string) {
+  if (status === 401 && path !== "/auth/login" && path !== "/auth/me") window.dispatchEvent(new Event(SIGNED_OUT));
+}
+
 async function call<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
   // X-Gigg-CSRF on every call: body-less writes (logout, restore) carry no JSON content type, and a
   // cross-site page can't set a custom header without a CORS preflight, which gigg never grants.
@@ -434,6 +441,7 @@ async function call<T>(method: string, path: string, body?: unknown, headers?: R
   const ct = r.headers.get("Content-Type") ?? "";
   const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) {
+    noteStatus(r.status, path);
     const d = data as { code?: string; detail?: string };
     throw new ApiError(r.status, d.code ?? "error", d.detail ?? r.statusText);
   }

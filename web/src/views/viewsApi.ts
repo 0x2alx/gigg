@@ -1,6 +1,6 @@
 // Fetch helpers for the table, my-tasks and command-palette views: the workspace task list with its
 // filters, cursor paging, cross-workspace fan-out and a small concurrency pool for bulk actions.
-import { ApiError, type Category, type Task } from "../api";
+import { ApiError, noteStatus, type Category, type Task } from "../api";
 import type { WorkspaceTree } from "../App";
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -15,6 +15,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   const ct = r.headers.get("Content-Type") ?? "";
   const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) {
+    noteStatus(r.status, path);
     const d = data as { code?: string; detail?: string };
     throw new ApiError(r.status, d.code ?? "error", d.detail ?? r.statusText);
   }

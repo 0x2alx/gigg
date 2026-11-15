@@ -1,7 +1,7 @@
 // Shared JSON call for the newer endpoints (capabilities, groups, fields, notifications, saved
 // filters). Same transport rules as api.ts: session cookie, same-origin JSON, X-Gigg-CSRF on every
 // call, If-Match when a version is given; huma's validation details are folded into the message.
-import { ApiError } from "./api";
+import { ApiError, noteStatus } from "./api";
 
 export async function call<T>(method: string, path: string, body?: unknown, version?: number): Promise<T> {
   const headers: Record<string, string> = { "X-Gigg-CSRF": "1" };
@@ -16,6 +16,7 @@ export async function call<T>(method: string, path: string, body?: unknown, vers
   const ct = r.headers.get("Content-Type") ?? "";
   const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) {
+    noteStatus(r.status, path);
     const d = data as { code?: string; detail?: string; errors?: { message?: string; location?: string }[] };
     const first = d.errors?.[0];
     const extra = first?.message ? ` (${first.location ? first.location.replace(/^body\./, "") + ": " : ""}${first.message})` : "";

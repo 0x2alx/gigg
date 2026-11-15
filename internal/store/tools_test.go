@@ -7,7 +7,7 @@ import (
 )
 
 func TestNormTools(t *testing.T) {
-	got, err := NormTools([]string{" Read", "Bash(git log --oneline *)", "", "Read", "mcp__gigg__list_tasks", "Edit(//srv/x/**)", "WebFetch(domain:example.com)", `Bash(curl -s "api.example.com/v1/forecast?city=Paris,FR")`})
+	got, err := NormTools([]string{" Read", "Bash(git log --oneline *)", "", "Read", "mcp__gigg__list_tasks", "Edit(//data/x/**)", "WebFetch(domain:example.com)", `Bash(curl -s "api.example.com/v1/forecast?city=Paris,FR")`})
 	if err != nil || len(got) != 6 || got[0] != "Read" || got[1] != "Bash(git log --oneline *)" {
 		t.Fatalf("%v %v", got, err)
 	}

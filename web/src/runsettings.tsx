@@ -53,7 +53,7 @@ export function ToolsInput({ value, onCommit, onError, disabled }: { value: stri
   return (
     <span className="tools-input">
       <textarea
-        rows={Math.min(8, Math.max(2, rules.length + 1))}
+        rows={Math.min(8, Math.max(3, rules.length + 1))}
         value={text}
         disabled={disabled}
         placeholder={"none: the agent's usual mode\nRead\nBash(git status *)"}

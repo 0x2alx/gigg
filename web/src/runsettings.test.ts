@@ -11,7 +11,7 @@ describe("run settings", () => {
     expect(runBody({ model: "sonnet", effort: "high", always_run: true, allowed_tools: ["Read"] })).toEqual({ model: "sonnet", effort: "high", always_run: true, allowed_tools: ["Read"] });
   });
   it("tool rules: what the server and the runner accept", () => {
-    for (const ok of ["Read", "Bash(git status *)", "Edit(//srv/shared/reports/**)", "mcp__gigg__get_task", "WebFetch(domain:example.com)", 'Bash(curl -s "api.example.com/v1/forecast?city=Paris,FR")']) expect(validTool(ok)).toBe(true);
+    for (const ok of ["Read", "Bash(git status *)", "Edit(//data/reports/**)", "mcp__gigg__get_task", "WebFetch(domain:example.com)", 'Bash(curl -s "api.example.com/v1/forecast?city=Paris,FR")']) expect(validTool(ok)).toBe(true);
     for (const bad of ["-p", "--allowedTools", "Read,Write", "Bash(a(b))", "Read Write", "Bash(x\ny)", "Bash()", "(x)", "Read)", "x".repeat(501)]) expect(validTool(bad)).toBe(false);
   });
   it("parses one rule per line, drops blanks and repeats, names the first bad one", () => {

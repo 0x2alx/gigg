@@ -341,6 +341,8 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Task[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // a link added or removed doesn't change the task's version: reload the list after each one
+  const [reload, setReload] = useState(0);
   useEffect(() => {
     let live = true;
     api
@@ -350,7 +352,7 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
     return () => {
       live = false;
     };
-  }, [task.id, task.version]);
+  }, [task.id, task.version, reload]);
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
     const s = q.trim();
@@ -375,13 +377,20 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
         setQ("");
         setFound([]);
         setAdding(false);
+        setReload((n) => n + 1);
         onTask(t);
       })
       .catch(fail);
   };
   const remove = (d: Dep) => {
     setErr("");
-    api.removeRelation(task.id, d.other, d.dir).then(onTask).catch(fail);
+    api
+      .removeRelation(task.id, d.other, d.dir)
+      .then((t) => {
+        setReload((n) => n + 1);
+        onTask(t);
+      })
+      .catch(fail);
   };
   const open = (id: number) => api.task(id).then(onOpen, fail);
 

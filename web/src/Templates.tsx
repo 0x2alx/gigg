@@ -91,7 +91,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
       )}
       <div className="list-bar">
         <PlaceFilter value={place} onChange={setPlace} tree={tree} />
-        {items && <span className="muted small">{shown.length === items.length ? `${items.length} templates` : `${shown.length} of ${items.length}`}</span>}
+        {items && <span className="muted small">{shown.length === items.length ? `${items.length} template${items.length === 1 ? "" : "s"}` : `${shown.length} of ${items.length}`}</span>}
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}
       {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No templates yet. Save one from the new-task form, or make one here." : "None here. Show everything to see the others."}</p>}

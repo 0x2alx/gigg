@@ -423,7 +423,22 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       ? statusColumns(boards.get(single.project.id)!, filter, me_)
       : []
     : categoryColumns(scopeIds.map((id) => boards.get(id)).filter((b): b is Board => !!b), filter, me_);
-  const open = columns.filter((c) => c.category !== "done").reduce((n, c) => n + c.tasks.length, 0);
+  const countOpen = (cols: BoardColumn[]) => cols.filter((c) => c.category !== "done").reduce((n, c) => n + c.tasks.length, 0);
+  const open = countOpen(columns);
+  // with a task filter (assignee, label, priority, search) on, the count says how many of all match
+  const taskFiltered = !!(filter.a || filter.l || filter.pr || filter.q);
+  const allOpen = !taskFiltered
+    ? open
+    : countOpen(
+        (() => {
+          const f: BoardFilter = { ...filter, a: "", l: "", pr: 0, q: "" };
+          return single
+            ? boards.get(single.project.id)
+              ? statusColumns(boards.get(single.project.id)!, f, me_)
+              : []
+            : categoryColumns(scopeIds.map((id) => boards.get(id)).filter((b): b is Board => !!b), f, me_);
+        })(),
+      );
   const active = columns.find((c) => c.key === activeCol) ?? columns.find((c) => c.category === "todo") ?? columns[0];
   const shown = narrow && active ? [active] : columns;
   // collapsed columns leave the grid and become small chips above it (wide screens; a phone shows one column)
@@ -577,7 +592,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
             {wsInScope.length === 1 && <WorkspaceBadge ws={wsInScope[0]!} />}
             {single && <span className="key">{single.project.key}</span>}
             <span className="muted">
-              {open} open task{open === 1 ? "" : "s"}
+              {taskFiltered ? `showing ${open} of ${allOpen} open task${allOpen === 1 ? "" : "s"}` : `${open} open task${open === 1 ? "" : "s"}`}
               {!single && ` · ${inScope.length} projects`}
             </span>
           </div>
@@ -737,7 +752,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                     </button>
                   )}
                   {!narrow && (
-                    <button type="button" className="icon-button" aria-expanded={true} aria-label={`Collapse ${c.name}: it becomes a small button above the board`} onClick={() => toggleCollapsed(c.id)}>
+                    <button type="button" className="icon-button col-collapse" aria-expanded={true} aria-label={`Collapse ${c.name}: it becomes a small button above the board`} onClick={() => toggleCollapsed(c.id)}>
                       <Icon name="shrink" />
                     </button>
                   )}
@@ -760,7 +775,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                   </div>
                 ))}
                 {manual && c.statusId !== undefined && line === others.length && <div className="drop-line" aria-hidden="true" />}
-                {c.tasks.length === 0 && <div className="empty">{drag !== null ? "Drop here" : "Nothing here"}</div>}
+                {c.tasks.length === 0 && (drag !== null || archivedIn(c).length === 0) && <div className="empty">{drag !== null ? "Drop here" : "Nothing here"}</div>}
                 {addHere && c.category !== "done" && (
                   <button type="button" className="column-add" onClick={() => addIn(c)}>
                     <Icon name="plus" strokeWidth={2} /> New task
@@ -1295,8 +1310,30 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
     const close = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setMenu(false);
     };
+    // Esc closes it (and only it), focus back on its button
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setMenu(false);
+      ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    };
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("keydown", key, true);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", key, true);
+    };
+  }, [menu]);
+  // near the bottom of the screen the menu opens upwards, so all of it stays in view
+  const [up, setUp] = useState(false);
+  useLayoutEffect(() => {
+    if (!menu) return setUp(false);
+    const m = ref.current?.querySelector<HTMLElement>(".menu");
+    const b = ref.current?.getBoundingClientRect();
+    if (!m || !b) return;
+    const h = m.getBoundingClientRect().height;
+    setUp(b.bottom + h + 8 > window.innerHeight && b.top - h - 8 > 0);
   }, [menu]);
   const move = (body: MoveBody) => {
     setMenu(false);
@@ -1496,7 +1533,7 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
             ⋯
           </button>
           {menu && (
-            <div className="menu" role="menu">
+            <div className={"menu" + (up ? " menu-up" : "")} role="menu">
               {canReorder && !(first && last) && <div className="menu-label">Order</div>}
               {canReorder && !first && (
                 <>

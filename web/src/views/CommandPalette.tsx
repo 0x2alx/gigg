@@ -138,7 +138,7 @@ function Palette({ onClose }: { onClose: () => void }) {
         const href = w.projects[0] ? `/w/${w.slug}/p/${w.projects[0].id}` : `/w/${w.slug}/table`;
         places.push({
           score: ws,
-          item: { id: `ws-${w.id}`, group: "Workspaces", icon: "▦", label: w.name, hint: <span className="muted small">{w.projects.length} projects</span>, run: () => go(href) },
+          item: { id: `ws-${w.id}`, group: "Workspaces", icon: "▦", label: w.name, hint: <span className="muted small">{w.projects.length} project{w.projects.length === 1 ? "" : "s"}</span>, run: () => go(href) },
         });
       }
       for (const p of w.projects) {

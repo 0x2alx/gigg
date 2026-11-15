@@ -34,9 +34,9 @@ func TestAllowedTools(t *testing.T) {
 	denied("create", code, out)
 	// rules: trimmed, repeats dropped, order kept; flags, commas outside the specifier, nested
 	// parentheses, control characters and junk refused
-	code, out, _ = e.req("POST", newTask, `{"title":"brief","category":"todo","allowed_tools":[" Read ","Bash(git status *)","Read","","Edit(//srv/shared/reports/**)","mcp__gigg__get_task"]}`, ada)
+	code, out, _ = e.req("POST", newTask, `{"title":"brief","category":"todo","allowed_tools":[" Read ","Bash(git status *)","Read","","Edit(//data/reports/**)","mcp__gigg__get_task"]}`, ada)
 	e.ok(code, out, 201)
-	if !strings.Contains(string(out), `"allowed_tools":["Read","Bash(git status *)","Edit(//srv/shared/reports/**)","mcp__gigg__get_task"]`) {
+	if !strings.Contains(string(out), `"allowed_tools":["Read","Bash(git status *)","Edit(//data/reports/**)","mcp__gigg__get_task"]`) {
 		t.Fatalf("normalised rules: %s", out)
 	}
 	brief := id(out)

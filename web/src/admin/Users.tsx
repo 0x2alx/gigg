@@ -120,19 +120,19 @@ export function UsersPage() {
                   </td>
                   <td className="small admin-lastlogin" data-label="Last login">{u.kind === "agent" ? <span className="muted">n/a</span> : <TimeAgo ms={u.last_login_at} />}</td>
                   <td className="admin-actions">
-                    <button type="button" className="button secondary small" onClick={() => setEditingId(u.id)}>
+                    <button type="button" className="button secondary small" aria-label={`Edit ${u.username}`} onClick={() => setEditingId(u.id)}>
                       Edit
                     </button>
                     {u.kind === "agent" && (
-                      <button type="button" className="button secondary small" onClick={() => setPictureId(u.id)}>
+                      <button type="button" className="button secondary small" aria-label={`Picture ${u.username}`} onClick={() => setPictureId(u.id)}>
                         Picture
                       </button>
                     )}
-                    <button type="button" className="button secondary small" onClick={() => setPermsFor(u)}>
+                    <button type="button" className="button secondary small" aria-label={`Permissions ${u.username}`} onClick={() => setPermsFor(u)}>
                       Permissions
                     </button>
                     {u.kind === "human" && (
-                      <button type="button" className="button secondary small" onClick={() => setPwFor(u)}>
+                      <button type="button" className="button secondary small" aria-label={`Password ${u.username}`} onClick={() => setPwFor(u)}>
                         Password
                       </button>
                     )}
@@ -146,6 +146,7 @@ export function UsersPage() {
                           : "Admins reach every workspace, manage users and keys, and read the audit log."
                       }
                       confirmLabel={u.is_admin ? "Revoke" : "Make admin"}
+                      disabled={u.is_admin && u.id === me.user.id}
                       onConfirm={() => adminApi.patchUser(u, { is_admin: !u.is_admin }).then(changed)}
                     />
                     {u.disabled ? (

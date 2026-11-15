@@ -147,6 +147,29 @@ export function UserBadge({ user }: { user: Pick<User, "username" | "display_nam
 // reducedMotion: the user asked the system for less motion (exit animations then close at once)
 export const reducedMotion = (): boolean => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// trapTab: Tab and Shift+Tab cycle inside the dialog (it's aria-modal: the page behind is out of reach),
+// also when the focus has slipped out of it.
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const shown = (el: HTMLElement) => (typeof el.checkVisibility === "function" ? el.checkVisibility({ visibilityProperty: true, contentVisibilityAuto: true }) : el.getClientRects().length > 0);
+export function trapTab(e: KeyboardEvent, box: HTMLElement | null) {
+  if (!box || e.defaultPrevented) return; // a field that uses Tab itself (mentions, list indent) wins
+  const all = [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el === document.activeElement || shown(el));
+  if (all.length === 0) return;
+  const first = all[0]!;
+  const last = all[all.length - 1]!;
+  const at = document.activeElement;
+  if (!box.contains(at)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+  } else if (e.shiftKey && at === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && at === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
 // EXIT_MS: how long a dialog or the task panel takes to animate out before it really closes
 export const EXIT_MS = 150;
 
@@ -202,6 +225,8 @@ export function Modal({ title, onClose, children, wide, xl, help, expandable }: 
       ref.current?.querySelector<HTMLElement>("input, textarea, select, button:not(.help-button)"))?.focus();
     const esc = (e: KeyboardEvent) => {
       if (e.key === "Escape") animatedClose.current();
+      // only the top dialog (the last one opened) keeps the focus
+      else if (e.key === "Tab" && [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].pop() === ref.current) trapTab(e, ref.current);
     };
     document.addEventListener("keydown", esc);
     return () => {

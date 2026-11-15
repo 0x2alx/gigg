@@ -13,7 +13,7 @@ Data colours (labels, statuses, priorities, workspaces, people) keep their hues 
 
 ## Theme options beyond colours
 
-Besides the colours, font, text size, corners and border width, the editor has four options that only gigg uses. The Android apps ignore them: a theme from an app imports as before, and a gigg theme copied into an app keeps its colours and font but not these four:
+Besides the colours, font, text size, corners and border width, the editor has four options that only gigg uses. Other apps that read the same theme JSON ignore them: a theme from such an app imports as before, and a gigg theme copied into one keeps its colours and font but not these four:
 
 - **Buttons and badges**: *Follow the corners* (the theme's corner size) or *Pill* (fully round buttons, fields, chips and badges).
 - **Board columns**: the colour of the board's columns. *Auto* (**A**) takes a step between the background and the cards.

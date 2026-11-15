@@ -68,8 +68,10 @@ a.admin-name:hover { text-decoration: underline; }
 .admin-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border: 1px solid var(--line-strong); border-radius: var(--radius-m); background: var(--surface); }
 .admin-seg-btn {
   background: none; color: var(--muted); border: 0; border-radius: calc(var(--radius-m) - 2px);
-  font: inherit; font-size: var(--fs-sm); min-height: 1.6rem; padding: 0 0.7rem; cursor: pointer; text-transform: capitalize;
+  font: inherit; font-size: var(--fs-sm); min-height: 1.6rem; padding: 0 0.7rem; cursor: pointer;
 }
+/* lowercase values ("all", "human") start with a capital; labels in sentence case stay as written */
+.admin-seg-btn::first-letter { text-transform: uppercase; }
 .admin-seg-btn:hover { background: var(--hover); color: var(--text); }
 .admin-seg-btn.on { background: var(--selected); color: var(--text); font-weight: var(--weight-strong); }
 .admin-seg-count { font-size: var(--fs-xs); color: var(--muted); margin-left: 0.2rem; font-variant-numeric: tabular-nums; }

@@ -250,6 +250,13 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   font-family: var(--mono); font-size: var(--fs-xs); font-weight: var(--weight-body); line-height: 1.55; font-variant-numeric: tabular-nums;
 }
 /* the column's tools (new task, collapse) show on hover and keyboard focus, and always on touch screens */
+/* a narrow column (five on a tablet) keeps its name readable: the stage icon goes, the tools get compact */
+.column { container: col / inline-size; }
+@container col (max-width: 13rem) {
+  .column-head .stage-icon { display: none; }
+  .column-head { padding-left: 0.5rem; gap: var(--sp-2); }
+  .column-tools .icon-button { width: 1.7rem; }
+}
 .column-tools { margin-left: auto; display: inline-flex; gap: 0.1rem; transition: opacity 0.12s ease-out; }
 .column-tools .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
 .column-tools .icon-button:hover { color: var(--text); }
@@ -401,6 +408,7 @@ a.pulse-item:hover { color: var(--text); }
   padding: 0.25rem; display: flex; flex-direction: column;
   box-shadow: var(--shadow-pop);
 }
+.menu.menu-up { top: auto; bottom: calc(100% + 0.25rem); }
 .menu button { display: flex; align-items: center; gap: var(--sp-4); background: none; border: 0; color: var(--text); font: inherit; font-size: var(--fs-base); text-align: left; padding: 0.4rem 0.55rem; border-radius: var(--radius-s); cursor: pointer; }
 .menu .ico { color: var(--muted); }
 .menu button:hover, .menu button:focus-visible { background: color-mix(in srgb, var(--text) 10%, var(--high)); }
@@ -1510,7 +1518,8 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .tm-body { display: flex; flex-direction: column; gap: var(--sp-5); }
 .tm-main, .tm-side { display: contents; }
 .tpl-pick, .tm-body .sched-tpl { order: 0; margin: 0; }
-.tm-s-task { order: 1; } .tm-s-where { order: 2; } .tm-s-when { order: 3; } .tm-s-people { order: 4; } .tm-s-check { order: 5; } .tm-s-agent { order: 6; }
+/* one column: the sections in source order (the tab order): Task, Checklist and fields, Where, When, Details,
+   Agent run; the full page puts the first two on the left */
 .tm-section {
   background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-l);
   padding: var(--sp-5) var(--sp-6) var(--sp-6); min-width: 0;
@@ -1533,7 +1542,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .tm-section .more-fields { background: var(--surface); }
 /* the actions stay in view at the bottom while the form scrolls */
 .tm-foot {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); position: sticky; bottom: calc(-1 * var(--sp-7)); z-index: 2;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); position: sticky; bottom: 0; z-index: 2;
   margin: var(--sp-5) calc(-1 * var(--sp-7)) calc(-1 * var(--sp-7)); padding: var(--sp-5) var(--sp-7);
   background: var(--surface); border-top: 1px solid var(--line); border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
@@ -1541,8 +1550,10 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .tm-form > .danger { margin: var(--sp-4) 0 0; }
 /* full page */
 .modal-backdrop:has(> .modal-full) { padding: 1rem; place-items: stretch center; }
-.modal.modal-full { width: min(100%, 110rem); max-width: none; min-height: calc(100dvh - 2rem); display: flex; flex-direction: column; }
+/* the whole page: the dialog scrolls inside itself, so its sticky footer stays within its border */
+.modal.modal-full { width: min(100%, 110rem); max-width: none; height: calc(100dvh - 2rem); overflow-y: auto; display: flex; flex-direction: column; }
 .modal-full .tm-form { flex: 1; }
+@media (min-width: 721px) { .modal-full .tm-foot { bottom: calc(-1 * var(--sp-7)); } } /* the dialog scrolls itself: stick over its bottom padding */
 .modal-full .tm-body { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(20rem, 1fr); gap: var(--sp-6) var(--sp-7); align-items: start; flex: 1; }
 .modal-full .tm-main, .modal-full .tm-side { display: flex; flex-direction: column; gap: var(--sp-5); min-width: 0; }
 .modal-full .tm-s-task .mde textarea { min-height: 18rem; }
@@ -1555,7 +1566,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   /* the phone sheet's padding: 0.9rem, 1rem + the safe area at the bottom */
   .tm-foot { margin: var(--sp-5) -0.9rem calc(-1rem - env(safe-area-inset-bottom)); padding: var(--sp-4) 0.9rem calc(var(--sp-4) + env(safe-area-inset-bottom)); bottom: calc(-1rem - env(safe-area-inset-bottom)); }
   .modal-backdrop:has(> .modal-full) { padding: 0; }
-  .modal.modal-full { min-height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  .modal.modal-full { height: 100dvh; max-height: 100dvh; border-radius: 0; }
 }
 
 /* the lists that span every workspace (recurring tasks, templates, schedules): a filter bar on top */

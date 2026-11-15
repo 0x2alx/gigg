@@ -39,10 +39,11 @@ export function ThemesPage() {
     show(`"${t.name}" copied as JSON.`);
   };
   const duplicate = (t: Theme) => setEditing({ ...t, id: "", name: `${t.name} copy`.slice(0, 40) });
+  const [deleting, setDeleting] = useState<Theme | null>(null);
   const remove = async (t: Theme) => {
-    if (!window.confirm(`Delete "${t.name}"?`)) return;
     await api.deleteTheme(t.id);
     await themes.reload();
+    show(`Deleted "${t.name}".`);
   };
   const save = async (t: Theme) => {
     const id = t.id || `custom-${Date.now()}`;
@@ -60,7 +61,7 @@ export function ThemesPage() {
     { icon: <Icon name="pencil" />, label: "Edit", run: () => setEditing(t) },
     { icon: <Icon name="copy" />, label: "Duplicate", run: () => duplicate(t) },
     { icon: "{ }", label: "Copy JSON", run: () => copy(t) },
-    { icon: <Icon name="trash" />, label: "Delete", run: () => void remove(t), danger: true },
+    { icon: <Icon name="trash" />, label: "Delete", run: () => setDeleting(t), danger: true },
   ];
   const builtinActions = (t: Theme): CardAction[] => [
     { icon: <Icon name="copy" />, label: "Duplicate", run: () => duplicate(t) },
@@ -146,6 +147,27 @@ export function ThemesPage() {
           ))}
         </div>
       </section>
+      {deleting && (
+        <Modal title={`Delete “${deleting.name}”?`} onClose={() => setDeleting(null)}>
+          <p>The theme is gone from your account on every device. A copy of its JSON brings it back.</p>
+          <div className="row end">
+            <button type="button" className="button secondary" onClick={() => setDeleting(null)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="button danger-button"
+              onClick={() => {
+                const t = deleting;
+                setDeleting(null);
+                void remove(t).catch((e: unknown) => show(e instanceof ApiError ? e.message : "Couldn't delete the theme."));
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </Modal>
+      )}
       {importing && (
         <ImportModal
           onClose={() => setImporting(false)}
@@ -605,6 +627,8 @@ function ColourDialog({ label, initial, onClose, onPick }: { label: string; init
 
 // ---- import and AI
 
+class ImportProblem extends Error {}
+
 function useImporter(onDone: (summary: string, notes: string[]) => void) {
   const { themes } = useApp();
   return async (text: string) => {
@@ -620,6 +644,8 @@ function useImporter(onDone: (summary: string, notes: string[]) => void) {
       if (r.dropped_oldest) res.notes.push("Only your 50 most recent themes were kept.");
       last = id;
     }
+    // nothing to import: say why, and the dialog (with the text) stays open
+    if (res.themes.length === 0 && !res.selectId) throw new ImportProblem([res.summary, ...res.notes].join(" "));
     const sel = res.selectId ?? (last || undefined);
     if (sel) await themes.select(sel, res.matchPhone ?? themes.matchSystem);
     else await themes.reload();
@@ -642,7 +668,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: (summar
         <button type="button" className="button secondary" onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className="button" disabled={!text.trim()} onClick={() => run(text).then(onClose).catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Import failed."))}>
+        <button type="button" className="button" disabled={!text.trim()} onClick={() => run(text).then(onClose).catch((e: unknown) => setErr(e instanceof ApiError || e instanceof ImportProblem ? e.message : "Import failed."))}>
           Import
         </button>
       </div>
@@ -684,7 +710,7 @@ function AIModal({ onClose, onDone }: { onClose: () => void; onDone: (summary: s
         <button type="button" className="button secondary" onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className="button" disabled={!answer.trim()} onClick={() => run(answer).then(onClose).catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Import failed."))}>
+        <button type="button" className="button" disabled={!answer.trim()} onClick={() => run(answer).then(onClose).catch((e: unknown) => setErr(e instanceof ApiError || e instanceof ImportProblem ? e.message : "Import failed."))}>
           Use this theme
         </button>
       </div>

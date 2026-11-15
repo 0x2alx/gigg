@@ -423,14 +423,18 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 	}
 	if f.Q != "" {
 		like := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(f.Q) + "%"
+		text := `t.title LIKE ? ESCAPE '\' OR t.description_md LIKE ? ESCAPE '\'`
+		args = append(args, like, like)
 		if f.SearchComments {
-			where = append(where, `(t.title LIKE ? ESCAPE '\' OR t.description_md LIKE ? ESCAPE '\' OR
-			EXISTS (SELECT 1 FROM comments c WHERE c.task_id = t.id AND c.deleted_at IS NULL AND c.body_md LIKE ? ESCAPE '\'))`)
-			args = append(args, like, like, like)
-		} else {
-			where = append(where, `(t.title LIKE ? ESCAPE '\' OR t.description_md LIKE ? ESCAPE '\')`)
-			args = append(args, like, like)
+			text += ` OR EXISTS (SELECT 1 FROM comments c WHERE c.task_id = t.id AND c.deleted_at IS NULL AND c.body_md LIKE ? ESCAPE '\')`
+			args = append(args, like)
 		}
+		// a key ("GIG-12", any case) also finds that task, by its current key or one it had before a move
+		if key, n, ok := ParseTaskKey(strings.ToUpper(strings.TrimSpace(f.Q))); ok {
+			text += ` OR (p.key = ? AND t.number = ?) OR EXISTS (SELECT 1 FROM task_aliases a WHERE a.task_id = t.id AND a.project_key = ? AND a.number = ?)`
+			args = append(args, key, n, key, n)
+		}
+		where = append(where, "("+text+")")
 	}
 	if f.DueBefore != nil {
 		where, args = append(where, "t.due_at IS NOT NULL AND t.due_at < ?"), append(args, *f.DueBefore)

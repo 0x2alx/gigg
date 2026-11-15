@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent as ReactFocusEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { setMentionUsers } from "./markdown";
 import { Link, Redirect, Route, Switch, useLocation, useSearch } from "wouter";
-import { api, ApiError, type Me, type Project, type ThemeState, type User } from "./api";
+import { api, ApiError, SIGNED_OUT, type Me, type Project, type ThemeState, type User } from "./api";
 import { NotificationsPage, TopBell } from "./Bell";
 import { badgeCount } from "./notifications";
 import { BoardPage } from "./Board";
@@ -81,13 +81,35 @@ export function App() {
       .catch(() => setMe(null));
   }, []);
   useEffect(load, [load]);
+  // a call answered 401: check the session; gone, back to the login page with a word why
+  const [ended, setEnded] = useState(false);
+  const signedIn = useRef(false); // calls still failing after a logout aren't a session that ended
+  signedIn.current = !!me;
+  useEffect(() => {
+    // one check at a time: a page whose session died fails many calls at once
+    let checking: Promise<void> | null = null;
+    const out = () => {
+      if (!signedIn.current || checking) return;
+      checking = api
+        .me()
+        .then(setMe, (e: unknown) => {
+          if (e instanceof ApiError && e.status === 401) {
+            setEnded(true);
+            setMe(null);
+          }
+        })
+        .finally(() => (checking = null));
+    };
+    window.addEventListener(SIGNED_OUT, out);
+    return () => window.removeEventListener(SIGNED_OUT, out);
+  }, []);
 
   if (me === undefined) return <div className="center muted">Loading…</div>;
-  if (me === null) return <Login onDone={load} />;
-  return <Shell me={me} onLogout={() => setMe(null)} />;
+  if (me === null) return <Login onDone={() => (setEnded(false), load())} ended={ended} />;
+  return <Shell key={me.user.id} me={me} onLogout={() => setMe(null)} />;
 }
 
-function Login({ onDone }: { onDone: () => void }) {
+function Login({ onDone, ended }: { onDone: () => void; ended?: boolean }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -109,6 +131,11 @@ function Login({ onDone }: { onDone: () => void }) {
           <img className="login-mark" src="/logo-mark.svg" alt="" width="96" height="96" />
           <h1 className="brand-big">gigg</h1>
         </div>
+        {ended && !error && (
+          <p className="muted small" role="status">
+            Your session ended. Log in again.
+          </p>
+        )}
         <label>
           Username
           <input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required autoFocus />

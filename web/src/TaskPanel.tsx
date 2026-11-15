@@ -369,7 +369,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                 <article key={c.id} className={"comment kind-" + c.kind}>
                   <div className="comment-head">
                     {author ? <Avatar user={author} size="l" /> : null}
-                    <strong>{c.author_username}</strong>
+                    <strong title={`@${c.author_username}`}>{author?.display_name || c.author_username}</strong>
                     {c.author_kind === "agent" && <span className="pill pill-agent">agent</span>}
                     {kb && <Pill color={kb[1]}>{kb[0]}</Pill>}
                     <span className="muted small">{fmtTime(c.created_at)}</span>
