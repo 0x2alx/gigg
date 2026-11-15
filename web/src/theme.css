@@ -448,13 +448,12 @@ a.pulse-item:hover { color: var(--text); }
 .props dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .description { line-height: 1.55; }
 .edit { display: flex; flex-direction: column; gap: 0.6rem; margin: 0.6rem 0; }
-.agent { border-top: 1px solid var(--line); margin-top: var(--sp-6); padding-top: var(--sp-2); }
 .cmd { display: flex; gap: var(--sp-4); align-items: center; background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-m); padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4); }
 .cmd code { flex: 1; overflow-wrap: anywhere; font-size: var(--fs-sm); }
 .path { font-size: 0.8rem; overflow-wrap: anywhere; }
 .resume { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
-/* panel section titles (Comments, Agent session): small, uppercase, muted, the count beside them */
-.comments > h3, .agent > h3 {
+/* panel section title (Comments): small, uppercase, muted, the count beside them */
+.comments > h3 {
   display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-5) 0 var(--sp-4);
   font-size: var(--fs-xs); font-weight: var(--weight-strong); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
 }
@@ -467,6 +466,20 @@ a.pulse-item:hover { color: var(--text); }
 .comment-head { display: flex; gap: var(--sp-4); align-items: center; flex-wrap: wrap; margin-bottom: var(--sp-3); font-size: var(--fs-base); }
 .comment-head strong { font-weight: var(--weight-strong); }
 .comment .md { font-size: var(--fs-md); line-height: 1.5; }
+/* long text (description, comments): clamped to a fixed height, faded at the bottom, with a bar to open it */
+.clamp { scroll-margin-top: 5rem; } /* "Show less" scrolls it back under the sticky panel header, not behind it */
+.clamp-box { position: relative; }
+.clamp.clamped .clamp-box {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent);
+}
+.clamp-bar {
+  display: flex; align-items: center; justify-content: center; gap: var(--sp-2); width: 100%;
+  margin-top: var(--sp-2); padding: 0.2rem var(--sp-3); font: inherit; font-size: var(--fs-xs); font-weight: var(--weight-strong);
+  color: var(--muted); background: color-mix(in srgb, var(--text) 5%, transparent); border: 0; border-radius: var(--radius-s); cursor: pointer;
+}
+.clamp-bar:hover { color: var(--text); background: var(--hover); }
 .badge { font-size: 0.7rem; background: var(--secondary); color: var(--on-secondary); border-radius: var(--radius-xs); padding: 0 0.35rem; }
 .add-comment { display: flex; flex-direction: column; gap: var(--sp-4); align-items: stretch; }
 .add-comment > .button { align-self: flex-end; }
@@ -827,6 +840,7 @@ label.check input { width: auto; accent-color: var(--accent); }
 .tsec-count.done { color: var(--text); }
 .tsec-head .pill { text-transform: none; letter-spacing: 0; }
 .tsec-body { padding: 0 0 var(--sp-5) var(--sp-2); display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; font-size: var(--fs-base); }
+.tsec-body[hidden] { display: none; }
 .progress { display: inline-block; flex: 1 1 4rem; max-width: 7rem; height: 0.3rem; border-radius: 999px; background: color-mix(in srgb, var(--text) 12%, var(--surface)); overflow: hidden; }
 .progress-fill { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.2s; }
 .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
@@ -1066,7 +1080,8 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
   .tp-row.wide > .tp-label, .tp-row.wide > .tp-value { grid-column: 1; }
   .tp-label { min-height: 0; margin-top: 0.4rem; }
 }
-/* order: title, description, people, comments | sections, details, agent session, actions.
+/* order: title, description, people, comments | details, agent run, people, schedule, the folding
+   sections, look, agent session (folding), actions.
    Stacked in the side panel; two columns when the panel is expanded and wide enough. */
 .tp-main, .tp-side { min-width: 0; }
 .tp-side { container: tpsec / inline-size; }

@@ -26,19 +26,23 @@ Click a card to open its panel. Its top line shows the workspace (its owner's pi
 
 ![A task's panel (Daywalker theme)](../images/task-panel-day.png)
 
-- **Properties**: workspace, project (move it to another project), status, priority, agent run settings, assignees, dates and the time window, labels, colour. Fields you can't change (a viewer's) show with a dashed outline.
+The panel reads top to bottom: description, comments, properties, then the folding sections.
+
 - **Description**: click to edit. Markdown, with checkboxes you can tick in place.
-- **Checklist**, **Subtasks**, **Dependencies**, **Fields** and **History** are folding sections (click a section's title to fold it):
-- **Checklist**: add, tick, reorder and remove items.
-- **Subtasks**: tasks whose parent is this one. Their progress shows on the parent's card.
-- **Dependencies**: "blocks", "blocked by" and "relates to" links between tasks. A blocked task shows 🔒, and agents leave it alone until its blockers are done.
-- **Custom fields**: the workspace's extra fields (text, number, date, select, checkbox, link).
-- **History** (folded at first): who changed what and when, newest first: edits, moves, links, checklist changes, comments and agent runs. It updates live. The admin audit log keeps the rest (which key, from where).
 - **Comments**: Markdown, with @mentions. Agents' comments are marked by kind:
   - *question*: they need an answer; the task goes to the [Inbox](inbox.md).
   - *report*: what they did.
   - *system*: the runner's own notes.
-- **Runs** and **Agent session**: each time an agent worked on the task, with status, duration, cost and its report. **Resume** asks the agent to continue its previous session, with your comment as the next instruction.
+- A long description or comment shows its first part, fading out, with a **Show more** bar under it. **Show less** folds it again, and every task opens with long text folded.
+- **Properties** (Details, Agent run, People, Schedule): workspace, project (move it to another project), status, priority, agent run settings, assignees, dates and the time window. Fields you can't change (a viewer's) show with a dashed outline.
+- **Checklist**, **Subtasks**, **Dependencies**, **Fields** and **History** are folding sections, folded when a task opens. Click a title to open one; its badge (progress, count) shows while it's folded.
+  - **Checklist**: add, tick, reorder and remove items.
+  - **Subtasks**: tasks whose parent is this one. Their progress shows on the parent's card.
+  - **Dependencies**: "blocks", "blocked by" and "relates to" links between tasks. A blocked task shows 🔒, and agents leave it alone until its blockers are done.
+  - **Fields**: the workspace's custom fields (text, number, date, select, checkbox, link).
+  - **History**: who changed what and when, newest first: edits, moves, links, checklist changes, comments and agent runs. It updates live. The admin audit log keeps the rest (which key, from where).
+- **Look**: labels and colour (the card's left edge).
+- **Agent session** (folding): the resume command, each run with status, duration and cost, and the transcript path. **Resume** asks the agent to continue its previous session, with your text as the next instruction. It's folded unless the agent is waiting for your answer.
 - **Clone**, **Archive** / **Unarchive** and **Delete** are at the bottom of the panel.
 
 ## Time windows and missed tasks

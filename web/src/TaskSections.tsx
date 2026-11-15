@@ -1,6 +1,6 @@
 // Task panel sections: checklist, subtasks, dependencies and custom fields. Each saves straight to
 // the server and hands the updated task back through onTask.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, type ChecklistItem, type CustomField, type Relation, type RelationDirection, type Task } from "./api";
 import { formatCustom, fromInput, moveAfter, progress, reorder, splitLines, toInput } from "./items";
 import { CATEGORY_COLOR } from "./theme";
@@ -9,23 +9,38 @@ import { Icon } from "./icons";
 
 export const errText = (e: unknown, fallback = "That didn't work.") => (e instanceof ApiError ? e.message : fallback);
 
-// Section: a compact collapsible block with a title row of badges.
-export function Section({ title, badges, children, defaultOpen = true, label, onOpenChange }: { title: string; badges?: ReactNode; children: ReactNode; defaultOpen?: boolean; label: string; onOpenChange?: (open: boolean) => void }) {
+// Section: a compact collapsible block with a title row of badges (the badges show while it is folded).
+// openOn: a value that opens the section each time it changes to a new non-zero value. keepMounted:
+// folding hides the body instead of removing it, so text typed in it survives.
+export function Section({ title, badges, children, defaultOpen = true, label, onOpenChange, openOn = 0, keepMounted = false }: { title: string; badges?: ReactNode; children: ReactNode; defaultOpen?: boolean; label: string; onOpenChange?: (open: boolean) => void; openOn?: number; keepMounted?: boolean }) {
   const [open, setOpenState] = useState(defaultOpen);
+  const bodyId = useId();
   const setOpen = (v: boolean) => {
     setOpenState(v);
     onOpenChange?.(v);
   };
+  const seen = useRef(openOn);
+  useEffect(() => {
+    if (openOn && openOn !== seen.current) {
+      setOpenState(true);
+      onOpenChange?.(true);
+    }
+    seen.current = openOn;
+  }, [openOn, onOpenChange]);
   return (
     <section className={"tsec" + (open ? " open" : "")} aria-label={label}>
-      <button type="button" className="tsec-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" className="tsec-head" aria-expanded={open} aria-controls={open || keepMounted ? bodyId : undefined} onClick={() => setOpen(!open)}>
         <span className="tsec-caret" aria-hidden="true">
           <Icon name={open ? "chevron-down" : "chevron-right"} strokeWidth={2.2} />
         </span>
         <span className="tsec-title">{title}</span>
         {badges}
       </button>
-      {open && <div className="tsec-body">{children}</div>}
+      {(open || keepMounted) && (
+        <div className="tsec-body" id={bodyId} hidden={!open}>
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -103,6 +118,7 @@ export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdi
   if (!canEdit && total === 0) return null;
   return (
     <Section
+      defaultOpen={false}
       label="Checklist"
       title="Checklist"
       badges={
@@ -244,6 +260,7 @@ export function SubtasksSection({ task, wsId, canCreate, onOpen, onChanged }: { 
   if (!canCreate && total === 0 && !task.parent_id) return null;
   return (
     <Section
+      defaultOpen={false}
       label="Subtasks"
       title="Subtasks"
       badges={
@@ -403,6 +420,7 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
   if (!canEdit && count === 0) return null;
   return (
     <Section
+      defaultOpen={false}
       label="Dependencies"
       title="Dependencies"
       badges={
@@ -518,7 +536,7 @@ export function CustomFieldsSection({ task, fields, canEdit, onTask }: { task: T
   };
   const set = fields.filter((f) => formatCustom(f, task.custom?.[String(f.id)]) !== "").length;
   return (
-    <Section label="Custom fields" title="Fields" badges={<span className="tsec-count">{set}/{fields.length} set</span>}>
+    <Section defaultOpen={false} label="Custom fields" title="Fields" badges={<span className="tsec-count">{set}/{fields.length} set</span>}>
       {err && (
         <p className="danger small" role="alert">
           {err}

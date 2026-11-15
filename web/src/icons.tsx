@@ -97,6 +97,7 @@ const P: Record<string, ReactNode> = {
   shrink: <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />,
   "chevron-right": <path d="m9 18 6-6-6-6" />,
   "chevron-down": <path d="m6 9 6 6 6-6" />,
+  "chevron-up": <path d="m18 15-6-6-6 6" />,
   "arrow-right": <path d="M5 12h14M13 6l6 6-6 6" />,
   checklist: <path d="m3 7 2 2 4-4M3 17l2 2 4-4M13 6h8M13 12h8M13 18h8" />,
   subtasks: <path d="M21 12h-8M21 6H8M21 18h-8M3 6v4a2 2 0 0 0 2 2h3M3 10v6a2 2 0 0 0 2 2h3" />,

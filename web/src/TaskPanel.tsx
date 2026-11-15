@@ -5,7 +5,8 @@ import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, assignable } fr
 import { DEFAULT_DUE_TIME, DEFAULT_START_TIME } from "./dates";
 import { Markdown, setMentionUsers } from "./markdown";
 import { MarkdownEditor } from "./MarkdownEditor";
-import { ChecklistSection, CustomFieldsSection, DependenciesSection, SubtasksSection } from "./TaskSections";
+import { ChecklistSection, CustomFieldsSection, DependenciesSection, Section, SubtasksSection } from "./TaskSections";
+import { Clamp } from "./Clamp";
 import { HistorySection } from "./TaskHistory";
 import { describeRule } from "./recurrence";
 import { CATEGORY_COLOR } from "./theme";
@@ -67,10 +68,16 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       return !f;
     });
 
+  const shownId = useRef<number | null>(null); // the task on screen, so a new one never shows the last one's runs
   const load = useCallback(() => {
     api
       .task(taskKey)
       .then((t) => {
+        if (shownId.current !== t.id) {
+          shownId.current = t.id;
+          setComments([]);
+          setRuns([]);
+        }
         setTask(t);
         setErr("");
         return Promise.all([api.comments(t.id), api.runs(t.id)]).then(([c, r]) => {
@@ -135,6 +142,13 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   const flashDirty = useCallback((): boolean => {
     const el = panelRef.current?.querySelector<HTMLElement>("[data-dirty]");
     if (!el) return false;
+    // in a folded section (an answer typed in Agent session): unfold it first, then show the field
+    const folded = el.closest<HTMLElement>(".tsec-body[hidden]");
+    if (folded) {
+      folded.parentElement?.querySelector<HTMLButtonElement>(".tsec-head")?.click();
+      setTimeout(() => flashDirtyRef.current(), 0);
+      return true;
+    }
     el.classList.remove("dirty-flash");
     void el.offsetWidth; // restart the animation
     el.classList.add("dirty-flash");
@@ -143,6 +157,8 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     setTimeout(() => el.classList.remove("dirty-flash"), 1300);
     return true;
   }, []);
+  const flashDirtyRef = useRef(flashDirty);
+  flashDirtyRef.current = flashDirty;
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   // closing slides the panel out first; opening another task meanwhile cancels it
@@ -249,6 +265,11 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
 
   const cmd = resumeCommand(task.session_id);
   const lastRun = runs[0];
+  // the agent is waiting for an answer: the Agent session (where the answer box is) opens, also when
+  // this happens while the panel is open; the id makes each new question open it again
+  const waitingRun = task.last_run?.status === "needs_human" ? task.last_run.id : 0;
+  // the newest question of a waiting task is never folded: it's the thing to answer
+  const openQuestion = task.status_category === "waiting" ? [...comments].reverse().find((c) => c.kind === "question" && !c.deleted)?.id : undefined;
   const project = ws.projects.find((p) => p.id === task.project_id);
   const creator = users.get(task.created_by);
   const candidates = assignable(users, members.get(ws.id) ?? []);
@@ -333,7 +354,9 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               {task.aliases.length > 0 && <p className="muted small tp-aliases">formerly {task.aliases.join(", ")}</p>}
               <section className="tp-desc" aria-label="Description">
                 {task.description_md ? (
-                  <Markdown source={task.description_md} className="description" />
+                  <Clamp key={task.id} label="description" maxRem={18}>
+                    <Markdown source={task.description_md} className="description" />
+                  </Clamp>
                 ) : canWrite ? (
                   <button type="button" className="tp-desc-empty" onClick={() => setEditing("text")}>
                     Add a description…
@@ -375,7 +398,13 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                     {kb && <Pill color={kb[1]}>{kb[0]}</Pill>}
                     <span className="muted small">{fmtTime(c.created_at)}</span>
                   </div>
-                  {c.deleted ? <p className="muted">Deleted.</p> : <Markdown source={c.body_md} />}
+                  {c.deleted ? (
+                    <p className="muted">Deleted.</p>
+                  ) : (
+                    <Clamp label="comment" off={c.id === openQuestion}>
+                      <Markdown source={c.body_md} />
+                    </Clamp>
+                  )}
                 </article>
               );
             })}
@@ -383,13 +412,6 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           </section>
         </div>
         <div className="tp-side">
-          <div className="tsecs">
-            <ChecklistSection task={task} canEdit={can("checklists")} onTask={onTask} />
-            <SubtasksSection task={task} wsId={ws.id} canCreate={can("create_tasks") && !task.deleted} onOpen={onMoved} onChanged={onChanged} />
-            <DependenciesSection task={task} wsId={ws.id} canEdit={can("relations")} onTask={onTask} onOpen={onMoved} />
-            <CustomFieldsSection task={task} fields={fields} canEdit={canWrite} onTask={onTask} />
-            <HistorySection key={task.id} task={task} />
-          </div>
           <div className="tp-props">
             <PropGroup title="Details">
               <Row label="Workspace">
@@ -536,7 +558,16 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                 </Row>
               )}
             </PropGroup>
-
+          </div>
+          {/* folded by default; keyed by task so a newly opened task starts folded again */}
+          <div className="tsecs" key={"secs-" + task.id}>
+            <ChecklistSection task={task} canEdit={can("checklists")} onTask={onTask} />
+            <SubtasksSection task={task} wsId={ws.id} canCreate={can("create_tasks") && !task.deleted} onOpen={onMoved} onChanged={onChanged} />
+            <DependenciesSection task={task} wsId={ws.id} canEdit={can("relations")} onTask={onTask} onOpen={onMoved} />
+            <CustomFieldsSection task={task} fields={fields} canEdit={canWrite} onTask={onTask} />
+            <HistorySection task={task} />
+          </div>
+          <div className="tp-props">
             <PropGroup title="Look">
               <Row label="Labels" wide>
                 {editing === "labels" ? (
@@ -567,48 +598,63 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
             </PropGroup>
           </div>
           {(cmd || runs.length > 0) && (
-            <section className="agent" aria-label="Agent session">
-              <h3>Agent session</h3>
-              {cmd && (
-                <div className="cmd">
-                  <code>{cmd}</code>
-                  <button type="button" className="button secondary small" onClick={() => void navigator.clipboard?.writeText(cmd)}>
-                    Copy
-                  </button>
-                </div>
-              )}
-              <div className="runs">
-                {runs.slice(0, 5).map((r) => (
-                  <div key={r.id} className="run">
-                    <Pill color={runColor[r.status] ?? "#8B8D98"}>{r.status.replace("_", " ")}</Pill>
-                    <span className="pill pill-muted">{r.mode || "run"} #{r.attempt}</span>
-                    <span className="small">{r.worker_username}</span>
-                    <span className="muted small">{fmtTime(r.started_at)}</span>
-                    {r.duration_ms !== null && <span className="pill pill-muted">{Math.round(r.duration_ms / 1000)} s</span>}
-                    {r.cost_usd !== null && <span className="pill pill-muted">${r.cost_usd.toFixed(2)}</span>}
-                    {r.num_turns !== null && <span className="pill pill-muted">{r.num_turns} turns</span>}
-                    {r.status === "running" && r.progress_note && (
-                      <span className="small">
-                        {r.progress_pct !== null && `${r.progress_pct}% · `}
-                        {r.progress_note}
-                      </span>
-                    )}
+            <div className="tsecs" key={"agent-" + task.id}>
+              <Section
+                label="Agent session"
+                title="Agent session"
+                // folded, except when the agent is waiting for an answer: the answer box is in here
+                defaultOpen={waitingRun > 0}
+                openOn={waitingRun}
+                keepMounted // a half-typed answer survives folding
+                badges={
+                  lastRun && (
+                    <>
+                      <Pill color={runColor[lastRun.status] ?? "#8B8D98"}>{lastRun.status.replace("_", " ")}</Pill>
+                      {runs.length > 0 && (
+                        <span className="tsec-count">
+                          {runs.length} run{runs.length === 1 ? "" : "s"} · ${task.cost_usd_total.toFixed(2)}
+                        </span>
+                      )}
+                    </>
+                  )
+                }
+              >
+                {cmd && (
+                  <div className="cmd">
+                    <code>{cmd}</code>
+                    <button type="button" className="button secondary small" onClick={() => void navigator.clipboard?.writeText(cmd)}>
+                      Copy
+                    </button>
                   </div>
-                ))}
-              </div>
-              {lastRun?.transcript_path && (
-                <p className="small">
-                  <span className="muted">Transcript </span>
-                  <code className="path">{lastRun.transcript_path}</code>
-                </p>
-              )}
-              {runs.length > 0 && (
-                <p className="small muted">
-                  ${task.cost_usd_total.toFixed(2)} over {runs.length} run{runs.length === 1 ? "" : "s"}
-                </p>
-              )}
-              {canWrite && task.session_id && <Resume task={task} onDone={(t) => act(Promise.resolve(t))} />}
-            </section>
+                )}
+                <div className="runs">
+                  {runs.slice(0, 5).map((r) => (
+                    <div key={r.id} className="run">
+                      <Pill color={runColor[r.status] ?? "#8B8D98"}>{r.status.replace("_", " ")}</Pill>
+                      <span className="pill pill-muted">{r.mode || "run"} #{r.attempt}</span>
+                      <span className="small">{r.worker_username}</span>
+                      <span className="muted small">{fmtTime(r.started_at)}</span>
+                      {r.duration_ms !== null && <span className="pill pill-muted">{Math.round(r.duration_ms / 1000)} s</span>}
+                      {r.cost_usd !== null && <span className="pill pill-muted">${r.cost_usd.toFixed(2)}</span>}
+                      {r.num_turns !== null && <span className="pill pill-muted">{r.num_turns} turns</span>}
+                      {r.status === "running" && r.progress_note && (
+                        <span className="small">
+                          {r.progress_pct !== null && `${r.progress_pct}% · `}
+                          {r.progress_note}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {lastRun?.transcript_path && (
+                  <p className="small">
+                    <span className="muted">Transcript </span>
+                    <code className="path">{lastRun.transcript_path}</code>
+                  </p>
+                )}
+                {canWrite && task.session_id && <Resume task={task} onDone={(t) => act(Promise.resolve(t))} />}
+              </Section>
+            </div>
           )}
           {canWrite && (
             <div className="tp-actions">
