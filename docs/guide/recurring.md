@@ -6,7 +6,7 @@ Three separate objects work together:
 - A **schedule** is a timing: "every day 09:00–11:00", "every Friday", "the last day of every month". Several recurring tasks can share one.
 - A **recurring task** links one template to one schedule in a project. It has its own start date, end date or maximum count, an overlap rule and a pause switch. The same template can be linked to several schedules, but each template–schedule pair appears only once per project.
 
-![Recurring tasks of a project (Nightwalker theme)](../images/recurring-night.png)
+![Recurring tasks (Nightwalker theme)](../images/recurring-night.png)
 
 ## Making a recurring task
 
@@ -30,8 +30,10 @@ You can also pick an existing **template** and an existing **schedule** in the s
 
 ## Templates
 
-**Templates** on the board lists the templates for the project in view, including those for every project of the workspace. You can create one there, edit it, or start a task from it. A template can be limited to one project or usable in all projects of its workspace.
+**Recurring**, **Schedules** and **Templates** (in the board's **⋯** menu) list everything across your workspaces, each row with its workspace and project. **Show** at the top narrows the list to one workspace or one project; a project also shows its workspace's templates for every project.
+
+**Templates** lists the templates. You can create one there, edit it, or start a task from it. A template can be limited to one project or usable in all projects of its workspace.
 
 ## Schedules
 
-**Schedules** lists a workspace's timings and how many recurring tasks use each. A schedule named after its timing (the default) is renamed automatically when you change the timing.
+**Schedules** lists the timings and how many recurring tasks use each. A new schedule asks which workspace it belongs to when you can add to several. A schedule named after its timing (the default) is renamed automatically when you change the timing.

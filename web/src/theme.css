@@ -49,12 +49,20 @@
   /* board columns: the theme's own lane colour and outline, else a step between page and cards, no outline */
   --lane: var(--low);
   --lane-border: transparent;
-  /* cards and the sidebar panels carry the theme's border colour and width */
+  /* cards carry the theme's border colour and width */
   --edge: var(--border);
   --edge-hover: color-mix(in srgb, var(--border) 60%, var(--text));
-  /* sidebar widths: open, and the collapsed rail */
-  --side-w: clamp(176px, 13rem, 240px);
-  --rail-w: 4.3rem;
+  /* the sidebar: a rail of two panels that open over the page. --item is a nav row (and the folded
+     highlight's size), --item-big the Board row, about a quarter bigger */
+  --side-w: clamp(184px, 13.5rem, 250px);
+  --item: 2.4rem;
+  --item-big: 3rem;
+  --panel-pad: 0.3rem;
+  --side-pad: 0.45rem;
+  --fold-w: calc(var(--item-big) + 2 * var(--panel-pad));
+  --rail-w: calc(var(--fold-w) + 2 * var(--side-pad));
+  /* the top bar (inbox, bell): bars that stick to the top of a page stick under it */
+  --topbar-h: calc(2.3rem + 2 * var(--sp-2));
   /* motion: one easing and three durations for the whole app (all off under prefers-reduced-motion) */
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
@@ -164,31 +172,29 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .login-mark { width: 6rem; height: 6rem; display: block; }
 
 /* Shell: a narrow sidebar and the content. */
-.shell { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); height: 100%; transition: grid-template-columns var(--dur-3) var(--ease); }
+.shell { display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr); height: 100%; }
 .sidebar {
   background: var(--bg);
-  padding: var(--sp-5) var(--sp-4);
+  padding: var(--sp-5) var(--side-pad);
   gap: var(--sp-5);
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow-y: auto;
+  position: relative; z-index: 40; /* an open panel lies over the page and the task panel (30), under popovers (45) */
 }
 .brand {
   display: inline-flex; align-items: center; gap: 0.45rem; min-width: 0;
   font-size: 1.2rem; font-weight: var(--weight-strong); color: var(--text); text-decoration: none; padding: 0 0.5rem 0.9rem;
 }
-.brand-mark { flex: none; width: 1.5rem; height: 1.7rem; color: var(--accent); }
+.brand-mark { flex: none; width: 1.5rem; height: 1.7rem; color: var(--logo, var(--accent)); }
 .brand-word { line-height: 1; }
-/* the sidebar is two floating panels: the pages and messages at the top, settings and you at the bottom */
-.sidebar nav, .side-bottom {
-  display: flex; flex-direction: column; gap: 2px; flex: none;
-  background: var(--surface); border: var(--border-w) solid var(--edge); border-radius: var(--radius-xl);
-  padding: var(--sp-3);
+/* the sidebar is two floating panels (no outline): the pages at the top, settings and you at the bottom */
+.side-panel {
+  display: flex; flex-direction: column; gap: 2px; flex: 0 1 auto; min-height: 0; overflow: hidden auto; scrollbar-width: none;
+  background: var(--surface); border-radius: var(--radius-xl); padding: var(--panel-pad);
 }
 .side-bottom { margin-top: auto; }
-.nav-sub { display: flex; flex-direction: column; gap: 1px; margin: 1px 0 var(--sp-2) 1.12rem; padding-left: var(--sp-3); border-left: 1px solid var(--line); }
-.shell.rail .nav-sub { margin-left: 0; padding-left: 0; border-left: 0; }
+.nav-sub { display: flex; flex-direction: column; gap: 1px; margin: 1px 0 var(--sp-2); }
 /* Pages: wide ones fill the content area; reading-width ones are centred (never stuck to the left). */
 .inbox, .profile, .theme-editor, .vw-narrow { margin-inline: auto; width: 100%; }
 /* nav rows: 30px, a bare 16px line icon, muted until hovered or selected */
@@ -200,15 +206,8 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 }
 .nav-item:hover { background: var(--hover); color: var(--text); }
 .nav-item.selected { background: var(--accent); color: var(--on-accent); }
-.nav-item.selected .count { color: var(--on-accent); }
-.nav-item.selected .count-alert, .shell.rail .nav-item.selected .count-alert { background: var(--on-accent); color: var(--accent); }
 .nav-sub .nav-item { min-height: 1.8rem; font-size: var(--fs-sm); }
 .nav-sub .nav-icon { font-size: 0.9rem; }
-/* the Board entry is the main one: about twice the others (row, icon, label) */
-.nav-item.nav-primary { min-height: calc(var(--ctl-h) * 1.9); font-size: 1.45rem; font-weight: var(--weight-strong); gap: var(--sp-5); }
-.nav-primary .nav-icon { width: 2.1rem; height: 2.1rem; font-size: 2.1rem; }
-/* a hairline between the pages (Board, Dashboard, My tasks) and the inbox and notifications */
-.nav-sep { border: 0; border-top: 1px solid var(--line); margin: var(--sp-2) var(--sp-3); align-self: stretch; }
 /* line icons (icons.tsx) sit on the text baseline */
 .ico { display: inline-block; flex: none; vertical-align: -0.125em; }
 
@@ -589,9 +588,11 @@ a.pulse-item:hover { color: var(--text); }
 .crumb { display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.3rem; }
 .section-title { margin: var(--sp-6) 0 var(--sp-5); }
 
-/* collapsible sidebar */
-.side-top { display: flex; align-items: center; justify-content: space-between; padding-bottom: 0.6rem; }
-.side-top .brand { padding: 0 0.5rem; }
+/* the sidebar's top: the logo (centred over the rail; on a phone with the word and the close button) */
+.side-top { display: flex; align-items: center; justify-content: center; padding-bottom: 0.3rem; }
+.side-top .brand { padding: 0.15rem; }
+.shell.narrow .side-top { justify-content: space-between; }
+.shell.narrow .side-top .brand { padding: 0 0.5rem; }
 .collapse { width: 1.75rem; height: 1.75rem; display: inline-grid; place-items: center; font-size: 1.05rem; }
 .nav-icon {
   flex: none; width: 1.11rem; height: 1.11rem; display: inline-grid; place-items: center;
@@ -601,32 +602,6 @@ a.pulse-item:hover { color: var(--text); }
 .nav-icon .avatar { width: 1.6rem; height: 1.6rem; font-size: 0.62rem; border-width: 0; }
 .nav-icon:has(.avatar) { width: 1.6rem; height: 1.6rem; }
 .nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.logout { align-self: flex-start; }
-.shell.collapsed { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
-.shell.rail .sidebar { padding: var(--sp-5) var(--sp-3); align-items: center; }
-.shell.rail .sidebar nav, .shell.rail .side-bottom { align-items: center; padding: var(--sp-3) var(--sp-2); }
-.shell.rail .nav-item.nav-primary { width: calc(var(--ctl-h) * 1.3); min-height: calc(var(--ctl-h) * 1.3); }
-.shell.rail .sidebar { overflow-x: hidden; }
-.shell.rail .nav-primary .nav-icon { width: 1.6rem; height: 1.6rem; font-size: 1.6rem; }
-.shell.rail .nav-sep { margin: var(--sp-2) var(--sp-2); }
-.shell.rail .side-top { flex-direction: column; justify-content: center; gap: var(--sp-3); }
-.shell.rail .side-top .brand { padding: 0.15rem; }
-.shell.rail .nav-item { justify-content: center; padding: 0; width: calc(var(--ctl-h) + 0.2rem); min-height: calc(var(--ctl-h) + 0.2rem); }
-.shell.rail .nav-sub { margin: 1px 0 var(--sp-2); }
-/* collapsed: the count sits on the icon's corner as a small solid number */
-.shell.rail .nav-item .count {
-  position: absolute; top: -0.1rem; right: -0.25rem; margin: 0; font-size: 0.6rem; line-height: 1.45; padding: 0 0.25rem;
-  background: var(--surface-variant); color: var(--text);
-}
-.shell.rail .nav-item .count-alert { background: var(--accent); color: var(--on-accent); }
-.shell.rail .ws { margin-top: 0.5rem; }
-/* a collapsed sidebar peeks open while hovered or focused: full width over the page, the page doesn't move */
-.shell.collapsed .sidebar { width: var(--rail-w); transition: width var(--dur-3) var(--ease), box-shadow var(--dur-3) var(--ease); }
-.shell.collapsed.peek .sidebar {
-  position: relative; z-index: 40; width: var(--side-w); /* over the task panel (30), under popovers (45) and dialogs (50) */
-  box-shadow: var(--shadow-pop);
-}
 
 /* profile */
 .profile { max-width: 46rem; display: flex; flex-direction: column; gap: var(--sp-6); }
@@ -646,7 +621,6 @@ a.pulse-item:hover { color: var(--text); }
 
 @media (max-width: 720px) {
   .form-grid { grid-template-columns: 1fr; }
-  .shell.collapsed { grid-template-columns: 1fr; }
 }
 
 /* ---- theme screen: gallery actions, editor, preview, colour dialog ---- */
@@ -659,11 +633,13 @@ a.pulse-item:hover { color: var(--text); }
 .notes { background: var(--low); border-left: 3px solid var(--danger); border-radius: var(--radius-s); padding: 0.5rem 0.5rem 0.5rem 1.5rem; }
 .theme-editor { max-width: 60rem; }
 .editor-bar {
-  position: sticky; top: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  position: sticky; top: var(--below-topbar); z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 1rem;
   background: var(--bg); padding: var(--sp-4) 0; margin-bottom: var(--sp-4); border-bottom: 1px solid var(--line);
 }
-.preview { position: sticky; top: 3.4rem; z-index: 4; padding: 0.9rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.preview { position: sticky; top: calc(var(--below-topbar) + 3.4rem); z-index: 4; padding: 0.9rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
 .preview-row { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.preview-brand { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 1.1em; border-radius: 0.4rem; }
+.preview-logo { width: 1.35rem; height: 1.55rem; }
 .preview-card { padding: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .preview-input, .preview-chip { padding: 0.25rem 0.7rem; }
 .preview-button { padding: 0.35rem 0.9rem; font-weight: 700; }
@@ -801,14 +777,6 @@ label.check input { width: auto; accent-color: var(--accent); }
   .props dt { margin-top: 0.45rem; }
   .modal { padding: 0.8rem 0.85rem 1rem; }
   .modal-backdrop { padding: 3vh 0.5rem 1rem; }
-  /* a collapsed sidebar becomes a wrapped bar of icons */
-  .shell.rail .sidebar { flex-direction: row; flex-wrap: wrap; align-items: center; max-height: none; padding: 0.4rem; gap: 0.2rem; }
-  .shell.rail .side-top { padding: 0; }
-  .shell.rail .sidebar nav, .shell.rail .side-bottom, .shell.rail .ws { flex-direction: row; flex-wrap: wrap; flex: none; gap: 0.2rem; }
-  .shell.rail .side-bottom { border-top: 0; padding-top: 0; }
-  .shell.rail .ws { display: flex; margin-top: 0; }
-  .shell.rail .nav-sub { flex-direction: row; flex-wrap: wrap; }
-  .shell.rail .nav-sep { display: none; }
 }
 
 /* ---- task items: checklist, subtasks, dependencies, custom fields, templates, mentions ---- */
@@ -912,7 +880,6 @@ button.nav-item { background: none; border: 0; font: inherit; font-size: var(--f
 button.nav-item:not(.selected) { color: var(--muted); }
 button.nav-item:hover { color: var(--text); }
 button.nav-item.selected, button.nav-item.selected:hover { color: var(--on-accent); }
-.shell.rail button.nav-item { width: calc(var(--ctl-h) + 0.2rem); }
 /* The bell popover lives in <body> (portal). Layers: sticky bars 5, card menus 20, task panel 30,
    this 45, modals 50, palette/toasts 60. The background is solid even if a theme colour has alpha. */
 .bell-pop {
@@ -921,12 +888,6 @@ button.nav-item.selected, button.nav-item.selected:hover { color: var(--on-accen
   color: var(--text); border: 1px solid var(--line-strong); border-radius: var(--radius-l);
   box-shadow: var(--shadow-pop);
   outline: none;
-}
-.bell-pop.has-notch::before {
-  content: ""; position: absolute; left: calc(-0.5rem - 0.5px); top: calc(var(--notch-y) - 0.5rem);
-  width: 1rem; height: 1rem; transform: rotate(45deg);
-  background: linear-gradient(var(--surface), var(--surface)), linear-gradient(var(--bg), var(--bg)) Canvas;
-  border-left: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong);
 }
 .bell-pop-body {
   position: relative; max-height: min(70vh, 36rem); overflow-y: auto; overscroll-behavior: contain;
@@ -959,25 +920,9 @@ button.nav-item.selected, button.nav-item.selected:hover { color: var(--on-accen
 .notif-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notif-text { overflow-wrap: anywhere; }
 .notif-dot { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--accent); margin-top: 0.45rem; }
-/* the footer: a small live pip and a quiet "Log out" */
-.side-foot { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-4) 0; font-size: var(--fs-xs); }
-.shell.rail .side-foot { padding: var(--sp-3) 0 0; justify-content: center; }
-.live-dot { font-size: var(--fs-xs); color: var(--muted); display: inline-flex; align-items: center; gap: 0.35rem; }
+.live-dot { color: var(--muted); display: inline-flex; align-items: center; padding: 0.4rem; }
 .live-pip { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--live, var(--muted)); flex: none; }
-.shell.rail .live-dot { padding: 0.4rem; }
-.live-word { color: var(--muted); }
-.side-foot .logout {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.35rem; border-radius: var(--radius-s);
-  color: var(--muted); font-size: var(--fs-xs);
-}
-.side-foot .logout:hover { color: var(--text); background: var(--hover); }
-@media (max-width: 720px) {
-  .shell.rail .side-foot { padding: 0 0.3rem; }
-}
 .mention-agent { background: var(--accent); color: var(--on-accent); }
-@media (max-width: 720px) {
-  .shell.rail .side-top { flex-direction: row; }
-}
 
 /* ---- themes gallery: header actions, current theme, equal-size cards with an icon tool row ---- */
 .themes { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -1100,8 +1045,7 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 .tp-people .arrow { display: inline-flex; color: var(--muted); }
 .tp-people .muted { margin-left: var(--sp-3); font-size: var(--fs-sm); }
 .tp-expand { flex: none; }
-.panel-full { left: var(--side-w); width: auto; box-shadow: none; transition: left var(--dur-3) var(--ease); }
-.shell.collapsed .panel-full { left: var(--rail-w); }
+.panel-full { left: var(--rail-w); width: auto; box-shadow: none; }
 @container tpanel (min-width: 58rem) {
   .tp-body { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(19rem, 1fr); gap: 1.75rem; align-items: start; }
   .tp-side { margin-top: 0.8rem; }
@@ -1163,7 +1107,7 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center; gap: 0.35rem; white-space: nowrap; }
 
 /* ---- phones: a top bar with a drawer menu, dialogs as bottom sheets, tables as stacked rows ---- */
-.topbar, .drawer-backdrop { display: none; }
+.drawer-backdrop { display: none; }
 .more-menu { position: relative; }
 .menu a { color: var(--text); text-decoration: none; font-size: var(--fs-base); padding: 0.4rem 0.55rem; border-radius: var(--radius-s); }
 .menu a:hover, .menu a:focus-visible { background: color-mix(in srgb, var(--text) 10%, var(--high)); }
@@ -1177,17 +1121,9 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   }
   .shell.narrow.drawer-open .sidebar { transform: none; visibility: visible; transition: transform var(--dur-3) var(--ease); }
   .drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 65; background: color-mix(in srgb, var(--bg) 55%, transparent); }
-  .topbar {
-    display: flex; align-items: center; gap: 0.4rem; position: sticky; top: -0.75rem; z-index: 25;
-    margin: -0.75rem -0.75rem 0.75rem; padding: 0.45rem 0.6rem; background: var(--surface);
-    border-bottom: 1px solid var(--line);
-  }
   .topbar-menu { font-size: 1.25rem; width: 2.4rem; height: 2.4rem; display: inline-grid; place-items: center; }
-  .shell.narrow .nav-item { min-height: 2.4rem; font-size: var(--fs-md); }
-  .shell.narrow .nav-item.nav-primary { min-height: 3.9rem; font-size: 1.45rem; }
+  .shell.narrow .nav-item { font-size: var(--fs-md); }
   .topbar-brand { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0; }
-  .topbar-bell { position: relative; width: 2.4rem; height: 2.4rem; display: inline-grid; place-items: center; text-decoration: none; font-size: 1.2rem; }
-  .topbar-bell .count { position: absolute; top: 0.1rem; right: 0; font-size: 0.6rem; line-height: 1.45; padding: 0 0.25rem; min-width: 0; background: var(--accent); color: var(--on-accent); }
   .topbar-me { display: inline-grid; place-items: center; width: 2.4rem; height: 2.4rem; }
   .page-head h1 { font-size: 1.35rem; }
   .head-actions { gap: 0.4rem; }
@@ -1414,7 +1350,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
    ====================================================================================================== */
 [data-shape="pill"] :is(.pill, .chip-label, .chip, .badge, .bf-chip, .bf-active, .bf-toggle, .bf-fold, .bf-pick,
   .seg, .seg button, .view-switch, .vs-item, .icon-button, .nav-item, .collapsed-chip, .column-add, .assignee,
-  .admin-seg-btn, .font-opt, .col-tab, .menu button, .menu a, .help-button, .count, .count-pill, .stage-label, .side-foot .logout) {
+  .admin-seg-btn, .font-opt, .col-tab, .menu button, .menu a, .help-button, .count, .count-pill, .stage-label, .topbar-icon) {
   border-radius: 999px;
 }
 [data-shape="pill"] .menu, [data-shape="pill"] .bell-pop { border-radius: var(--radius-xl); }
@@ -1427,33 +1363,32 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 }
 .stage-label .stage-icon { font-size: 0.85rem; --stage-check: var(--stage); }
 
-/* the board's top bar: soft controls on the page background (no hard edges), a little taller */
-.board-page > .page-head, .board-filters { --ctl-h: 2.45rem; }
+/* the board's top bar: soft controls on the page background (no hard edges), slim (the standard height) */
 .board-page > .page-head .button { min-height: var(--ctl-h); }
 .board-page > .page-head .button.secondary { background: var(--surface); border-color: transparent; }
 .board-page > .page-head .button.secondary:hover { border-color: var(--line-strong); }
-.view-switch { height: var(--ctl-h); border-color: transparent; background: var(--surface); border-radius: var(--ctl-r); padding: 3px; gap: 3px; }
-.vs-item { border-radius: calc(var(--ctl-r) - 3px); padding: 0 0.95rem; }
+.view-switch { height: var(--ctl-h); border-color: transparent; background: var(--surface); border-radius: var(--ctl-r); padding: 2px; gap: 2px; }
+.vs-item { border-radius: calc(var(--ctl-r) - 2px); padding: 0 0.8rem; }
 .vs-item.on { background: var(--accent); color: var(--on-accent); }
 .board-filters .bf-fold, .bf-toggle, .bf-pick, .bf-search input {
   min-height: var(--ctl-h); background: var(--surface); border: 1px solid transparent; border-radius: var(--ctl-r);
   transition: border-color var(--dur-1) ease-out, background-color var(--dur-1) ease-out;
 }
 .board-filters .bf-fold:hover, .bf-toggle:hover, .bf-pick:hover, .bf-search input:hover:not(:focus) { border-color: var(--line-strong); }
-.bf-fold { padding: 0 0.85rem; color: var(--text); font-weight: var(--weight-strong); }
+.bf-fold { padding: 0 0.75rem; color: var(--text); font-weight: var(--weight-strong); }
 .bf-fold .ico:first-child { color: var(--muted); }
 .board-filters .bf-fold.on { background: var(--selected); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
-.bf-search input { height: var(--ctl-h); padding-left: 2.2rem; }
-.bf-search svg { left: 0.85rem; font-size: 1.05rem; }
+.bf-search input { height: var(--ctl-h); padding-left: 2.05rem; }
+.bf-search svg { left: 0.75rem; font-size: 1rem; }
 /* a select as a pill: its name in muted text, then the value and the chevron */
-.bf-pick { display: inline-flex; flex-direction: row; align-items: center; gap: 0.1rem; padding-left: 0.85rem; color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; max-width: 100%; min-width: 0; cursor: pointer; }
+.bf-pick { display: inline-flex; flex-direction: row; align-items: center; gap: 0.1rem; padding-left: 0.75rem; color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; max-width: 100%; min-width: 0; cursor: pointer; }
 .bf-fields .bf-pick select { min-width: 0; text-overflow: ellipsis; }
 .bf-pick-label::after { content: ":"; }
 .bf-fields .bf-pick select { height: calc(var(--ctl-h) - 2px); min-height: 0; border: 0; background-color: transparent; padding-left: 0.3rem; color: var(--text); font-weight: var(--weight-strong); }
 .bf-fields .bf-pick select:focus-visible { outline-offset: -2px; }
 .bf-pick:has(select.active) { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 .bf-fields .bf-pick select.active { background-color: transparent; border: 0; }
-.bf-toggle { padding: 0 0.85rem; }
+.bf-toggle { padding: 0 0.75rem; }
 
 /* ---- motion: pages, panels, dialogs, menus, columns and cards come in (and dialogs go out) softly ---- */
 @keyframes g-fade { from { opacity: 0; } }
@@ -1491,4 +1426,157 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
     animation-duration: 1ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important;
     transition-duration: 1ms !important; scroll-behavior: auto !important;
   }
+}
+
+/* ======================================================================================================
+   Sidebar rail and top bar (round 5). Wide screens: the sidebar is a fixed rail; each panel folds to its
+   icons and opens over the page on its own (SidePanel in App.tsx). A row's highlight is drawn by ::before:
+   a circle (or rounded square) around the icon while folded, the whole row while open, so opening only
+   reveals the labels and nothing jumps. On a phone the same panels sit in the drawer, always open.
+   ====================================================================================================== */
+.side-panel .nav-item, .side-panel .nav-item:hover, .side-panel .nav-item.selected {
+  --h: var(--item); --ni: 1.11rem;
+  position: relative; isolation: isolate; background: none; min-height: var(--h); width: 100%;
+  padding: 0 var(--sp-4) 0 calc((var(--item-big) - var(--ni)) / 2); white-space: nowrap;
+  border-radius: var(--ctl-r);
+}
+.side-panel .nav-item::before {
+  content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: 0; width: 100%;
+  border-radius: inherit; background: transparent;
+  transition: left var(--dur-3) var(--ease), width var(--dur-3) var(--ease), background-color var(--dur-1) ease-out;
+}
+.side-panel.folded .nav-item::before { left: calc((var(--item-big) - var(--h)) / 2); width: var(--h); }
+.side-panel .nav-item:hover::before { background: var(--hover); }
+.side-panel .nav-item.selected::before { background: var(--accent); }
+.side-panel .nav-label { transition: opacity var(--dur-2) var(--ease); }
+.side-panel.folded .nav-label { opacity: 0; }
+.side-panel .nav-sub .nav-item { --h: 2.05rem; --ni: 0.95rem; }
+.side-panel .nav-item:has(.avatar) { --ni: 1.6rem; }
+/* Board: about a quarter bigger than the other rows (row, icon, label) */
+.side-panel .nav-item.nav-primary { --h: var(--item-big); --ni: 1.45rem; font-size: 1.12rem; font-weight: var(--weight-strong); }
+.nav-primary .nav-icon { width: 1.45rem; height: 1.45rem; font-size: 1.45rem; }
+.side-panel.folded, .side-panel.open { width: var(--fold-w); transition: width var(--dur-3) var(--ease), box-shadow var(--dur-3) var(--ease); }
+.side-panel.open { width: var(--side-w); box-shadow: var(--shadow-pop); }
+.shell:not(.narrow) .sidebar { overflow: visible; }
+.shell.narrow .side-panel { gap: 3px; flex: none; }
+.shell.narrow .sidebar { overflow-y: auto; }
+.side-panel .nav-item:focus-visible { outline-offset: -2px; }
+
+/* the top bar: inbox and notifications in the top-right corner (with the live pip); on a phone also the
+   menu, the brand and you. It stays at the top while the page scrolls. */
+.topbar {
+  display: flex; align-items: center; gap: var(--sp-2); position: sticky; top: calc(-1 * var(--content-pt)); z-index: 25; min-height: var(--topbar-h);
+  margin: calc(-1 * var(--content-pt)) 0 0; padding: var(--sp-2) 0; background: var(--bg);
+}
+/* sticky offsets count from inside the page's top padding: the top bar goes up over it (nothing shows
+   above the bar), and the bars that stick under it use --below-topbar */
+.content { --content-pt: var(--sp-4); --below-topbar: calc(var(--topbar-h) - var(--content-pt)); padding-top: var(--content-pt); }
+.topbar-icon {
+  position: relative; width: 2.3rem; height: 2.3rem; display: inline-grid; place-items: center; font-size: 1.15rem;
+  border-radius: 999px; color: var(--muted); text-decoration: none;
+}
+.topbar-icon:hover { color: var(--text); background: var(--hover); }
+.topbar-icon.on, .topbar-icon.on:hover { background: var(--accent); color: var(--on-accent); }
+.topbar-icon .count {
+  position: absolute; top: -0.05rem; right: -0.15rem; margin: 0; min-width: 1rem; text-align: center;
+  font-size: 0.62rem; line-height: 1.5; padding: 0 0.25rem; background: var(--accent); color: var(--on-accent);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.topbar-icon.on .count { background: var(--on-accent); color: var(--accent); }
+/* the bell popover hangs under the bell, its notch pointing up at it */
+.bell-pop.has-notch::before {
+  content: ""; position: absolute; top: calc(-0.5rem - 0.5px); left: calc(var(--notch-x) - 0.5rem);
+  width: 1rem; height: 1rem; transform: rotate(45deg);
+  background: linear-gradient(var(--surface), var(--surface)), linear-gradient(var(--bg), var(--bg)) Canvas;
+  border-left: 1px solid var(--line-strong); border-top: 1px solid var(--line-strong);
+}
+.bell-pop { transform-origin: top right; }
+@media (max-width: 720px) {
+  .content { --content-pt: 0.75rem; }
+  .topbar {
+    gap: 0.4rem; margin: calc(-1 * var(--content-pt)) -0.75rem 0.75rem; padding: 0.45rem 0.6rem;
+    background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+}
+
+/* ---- the task form (TaskModal): titled sections on soft panels, fields in grids; full page in two columns.
+   In the dialog the sections run in reading order (task, where, when, people, checklist, agent run); the
+   two column wrappers only take effect on the full page (main: task and checklist; side: the rest). ---- */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.modal-head > h2 { flex: 1; min-width: 0; }
+.modal-head > .modal-expand { width: 1.94rem; height: 1.94rem; padding: 0; display: inline-grid; place-items: center; font-size: 0.95rem; flex: none; color: var(--muted); }
+.modal-head > .modal-expand:hover { color: var(--text); }
+.tm-form { display: flex; flex-direction: column; }
+.tm-body { display: flex; flex-direction: column; gap: var(--sp-5); }
+.tm-main, .tm-side { display: contents; }
+.tpl-pick, .tm-body .sched-tpl { order: 0; margin: 0; }
+.tm-s-task { order: 1; } .tm-s-where { order: 2; } .tm-s-when { order: 3; } .tm-s-people { order: 4; } .tm-s-check { order: 5; } .tm-s-agent { order: 6; }
+.tm-section {
+  background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-l);
+  padding: var(--sp-5) var(--sp-6) var(--sp-6); min-width: 0;
+}
+.tm-h {
+  display: flex; align-items: center; gap: 0.45rem; margin: 0 0 var(--sp-5);
+  font-size: var(--fs-xs); font-weight: var(--weight-strong); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+}
+.tm-h > .ico { color: var(--accent); font-size: 0.95rem; }
+.tm-h .help-button { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.tm-stack { display: flex; flex-direction: column; gap: var(--sp-5); }
+.tm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: var(--sp-5) var(--sp-6); align-items: start; }
+.tm-s-people .tm-grid { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+.tm-s-people .tm-grid > :last-child { grid-column: 1 / -1; }
+.tm-stack > .tm-grid { margin-bottom: 0; }
+.tm-section select { width: 100%; }
+/* the repeat block and the run settings sit flat inside their section */
+.tm-section .repeat { background: none; border: 0; padding: 0; }
+.run-settings.bare { border: 0; padding: 0; margin: 0; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--sp-5) var(--sp-6); }
+.tm-section .more-fields { background: var(--surface); }
+/* the actions stay in view at the bottom while the form scrolls */
+.tm-foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); position: sticky; bottom: calc(-1 * var(--sp-7)); z-index: 2;
+  margin: var(--sp-5) calc(-1 * var(--sp-7)) calc(-1 * var(--sp-7)); padding: var(--sp-5) var(--sp-7);
+  background: var(--surface); border-top: 1px solid var(--line); border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+.tm-foot .grow { flex: 1; }
+.tm-form > .danger { margin: var(--sp-4) 0 0; }
+/* full page */
+.modal-backdrop:has(> .modal-full) { padding: 1rem; place-items: stretch center; }
+.modal.modal-full { width: min(100%, 110rem); max-width: none; min-height: calc(100dvh - 2rem); display: flex; flex-direction: column; }
+.modal-full .tm-form { flex: 1; }
+.modal-full .tm-body { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(20rem, 1fr); gap: var(--sp-6) var(--sp-7); align-items: start; flex: 1; }
+.modal-full .tm-main, .modal-full .tm-side { display: flex; flex-direction: column; gap: var(--sp-5); min-width: 0; }
+.modal-full .tm-s-task .mde textarea { min-height: 18rem; }
+@media (max-width: 900px) {
+  .modal-full .tm-body { display: flex; flex-direction: column; }
+  .modal-full .tm-main, .modal-full .tm-side { display: contents; }
+}
+@media (max-width: 720px) {
+  .tm-section { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
+  /* the phone sheet's padding: 0.9rem, 1rem + the safe area at the bottom */
+  .tm-foot { margin: var(--sp-5) -0.9rem calc(-1rem - env(safe-area-inset-bottom)); padding: var(--sp-4) 0.9rem calc(var(--sp-4) + env(safe-area-inset-bottom)); bottom: calc(-1rem - env(safe-area-inset-bottom)); }
+  .modal-backdrop:has(> .modal-full) { padding: 0; }
+  .modal.modal-full { min-height: 100dvh; max-height: 100dvh; border-radius: 0; }
+}
+
+/* the lists that span every workspace (recurring tasks, templates, schedules): a filter bar on top */
+.list-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-4); margin: 0 0 var(--sp-5); min-height: var(--ctl-h); }
+.place-filter {
+  min-height: var(--ctl-h); background: var(--surface-variant); border: 1px solid transparent; border-radius: var(--ctl-r);
+}
+.place-filter:hover { border-color: var(--line-strong); }
+.place-filter select {
+  height: calc(var(--ctl-h) - 2px); min-height: 0; border: 0; background-color: transparent; padding-left: 0.3rem;
+  color: var(--text); font-weight: var(--weight-strong); min-width: 0; text-overflow: ellipsis;
+}
+.place-filter select:focus-visible { outline-offset: -2px; }
+.place-filter:has(select.active) { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.modal-full .tm-side .tm-grid { grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); }
+.tm-foot .save-tpl .link { font-size: var(--fs-sm); }
+
+/* the task panel starts under the top bar on wide screens, so the inbox and the bell stay in reach */
+@media (min-width: 721px) {
+  .panel { top: var(--topbar-h); border-top: 1px solid var(--line-strong); border-top-left-radius: var(--radius-l); }
+}
+@media (max-width: 720px) {
+  :root { --topbar-h: calc(2.4rem + 0.9rem + 1px); }
 }

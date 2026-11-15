@@ -8,14 +8,17 @@ Click **New task** on the board. You can also press **Ctrl+K** (⌘K on a Mac) a
 
 ![The new task form (Nightwalker theme)](../images/task-new-night.png)
 
-- **Title** and **Description**: the description is Markdown. Type `@` to mention someone; they get a notification.
-- **Status**, **Priority**, **Labels** (new labels are created as you type), **Assignees**, **Colour** (the card's left edge).
-- **Start** and **Due**: dates with an optional time. A task with a start date in the future isn't picked up by agents before then.
-- **Checklist**: one item per line.
-- **Template**: start from a saved template, or save this form as one (**Save as template**).
-- **Repeat**: turns the task into a recurring task. See [Recurring tasks](recurring.md).
+The form is in sections:
+
+- **From template** (when there are templates): fill the form from one, or create the task from it as is.
+- **Task**: the **Title** and the **Description** (Markdown; type `@` to mention someone, and they get a notification).
+- **Where**: **Workspace**, **Project** and **Status**. The form starts in the project in view (else the one you used last); pick any workspace and project you can add to. Moving the task to another project keeps its stage (To-Do, Doing…) in that project's statuses; moving it to another workspace clears the custom fields, the picked template and the assignees who aren't members there.
+- **When**: **Start** and **Due**, dates with an optional time (a task with a start date in the future isn't picked up by agents before then), and **Repeat**, which turns the task into a recurring task (shown when you have the Schedules permission in that workspace). See [Recurring tasks](recurring.md).
+- **Details**: **Priority**, **Assignees**, **Labels** (new labels are created as you type) and **Colour** (the card's left edge).
+- **Checklist and fields**: the checklist, one item per line, and the workspace's custom fields under **More fields**.
 - **Agent run**: model, effort, always run, allowed tools. See [Agents](agents.md).
-- Custom fields, if your workspace has any, are under **More**.
+
+**Save as template** at the bottom keeps the form as a template. The expand button (two diagonal arrows, top right) grows the form to the whole page, with the task and checklist on the left and the rest on the right; your browser remembers the choice for the next time.
 
 ## The task panel
 

@@ -25,7 +25,7 @@ import { setMentionUsers } from "./markdown";
 import { RecurringModal } from "./Recurring";
 import { SchedulesModal } from "./Schedules";
 import { TemplatesModal } from "./Templates";
-import { TaskModal } from "./TaskModal";
+import { TaskModal, lastProject } from "./TaskModal";
 import { TaskPanel } from "./TaskPanel";
 import { viewsApi } from "./views/viewsApi";
 import { CATEGORY_COLOR, colorFor, readableOn } from "./theme";
@@ -40,7 +40,7 @@ import { cardState, elapsed, plainText } from "./cardState";
 const openStatuses = (b: Board): Status[] => b.statuses.filter((s) => s.category !== "cancelled");
 const canWriteIn = (ws: WorkspaceTree) => ws.role !== "viewer" && ws.role !== "commenter";
 
-type ProjectAction = "new" | "recurring" | "templates" | "archive";
+type BoardAction = "new" | "recurring" | "templates" | "schedules" | "archive";
 
 // BoardPage: one board over every workspace and project in reach, narrowed by the filter in the URL
 // (/board?ws=..&p=..&a=..&l=..&pr=..&q=..&arch=1). One project in view: its own status columns and
@@ -97,15 +97,15 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const [drag, setDrag] = useState<number | null>(null);
   const [drop, setDrop] = useState<{ col: string; index: number } | null>(null);
   const [activeCol, setActiveCol] = useState<string | null>(null);
-  const [pick, setPick] = useState<ProjectAction | "schedules" | null>(null);
   const [adding, setAdding] = useState<number | null>(null);
   // a column's "+": the new task starts in that column (its status, or its stage's first status in the picked project)
   const [newIn, setNewIn] = useState<{ category: Category; statusId?: number } | null>(null);
-  const [recurring, setRecurring] = useState<{ pid: number; highlight?: number } | null>(null);
-  const [templates, setTemplates] = useState<number | null>(null);
+  // the lists that span every workspace (each with its own optional filter)
+  const [recurring, setRecurring] = useState<{ highlight?: number } | null>(null);
+  const [templates, setTemplates] = useState(false);
   // the archive dialog: the projects ticked to start with, and which finished tasks (both when unset)
   const [archiveDone, setArchiveDone] = useState<{ ids: number[]; category?: "done" | "cancelled" } | null>(null);
-  const [timings, setTimings] = useState<number | null>(null);
+  const [timings, setTimings] = useState(false);
   const [trash, setTrash] = useState(false);
   const narrow = useNarrow();
 
@@ -235,25 +235,34 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     [load, refresh],
   );
 
-  // project actions: straight to the one project in view, or pick one first
-  const runAction = useCallback((what: ProjectAction, pid: number) => {
-    setPick(null);
-    if (what === "new") setAdding(pid);
-    else if (what === "recurring") setRecurring({ pid });
-    else if (what === "templates") setTemplates(pid);
-    else setArchiveDone({ ids: [pid] });
-  }, []);
+  // a new task opens straight in the form, which offers every project you can add to: it starts in the
+  // project in view, else the one last used in view, else the first in view; with none of those
+  // writable, the last used anywhere, else the first project of a workspace you can add to
+  // the projects in view you can add tasks to (the role, and the Create tasks permission)
+  const writable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "create_tasks", x.ws.id));
+  // every workspace you can add to (the form may move the task there)
+  const newChoices = tree.filter((w) => canWriteIn(w) && hasCap(me, "create_tasks", w.id) && w.projects.length > 0);
+  const openNew = useCallback(() => {
+    const last = lastProject();
+    const at = (single && writable.includes(single) ? single : undefined) ?? writable.find((x) => x.project.id === last) ?? writable[0];
+    if (at) return setAdding(at.project.id);
+    const anywhere = newChoices.flatMap((w) => w.projects);
+    const p = anywhere.find((x) => x.id === last) ?? anywhere[0];
+    if (p) setAdding(p.id);
+  }, [single, writable, newChoices]);
   const archivable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "archive_tasks", x.ws.id));
-  const action = (what: ProjectAction | "schedules", category?: "done" | "cancelled") => {
+  const action = (what: BoardAction, category?: "done" | "cancelled") => {
     if (what === "archive") {
       // one dialog for any number of projects: up to three in view start ticked; more start unticked, so
       // one stray click can't archive across every workspace ("All projects in view" is one tick away)
       setArchiveDone({ ids: archivable.length <= 3 ? archivable.map((x) => x.project.id) : [], category });
-    } else if (what === "schedules") {
-      if (wsInScope.length === 1) setTimings(wsInScope[0]!.id);
-      else setPick("schedules");
-    } else if (single) runAction(what, single.project.id);
-    else setPick(what);
+    } else if (what === "schedules") setTimings(true);
+    else if (what === "recurring") setRecurring({});
+    else if (what === "templates") setTemplates(true);
+    else {
+      setNewIn(null);
+      openNew();
+    }
   };
   // ?new=1 (the command palette's "New task") opens the new-task flow
   useEffect(() => {
@@ -263,9 +272,8 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     const rest = s.toString();
     navigate(loc + (rest ? "?" + rest : ""), { replace: true });
     setNewIn(null);
-    if (inScope.length === 1) setAdding(inScope[0]!.project.id);
-    else if (inScope.length > 1) setPick("new");
-  }, [search, loc, navigate, inScope]);
+    openNew();
+  }, [search, loc, navigate, openNew]);
 
   const collapseKey = single ? single.project.id : 0;
   const [collapsed, setCollapsed] = useState<number[]>(() => loadCollapsed(collapseKey));
@@ -444,10 +452,10 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     .map((id) => users.get(id))
     .filter((u): u is NonNullable<typeof u> => !!u)
     .sort((a, b) => (a.display_name || a.username).localeCompare(b.display_name || b.username));
-  const anyWrite = inScope.some((x) => canWriteIn(x.ws));
   const wsArchive = inScope.some((x) => canWriteIn(x.ws) && hasCap(me, "archive_tasks", x.ws.id));
   const wsTemplates = inScope.some((x) => hasCap(me, "templates", x.ws.id));
-  const tableHref = (w: WorkspaceTree) => `/w/${w.slug}${single && single.ws.id === w.id ? `/p/${single.project.id}` : ""}/table`;
+  // the table of what's in view: the one project, the one workspace, else every workspace
+  const tableHref = single ? `/w/${single.ws.slug}/p/${single.project.id}/table` : wsInScope.length === 1 ? `/w/${wsInScope[0]!.slug}/table` : "/table";
 
   const endDrag = () => {
     clearTimeout(dragTimer.current); // a drag that ends before it registered must not stay "dragging"
@@ -485,14 +493,11 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const colColor = (c: BoardColumn): string => c.color ?? CATEGORY_COLOR[c.category] ?? "var(--muted)";
   // the column name sits on a filled label of its stage colour (a hex colour, so the text colour can be picked)
   const stageBg = (c: BoardColumn): string => c.color ?? CATEGORY_COLOR[c.category] ?? CATEGORY_COLOR.backlog!;
-  // a column's "+": one project in view opens the form in that status; several ask which project first
-  const writable = inScope.filter((x) => canWriteIn(x.ws));
+  // a column's "+": the form starts in that column's status (or its stage, in another project)
   const canAddIn = (c: BoardColumn) => writable.length > 0 && c.category !== "cancelled";
   const addIn = (c: BoardColumn) => {
     setNewIn({ category: c.category, statusId: c.statusId });
-    if (single) runAction("new", single.project.id);
-    else if (writable.length === 1) runAction("new", writable[0]!.project.id);
-    else setPick("new");
+    openNew();
   };
   const cardFor = (t: Task, c: BoardColumn, i: number, archivedCard: boolean) => {
     const p = projOf(t.project_id);
@@ -526,16 +531,9 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
 
   const panel = taskPid && taskKey ? projOf(taskPid) : null;
   const panelBoard = taskPid ? boards.get(taskPid) : undefined;
-  const ctxFor = (pid: number | null) => {
-    if (pid === null) return null;
-    const p = projOf(pid);
-    const b = boards.get(pid);
-    return p && b ? { ...p, board: b } : null;
-  };
-  const addCtx = ctxFor(adding);
-  const recCtx = ctxFor(recurring?.pid ?? null);
-  const tplCtx = ctxFor(templates);
-  const timingsWs = timings !== null ? tree.find((w) => w.id === timings) : undefined;
+  // the new task's start project: its board when in view (statuses, labels), else the form fetches them
+  const addAt = adding === null ? null : projOf(adding);
+  const addBoard = adding === null ? undefined : boards.get(adding);
 
   // the board's less frequent actions: the "⋯" menu of the page head (on a phone also the table links)
   const tools = (
@@ -587,11 +585,9 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
         <div className="head-actions">
           {narrow ? (
             <MoreMenu label="More">
-              {wsInScope.map((w) => (
-                <Link key={w.id} href={tableHref(w)} role="menuitem">
-                  ☰ Table{wsInScope.length > 1 ? ` · ${w.name}` : ""}
-                </Link>
-              ))}
+              <Link href={tableHref} role="menuitem">
+                ☰ Table
+              </Link>
               {tools}
             </MoreMenu>
           ) : (
@@ -599,22 +595,12 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
               <span className="vs-item on" aria-current="page">
                 Board
               </span>
-              {wsInScope.length === 1 ? (
-                <Link href={tableHref(wsInScope[0]!)} className="vs-item">
-                  Table
-                </Link>
-              ) : (
-                <MoreMenu label="Table" className="vs-menu" buttonClass="vs-item">
-                  {wsInScope.map((w) => (
-                    <Link key={w.id} href={tableHref(w)} role="menuitem">
-                      {w.name}
-                    </Link>
-                  ))}
-                </MoreMenu>
-              )}
+              <Link href={tableHref} className="vs-item">
+                Table
+              </Link>
             </div>
           )}
-          {anyWrite && (
+          {newChoices.length > 0 && (
             <button
               type="button"
               className="button"
@@ -796,25 +782,15 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           );
         })}
       </div>
-      {pick && (
-        <PickModal
-          what={pick}
-          options={pick === "schedules" ? [] : inScope.filter((x) => (pick === "templates" ? hasCap(me, "templates", x.ws.id) : pick === "archive" ? archivable.includes(x) : pick === "new" ? canWriteIn(x.ws) : true))}
-          workspaces={wsInScope}
-          onPick={(id) => (pick === "schedules" ? (setPick(null), setTimings(id)) : runAction(pick, id))}
-          onClose={() => {
-            setPick(null);
-            setNewIn(null);
-          }}
-        />
-      )}
-      {addCtx && (
+      {addAt && (
         <TaskModal
-          ws={addCtx.ws}
-          projectId={addCtx.project.id}
-          statuses={openStatuses(addCtx.board)}
-          labels={addCtx.board.labels}
-          initialStatus={newIn ? (newIn.statusId ?? openStatuses(addCtx.board).find((s) => s.category === newIn.category)?.id) : undefined}
+          ws={addAt.ws}
+          projectId={addAt.project.id}
+          statuses={addBoard ? openStatuses(addBoard) : []}
+          labels={addBoard?.labels ?? []}
+          choices={newChoices}
+          initialStatus={newIn && addBoard ? (newIn.statusId ?? openStatuses(addBoard).find((s) => s.category === newIn.category)?.id) : undefined}
+          initialCategory={newIn?.category}
           onClose={() => {
             setAdding(null);
             setNewIn(null);
@@ -822,30 +798,9 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           onCreated={changed}
         />
       )}
-      {recCtx && (
-        <RecurringModal
-          ws={recCtx.ws}
-          projectId={recCtx.project.id}
-          statuses={openStatuses(recCtx.board)}
-          labels={recCtx.board.labels}
-          canWrite={canWriteIn(recCtx.ws)}
-          highlight={recurring?.highlight}
-          onClose={() => setRecurring(null)}
-          onChanged={changed}
-        />
-      )}
-      {timingsWs && <SchedulesModal ws={timingsWs} canWrite={canWriteIn(timingsWs) && hasCap(me, "schedules", timingsWs.id)} onClose={() => setTimings(null)} onChanged={changed} />}
-      {tplCtx && (
-        <TemplatesModal
-          ws={tplCtx.ws}
-          projectId={tplCtx.project.id}
-          statuses={openStatuses(tplCtx.board)}
-          labels={tplCtx.board.labels}
-          canEdit={canWriteIn(tplCtx.ws)}
-          onClose={() => setTemplates(null)}
-          onChanged={changed}
-        />
-      )}
+      {recurring && <RecurringModal highlight={recurring.highlight} onClose={() => setRecurring(null)} onChanged={changed} />}
+      {timings && <SchedulesModal onClose={() => setTimings(false)} onChanged={changed} />}
+      {templates && <TemplatesModal onClose={() => setTemplates(false)} onChanged={changed} />}
       {archiveDone !== null && (
         <ArchiveDoneModal
           options={archivable}
@@ -866,7 +821,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           onClose={() => navigate(boardURL)}
           onChanged={changed}
           onMoved={(t) => navigate(`/board/p/${t.project_id}/t/${t.key}${qs}`)}
-          onOpenSchedule={(id) => setRecurring({ pid: panel.project.id, highlight: id })}
+          onOpenSchedule={(id) => setRecurring({ highlight: id })}
         />
       )}
       {toast && (
@@ -1158,37 +1113,6 @@ function TrashModal({ scope: inScope, onClose, onRestored }: { scope: { ws: Work
             </div>
           );
         })}
-      </div>
-    </Modal>
-  );
-}
-
-// PickModal: the project (or workspace) a board-wide action applies to, when several are in view.
-function PickModal({ what, options, workspaces, onPick, onClose }: {
-  what: ProjectAction | "schedules";
-  options: { ws: WorkspaceTree; project: { id: number; key: string; name: string } }[];
-  workspaces: WorkspaceTree[];
-  onPick: (id: number) => void;
-  onClose: () => void;
-}) {
-  const title = { new: "New task in…", recurring: "Recurring tasks of…", templates: "Templates for…", archive: "Archive done tasks in…", schedules: "Schedules of…" }[what];
-  return (
-    <Modal title={title} onClose={onClose}>
-      <div className="pick-list">
-        {what === "schedules"
-          ? workspaces.map((w) => (
-              <button key={w.id} type="button" className="pick-item" onClick={() => onPick(w.id)}>
-                <WorkspaceBadge ws={w} />
-              </button>
-            ))
-          : options.map(({ ws, project }) => (
-              <button key={project.id} type="button" className="pick-item" onClick={() => onPick(project.id)}>
-                <WorkspaceBadge ws={ws} />
-                <span className="pill pill-key">{project.key}</span>
-                <span>{project.name}</span>
-              </button>
-            ))}
-        {what !== "schedules" && options.length === 0 && <p className="muted small">No project in view allows this.</p>}
       </div>
     </Modal>
   );

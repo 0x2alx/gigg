@@ -52,30 +52,23 @@ export function badgeCount(n: number): string {
 export interface Placement {
   top: number;
   left: number;
-  arrowY: number | null; // the notch's distance from the popover's top; null when it can't point at the anchor
+  arrowX: number | null; // the notch's distance from the popover's left edge; null when it can't point at the anchor
 }
 
-// placePopover: where the bell popover goes. It opens just right of the sidebar edge (never half over
-// it), with its notch level with the bell, and stays `margin` px inside the viewport. When the
-// viewport is too narrow to fit it beside the sidebar it is clamped inside and drops the notch.
-export function placePopover(
-  anchor: { top: number; height: number },
-  edge: number,
+// placeBelow: where the bell popover goes. It hangs `gap` px under the bell with its right edge in line
+// with the bell's right edge, stays `margin` px inside the viewport, and its notch points at the bell's
+// middle (dropped when the clamped popover no longer spans it).
+export function placeBelow(
+  anchor: { left: number; right: number; bottom: number },
   size: { width: number; height: number },
   viewport: { width: number; height: number },
-  gap = 12,
+  gap = 10,
   margin = 8,
 ): Placement {
-  const mid = anchor.top + anchor.height / 2;
-  const notch = 24; // preferred notch offset from the popover's top
-  const maxTop = Math.max(margin, viewport.height - size.height - margin);
-  const top = Math.round(Math.min(Math.max(margin, mid - notch), maxTop));
-  let left = edge + gap;
-  let fits = true;
-  if (left + size.width > viewport.width - margin) {
-    left = Math.max(margin, viewport.width - size.width - margin);
-    fits = false;
-  }
-  const y = Math.min(Math.max(12, mid - top), Math.max(12, size.height - 12));
-  return { top, left: Math.round(left), arrowY: fits ? Math.round(y) : null };
+  const mid = (anchor.left + anchor.right) / 2;
+  const maxLeft = Math.max(margin, viewport.width - size.width - margin);
+  const left = Math.round(Math.min(Math.max(margin, anchor.right - size.width), maxLeft));
+  const top = Math.round(Math.max(margin, Math.min(anchor.bottom + gap, viewport.height - size.height - margin)));
+  const x = mid - left;
+  return { top, left, arrowX: x >= 14 && x <= size.width - 14 && top === Math.round(anchor.bottom + gap) ? Math.round(x) : null };
 }

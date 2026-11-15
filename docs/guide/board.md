@@ -1,8 +1,10 @@
 # The board
 
-The board shows the tasks of every workspace and project you can see, in one place. Open it from **Board**, the first and largest entry in the sidebar. The sidebar is two panels: at the top **Board**, **Dashboard** and **My tasks** (with your saved views), then, after a thin line, **Inbox** and **Notifications**; at the bottom **Admin**, **Themes**, your profile and **Log out**. The page you are on is filled with the theme's accent colour.
+The board shows the tasks of every workspace and project you can see, in one place. Open it from **Board**, the first and largest entry in the sidebar.
 
-The sidebar button at its top (a square with a bar) collapses the sidebar to a strip of icons, or keeps it open. While it is collapsed, pointing at the strip (or tabbing into it) opens it over the page, and it folds back when the pointer leaves. The choice is saved on your account.
+The sidebar is a narrow strip of icons in two panels: at the top **Board**, **Dashboard** and **My tasks** (with your saved views); at the bottom **Admin**, **Themes**, your profile and **Log out**. Point at a panel (or tab into it) and it opens over the page with its labels, without moving the page; it folds back a moment after the pointer leaves. Each panel opens on its own. The page you are on is filled with the theme's accent colour.
+
+**Inbox** (an envelope) and **Notifications** (a bell) sit in the top-right corner of every page, each with its count, beside the live-connection dot. See [Inbox and notifications](inbox.md). On a phone the sidebar is a menu behind the button at the top left.
 
 ![The board across several workspaces (Nightwalker theme)](../images/board-all-night.png)
 
@@ -15,7 +17,7 @@ Cancelled tasks don't appear on the board. Use the table view to see them.
 
 Each column header shows the column's name on a label filled with its colour, with a small mark for the stage (a dashed ring for Backlog, an empty ring for To-Do, half full for Doing, a pause bar for Waiting, a check for Done), then its number of tasks. Hovering over the header (or tabbing to it) shows two buttons on the right:
 
-- **+**: a new task in this column. With several projects in view it first asks which project, and the task starts in that project's first status of the stage.
+- **+**: a new task in this column. The form starts in this column's status; if you move the task to another project in the form, it starts in that project's first status of the same stage.
 - **Collapse** (two arrows pointing in): the column leaves the board and becomes a small button above it, with its name and count. Click the button to bring the column back. The board remembers collapsed columns per browser. You can drop a card on a collapsed column's button too.
 
 Each column also ends with **+ New task**, except Done: when it holds tasks it ends with **Archive done** instead, which opens the archive dialog for done tasks only (see **Archive done** below). Cancelled tasks never show on the board; **⋯ → Archive done** archives them too. On a phone, the columns are tabs above the cards.
@@ -93,8 +95,8 @@ The filters live in the page address (for example `/board?ws=acme&pr=3`), so you
 
 Next to the title (and its **?** help button) the header has three things:
 
-- **Board | Table**: a switch between this board and the same tasks as a sortable table (per workspace), with bulk actions. See [Views](views.md). With several workspaces in view, **Table** asks which workspace.
-- **+ New task**: with one project in view it opens the form right away; otherwise it first asks which project.
+- **Board | Table**: a switch between this board and the same tasks as a sortable table, with bulk actions: the project in view, the workspace in view, or every workspace. See [Views](views.md).
+- **+ New task**: opens the form right away, in the project in view (with several in view, the one you last added a task to). The form's **Where** section moves it to any project you can add to.
 - **⋯** (More actions): the less frequent actions.
   - **Recurring**, **Schedules**, **Templates**: see [Recurring tasks](recurring.md).
   - **Archive done**: archives the tasks in Done and Cancelled (all of them, or those finished 7 or 30+ days ago). With several projects in view it lists them (ticked when there are up to three, unticked when more): tick the ones to clean up, or use **All projects in view**. It archives every done and cancelled task of those projects; the assignee, label, priority and search filters don't apply. Archived tasks leave the board and lists but stay searchable, and you can unarchive them from the task.
@@ -102,4 +104,4 @@ Next to the title (and its **?** help button) the header has three things:
 
 ![The trash (Daywalker theme)](../images/trash-day.png)
 
-Actions that act on one project (Recurring, Templates, New task) ask which project when several are in view. Schedules asks which workspace. On a phone, **⋯ More** holds the Table links and these actions, and the archived toggle sits in the **Filters** fold.
+Recurring, Schedules and Templates list everything across your workspaces, with a **Show** filter at the top to narrow them to one workspace or project. On a phone, **⋯ More** holds the Table link and these actions, and the archived toggle sits in the **Filters** fold.

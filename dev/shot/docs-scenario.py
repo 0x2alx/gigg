@@ -91,7 +91,7 @@ steps = [
     {"wait": 400},
     {"shot": "agent-run-day", "el": "aside.panel", "margin": 0},
     *page("/inbox", ".inbox", "inbox-day"),
-    *page("/w/acme/table", "table", "table-day"),
+    *page("/table", "table", "table-day"),
     *page("/themes", "h1", "themes-day"),
     {"goto": "/admin/users"},
     {"wait": "table"},

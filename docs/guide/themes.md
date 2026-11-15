@@ -13,11 +13,12 @@ Data colours (labels, statuses, priorities, workspaces, people) keep their hues 
 
 ## Theme options beyond colours
 
-Besides the colours, font, text size, corners and border width, the editor has three options that only gigg uses. The Android apps ignore them: a theme from an app imports as before, and a gigg theme copied into an app keeps its colours and font but not these three:
+Besides the colours, font, text size, corners and border width, the editor has four options that only gigg uses. The Android apps ignore them: a theme from an app imports as before, and a gigg theme copied into an app keeps its colours and font but not these four:
 
 - **Buttons and badges**: *Follow the corners* (the theme's corner size) or *Pill* (fully round buttons, fields, chips and badges).
 - **Board columns**: the colour of the board's columns. *Auto* (**A**) takes a step between the background and the cards.
 - **Column borders**: an outline around each column (at least 1 px, even with a border width of 0), or none (**∅**). When **Board columns** has a colour of its own, the contrast check also covers the secondary text on it, and its **Fix** adjusts the column colour.
+- **Logo**: the colour of the gigg ship at the top of the sidebar. *Auto* (**A**) uses the accent. The preview at the top of the editor shows it.
 
-Cards and the two sidebar panels use the theme's **Borders** colour and **Border width**, so changing those shows on the board.
+Cards use the theme's **Borders** colour and **Border width**, so changing those shows on the board. The sidebar panels have no outline.
 

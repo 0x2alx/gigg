@@ -24,6 +24,12 @@ const P: Record<string, ReactNode> = {
       <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
     </>
   ),
+  mail: (
+    <>
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+      <path d="m3 7 9 6 9-6" />
+    </>
+  ),
   bell: (
     <>
       <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
@@ -78,12 +84,6 @@ const P: Record<string, ReactNode> = {
   ),
   list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
   filter: <path d="M3.5 5h17l-6.5 8v5.5l-4 2V13z" />,
-  sidebar: (
-    <>
-      <rect x="3" y="3" width="18" height="18" rx="2.5" />
-      <path d="M9 3v18" />
-    </>
-  ),
   x: <path d="M18 6 6 18M6 6l12 12" />,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   logout: (

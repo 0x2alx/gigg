@@ -307,3 +307,20 @@ func TestStatusRules(t *testing.T) {
 		return nil
 	})
 }
+
+func TestTaskOrder(t *testing.T) {
+	for in, want := range map[string]string{
+		"due":             "t.due_at IS NULL, t.due_at, t.id",
+		"-due":            "t.due_at IS NULL, t.due_at DESC, t.id",
+		"-number":         "p.key DESC, t.number DESC, t.id",
+		"title,-priority": "t.title COLLATE NOCASE, t.priority DESC, t.id",
+	} {
+		got, err := taskOrder(in)
+		if err != nil || got != want {
+			t.Errorf("taskOrder(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	if _, err := taskOrder("bogus"); err == nil {
+		t.Error("taskOrder(bogus): want an error")
+	}
+}

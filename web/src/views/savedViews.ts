@@ -14,8 +14,8 @@ export interface SavedFilter {
 
 export const savedViewsApi = {
   list: () => call<{ items: SavedFilter[] }>("GET", "/me/filters"),
-  create: (body: { workspace_id?: number; name: string; query: Record<string, string> }) => call<SavedFilter>("POST", "/me/filters", body),
-  update: (id: number, body: { workspace_id?: number; name: string; query: Record<string, string> }) => call<SavedFilter>("PUT", `/me/filters/${id}`, body),
+  create: (body: { workspace_id?: number | null; name: string; query: Record<string, string> }) => call<SavedFilter>("POST", "/me/filters", body),
+  update: (id: number, body: { workspace_id?: number | null; name: string; query: Record<string, string> }) => call<SavedFilter>("PUT", `/me/filters/${id}`, body),
   remove: (id: number) => call<void>("DELETE", `/me/filters/${id}`),
 };
 
@@ -95,10 +95,16 @@ export function parse(src: Record<string, string> | URLSearchParams, meId?: numb
 
 // viewHref: where a saved view opens — the table of its workspace (or project) with its filters.
 export function viewHref(tree: WorkspaceTree[], v: SavedFilter, meId?: number): string {
-  const ws = (v.workspace_id ? tree.find((w) => w.id === v.workspace_id) : undefined) ?? tree[0];
-  if (!ws) return "/";
   const { filters, project } = parse(v.query, meId);
   const search = toSearch(filters);
+  // a view across workspaces opens the all-workspaces table (its project, when it names one)
+  if (v.workspace_id === null) {
+    const pw = project ? tree.find((w) => w.projects.some((p) => p.id === project)) : undefined;
+    const base = pw ? `/w/${pw.slug}/p/${project}/table` : "/table";
+    return search ? `${base}?${search}` : base;
+  }
+  const ws = tree.find((w) => w.id === v.workspace_id) ?? tree[0];
+  if (!ws) return "/";
   const base = project && ws.projects.some((p) => p.id === project) ? `/w/${ws.slug}/p/${project}/table` : `/w/${ws.slug}/table`;
   return search ? `${base}?${search}` : base;
 }

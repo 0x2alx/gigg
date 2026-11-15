@@ -58,7 +58,7 @@ describe("viewHref", () => {
   });
   it("falls back to the workspace table", () => {
     expect(viewHref(tree, { id: 1, workspace_id: 2, name: "v", query: { project: "10" } })).toBe("/w/work/table");
-    expect(viewHref(tree, { id: 1, workspace_id: null, name: "v", query: { mine: "1" } }, 9)).toBe("/w/home/table?assignee=9");
+    expect(viewHref(tree, { id: 1, workspace_id: null, name: "v", query: { mine: "1" } }, 9)).toBe("/table?assignee=9");
   });
 });
 

@@ -6,9 +6,10 @@ import { api, ApiError } from "./api";
 import { useApp, toTheme } from "./App";
 import {
   BUILTINS, BUNDLED_FONTS, COLOUR_KEYS, ROLE_LABEL, SYSTEM_FONTS, aiPrompt, contrastProblems, findTheme, importText, mix, nearestPassing,
-  colourOf as roleColour, laneOf, parseColour, ratio, readableOn, sane, secondaryOf, themeJSON, type ColourKey, type Theme,
+  colourOf as roleColour, laneOf, logoOf, parseColour, ratio, readableOn, sane, secondaryOf, themeJSON, type ColourKey, type Theme,
 } from "./theme";
 import { Modal } from "./ui";
+import { LogoMark } from "./Logo";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
@@ -260,7 +261,7 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
     window.setTimeout(() => setFlash((f) => (f === highlight ? "" : f)), 600);
   };
   const colourOf = (k: ColourKey) => roleColour(t, k);
-  const auto = (k: ColourKey) => (k === "secondary" && t.secondary === null) || (k === "laneColor" && !t.laneColor) || (k === "laneBorder" && !t.laneBorder);
+  const auto = (k: ColourKey) => (k === "secondary" && t.secondary === null) || (k === "laneColor" && !t.laneColor) || (k === "laneBorder" && !t.laneBorder) || (k === "logoColor" && !t.logoColor);
   const save = () => onSave(sane(t)).catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't save the theme."));
   useEffect(() => {
     for (const f of BUNDLED_FONTS) loadPreviewFont(f);
@@ -288,7 +289,7 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
           <input type="checkbox" checked={t.dark} onChange={(e) => set({ dark: e.target.checked }, "background")} />
           <span>Dark theme</span>
         </label>
-        {([...COLOUR_KEYS.filter((k) => k !== "accent" && k !== "onAccent" && k !== "text" && k !== "mutedText" && k !== "danger"), "accent", "onAccent", "secondary", "text", "mutedText", "danger", "laneColor", "laneBorder"] as ColourKey[]).map((k) => (
+        {([...COLOUR_KEYS.filter((k) => k !== "accent" && k !== "onAccent" && k !== "text" && k !== "mutedText" && k !== "danger"), "accent", "onAccent", "secondary", "text", "mutedText", "danger", "laneColor", "laneBorder", "logoColor"] as ColourKey[]).map((k) => (
           <div key={k} className="editor-row">
             <span>{ROLE_LABEL[k]}</span>
             <div className="swatches">
@@ -311,6 +312,13 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
                   title="None: columns without an outline." style={{ background: laneOf(t) }}
                   onClick={() => set({ laneBorder: null }, k)}>
                   ∅
+                </button>
+              )}
+              {k === "logoColor" && (
+                <button type="button" className={"swatch auto" + (!t.logoColor ? " on" : "")} aria-label={`${ROLE_LABEL[k]}: Auto${!t.logoColor ? ", selected" : ""}`}
+                  title="Auto: the accent; it follows the accent when you change it." style={{ background: t.accent }}
+                  onClick={() => set({ logoColor: null }, k)}>
+                  A
                 </button>
               )}
               {dedupe([colourOf(k), ...PRESETS]).map((c) => (
@@ -450,6 +458,10 @@ function Preview({ t, flash }: { t: Theme; flash: string }) {
   return (
     <div className={"preview" + hl("background")} style={{ background: t.background, color: t.text, fontFamily: fontStack(t.font), fontWeight: fw, fontSize: `${t.textScalePct}%`, borderRadius: r * 1.5 }}>
       <div className="preview-row">
+        <span className={"preview-brand" + hl("logoColor")} style={{ color: logoOf(t) }} title="Logo">
+          <LogoMark className="preview-logo" compact />
+          <strong style={{ color: t.text }}>gigg</strong>
+        </span>
         <strong>Background: {t.name}</strong>
         <span className={hl("danger")} style={{ color: t.danger }}>
           Warnings

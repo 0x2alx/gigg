@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent as ReactFocusEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent as ReactFocusEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { setMentionUsers } from "./markdown";
 import { Link, Redirect, Route, Switch, useLocation, useSearch } from "wouter";
 import { api, ApiError, type Me, type Project, type ThemeState, type User } from "./api";
-import { BellButton, NotificationsPage, TopBell } from "./Bell";
+import { NotificationsPage, TopBell } from "./Bell";
+import { badgeCount } from "./notifications";
 import { BoardPage } from "./Board";
 import { DashboardPage } from "./Dashboard";
 import { InboxPage } from "./Inbox";
@@ -60,7 +61,7 @@ export interface Themes {
 // The base fills fields the stored theme lacks; the gigg-only extras are not filled in (absent means
 // "follow the corners", "auto" and "none"), so Nightwalker's pill shape doesn't leak into other themes.
 export function toTheme(id: string, o: Record<string, unknown>): Theme {
-  const { controlShape: _s, laneColor: _l, laneBorder: _b, ...base } = BUILTINS[1] as Theme;
+  const { controlShape: _s, laneColor: _l, laneBorder: _b, logoColor: _g, ...base } = BUILTINS[1] as Theme;
   return sane({ ...base, ...(o as Partial<Theme>), secondary: (o.secondary as string | undefined) ?? null, id, description: "" });
 }
 
@@ -135,13 +136,6 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   const narrow = useNarrow();
   const [drawer, setDrawer] = useState(false);
   const prefSaves = useRef(new Map<string, Promise<unknown>>());
-  // peek: a collapsed sidebar open for as long as the pointer (or the keyboard focus) is on it
-  const [peek, setPeek] = useState(false);
-  const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(peekTimer.current), []);
-  useEffect(() => {
-    if (narrow) setPeek(false); // back on a wide screen, the rail starts folded
-  }, [narrow]);
   useEffect(() => setDrawer(false), [loc, narrow]);
   useEffect(() => {
     if (!drawer) return;
@@ -263,7 +257,7 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   }, [reloadInbox]);
 
   // setPref: one key at a time; the server merges it into the stored preferences, so another tab saving
-  // its own key can't put back an old value of this one (a stale "sidebar: open" did exactly that)
+  // its own key can't put back an old value of this one (a stale preference from another tab did exactly that)
   // (undefined or null removes the key: sent as null, since JSON drops undefined)
   const setPref = useCallback((key: string, value: unknown) => {
     const gone = value === undefined || value === null;
@@ -285,32 +279,6 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   );
   if (!ctx) return <div className="center muted">Loading…</div>;
 
-  const pinnedShut = !narrow && prefs.sidebar === "collapsed"; // the drawer always shows labels
-  const collapsed = pinnedShut && !peek; // labels hidden: the icon rail
-  const peekIn = () => {
-    if (!pinnedShut) return;
-    clearTimeout(peekTimer.current);
-    peekTimer.current = setTimeout(() => setPeek(true), 120);
-  };
-  // only a real mouse peeks (a tap on a touch screen would open it over the page it just went to), and
-  // only keyboard focus does (focus put back by a dialog or a popover isn't someone looking at the menu)
-  const pointerIn = (e: ReactPointerEvent<HTMLElement>) => {
-    if (e.pointerType === "mouse") peekIn();
-  };
-  const focusIn = (e: ReactFocusEvent<HTMLElement>) => {
-    if (e.target instanceof HTMLElement && e.target.matches(":focus-visible") && !modalOpen()) peekIn();
-  };
-  const peekOut = () => {
-    clearTimeout(peekTimer.current);
-    peekTimer.current = setTimeout(() => setPeek(false), 220);
-  };
-  // the pointer leaving doesn't fold it while the keyboard is working in it (a mouse click leaves focus
-  // there too, but not :focus-visible); Esc folds it either way
-  const pointerOut = (e: ReactPointerEvent<HTMLElement>) => {
-    const f = document.activeElement;
-    if (f && e.currentTarget.contains(f) && f.matches(":focus-visible")) return;
-    peekOut();
-  };
   const first = ctx.tree.find((w) => w.projects.length > 0);
   const logout = () => {
     api.logout().finally(onLogout);
@@ -319,112 +287,80 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   const inAdmin = loc === "/admin" || loc.startsWith("/admin/");
   return (
     <Ctx.Provider value={ctx}>
-      <div className={"shell" + (pinnedShut ? " collapsed" : "") + (collapsed ? " rail" : "") + (pinnedShut && peek ? " peek" : "") + (narrow ? " narrow" : "") + (drawer ? " drawer-open" : "")}>
+      <div className={"shell" + (narrow ? " narrow" : "") + (drawer ? " drawer-open" : "")}>
         {narrow && drawer && <div className="drawer-backdrop" onClick={() => setDrawer(false)} aria-hidden="true" />}
-        <aside
-          id="sidebar"
-          className="sidebar"
-          aria-label="Navigation"
-          inert={narrow && !drawer ? true : undefined}
-          onPointerEnter={pointerIn}
-          onPointerLeave={pointerOut}
-          onFocus={focusIn}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) peekOut();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape" && peek) {
-              e.preventDefault(); // the task panel closes on an Esc nobody else handled
-              e.stopPropagation();
-              clearTimeout(peekTimer.current);
-              setPeek(false);
-            }
-          }}
-        >
+        {/* wide screens: a rail of icons; each of its two panels opens over the page on its own while the
+            mouse (or the keyboard focus) is on it. Phones: a drawer with every label. */}
+        <aside id="sidebar" className="sidebar" aria-label="Navigation" inert={narrow && !drawer ? true : undefined}>
           <div className="side-top">
-            <Link href="/" className="brand" aria-label={collapsed ? "gigg home" : undefined} title={collapsed ? "gigg" : undefined}>
+            <Link href="/" className="brand" aria-label="gigg home" title="gigg">
               <LogoMark className="brand-mark" compact />
-              {!collapsed && <span className="brand-word">gigg</span>}
+              {narrow && <span className="brand-word">gigg</span>}
             </Link>
-            {narrow ? (
+            {narrow && (
               <button type="button" className="icon-button collapse" onClick={() => setDrawer(false)} aria-label="Close the menu">
                 <Icon name="x" />
               </button>
-            ) : (
-              <button
-                type="button"
-                className="icon-button collapse"
-                onClick={() => {
-                  clearTimeout(peekTimer.current);
-                  setPeek(false);
-                  setPref("sidebar", pinnedShut ? "open" : "collapsed");
-                }}
-                aria-label={pinnedShut ? "Keep the menu open" : "Collapse the menu (it opens while you point at it)"}
-                title={pinnedShut ? "Keep the menu open" : "Collapse the menu: it opens while you point at it"}
-              >
-                <Icon name="sidebar" />
-              </button>
             )}
           </div>
-          <nav>
-            <NavLink href="/board" prefix icon={<Icon name="board" />} label="Board" collapsed={collapsed} className="nav-primary" />
-            <NavLink href="/dashboard" icon={<Icon name="dashboard" />} label="Dashboard" collapsed={collapsed} />
-            <NavLink href="/my" icon={<Icon name="check" />} label="My tasks" collapsed={collapsed} />
+          <SidePanel as="nav" label="Pages" hover={!narrow}>
+            <NavLink href="/board" prefix icon={<Icon name="board" />} label="Board" className="nav-primary" />
+            <NavLink href="/dashboard" icon={<Icon name="dashboard" />} label="Dashboard" />
+            <NavLink href="/my" icon={<Icon name="check" />} label="My tasks" />
             {savedViews.length > 0 && (
               <div className="nav-sub" role="group" aria-label="Saved views">
                 {savedViews.map((v) => (
-                  <SavedViewLink key={v.id} href={viewHref(ctx.tree, v, me.user.id)} label={v.name} collapsed={collapsed} title={savedViewTitle(v, ctx.tree)} />
+                  <SavedViewLink key={v.id} href={viewHref(ctx.tree, v, me.user.id)} label={v.name} title={savedViewTitle(v, ctx.tree)} />
                 ))}
               </div>
             )}
-            <hr className="nav-sep" />
-            <NavLink href="/inbox" icon={<Icon name="inbox" />} label="Inbox" collapsed={collapsed}>
-              {inboxCount > 0 && <span className="count count-alert">{inboxCount}</span>}
-            </NavLink>
-            <BellButton collapsed={collapsed} />
-          </nav>
-          <div className="side-bottom">
-            {me.admin && <NavLink href="/admin" icon={<Icon name="settings" />} label="Admin" collapsed={collapsed} />}
+          </SidePanel>
+          <SidePanel as="div" label="Settings and account" hover={!narrow} className="side-bottom">
+            {me.admin && <NavLink href="/admin" icon={<Icon name="settings" />} label="Admin" />}
             {me.admin && inAdmin && (
               <div className="nav-sub" role="group" aria-label="Admin sections">
                 {ADMIN_TABS.map((t) => (
-                  <NavLink key={t.href} href={"/admin" + t.href} prefix icon={<Icon name={t.icon} />} label={t.label} collapsed={collapsed} />
+                  <NavLink key={t.href} href={"/admin" + t.href} prefix icon={<Icon name={t.icon} />} label={t.label} />
                 ))}
               </div>
             )}
-            <NavLink href="/themes" icon={<Icon name="theme" />} label="Themes" collapsed={collapsed} />
-            <NavLink href="/profile" icon={<Avatar user={me.user} size="xs" />} label={me.user.display_name || me.user.username} collapsed={collapsed} />
-            <div className="side-foot">
-              <span className={"live-dot live-" + live} style={live === "off" ? undefined : ({ "--live": live === "live" ? CATEGORY_COLOR.done : PRIORITY_COLOR[2] } as CSSProperties)} role="status" title={LIVE_TITLE[live]} aria-label={LIVE_TITLE[live]}>
-                <span className="live-pip" aria-hidden="true" />
-                {!collapsed && <span className="live-word">{live === "live" ? "Live" : live === "connecting" ? "Connecting" : "Offline"}</span>}
+            <NavLink href="/themes" icon={<Icon name="theme" />} label="Themes" />
+            <NavLink href="/profile" icon={<Avatar user={me.user} size="xs" />} label={me.user.display_name || me.user.username} />
+            <button type="button" className="nav-item" onClick={logout}>
+              <span className="nav-icon" aria-hidden="true">
+                <Icon name="logout" />
               </span>
-              {!collapsed && (
-                <button type="button" className="link logout" onClick={logout}>
-                  <Icon name="logout" />
-                  Log out
-                </button>
-              )}
-            </div>
-          </div>
+              <span className="nav-label">Log out</span>
+            </button>
+          </SidePanel>
         </aside>
         <main className="content">
-          {narrow && (
-            <header className="topbar">
-              <button type="button" className="icon-button topbar-menu" onClick={() => setDrawer(true)} aria-label="Open the menu" aria-expanded={drawer} aria-controls="sidebar">
-                <Icon name="menu" />
-              </button>
-              <Link href="/" className="brand topbar-brand" aria-label="gigg home">
-                <LogoMark className="brand-mark" compact />
-                <span className="brand-word">gigg</span>
-              </Link>
-              <span className="grow" />
-              <TopBell />
+          {/* the top bar: messages in the top-right corner (inbox, notifications, the live pip); on a phone
+              also the menu button, the brand and you */}
+          <header className="topbar">
+            {narrow && (
+              <>
+                <button type="button" className="icon-button topbar-menu" onClick={() => setDrawer(true)} aria-label="Open the menu" aria-expanded={drawer} aria-controls="sidebar">
+                  <Icon name="menu" />
+                </button>
+                <Link href="/" className="brand topbar-brand" aria-label="gigg home">
+                  <LogoMark className="brand-mark" compact />
+                  <span className="brand-word">gigg</span>
+                </Link>
+              </>
+            )}
+            <span className="grow" />
+            <span className={"live-dot live-" + live} style={live === "off" ? undefined : ({ "--live": live === "live" ? CATEGORY_COLOR.done : PRIORITY_COLOR[2] } as CSSProperties)} role="status" title={LIVE_TITLE[live]} aria-label={LIVE_TITLE[live]}>
+              <span className="live-pip" aria-hidden="true" />
+            </span>
+            <InboxLink count={inboxCount} />
+            <TopBell />
+            {narrow && (
               <Link href="/profile" className="topbar-me" aria-label="Profile" title="Profile">
                 <Avatar user={me.user} size="xs" />
               </Link>
-            </header>
-          )}
+            )}
+          </header>
           {/* a page change fades the new page in (keyed by the section, so a task opening on the board or a
               tab inside Admin doesn't replay it) */}
           <div className="page-anim" key={loc.split("/")[1] ?? ""}>
@@ -452,6 +388,9 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             </Route>
             <Route path="/w/:ws/p/:pid/table">{(params) => <TableView ws={params.ws} pid={Number(params.pid)} />}</Route>
             <Route path="/w/:ws/table">{(params) => <TableView ws={params.ws} />}</Route>
+            <Route path="/table">
+              <TableView />
+            </Route>
             <Route path="/board/p/:pid/t/:key">{(params) => <BoardPage taskPid={Number(params.pid)} taskKey={params.key} />}</Route>
             <Route path="/board">
               <BoardPage />
@@ -481,33 +420,125 @@ function savedViewTitle(v: SavedFilter, tree: WorkspaceTree[]): string {
 }
 
 // SavedViewLink: like NavLink, but active only when the search matches too.
-function SavedViewLink({ href, label, collapsed, title }: { href: string; label: string; collapsed: boolean; title: string }) {
+function SavedViewLink({ href, label, title }: { href: string; label: string; title: string }) {
   const [loc] = useLocation();
   const search = useSearch();
   const active = loc + (search ? "?" + search : "") === href;
   return (
-    <Link href={href} className={"nav-item" + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title} aria-label={collapsed ? title : undefined}>
+    <Link href={href} className={"nav-item" + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title}>
       <span className="nav-icon" aria-hidden="true">
         <Icon name="star" />
       </span>
-      {!collapsed && <span className="nav-label">{label}</span>}
+      <span className="nav-label">{label}</span>
     </Link>
   );
 }
 
-function NavLink({ href, children, prefix, icon, label, collapsed, title, className }: {
-  href: string; children?: ReactNode; prefix?: boolean; icon: ReactNode; label: string; collapsed: boolean; title?: string; className?: string;
+function NavLink({ href, children, prefix, icon, label, title, className }: {
+  href: string; children?: ReactNode; prefix?: boolean; icon: ReactNode; label: string; title?: string; className?: string;
 }) {
   const [loc] = useLocation();
   const active = prefix ? loc === href || loc.startsWith(href + "/") : loc === href;
   return (
-    <Link href={href} className={"nav-item" + (className ? " " + className : "") + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title ?? label} aria-label={collapsed ? label : undefined}>
+    <Link href={href} className={"nav-item" + (className ? " " + className : "") + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title}>
       <span className="nav-icon" aria-hidden="true">{icon}</span>
-      {!collapsed && <span className="nav-label">{label}</span>}
+      <span className="nav-label">{label}</span>
       {children}
     </Link>
   );
 }
+
+// InboxLink: the top bar's envelope, to the inbox (tasks waiting for a human) with their count.
+function InboxLink({ count }: { count: number }) {
+  const [loc] = useLocation();
+  const label = count ? `Inbox, ${count} waiting` : "Inbox";
+  return (
+    <Link href="/inbox" className={"icon-button topbar-icon" + (loc === "/inbox" ? " on" : "")} aria-label={label} title={label} aria-current={loc === "/inbox" ? "page" : undefined}>
+      <Icon name="mail" />
+      {count > 0 && <span className="count count-alert">{badgeCount(count)}</span>}
+    </Link>
+  );
+}
+
+// SidePanel: one of the rail's two panels. With `hover` (wide screens) it folds to its icons and opens
+// over the page while the mouse is on it (after a short pause, so passing over doesn't flash it) or
+// while the keyboard works in it; it folds back a little after the mouse leaves. Each panel on its own.
+// On a touch screen (a tablet: wide, but no hover) the first tap opens it instead of following the
+// icon, a tap on an entry then goes there and folds it, and a tap outside folds it.
+function SidePanel({ as: Tag, label, hover, className, children }: { as: "nav" | "div"; label: string; hover: boolean; className?: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    if (!hover) {
+      clearTimeout(timer.current);
+      setOpen(false);
+    }
+  }, [hover]);
+  const later = (v: boolean, ms: number) => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setOpen(v), ms);
+  };
+  const self = useRef<HTMLElement>(null);
+  const touch = useRef(false); // the last press on it was a finger or a pen
+  useEffect(() => {
+    if (!open || !hover) return;
+    const out = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" && !self.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", out);
+    return () => document.removeEventListener("pointerdown", out);
+  }, [open, hover]);
+  const handlers = hover
+    ? {
+        // only a real mouse opens it (a tap on a touch screen just goes to the page)
+        onPointerEnter: (e: ReactPointerEvent<HTMLElement>) => {
+          if (e.pointerType === "mouse") later(true, OPEN_MS);
+        },
+        // the mouse leaving doesn't fold it while the keyboard is working in it
+        onPointerLeave: (e: ReactPointerEvent<HTMLElement>) => {
+          if (e.pointerType !== "mouse") return; // a finger lifting "leaves" too; taps fold it (see above)
+          const f = document.activeElement;
+          if (f && e.currentTarget.contains(f) && f.matches(":focus-visible")) return;
+          later(false, CLOSE_MS);
+        },
+        // keyboard focus opens it (focus put back by a dialog or a popover isn't someone reaching for the menu)
+        onFocus: (e: ReactFocusEvent<HTMLElement>) => {
+          if (e.target instanceof HTMLElement && e.target.matches(":focus-visible") && !modalOpen()) later(true, 0);
+        },
+        onBlur: (e: ReactFocusEvent<HTMLElement>) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null) && !e.currentTarget.matches(":hover")) later(false, 150);
+        },
+        onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
+          touch.current = e.pointerType !== "mouse";
+        },
+        onClickCapture: (e: ReactMouseEvent<HTMLElement>) => {
+          if (!touch.current) return;
+          if (!open) {
+            e.preventDefault(); // the first tap opens the panel, it doesn't follow the icon
+            e.stopPropagation();
+            clearTimeout(timer.current);
+            setOpen(true);
+          } else if ((e.target as Element).closest("a, button")) later(false, 0);
+        },
+        onKeyDown: (e: ReactKeyboardEvent<HTMLElement>) => {
+          if (e.key === "Escape" && open) {
+            e.preventDefault(); // the task panel closes on an Esc nobody else handled
+            e.stopPropagation();
+            clearTimeout(timer.current);
+            setOpen(false);
+          }
+        },
+      }
+    : {};
+  return (
+    <Tag ref={self as never} className={"side-panel" + (className ? " " + className : "") + (hover ? (open ? " open" : " folded") : "")} aria-label={label} {...(Tag === "div" ? { role: "group" } : {})} {...handlers}>
+      {children}
+    </Tag>
+  );
+}
+const OPEN_MS = 120;
+const CLOSE_MS = 450;
 
 // modalOpen: a dialog is up (focus moving behind it, by Tab, isn't someone reaching for the menu)
 function modalOpen(): boolean {

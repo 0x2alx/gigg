@@ -88,11 +88,11 @@ func TestSaneExtras(t *testing.T) {
 	base := `{"name":"X","dark":true,"background":"#000000","surface":"#111111","surfaceVariant":"#222222",
 	"border":"#333333","accent":"#444444","onAccent":"#555555","text":"#666666","mutedText":"#777777","danger":"#888888",
 	"font":"Inter","fontWeight":"Medium","textScalePct":90,"cornerDp":8,"borderDp":1`
-	out, err := Sane([]byte(base + `,"controlShape":"pill","laneColor":"#abcdef","laneBorder":"#123456"}`))
+	out, err := Sane([]byte(base + `,"controlShape":"pill","laneColor":"#abcdef","laneBorder":"#123456","logoColor":"#ff8800"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"controlShape":"pill"`, `"laneColor":"#ABCDEF"`, `"laneBorder":"#123456"`} {
+	for _, want := range []string{`"controlShape":"pill"`, `"laneColor":"#ABCDEF"`, `"laneBorder":"#123456"`, `"logoColor":"#FF8800"`} {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("missing %s in %s", want, out)
 		}

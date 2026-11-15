@@ -18,7 +18,7 @@
 /* bulk bar */
 /* the bulk bar floats over the table while rows are selected */
 .vw-bulk {
-  position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: var(--sp-4); align-items: center;
+  position: sticky; top: var(--below-topbar, 0px); z-index: 5; display: flex; flex-wrap: wrap; gap: var(--sp-4); align-items: center;
   margin-bottom: var(--sp-5); padding: var(--sp-4) var(--sp-5); border-radius: var(--radius-l);
   background: var(--high); color: var(--text); border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--surface)); box-shadow: var(--shadow-pop);
 }

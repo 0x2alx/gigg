@@ -110,11 +110,11 @@ describe("contrast fixes", () => {
 
 describe("gigg extras (control shape, board columns)", () => {
   it("round-trip through Copy JSON and are left out when unset or invalid", () => {
-    const t = { ...BUILTINS[0]!, controlShape: "pill" as const, laneColor: "#112233", laneBorder: "#445566" };
+    const t = { ...BUILTINS[0]!, controlShape: "pill" as const, laneColor: "#112233", laneBorder: "#445566", logoColor: "#778899" };
     const json = themeJSON(t);
     expect(json).toContain('"controlShape": "pill"');
     const back = fromObject(JSON.parse(json), current, []);
-    expect([back.controlShape, back.laneColor, back.laneBorder]).toEqual(["pill", "#112233", "#445566"]);
+    expect([back.controlShape, back.laneColor, back.laneBorder, back.logoColor]).toEqual(["pill", "#112233", "#445566", "#778899"]);
     const notes: string[] = [];
     const bad = fromObject({ ...JSON.parse(json), controlShape: "blob", laneColor: "nope" }, current, notes);
     expect(bad.controlShape).toBeUndefined();

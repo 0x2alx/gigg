@@ -6,11 +6,11 @@ The **Inbox** lists every task in a Waiting status across the workspaces you can
 
 ![The inbox (Daywalker theme)](../images/inbox-day.png)
 
-The sidebar shows how many tasks are waiting, as a small tinted number beside **Inbox**.
+The envelope in the top-right corner of every page opens the inbox. Its badge shows how many tasks are waiting.
 
 ## Notifications
 
-The bell (**Notifications** in the sidebar) collects what happened to you:
+The bell in the top-right corner collects what happened to you. Click it to open the list under it (on a phone it opens the notifications page):
 
 | Kind | When |
 |---|---|
@@ -20,11 +20,11 @@ The bell (**Notifications** in the sidebar) collects what happened to you:
 | comment | Someone posted a report on a task you created or are assigned to |
 | missed | A task of yours wasn't started before its window closed |
 
-Click one to open the task. **Mark all read** clears the badge. The full list is under **Notifications** in the sidebar.
+Click one to open the task. **Mark all read** clears the badge. The command palette (**Ctrl+K**) also has a **Notifications** page with the full list.
 
 ## Live updates
 
-The small dot at the bottom of the sidebar, beside **Log out**, shows the live connection to the server (hover it for the details):
+The small dot in the top-right corner, beside the envelope, shows the live connection to the server (hover it for the details):
 
 - **Live** (green): changes by others, people or agents, appear within a second or two.
 - **Connecting** (amber): reconnecting after a restart or a network blip.

@@ -1,6 +1,7 @@
-// Table view: every task of a workspace (or one project) as a sortable, filterable table with
-// multi-select and bulk actions. Sorting and most filters run on the server; "include done" is
-// applied here because the list API takes a single category.
+// Table view: every task of all your workspaces, of one workspace or of one project, as a sortable,
+// filterable table with multi-select and bulk actions. Filters run on the server; one workspace is
+// sorted and paged there too, all of them are fetched per workspace and merged and sorted here.
+// "Include done" is applied here because the list API takes a single category.
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type CSSProperties } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { fmtDue } from "../dates";
@@ -12,6 +13,8 @@ import { Avatar, LabelChip, Modal, PriorityIcon, StatusDot } from "../ui";
 import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
 import { ALL_CATEGORIES, errMsg, isClosed, isOverdue, pool, relTime, taskHref, viewsApi, type TaskQuery } from "./viewsApi";
+import { compareTasks } from "./tableSort";
+import { PlaceFilter } from "../places";
 import { parse, PASSTHROUGH, savedViewsApi, summary, toQuery, toSearch, viewHref, type SavedFilter, type SortKey, type TableFilters } from "./savedViews";
 import "./views.css";
 import { HelpButton } from "../help";
@@ -22,22 +25,34 @@ interface Sort {
 }
 
 const PAGE = 200;
+const MAX_PAGES = 5; // all workspaces: at most this many pages each (1000 tasks), then "+" says there are more
 
-export function TableView({ ws: wsSlug, pid }: { ws: string; pid?: number }) {
+const writableWs = (w: WorkspaceTree) => w.role !== "viewer" && w.role !== "commenter";
+
+// TableView: no ws, every workspace (/table); a ws, that workspace; a pid, that project.
+export function TableView({ ws: wsSlug, pid }: { ws?: string; pid?: number }) {
   const { tree, users, members } = useApp();
-  const ws = tree.find((w) => w.slug === wsSlug);
-  if (!ws) return <p className="danger">No workspace “{wsSlug}”.</p>;
-  const project = pid ? ws.projects.find((p) => p.id === pid) : undefined;
-  if (pid && !project) return <p className="danger">That project isn't in {ws.name}.</p>;
-  return <Table key={`${ws.id}:${pid ?? ""}`} ws={ws} pid={pid} users={users} memberIds={members.get(ws.id) ?? []} />;
+  const ws = wsSlug ? tree.find((w) => w.slug === wsSlug) : undefined;
+  if (wsSlug && !ws) return <p className="danger">No workspace “{wsSlug}”.</p>;
+  const project = ws && pid ? ws.projects.find((p) => p.id === pid) : undefined;
+  if (ws && pid && !project) return <p className="danger">That project isn't in {ws.name}.</p>;
+  const memberIds = [...new Set((ws ? [ws] : tree).flatMap((w) => members.get(w.id) ?? []))];
+  return <Table key={`${ws?.id ?? "all"}:${pid ?? ""}`} ws={ws} pid={pid} users={users} memberIds={memberIds} />;
 }
 
-function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number; users: ReturnType<typeof useApp>["users"]; memberIds: number[] }) {
-  const { tree, refresh, me, savedViews, reloadSavedViews } = useApp();
+function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number; users: ReturnType<typeof useApp>["users"]; memberIds: number[] }) {
+  const { tree, refresh, me, savedViews, reloadSavedViews, members } = useApp();
   const [loc, navigate] = useLocation();
   const search = useSearch();
-  const project = pid ? ws.projects.find((p) => p.id === pid) : undefined;
-  const canWrite = ws.role !== "viewer" && ws.role !== "commenter";
+  const project = ws && pid ? ws.projects.find((p) => p.id === pid) : undefined;
+  const scope = useMemo(() => (ws ? [ws] : tree), [ws, tree]);
+  const scopeKey = scope.map((w) => w.slug).join(",");
+  const canWrite = scope.some(writableWs);
+  const wsOfTask = (t: Task) => scope.find((w) => w.id === t.workspace_id);
+  const canWriteTask = (t: Task) => {
+    const w = wsOfTask(t);
+    return !!w && writableWs(w);
+  };
 
   // the filters live in the URL (shareable, and what saved views link to)
   const initial = useMemo(() => parse(new URLSearchParams(search), me.user.id).filters, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -84,6 +99,7 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
   const [cursor, setCursor] = useState<string | undefined>();
   const [error, setError] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
+  const [capped, setCapped] = useState(false); // all workspaces: some had more than MAX_PAGES pages
   const [labels, setLabels] = useState<Tag[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -93,12 +109,14 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
     return () => clearTimeout(t);
   }, [text]);
 
+  // the label filter goes by name, so one entry per name across the workspaces
   useEffect(() => {
-    api
-      .labels(ws.slug)
-      .then((r) => setLabels(r.items))
-      .catch(() => setLabels([]));
-  }, [ws.slug]);
+    Promise.allSettled(scope.map((w) => api.labels(w.slug))).then((res) => {
+      const seen = new Map<string, Tag>();
+      for (const r of res) if (r.status === "fulfilled") for (const l of r.value.items) if (!seen.has(l.name.toLowerCase())) seen.set(l.name.toLowerCase(), l);
+      setLabels([...seen.values()].sort((a, b) => a.name.localeCompare(b.name)));
+    });
+  }, [scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const query = useMemo<TaskQuery>(
     () => ({
@@ -115,40 +133,83 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
     [pid, category, label, assignee, prioMin, q, sort, extra],
   );
 
+  const loadSeq = useRef(0);
   const load = useCallback(() => {
     setError("");
-    viewsApi
-      .tasks(ws.slug, query)
-      .then((r) => {
-        setRows(r.items);
-        setCursor(r.next_cursor || undefined);
-        setSelected((s) => new Set([...s].filter((id) => r.items.some((t) => t.id === id))));
-      })
-      .catch((e: unknown) => setError(errMsg(e)));
-  }, [ws.slug, query]);
+    const seq = ++loadSeq.current;
+    const done = (items: Task[], next: string | undefined) => {
+      if (seq !== loadSeq.current) return; // a newer load (other filters) is on its way
+      setRows(items);
+      setCursor(next);
+      setSelected((s) => new Set([...s].filter((id) => items.some((t) => t.id === id))));
+    };
+    if (ws) {
+      viewsApi
+        .tasks(ws.slug, query)
+        .then((r) => done(r.items, r.next_cursor || undefined))
+        .catch((e: unknown) => seq === loadSeq.current && setError(errMsg(e)));
+      return;
+    }
+    // every workspace: each one's pages (up to MAX_PAGES), merged and sorted here
+    const all = async (w: WorkspaceTree): Promise<{ items: Task[]; more: boolean }> => {
+      const items: Task[] = [];
+      let cur: string | undefined;
+      for (let i = 0; i < MAX_PAGES; i++) {
+        const r = await viewsApi.tasks(w.slug, cur ? { ...query, cursor: cur } : query);
+        items.push(...r.items);
+        cur = r.next_cursor || undefined;
+        if (!cur) return { items, more: false };
+      }
+      return { items, more: true };
+    };
+    Promise.allSettled(scope.map(all)).then((res) => {
+      const items: Task[] = [];
+      const bad: string[] = [];
+      let more = false;
+      res.forEach((r, i) => {
+        if (r.status === "fulfilled") {
+          items.push(...r.value.items);
+          more ||= r.value.more;
+        } else bad.push(scope[i]!.name);
+      });
+      if (seq !== loadSeq.current) return;
+      done(items.sort((a, b) => compareTasks(a, b, sort)), undefined);
+      setCapped(more);
+      if (bad.length) setError(`Couldn't load the tasks of ${bad.join(", ")}.`);
+    });
+  }, [ws, scopeKey, query, sort]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(load, [load]);
 
   const more = () => {
-    if (!cursor) return;
+    if (!cursor || !ws) return;
+    const seq = loadSeq.current; // a filter change meanwhile makes this page stale
     setLoadingMore(true);
     viewsApi
       .tasks(ws.slug, { ...query, cursor })
       .then((r) => {
+        if (seq !== loadSeq.current) return;
         setRows((cur) => [...(cur ?? []), ...r.items.filter((t) => !(cur ?? []).some((c) => c.id === t.id))]);
         setCursor(r.next_cursor || undefined);
       })
-      .catch((e: unknown) => setError(errMsg(e)))
+      .catch((e: unknown) => seq === loadSeq.current && setError(errMsg(e)))
       .finally(() => setLoadingMore(false));
   };
 
   // an explicit done/cancelled category filter wins over the toggle
   const visible = useMemo(() => (rows ?? []).filter((t) => includeDone || category !== "" || !isClosed(t.status_category)), [rows, includeDone, category]);
   const hidden = (rows?.length ?? 0) - visible.length;
-  const projectOf = (id: number) => ws.projects.find((p) => p.id === id);
+  const projectOf = (id: number) => {
+    for (const w of scope) {
+      const p = w.projects.find((x) => x.id === id);
+      if (p) return p;
+    }
+    return undefined;
+  };
   const candidates = assignable(users, memberIds);
 
-  const allOn = visible.length > 0 && visible.every((t) => selected.has(t.id));
-  const toggleAll = () => setSelected(allOn ? new Set() : new Set(visible.map((t) => t.id)));
+  const selectable = visible.filter(canWriteTask);
+  const allOn = selectable.length > 0 && selectable.every((t) => selected.has(t.id));
+  const toggleAll = () => setSelected(allOn ? new Set() : new Set(selectable.map((t) => t.id)));
   const toggle = (id: number) =>
     setSelected((s) => {
       const n = new Set(s);
@@ -167,52 +228,46 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
     setPrioMin(0);
     setExtra({});
   };
-  const views = savedViews.filter((v) => v.workspace_id === ws.id || v.workspace_id === null);
+  const views = savedViews.filter((v) => v.workspace_id === null || (ws ? v.workspace_id === ws.id : false));
   const here = loc + (search ? "?" + search : "");
   const canSave = hasCap(me, "saved_filters");
 
   const selectedTasks = visible.filter((t) => selected.has(t.id));
-  const boardHref = project ? `/w/${ws.slug}/p/${project.id}` : null;
+  // bulk assign offers only people who can be assigned in every workspace of the selection
+  const selWs = [...new Set(selectedTasks.map((t) => t.workspace_id))];
+  const bulkCandidates = candidates.filter((u) => u.is_admin || selWs.every((id) => (members.get(id) ?? []).includes(u.id)));
+  const boardHref = project ? `/board?p=${project.id}` : ws ? `/board?ws=${ws.slug}` : "/board";
+  // the filter at the top moves between the tables: all, a workspace, a project (same filters kept)
+  const place = project ? `p:${project.id}` : ws ? `w:${ws.id}` : "";
+  const goPlace = (v: string) => {
+    const id = Number(v.slice(2));
+    const w = v.startsWith("p:") ? tree.find((x) => x.projects.some((p) => p.id === id)) : tree.find((x) => x.id === id);
+    const base = !v || !w ? "/table" : v.startsWith("p:") ? `/w/${w.slug}/p/${id}/table` : `/w/${w.slug}/table`;
+    navigate(search ? `${base}?${search}` : base);
+  };
 
   return (
     <div className="vw-page">
       <header className="page-head">
         <div>
           <div className="crumb">
-            <WorkspaceBadge ws={ws} />
+            {ws ? <WorkspaceBadge ws={ws} /> : <span className="pill pill-muted">All workspaces</span>}
             {project && <span className="pill pill-key">{project.key}</span>}
             <span className="muted small">
-              {rows === null ? "Loading…" : `${visible.length}${cursor ? "+" : ""} tasks`}
+              {rows === null ? "Loading…" : `${visible.length}${cursor || capped ? "+" : ""} tasks`}
               {hidden > 0 && ` · ${hidden} done hidden`}
             </span>
           </div>
           <h1>
-            {project ? `${project.name} · Table` : `${ws.name} · All tasks`}
+            {project ? `${project.name} · Table` : ws ? `${ws.name} · All tasks` : "All tasks"}
             <HelpButton topic="views" label="Help: tables and saved views" />
           </h1>
         </div>
         <div className="row vw-head-actions">
-          {project ? (
-            <>
-              <Link href={`/w/${ws.slug}/table`} className="button secondary small">
-                Whole workspace
-              </Link>
-              <Link href={boardHref!} className="button secondary small">
-                <Icon name="board" /> Board
-              </Link>
-            </>
-          ) : (
-            ws.projects.length > 0 && (
-              <select aria-label="Limit to a project" value="" onChange={(e) => e.target.value && navigate(`/w/${ws.slug}/p/${e.target.value}/table`)}>
-                <option value="">Limit to project…</option>
-                {ws.projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.key} · {p.name}
-                  </option>
-                ))}
-              </select>
-            )
-          )}
+          <PlaceFilter value={place} onChange={goPlace} tree={tree} />
+          <Link href={boardHref} className="button secondary small">
+            <Icon name="board" /> Board
+          </Link>
         </div>
       </header>
 
@@ -282,6 +337,7 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
       {saving && (
         <SaveView
           ws={ws}
+          tree={tree}
           query={toQuery(filters, pid)}
           existing={views}
           onClose={() => setSaving(false)}
@@ -296,7 +352,7 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
         <BulkBar
           tasks={selectedTasks}
           labels={labels}
-          candidates={candidates}
+          candidates={bulkCandidates}
           onClear={() => setSelected(new Set())}
           onDone={() => {
             load();
@@ -317,7 +373,7 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
             <tr>
               {canWrite && (
                 <th className="vw-check">
-                  <input type="checkbox" checked={allOn} onChange={toggleAll} aria-label="Select all shown tasks" disabled={visible.length === 0} />
+                  <input type="checkbox" checked={allOn} onChange={toggleAll} aria-label="Select all shown tasks" disabled={selectable.length === 0} />
                 </th>
               )}
               <SortTh label="Key" k="number" sort={sort} onSort={clickSort} />
@@ -340,7 +396,7 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
                 <tr key={t.id} className={on ? "vw-on" : undefined} onClick={(e) => !(e.target as HTMLElement).closest("a, button, input, label") && navigate(href)}>
                   {canWrite && (
                     <td className="vw-check">
-                      <input type="checkbox" checked={on} onChange={() => toggle(t.id)} aria-label={`Select ${t.key}`} />
+                      {canWriteTask(t) && <input type="checkbox" checked={on} onChange={() => toggle(t.id)} aria-label={`Select ${t.key}`} />}
                     </td>
                   )}
                   <td className="vw-nowrap vw-key">{t.key}</td>
@@ -391,6 +447,11 @@ function Table({ ws, pid, users, memberIds }: { ws: WorkspaceTree; pid?: number;
           </tbody>
         </table>
         {rows !== null && visible.length === 0 && <div className="vw-empty">{filtered ? "No tasks match these filters." : "No open tasks here."}</div>}
+        {capped && (
+          <div className="vw-more muted small">
+            Some workspaces have more than {MAX_PAGES * PAGE} matching tasks; only their first {MAX_PAGES * PAGE} (in this order) are here. Narrow the filters, or open one workspace's table to page through all of it.
+          </div>
+        )}
         {cursor && (
           <div className="vw-more">
             <button type="button" className="button secondary small" onClick={more} disabled={loadingMore}>
@@ -449,17 +510,18 @@ function ViewChip({ view, href, active, onDeleted }: { view: SavedFilter; href: 
   );
 }
 
-function SaveView({ ws, query, existing, onClose, onSaved }: {
-  ws: WorkspaceTree; query: Record<string, string>; existing: SavedFilter[]; onClose: () => void; onSaved: () => void;
+// ws unset: a view across every workspace
+function SaveView({ ws, tree, query, existing, onClose, onSaved }: {
+  ws?: WorkspaceTree; tree: WorkspaceTree[]; query: Record<string, string>; existing: SavedFilter[]; onClose: () => void; onSaved: () => void;
 }) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const same = existing.find((v) => v.workspace_id === ws.id && v.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const same = existing.find((v) => v.workspace_id === (ws?.id ?? null) && v.name.trim().toLowerCase() === name.trim().toLowerCase());
   const chips = summary(query);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const body = { workspace_id: ws.id, name: name.trim(), query };
+    const body = { workspace_id: ws?.id ?? null, name: name.trim(), query };
     setBusy(true);
     (same ? savedViewsApi.update(same.id, body) : savedViewsApi.create(body))
       .then(onSaved)
@@ -474,8 +536,8 @@ function SaveView({ ws, query, existing, onClose, onSaved }: {
           <input value={name} required maxLength={60} placeholder="e.g. Urgent ops" onChange={(e) => setName(e.target.value)} />
         </label>
         <div className="span2 vw-chips">
-          <WorkspaceBadge ws={ws} />
-          {query.project && <span className="pill pill-key">{ws.projects.find((p) => String(p.id) === query.project)?.key ?? "project"}</span>}
+          {ws ? <WorkspaceBadge ws={ws} /> : <span className="pill pill-muted">All workspaces</span>}
+          {query.project && <span className="pill pill-key">{(ws ? [ws] : tree).flatMap((w) => w.projects).find((p) => String(p.id) === query.project)?.key ?? "project"}</span>}
           {chips.length ? chips.map((c) => <span key={c} className="pill pill-muted">{c}</span>) : <span className="muted small">no filters: every open task</span>}
           {query.sort && <span className="pill pill-muted">sort {query.sort}</span>}
         </div>

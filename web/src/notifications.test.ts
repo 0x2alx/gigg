@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { badgeCount, kindInfo, notificationText, placePopover } from "./notifications";
+import { badgeCount, kindInfo, notificationText, placeBelow } from "./notifications";
 
 describe("notificationText", () => {
   it("names the actor and the task", () => {
@@ -29,28 +29,25 @@ describe("badgeCount", () => {
   });
 });
 
-describe("placePopover", () => {
+describe("placeBelow", () => {
   const vp = { width: 1280, height: 800 };
   const size = { width: 380, height: 420 };
-  it("opens beside the sidebar edge with the notch on the bell", () => {
-    const p = placePopover({ top: 100, height: 32 }, 220, size, vp);
-    expect(p.left).toBe(232);
-    expect(p.top).toBe(92);
-    expect(p.arrowY).toBe(24);
+  it("hangs under the bell, right edges in line, notch on the bell", () => {
+    const p = placeBelow({ left: 1200, right: 1236, bottom: 48 }, size, vp);
+    expect(p.top).toBe(58);
+    expect(p.left).toBe(1236 - 380);
+    expect(p.arrowX).toBe(1218 - p.left);
   });
-  it("stays inside the viewport near the bottom, notch still on the bell", () => {
-    const p = placePopover({ top: 700, height: 32 }, 220, size, vp);
-    expect(p.top).toBe(800 - 420 - 8);
-    expect(p.arrowY).toBe(716 - p.top);
+  it("stays inside the left margin on a narrow viewport and drops the notch when it can't point", () => {
+    const p = placeBelow({ left: 10, right: 46, bottom: 48 }, size, { width: 400, height: 800 });
+    expect(p.left).toBe(8);
+    expect(p.arrowX).toBe(20);
+    const q = placeBelow({ left: 0, right: 12, bottom: 48 }, size, { width: 400, height: 800 });
+    expect(q.arrowX).toBeNull();
   });
-  it("never goes above the top margin", () => {
-    const p = placePopover({ top: 0, height: 20 }, 220, size, vp);
-    expect(p.top).toBe(8);
-    expect(p.arrowY).toBe(12);
-  });
-  it("clamps into narrow viewports and drops the notch", () => {
-    const p = placePopover({ top: 100, height: 32 }, 220, size, { width: 500, height: 800 });
-    expect(p.left).toBe(500 - 380 - 8);
-    expect(p.arrowY).toBeNull();
+  it("moves up on a short viewport and then drops the notch", () => {
+    const p = placeBelow({ left: 1200, right: 1236, bottom: 48 }, size, { width: 1280, height: 450 });
+    expect(p.top).toBe(450 - 420 - 8);
+    expect(p.arrowX).toBeNull();
   });
 });

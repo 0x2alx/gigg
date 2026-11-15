@@ -26,11 +26,16 @@ export interface Theme {
   controlShape?: "pill" | "rounded"; // buttons, fields, pills and badges fully round, or following the corners
   laneColor?: string | null; // the board's column background (unset: a step between page and cards)
   laneBorder?: string | null; // the column outline (unset: none)
+  logoColor?: string | null; // the gigg ship in the sidebar (unset: the accent)
 }
 
-// laneOf / laneBorderOf: the column colours a theme ends up with (its own, or derived)
+// the gigg-only colour keys (each optional: unset means derived)
+export const EXTRA_COLOURS = ["laneColor", "laneBorder", "logoColor"] as const;
+
+// laneOf / laneBorderOf / logoOf: the column colours a theme ends up with (its own, or derived)
 export const laneOf = (t: Pick<Theme, "laneColor" | "background" | "surface">): string => t.laneColor ?? mix(t.background, t.surface, 0.5);
 export const laneBorderOf = (t: Pick<Theme, "laneBorder">): string | null => t.laneBorder ?? null;
+export const logoOf = (t: Pick<Theme, "logoColor" | "accent">): string => t.logoColor ?? t.accent;
 
 export const BUILTINS: Theme[] = [
   { id: "clumsy-clanker", name: "Clumsy Clanker", dark: true, background: "#100318", surface: "#1C0A2E", surfaceVariant: "#2A1247",
@@ -41,10 +46,10 @@ export const BUILTINS: Theme[] = [
     border: "#2D393E", accent: "#CDFFFB", onAccent: "#12302E", text: "#EEF8F7", mutedText: "#A3B6B8", danger: "#FF8A80", secondary: null,
     font: "Rubik", fontWeight: "Medium", textScalePct: 93, cornerDp: 9, borderDp: 1, controlShape: "pill",
     description: "Slate blue-grey with a pale aqua accent, pill buttons. The default in dark mode." },
-  { id: "daywalker", name: "Daywalker", dark: false, background: "#EEF2F1", surface: "#FFFFFF", surfaceVariant: "#F2F5F4",
-    border: "#E1E7E5", accent: "#5967DB", onAccent: "#FFFFFF", text: "#1A1D24", mutedText: "#5A6372", danger: "#C62828", secondary: null,
-    font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 12, borderDp: 1, controlShape: "pill", laneColor: "#E5EBE9",
-    description: "Soft mint-grey page, white panels and cards, pill buttons and an indigo accent. The default in light mode." },
+  { id: "daywalker", name: "Daywalker", dark: false, background: "#ECECE6", surface: "#FBF9F3", surfaceVariant: "#F3F0E8",
+    border: "#E2DFD6", accent: "#5967DB", onAccent: "#FFFFFF", text: "#1A1D24", mutedText: "#5A6170", danger: "#C62828", secondary: null,
+    font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 12, borderDp: 1, controlShape: "pill", laneColor: "#E3E2DA",
+    description: "Soft warm-grey page, eggshell panels and cards, pill buttons and an indigo accent. The default in light mode." },
   { id: "petty-officer", name: "Petty Officer", dark: true, background: "#0C140D", surface: "#141E15", surfaceVariant: "#1E2C1F",
     border: "#3C5A38", accent: "#F0B429", onAccent: "#1A1200", text: "#ECF3EA", mutedText: "#A9BFA2", danger: "#FF5C52", secondary: "#3E6B3A",
     font: "Michroma", fontWeight: "Medium", textScalePct: 90, cornerDp: 6, borderDp: 1,
@@ -188,8 +193,9 @@ export function applyTheme(t: Theme): void {
   set("--low", mix(t.background, t.surface, 0.5));
   set("--lane", laneOf(t));
   set("--lane-border", laneBorderOf(t) ?? "transparent");
+  set("--logo", logoOf(t));
   set("--ctl-r", t.controlShape === "pill" ? "999px" : "var(--radius-m)");
-  set("--ctl-px", t.controlShape === "pill" ? "0.85rem" : "0.6rem");
+  set("--ctl-px", t.controlShape === "pill" ? "0.75rem" : "0.6rem");
   document.documentElement.dataset.shape = t.controlShape === "pill" ? "pill" : "rounded";
   set("--high", mix(t.surface, t.surfaceVariant, 0.5));
   set("--faint", mix(t.border, t.surface, 0.5));
@@ -267,12 +273,12 @@ export const DATA_COLORS: string[] = [...new Set([...PALETTE, ...Object.values(C
 // =====================================================================================
 
 export const COLOUR_KEYS = ["background", "surface", "surfaceVariant", "border", "accent", "onAccent", "text", "mutedText", "danger"] as const;
-export type ColourKey = (typeof COLOUR_KEYS)[number] | "secondary" | "laneColor" | "laneBorder";
+export type ColourKey = (typeof COLOUR_KEYS)[number] | "secondary" | "laneColor" | "laneBorder" | "logoColor";
 
 export const ROLE_LABEL: Record<ColourKey, string> = {
   background: "Background", surface: "Cards", surfaceVariant: "Inputs and chips", border: "Borders", accent: "Accent",
   onAccent: "Text on the accent", secondary: "Secondary buttons", text: "Text", mutedText: "Secondary text", danger: "Warnings",
-  laneColor: "Board columns", laneBorder: "Column borders",
+  laneColor: "Board columns", laneBorder: "Column borders", logoColor: "Logo",
 };
 
 // colourOf: a role's colour as shown (secondary and the board columns fall back to their derived colour)
@@ -280,6 +286,7 @@ export function colourOf(t: Theme, k: ColourKey): string {
   if (k === "secondary") return secondaryOf(t);
   if (k === "laneColor") return laneOf(t);
   if (k === "laneBorder") return laneBorderOf(t) ?? laneOf(t);
+  if (k === "logoColor") return logoOf(t);
   return t[k];
 }
 
@@ -326,7 +333,7 @@ export function sane(t: Theme): Theme {
   if (!/^[A-Za-z0-9 ]{1,60}$/.test(out.font)) out.font = "Phone default";
   // the extras: kept when valid, otherwise left out (not null), so a theme without them stays as it was
   if (out.controlShape !== "pill") delete out.controlShape;
-  for (const k of ["laneColor", "laneBorder"] as const) {
+  for (const k of EXTRA_COLOURS) {
     const c = out[k] ? parseColour(out[k]) : null;
     if (c) out[k] = c;
     else delete out[k];
@@ -352,6 +359,7 @@ export function themeJSON(t: Theme): string {
   if (t.controlShape === "pill") o.controlShape = "pill";
   if (t.laneColor) o.laneColor = t.laneColor;
   if (t.laneBorder) o.laneBorder = t.laneBorder;
+  if (t.logoColor) o.logoColor = t.logoColor;
   if (t.widget) o.widget = t.widget;
   return JSON.stringify(o, null, 4);
 }
@@ -455,6 +463,7 @@ export function fromObject(o: Record<string, unknown>, current: Theme, notes: st
   delete t.controlShape;
   delete t.laneColor;
   delete t.laneBorder;
+  delete t.logoColor;
   if (typeof o.dark === "boolean") t.dark = o.dark;
   for (const k of COLOUR_KEYS) {
     if (!(k in o)) continue;
@@ -481,7 +490,7 @@ export function fromObject(o: Record<string, unknown>, current: Theme, notes: st
   for (const k of ["textScalePct", "cornerDp", "borderDp"] as const) if (typeof o[k] === "number") t[k] = o[k] as number;
   if (o.widget && typeof o.widget === "object" && !Array.isArray(o.widget)) t.widget = o.widget as Record<string, unknown>;
   if (o.controlShape === "pill") t.controlShape = "pill";
-  for (const k of ["laneColor", "laneBorder"] as const) {
+  for (const k of EXTRA_COLOURS) {
     if (!(k in o) || o[k] === null) continue;
     const c = parseColour(o[k]);
     if (c) t[k] = c;

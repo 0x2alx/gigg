@@ -124,11 +124,12 @@ export function EffortSelect({ value, onChange, disabled, label = "Effort" }: { 
 }
 
 // RunSettingsFields: the run fields for a form (new task, template, recurring task).
-export function RunSettingsFields({ value, onChange, canAlways, canTools }: { value: RunSettings; onChange: (v: RunSettings) => void; canAlways: boolean; canTools: boolean }) {
+// bare: no frame or legend (the caller's own section heading names it)
+export function RunSettingsFields({ value, onChange, canAlways, canTools, bare }: { value: RunSettings; onChange: (v: RunSettings) => void; canAlways: boolean; canTools: boolean; bare?: boolean }) {
   return (
-    <fieldset className="span2 run-settings">
-      <legend className="field-label">
-        Agent run <HelpButton topic="agents" label="Help: how agents run tasks" />
+    <fieldset className={"span2 run-settings" + (bare ? " bare" : "")}>
+      <legend className={bare ? "sr-only" : "field-label"}>
+        Agent run {!bare && <HelpButton topic="agents" label="Help: how agents run tasks" />}
       </legend>
       <label>
         Model

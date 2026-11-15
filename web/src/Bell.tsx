@@ -1,13 +1,13 @@
 // The bell: unread notifications (mentions, assignments, questions, missed windows, comments).
-// A sidebar item with a count; on wide screens it opens a popover, on narrow ones the
+// A top-bar button with a count; on wide screens it opens a popover, on narrow ones the
 // /notifications page. Polls the count every 60 s and refreshes (debounced) on live activity.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { api } from "./api";
 import { useApp } from "./App";
 import { countsChange, onActivity } from "./live";
-import { badgeCount, kindInfo, notificationsApi, notificationText, placePopover, type Notification, type Placement } from "./notifications";
+import { badgeCount, kindInfo, notificationsApi, notificationText, placeBelow, type Notification, type Placement } from "./notifications";
 import { Avatar } from "./ui";
 import { Icon } from "./icons";
 import { errMsg, relTime, taskHref } from "./views/viewsApi";
@@ -47,54 +47,37 @@ export function useUnread(): number {
 
 const narrow = () => matchMedia("(max-width: 720px)").matches;
 
-// TopBell: the phone top bar's bell, a link to the notifications page with the unread count.
+// TopBell: the top bar's bell with the unread count. Wide screens: a popover under it; phones: the
+// notifications page.
 export function TopBell() {
-  const unread = useUnread();
-  const label = unread ? `Notifications, ${unread} unread` : "Notifications";
-  return (
-    <Link href="/notifications" className="icon-button topbar-bell" aria-label={label} title={label}>
-      <Icon name="bell" />
-      {unread > 0 && <span className="count count-alert">{badgeCount(unread)}</span>}
-    </Link>
-  );
-}
-
-export function BellButton({ collapsed }: { collapsed: boolean }) {
   const unread = useUnread();
   const [loc, navigate] = useLocation();
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
-  const active = loc === "/notifications";
   const label = unread ? `Notifications, ${unread} unread` : "Notifications";
-  const click = () => {
-    if (narrow()) navigate("/notifications");
-    else setOpen((o) => !o);
-  };
+  const close = useCallback(() => setOpen(false), []);
   return (
     <>
       <button
         ref={btn}
         type="button"
-        className={"nav-item bell" + (active || open ? " selected" : "")}
-        onClick={click}
+        className={"icon-button topbar-icon" + (open || loc === "/notifications" ? " on" : "")}
+        onClick={() => (narrow() ? navigate("/notifications") : setOpen((o) => !o))}
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-label={label}
         title={label}
-        aria-label={collapsed ? label : undefined}
       >
-        <span className="nav-icon" aria-hidden="true">
-          <Icon name="bell" />
-        </span>
-        {!collapsed && <span className="nav-label">Notifications</span>}
+        <Icon name="bell" />
         {unread > 0 && <span className="count count-alert">{badgeCount(unread)}</span>}
       </button>
-      {open && <BellPopover anchor={btn.current} onClose={() => setOpen(false)} />}
+      {open && <BellPopover anchor={btn.current} onClose={close} />}
     </>
   );
 }
 
-// BellPopover: rendered into <body> (a portal) so no sidebar overflow or page stacking context can
-// clip it or paint over it; it sits beside the sidebar edge with a notch pointing at the bell.
+// BellPopover: rendered into <body> (a portal) so no page stacking context can clip it or paint over it;
+// it hangs under the bell, its right edge in line with the bell's, inside the viewport.
 function BellPopover({ anchor, onClose }: { anchor: HTMLElement | null; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Placement | null>(null);
@@ -103,20 +86,15 @@ function BellPopover({ anchor, onClose }: { anchor: HTMLElement | null; onClose:
     if (!anchor || !el) return;
     const place = () => {
       const r = anchor.getBoundingClientRect();
-      const edge = anchor.closest(".sidebar")?.getBoundingClientRect().right ?? r.right;
-      setPos(placePopover({ top: r.top, height: r.height }, edge, { width: el.offsetWidth, height: el.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }));
+      setPos(placeBelow({ left: r.left, right: r.right, bottom: r.bottom }, { width: el.offsetWidth, height: el.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }));
     };
     place();
     const ro = new ResizeObserver(place);
     ro.observe(el);
-    const side = anchor.closest(".sidebar");
-    if (side) ro.observe(side); // a peeking sidebar widens and folds back: the popover follows its edge
     window.addEventListener("resize", place);
-    side?.addEventListener("scroll", place);
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", place);
-      side?.removeEventListener("scroll", place);
     };
   }, [anchor]);
   // focus moves into the popover once it is placed (a hidden element can't take focus)
@@ -129,21 +107,24 @@ function BellPopover({ anchor, onClose }: { anchor: HTMLElement | null; onClose:
       const t = e.target as Node;
       if (!ref.current?.contains(t) && !anchor?.contains(t)) onClose();
     };
+    // capture phase, and stopped: Esc closes only the popover, not the task panel (or dialog) under it
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
       onClose();
       anchor?.focus();
     };
     document.addEventListener("mousedown", down);
-    document.addEventListener("keydown", key);
+    document.addEventListener("keydown", key, true);
     return () => {
       document.removeEventListener("mousedown", down);
-      document.removeEventListener("keydown", key);
+      document.removeEventListener("keydown", key, true);
     };
   }, [anchor, onClose]);
-  const style = { top: pos?.top ?? 8, left: pos?.left ?? 8, visibility: pos ? undefined : "hidden", "--notch-y": `${pos?.arrowY ?? 0}px` } as CSSProperties;
+  const style = { top: pos?.top ?? 8, left: pos?.left ?? 8, visibility: pos ? undefined : "hidden", "--notch-x": `${pos?.arrowX ?? 0}px` } as CSSProperties;
   return createPortal(
-    <div ref={ref} tabIndex={-1} className={"bell-pop" + (pos?.arrowY != null ? " has-notch" : "")} role="dialog" aria-label="Notifications" style={style}>
+    <div ref={ref} tabIndex={-1} className={"bell-pop" + (pos?.arrowX != null ? " has-notch" : "")} role="dialog" aria-label="Notifications" style={style}>
       <div className="bell-pop-body">
         <NotificationList compact onNavigate={onClose} />
       </div>

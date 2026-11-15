@@ -150,8 +150,15 @@ export const reducedMotion = (): boolean => typeof matchMedia === "function" && 
 // EXIT_MS: how long a dialog or the task panel takes to animate out before it really closes
 export const EXIT_MS = 150;
 
-export function Modal({ title, onClose, children, wide, xl, help }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; xl?: boolean; help?: ReactNode }) {
+// expandable: a button in the header grows the dialog to the whole page (and back); the choice is
+// remembered on this device for the next expandable dialog.
+export function Modal({ title, onClose, children, wide, xl, help, expandable }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; xl?: boolean; help?: ReactNode; expandable?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [full, setFull] = useState(() => !!expandable && readFull());
+  const toggleFull = () => {
+    writeFull(!full);
+    setFull(!full);
+  };
   // onClose through a ref: the focus setup runs once per dialog, not on every render of a caller that
   // passes a new function each time (that sent the focus back to the first button at each click)
   const closeRef = useRef(onClose);
@@ -204,10 +211,15 @@ export function Modal({ title, onClose, children, wide, xl, help }: { title: str
   }, []);
   return (
     <div className={"modal-backdrop" + (closing ? " closing" : "") + (reopen ? " reopen" : "")} inert={closing || undefined} onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className={"modal" + (xl ? " modal-xl" : wide ? " modal-wide" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
+      <div className={"modal" + (xl ? " modal-xl" : wide ? " modal-wide" : "") + (full ? " modal-full" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <div className="modal-head">
           <h2>{title}</h2>
           {help}
+          {expandable && (
+            <button type="button" className="icon-button modal-expand" onClick={toggleFull} aria-label={full ? "Back to a dialog" : "Expand to the whole page"} title={full ? "Back to a dialog" : "Expand to the whole page"}>
+              <Icon name={full ? "shrink" : "expand"} />
+            </button>
+          )}
           <button type="button" className="icon-button" onClick={close} aria-label="Close">
             <Icon name="x" />
           </button>
@@ -216,6 +228,23 @@ export function Modal({ title, onClose, children, wide, xl, help }: { title: str
       </div>
     </div>
   );
+}
+
+const FULL_KEY = "gigg:modal-full";
+function readFull(): boolean {
+  try {
+    return localStorage.getItem(FULL_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeFull(on: boolean) {
+  try {
+    if (on) localStorage.setItem(FULL_KEY, "1");
+    else localStorage.removeItem(FULL_KEY);
+  } catch {
+    // storage blocked: the choice lasts for this dialog only
+  }
 }
 
 // TaskBadges: the schedule, time-window and missed badges (cards and the task panel). With items

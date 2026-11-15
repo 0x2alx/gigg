@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Schedule } from "./api";
 import { defaultRepeat } from "./recurrence";
-import { repeatOfSchedule, sameTiming, scheduleBody } from "./Schedules";
+import { repeatOfSchedule, sameTiming, scheduleBody } from "./scheduleTiming";
 
 const fri: Schedule = {
   id: 3, workspace_id: 1, name: "Fridays", freq: "weekly", interval: 1, weekdays: [5], month_day: null, tz: "UTC",

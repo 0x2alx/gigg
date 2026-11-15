@@ -1,35 +1,55 @@
-// The project's task templates (plus the workspace-wide ones): list with badges; new, edit, delete.
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import { api, ApiError, type Status, type Tag, type Template } from "./api";
+// Every task template in reach, across the workspaces (narrowed by an optional workspace/project filter;
+// a project shows its own and its workspace's "any project" ones): list with badges; new, edit, delete.
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { api, ApiError, hasCap, type Tag, type Template } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
+import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
+import { WorkspaceBadge } from "./WorkspaceBadge";
 import { TaskModal } from "./TaskModal";
 import { Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
-export function TemplatesModal({ ws, projectId, statuses, labels, canEdit, onClose, onChanged }: {
-  ws: WorkspaceTree;
-  projectId: number;
-  statuses: Status[];
-  labels: Tag[];
-  canEdit: boolean;
+const canWriteIn = (ws: WorkspaceTree) => ws.role !== "viewer" && ws.role !== "commenter";
+
+export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
+  initialPlace?: Place;
   onClose: () => void;
   onChanged: (message?: string) => void;
 }) {
-  const { users } = useApp();
+  const { users, tree, me } = useApp();
   const [items, setItems] = useState<Template[] | null>(null);
+  const [labelsOf, setLabelsOf] = useState<Map<number, Tag[]>>(new Map());
+  const [place, setPlace] = useState<Place>(initialPlace);
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState<Template | "new" | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null);
   const closeEdit = useCallback(() => setEditing(null), []);
 
+  const wsKey = tree.map((w) => w.id).join(",");
+  const loadSeq = useRef(0);
   const load = useCallback(() => {
-    api
-      .templates(ws.id, projectId)
-      .then((r) => setItems(r.items))
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't load the templates."));
-  }, [ws.id, projectId]);
+    const seq = ++loadSeq.current;
+    Promise.allSettled(tree.map((w) => api.templates(w.id))).then((res) => {
+      if (seq !== loadSeq.current) return; // a newer load is on its way
+      const all: Template[] = [];
+      const bad: string[] = [];
+      res.forEach((r, i) => (r.status === "fulfilled" ? all.push(...r.value.items) : bad.push(tree[i]!.name)));
+      setItems(all.sort((a, b) => a.name.localeCompare(b.name)));
+      setErr(bad.length ? `Couldn't load the templates of ${bad.join(", ")}.` : "");
+    });
+  }, [wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(load, [load]);
+  useEffect(() => {
+    Promise.allSettled(tree.map((w) => api.labels(w.slug))).then((res) =>
+      setLabelsOf(new Map(res.flatMap((r, i) => (r.status === "fulfilled" ? [[tree[i]!.id, r.value.items] as [number, Tag[]]] : [])))),
+    );
+  }, [wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const wsOf = useCallback((id: number) => tree.find((w) => w.id === id), [tree]);
+  const canEditIn = useCallback((w: WorkspaceTree) => canWriteIn(w) && hasCap(me, "templates", w.id), [me]);
+  const shown = useMemo(() => (items ?? []).filter((t) => placeMatch(place, tree, t.workspace_id, t.project_id)), [items, place, tree]);
+  const editable = useMemo(() => tree.filter(canEditIn), [tree, canEditIn]);
+  const start = placeStart(place, tree, (w) => editable.includes(w));
 
   const remove = (t: Template) => {
     setErr("");
@@ -42,13 +62,16 @@ export function TemplatesModal({ ws, projectId, statuses, labels, canEdit, onClo
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't delete the template."));
   };
 
-  if (editing) {
+  const editWs = editing && editing !== "new" ? wsOf(editing.workspace_id) : undefined;
+  if (editing && (editing === "new" ? start : editWs)) {
+    const w = editing === "new" ? start!.ws : editWs!;
     return (
       <TaskModal
-        ws={ws}
-        projectId={projectId}
-        statuses={statuses}
-        labels={labels}
+        ws={w}
+        projectId={editing === "new" ? start!.projectId : (editing.project_id ?? w.projects[0]?.id ?? 0)}
+        statuses={[]}
+        labels={labelsOf.get(w.id) ?? []}
+        choices={editing === "new" ? editable : undefined}
         template={editing}
         onClose={closeEdit}
         onCreated={(msg) => {
@@ -66,16 +89,25 @@ export function TemplatesModal({ ws, projectId, statuses, labels, canEdit, onClo
           {err}
         </p>
       )}
+      <div className="list-bar">
+        <PlaceFilter value={place} onChange={setPlace} tree={tree} />
+        {items && <span className="muted small">{shown.length === items.length ? `${items.length} templates` : `${shown.length} of ${items.length}`}</span>}
+      </div>
       {items === null && !err && <p className="muted">Loading…</p>}
-      {items?.length === 0 && <p className="muted">No templates yet. Save one from the new-task form, or make one here.</p>}
-      {items && items.length > 0 && (
+      {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No templates yet. Save one from the new-task form, or make one here." : "None here. Show everything to see the others."}</p>}
+      {shown.length > 0 && (
         <ul className="schedules" aria-label="Templates">
-          {items.map((t) => (
+          {shown.map((t) => {
+            const tws = wsOf(t.workspace_id);
+            const canEdit = !!tws && canEditIn(tws);
+            const labels = labelsOf.get(t.workspace_id) ?? [];
+            return (
             <li key={t.id} className="schedule" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
               <div className="schedule-top">
                 <span className="pill pill-accent"><Icon name="template" /></span>
                 <strong className="schedule-title">{t.name}</strong>
-                {t.project_id === null ? <span className="pill pill-ws">any project</span> : <span className="pill pill-key">{ws.projects.find((p) => p.id === t.project_id)?.key ?? "?"}</span>}
+                {tws && tree.length > 1 && <WorkspaceBadge ws={tws} />}
+                {t.project_id === null ? <span className="pill pill-ws">any project</span> : <span className="pill pill-key">{tws?.projects.find((p) => p.id === t.project_id)?.key ?? "?"}</span>}
                 <PriorityBadge priority={t.priority} />
               </div>
               <div className="schedule-rule">{t.title}</div>
@@ -127,10 +159,11 @@ export function TemplatesModal({ ws, projectId, statuses, labels, canEdit, onClo
                 </div>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
-      {canEdit && (
+      {start && (
         <div className="row end">
           <button type="button" className="button" onClick={() => setEditing("new")}>
             + New template

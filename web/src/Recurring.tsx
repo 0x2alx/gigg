@@ -1,7 +1,10 @@
-// The project's recurring tasks (a template on a schedule): rule, next occurrence, counts; pause, edit, delete.
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { api, ApiError, fmtDate, recurrenceBody, type Recurrence, type Status, type Tag } from "./api";
+// Every recurring task in reach (a template on a schedule), across the workspaces, narrowed by an optional
+// workspace/project filter: rule, next occurrence, counts; pause, edit, delete.
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { api, ApiError, fmtDate, hasCap, recurrenceBody, type Recurrence, type Tag } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
+import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
+import { WorkspaceBadge } from "./WorkspaceBadge";
 import { describeRule, fmtInstant, localTZ } from "./recurrence";
 import { TaskModal } from "./TaskModal";
 import { SCHEDULE_COLOR } from "./theme";
@@ -9,18 +12,18 @@ import { Avatar, LabelChip, Modal, Pill, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
-export function RecurringModal({ ws, projectId, statuses, labels, canWrite, highlight, onClose, onChanged }: {
-  ws: WorkspaceTree;
-  projectId: number;
-  statuses: Status[];
-  labels: Tag[];
-  canWrite: boolean;
+const canWriteIn = (ws: WorkspaceTree) => ws.role !== "viewer" && ws.role !== "commenter";
+
+export function RecurringModal({ initialPlace = "", highlight, onClose, onChanged }: {
+  initialPlace?: Place;
   highlight?: number;
   onClose: () => void;
   onChanged: (message?: string) => void;
 }) {
-  const { users } = useApp();
+  const { users, tree, me } = useApp();
   const [items, setItems] = useState<Recurrence[] | null>(null);
+  const [labelsOf, setLabelsOf] = useState<Map<number, Tag[]>>(new Map());
+  const [place, setPlace] = useState<Place>(initialPlace);
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState<Recurrence | "new" | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null);
@@ -28,13 +31,30 @@ export function RecurringModal({ ws, projectId, statuses, labels, canWrite, high
   const listRef = useRef<HTMLUListElement>(null);
   const closeEdit = useCallback(() => setEditing(null), []);
 
+  // one call per workspace; a workspace that fails is named, the others still show
+  const wsKey = tree.map((w) => w.id).join(",");
+  const loadSeq = useRef(0);
   const load = useCallback(() => {
-    api
-      .recurrences(ws.slug, projectId)
-      .then((r) => setItems(r.items))
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't load the recurring tasks."));
-  }, [ws.slug, projectId]);
+    const seq = ++loadSeq.current;
+    Promise.allSettled(tree.map((w) => api.recurrences(w.slug))).then((res) => {
+      if (seq !== loadSeq.current) return; // a newer load is on its way
+      const all: Recurrence[] = [];
+      const bad: string[] = [];
+      res.forEach((r, i) => (r.status === "fulfilled" ? all.push(...r.value.items) : bad.push(tree[i]!.name)));
+      setItems(all.sort((a, b) => a.title.localeCompare(b.title)));
+      setErr(bad.length ? `Couldn't load the recurring tasks of ${bad.join(", ")}.` : "");
+    });
+  }, [wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(load, [load]);
+  useEffect(() => {
+    Promise.allSettled(tree.map((w) => api.labels(w.slug))).then((res) =>
+      setLabelsOf(new Map(res.flatMap((r, i) => (r.status === "fulfilled" ? [[tree[i]!.id, r.value.items] as [number, Tag[]]] : [])))),
+    );
+  }, [wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const wsOf = useCallback((id: number) => tree.find((w) => w.id === id), [tree]);
+  const shown = useMemo(() => (items ?? []).filter((r) => placeMatch(place, tree, r.workspace_id, r.project_id)), [items, place, tree]);
+  const writable = useMemo(() => tree.filter((w) => canWriteIn(w) && hasCap(me, "schedules", w.id)), [tree, me]); // the server wants Schedules for recurring tasks
+  const start = placeStart(place, tree, (w) => writable.includes(w));
 
   useEffect(() => {
     if (highlight && items) listRef.current?.querySelector(`[data-schedule="${highlight}"]`)?.scrollIntoView({ block: "nearest" });
@@ -74,13 +94,15 @@ export function RecurringModal({ ws, projectId, statuses, labels, canWrite, high
       .finally(() => setBusy(null));
   };
 
-  if (editing) {
+  const editWs = editing && editing !== "new" ? wsOf(editing.workspace_id) : undefined;
+  if (editing && (editing === "new" ? start : editWs)) {
     return (
       <TaskModal
-        ws={ws}
-        projectId={projectId}
-        statuses={statuses}
-        labels={labels}
+        ws={editing === "new" ? start!.ws : editWs!}
+        projectId={editing === "new" ? start!.projectId : editing.project_id}
+        statuses={[]}
+        labels={labelsOf.get(editing === "new" ? start!.ws.id : editing.workspace_id) ?? []}
+        choices={editing === "new" ? writable : undefined}
         schedule={editing === "new" ? undefined : editing}
         repeat={editing === "new" ? "weekly" : undefined}
         onClose={closeEdit}
@@ -100,17 +122,27 @@ export function RecurringModal({ ws, projectId, statuses, labels, canWrite, high
           {err}
         </p>
       )}
+      <div className="list-bar">
+        <PlaceFilter value={place} onChange={setPlace} tree={tree} />
+        {items && <span className="muted small">{shown.length === items.length ? `${items.length} recurring` : `${shown.length} of ${items.length}`}</span>}
+      </div>
       {items === null && !err && <p className="muted">Loading…</p>}
-      {items?.length === 0 && <p className="muted">No recurring tasks in this project yet. Make one here, or with Repeat in a new task.</p>}
-      {items && items.length > 0 && (
+      {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No recurring tasks yet. Make one here, or with Repeat in a new task." : "None here. Show everything to see the others."}</p>}
+      {shown.length > 0 && (
         <ul className="schedules" ref={listRef} aria-label="Recurring tasks">
-          {items.map((r) => (
+          {shown.map((r) => {
+            const rws = wsOf(r.workspace_id);
+            const canWrite = !!rws && canWriteIn(rws) && hasCap(me, "schedules", rws.id);
+            const labels = labelsOf.get(r.workspace_id) ?? [];
+            return (
             <li key={r.id} data-schedule={r.id} className={"schedule" + (r.id === highlight ? " flash highlighted" : "") + (r.paused ? " paused" : "")} style={r.color ? ({ "--row-c": r.color } as CSSProperties) : undefined}>
               <div className="schedule-top">
                 <Pill color={SCHEDULE_COLOR} title="Recurring">
                   ⟳
                 </Pill>
                 <strong className="schedule-title">{r.title}</strong>
+                {rws && tree.length > 1 && <WorkspaceBadge ws={rws} />}
+                <span className="pill pill-key">{rws?.projects.find((p) => p.id === r.project_id)?.key ?? "?"}</span>
                 {r.paused && <span className="pill pill-danger">paused</span>}
                 {!r.next_at && <span className="pill pill-muted">finished</span>}
                 <PriorityBadge priority={r.priority} />
@@ -182,10 +214,11 @@ export function RecurringModal({ ws, projectId, statuses, labels, canWrite, high
                 </div>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
-      {canWrite && (
+      {start && (
         <div className="row end">
           <button type="button" className="button" onClick={() => setEditing("new")}>
             + New recurring task

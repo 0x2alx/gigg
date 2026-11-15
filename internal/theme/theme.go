@@ -139,7 +139,7 @@ func Sane(raw []byte) ([]byte, error) {
 	if v, _ := m["controlShape"].(string); v == "pill" {
 		put("controlShape", "pill")
 	}
-	for _, k := range []string{"laneColor", "laneBorder"} {
+	for _, k := range []string{"laneColor", "laneBorder", "logoColor"} {
 		if v, present := m[k]; present && v != nil {
 			if c, ok := ParseColour(v); ok {
 				put(k, c)

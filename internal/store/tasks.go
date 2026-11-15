@@ -469,9 +469,16 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 	return out, more, fill(ctx, q, out)
 }
 
-var sortCols = map[string]string{
-	"priority": "t.priority", "due": "t.due_at IS NULL, t.due_at", "created": "t.created_at", "updated": "t.updated_at",
-	"number": "t.number", "title": "t.title COLLATE NOCASE",
+// sortCols: each sort field's ORDER BY terms, ascending and descending. Tasks without a due date come
+// last either way, and the number sorts by project key first (numbers repeat across projects). The
+// web's all-workspaces table merges these lists and sorts them the same way (web/src/views/tableSort.ts).
+var sortCols = map[string][2]string{
+	"priority": {"t.priority", "t.priority DESC"},
+	"due":      {"t.due_at IS NULL, t.due_at", "t.due_at IS NULL, t.due_at DESC"},
+	"created":  {"t.created_at", "t.created_at DESC"},
+	"updated":  {"t.updated_at", "t.updated_at DESC"},
+	"number":   {"p.key, t.number", "p.key DESC, t.number DESC"},
+	"title":    {"t.title COLLATE NOCASE", "t.title COLLATE NOCASE DESC"},
 }
 
 func taskOrder(s string) (string, error) {
@@ -481,12 +488,13 @@ func taskOrder(s string) (string, error) {
 	var parts []string
 	for _, f := range strings.Split(s, ",") {
 		desc := strings.HasPrefix(f, "-")
-		col, ok := sortCols[strings.TrimPrefix(f, "-")]
+		cols, ok := sortCols[strings.TrimPrefix(f, "-")]
 		if !ok {
 			return "", Invalid("unknown sort field %q", f)
 		}
+		col := cols[0]
 		if desc {
-			col = strings.ReplaceAll(col, ",", " DESC,") + " DESC"
+			col = cols[1]
 		}
 		parts = append(parts, col)
 	}

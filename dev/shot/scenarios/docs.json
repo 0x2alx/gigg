@@ -337,7 +337,7 @@
    "full": false
   },
   {
-   "goto": "/w/acme/table"
+   "goto": "/table"
   },
   {
    "wait": "table"
