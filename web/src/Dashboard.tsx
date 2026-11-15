@@ -1,12 +1,14 @@
 // Dashboard: what the agents' runners did in the last 24 hours, per workspace, against its caps;
 // the pause switch (PAUSE TASKS) and the caps for admins.
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent } from "react";
+import { Link, useLocation } from "wouter";
 import { fmtTime, hasCap } from "./api";
 import { useApp } from "./App";
 import { call } from "./http";
 import { Avatar, Modal } from "./ui";
 import { CATEGORY_COLOR, colorFor } from "./theme";
 import { HelpButton } from "./help";
+import { filterQuery, EMPTY_FILTER } from "./boardModel";
 import { Icon } from "./icons";
 
 export interface RunnerSettings {
@@ -169,7 +171,26 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
   const ws = tree.find((w) => w.id === it.workspace_id);
   const owner = ws?.owner_id != null ? users.get(ws.owner_id) : undefined;
   const { settings: s, usage: u } = it;
+  const [, navigate] = useLocation();
   const [editing, setEditing] = useState(false);
+  // the card opens the board filtered to this workspace: the title is the link (keyboard, middle or
+  // modified click), and a plain click anywhere else on the card does the same, except on its own
+  // controls, while the caps are being edited, or while selecting text (a drag or a double-click)
+  const boardHref = ws ? "/board" + filterQuery({ ...EMPTY_FILTER, ws: [ws.slug] }) : undefined;
+  const pending = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(pending.current), []);
+  const cardClick = (e: MouseEvent<HTMLElement>) => {
+    clearTimeout(pending.current); // a second click: a double-click selecting a word, not a visit
+    if (!boardHref || editing || e.button !== 0 || e.defaultPrevented || e.detail > 1) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!e.currentTarget.contains(e.target as Node)) return; // from a portal rendered inside the card
+    if ((e.target as Element).closest("a, button, input, select, textarea, label, form, [role='dialog']")) return;
+    if (window.getSelection()?.toString()) return;
+    // wait out a double-click before leaving
+    pending.current = setTimeout(() => {
+      if (!window.getSelection()?.toString()) navigate(boardHref);
+    }, 250);
+  };
   const [daily, setDaily] = useState(s.daily_cap);
   const [night, setNight] = useState(s.night_cap);
   const save = (e: FormEvent) => {
@@ -179,14 +200,21 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
   };
   return (
     <section
-      className={"card dash-card" + (s.paused ? " paused" : "") + (ws ? " dash-card-ws" : "")}
+      className={"card dash-card" + (s.paused ? " paused" : "") + (ws ? " dash-card-ws" : "") + (ws && !editing ? " dash-card-link" : "")}
       style={ws ? ({ "--c": colorFor(ws.slug, ws.color) } as CSSProperties) : undefined}
       aria-label={`Runner of ${it.name}`}
+      onClick={cardClick}
     >
       <div className="dash-card-head">
         <h2 className="dash-card-title">
-          {owner ? <Avatar user={owner} size="xs" /> : ws && <span className="dot" style={{ background: colorFor(ws.slug, ws.color) }} aria-hidden="true" />}
-          {it.name}
+          {owner ? <Avatar user={owner} size="l" /> : ws && <span className="dot dash-card-dot" style={{ background: colorFor(ws.slug, ws.color) }} aria-hidden="true" />}
+          {boardHref ? (
+            <Link href={boardHref} className="dash-card-name" title={`Open the board for ${it.name}`}>
+              {it.name}
+            </Link>
+          ) : (
+            it.name
+          )}
         </h2>
         {s.paused ? (
           <span className="dash-state dash-state-paused" data-tip="No new task runs start in this workspace">

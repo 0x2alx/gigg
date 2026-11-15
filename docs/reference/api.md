@@ -382,7 +382,7 @@ in [access.md](access.md).
 | POST | `/tasks/{id}/restore` | Restore a task from the trash. |
 | POST | `/tasks/{id}/archive` | Archive a task (off the board and lists; not trash). |
 | POST | `/tasks/{id}/unarchive` | Bring an archived task back. |
-| POST | `/projects/{p}/archive-done` | Archive done and cancelled tasks finished more than N days ago. |
+| POST | `/projects/{p}/archive-done` | Archive done and cancelled tasks finished more than N days ago (`older_than_days`); `category` (`done` or `cancelled`) limits it to one. |
 | POST | `/tasks/{id}/resume` | Ask for the task's agent session to be resumed (records the request, moves the task to todo). |
 | GET | `/tasks/{id}/activity` | A task's history (old values included). |
 | GET | `/tasks/{id}/relations` | Tasks this one blocks, is blocked by, or relates to. |

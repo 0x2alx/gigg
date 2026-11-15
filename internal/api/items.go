@@ -258,7 +258,8 @@ func (a *API) registerItems() {
 		Summary: "Archive the project's done and cancelled tasks finished more than N days ago"}, func(ctx context.Context, in *struct {
 		P    int64 `path:"p"`
 		Body struct {
-			OlderThanDays int64 `json:"older_than_days" minimum:"0" maximum:"3650"`
+			OlderThanDays int64  `json:"older_than_days" minimum:"0" maximum:"3650"`
+			Category      string `json:"category,omitempty" enum:"done,cancelled" doc:"Only this category; left out, done and cancelled both"`
 		}
 	}) (*struct {
 		Body struct {
@@ -286,7 +287,7 @@ func (a *API) registerItems() {
 		}{}
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			var err error
-			out.Body.Archived, err = store.ArchiveDone(ctx, tx, p.Actor(), pr, store.Now()-in.Body.OlderThanDays*86400000)
+			out.Body.Archived, err = store.ArchiveDone(ctx, tx, p.Actor(), pr, store.Now()-in.Body.OlderThanDays*86400000, in.Body.Category)
 			return err
 		})
 		return out, err

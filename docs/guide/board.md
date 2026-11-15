@@ -1,6 +1,6 @@
 # The board
 
-The board shows the tasks of every workspace and project you can see, in one place. Open it from **Board** in the sidebar.
+The board shows the tasks of every workspace and project you can see, in one place. Open it from **Board**, the first and largest entry in the sidebar. Below it come **Dashboard** and **My tasks** (with your saved views), then, after a thin line, **Inbox** and **Notifications**.
 
 The sidebar button at its top (a square with a bar) collapses the sidebar to a strip of icons, or keeps it open. While it is collapsed, pointing at the strip (or tabbing into it) opens it over the page, and it folds back when the pointer leaves. The choice is saved on your account.
 
@@ -18,7 +18,7 @@ Each column header shows the stage as a small ring in the column's colour (dashe
 - **+**: a new task in this column. With several projects in view it first asks which project, and the task starts in that project's first status of the stage.
 - **Collapse** (two arrows pointing in): the column leaves the board and becomes a small button above it, with its name and count. Click the button to bring the column back. The board remembers collapsed columns per browser. You can drop a card on a collapsed column's button too.
 
-Each column also ends with **+ New task** (except Done). On a phone, the columns are tabs above the cards, and the filters start folded under **Filters**.
+Each column also ends with **+ New task**. Done and Cancelled take no new tasks there: when they hold tasks they end with **Archive done** or **Archive cancelled** instead, which opens the archive dialog for that column's tasks only (see **Archive done** below). On a phone, the columns are tabs above the cards.
 
 ### Agent activity
 
@@ -83,11 +83,11 @@ The toolbar above the columns narrows the board, in one row:
 - **Archived**: a toggle that shows archived tasks, greyed out, in their columns.
 - **Clear filters**: appears only while a filter is on, and resets everything except the archived toggle.
 
-Under the toolbar, small chips scope the board: **Workspaces** and **Projects**. Click a chip to show only that one; click more chips to add them. **All workspaces** / **All projects** clears the selection. The workspace chips show the workspace's owner picture and colour.
+With the filters open, small chips under the toolbar scope the board: **Workspaces** and **Projects**. Click a chip to show only that one; click more chips to add them. **All workspaces** / **All projects** clears the selection. The workspace chips show the workspace's owner picture and colour.
 
-**Filters** at the start of the toolbar folds the filters away: what stays is one line with the filters that are on, each as a chip with **×** to remove it (and **Clear all** when there are several), or just the **Filters** button with nothing set. While folded, a number on the button counts the filters that are on. The board remembers whether you folded them; on a phone they start folded.
+**Filters** at the start of the toolbar folds the filters away: what stays is one line with the filters that are on, each as a chip with **×** to remove it (and **Clear all** when there are several), or just the **Filters** button with nothing set. While folded, a number on the button counts the filters that are on. They start folded; the board remembers when you open them (on a phone they start folded each time).
 
-The filters live in the page address (for example `/board?ws=acme&pr=3`), so you can bookmark or share a filtered board. The board also remembers the last filter you used.
+The filters live in the page address (for example `/board?ws=acme&pr=3`), so you can bookmark or share a filtered board. The board also remembers the last filter you used, including one you arrived with from a link or a dashboard card.
 
 ## The buttons at the top
 
@@ -97,7 +97,7 @@ Next to the title (and its **?** help button) the header has three things:
 - **+ New task**: with one project in view it opens the form right away; otherwise it first asks which project.
 - **⋯** (More actions): the less frequent actions.
   - **Recurring**, **Schedules**, **Templates**: see [Recurring tasks](recurring.md).
-  - **Archive done**: archives the tasks in Done (all of them, or those done for 7 or 30+ days). With several projects in view it lists them (ticked when there are up to three, unticked when more): tick the ones to clean up, or use **All projects in view**. It archives every done task of those projects; the assignee, label, priority and search filters don't apply. Archived tasks leave the board and lists but stay searchable, and you can unarchive them from the task.
+  - **Archive done**: archives the tasks in Done and Cancelled (all of them, or those finished 7 or 30+ days ago). With several projects in view it lists them (ticked when there are up to three, unticked when more): tick the ones to clean up, or use **All projects in view**. It archives every done and cancelled task of those projects; the assignee, label, priority and search filters don't apply. Archived tasks leave the board and lists but stay searchable, and you can unarchive them from the task.
   - **Trash**: the deleted tasks of the projects in view, most recently changed first, each with **Restore**, which puts it back in its column. Restoring needs the *Delete tasks* permission.
 
 ![The trash (Daywalker theme)](../images/trash-day.png)

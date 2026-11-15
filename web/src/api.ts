@@ -509,7 +509,8 @@ export const api = {
   deleteChecklist: (id: number, item: number) => call<Task>("DELETE", `/tasks/${id}/checklist/${item}`),
   archiveTask: (id: number) => call<Task>("POST", `/tasks/${id}/archive`),
   unarchiveTask: (id: number) => call<Task>("POST", `/tasks/${id}/unarchive`),
-  archiveDone: (p: number, older_than_days: number) => call<{ archived: number }>("POST", `/projects/${p}/archive-done`, { older_than_days }),
+  archiveDone: (p: number, older_than_days: number, category?: "done" | "cancelled") =>
+    call<{ archived: number }>("POST", `/projects/${p}/archive-done`, category ? { older_than_days, category } : { older_than_days }),
   fields: (ws: string | number) => call<{ items: CustomField[] }>("GET", `/workspaces/${ws}/fields`),
   setCustom: (id: number, values: Record<string, unknown>) => call<Task>("PATCH", `/tasks/${id}/custom`, { values }),
   templates: (ws: string | number, project?: number) => call<{ items: Template[] }>("GET", `/workspaces/${ws}/templates${project ? `?project=${project}` : ""}`),

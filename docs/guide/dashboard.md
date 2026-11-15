@@ -6,6 +6,8 @@ The dashboard shows each workspace's agent runs over the last 24 hours: how clos
 
 ## A workspace's card
 
+Click a card (or its name) to open the board filtered to that workspace. The card's own buttons, such as **Resume** and **Change caps**, don't open the board.
+
 - **running / paused** (a green or red dot beside the name): whether the workspace's runner may start tasks.
 - **Tasks, last 24 h**: different tasks started in a rolling day, against the daily cap.
 - **Budget-dependent (night)**: of those, the tasks that aren't always-run, against their own cap. A runner usually runs them only when the usage budget allows, for example at night.

@@ -36,6 +36,9 @@ steps = [
     {"press": "Enter"},
     {"wait": ".board"},
     {"wait": 6000},  # the container's network settles once at the start (Chromium: ERR_NETWORK_CHANGED)
+    # a fresh account's look: the filter row folded (an earlier run left it open)
+    {"eval": "(() => { fetch('/api/v1/me', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preferences: { board_filters: null } }) }); return true; })()", "expect": True},
+    {"wait": 800},
     # ---- Nightwalker
     theme("nightwalker"),
     *page("/board", ".board .task-card", "board-all-night"),
@@ -76,6 +79,9 @@ steps = [
     {"shot": "help-night", "full": False},
     # ---- Daywalker
     theme("daywalker"),
+    # the filter row starts folded: open it for the filters screenshot (saved on the account, so a reload keeps it)
+    {"eval": "(() => { fetch('/api/v1/me', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preferences: { board_filters: 'open' } }) }); return true; })()", "expect": True},
+    {"wait": 800},
     *page("/board?ws=acme&pr=2", ".board .task-card", "board-filters-day"),
     *page("/board/p/1/t/PLT-1", "aside.panel .tp-body", "task-panel-day", settle=1200),
     {"goto": "/board/p/1/t/PLT-4"},

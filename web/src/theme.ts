@@ -27,11 +27,11 @@ export interface Theme {
 export const BUILTINS: Theme[] = [
   { id: "clumsy-clanker", name: "Clumsy Clanker", dark: true, background: "#100318", surface: "#1C0A2E", surfaceVariant: "#2A1247",
     border: "#BE5CFF", accent: "#BE5CFF", onAccent: "#16052A", text: "#FFC107", mutedText: "#FE2AFF", danger: "#FF4D6D", secondary: null,
-    font: "Tektur", fontWeight: "Medium", textScalePct: 90, cornerDp: 12, borderDp: 2,
+    font: "Tektur", fontWeight: "Medium", textScalePct: 92, cornerDp: 12, borderDp: 2,
     description: "The signature look: near-black purple, a neon violet edge and accent, amber text, magenta secondary text." },
-  { id: "nightwalker", name: "Nightwalker", dark: true, background: "#1C2529", surface: "#253136", surfaceVariant: "#2F3D43",
-    border: "#3B4B52", accent: "#CDFFFB", onAccent: "#12302E", text: "#EEF8F7", mutedText: "#A3B6B8", danger: "#FF8A80", secondary: null,
-    font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 8, borderDp: 1,
+  { id: "nightwalker", name: "Nightwalker", dark: true, background: "#1A2226", surface: "#253136", surfaceVariant: "#2F3D43",
+    border: "#2D393E", accent: "#CDFFFB", onAccent: "#12302E", text: "#EEF8F7", mutedText: "#A3B6B8", danger: "#FF8A80", secondary: null,
+    font: "Rubik", fontWeight: "Medium", textScalePct: 93, cornerDp: 9, borderDp: 1,
     description: "Slate blue-grey with a pale aqua accent. The default in dark mode." },
   { id: "daywalker", name: "Daywalker", dark: false, background: "#F6F7F9", surface: "#FFFFFF", surfaceVariant: "#EEF0F4",
     border: "#DCE0E7", accent: "#5967DB", onAccent: "#FFFFFF", text: "#1A1D24", mutedText: "#5A6372", danger: "#C62828", secondary: null,
@@ -49,9 +49,9 @@ export const BUILTINS: Theme[] = [
     border: "#26365C", accent: "#00E5FF", onAccent: "#00151A", text: "#E6F7FF", mutedText: "#8FA6C7", danger: "#FF3DCB", secondary: null,
     font: "Oxanium", fontWeight: "Medium", textScalePct: 90, cornerDp: 10, borderDp: 1,
     description: "Deep navy with a cyan accent." },
-  { id: "carbon", name: "Carbon", dark: true, background: "#141414", surface: "#2B2B2B", surfaceVariant: "#363636",
+  { id: "carbon", name: "Carbon", dark: true, background: "#1C1C1C", surface: "#2B2B2B", surfaceVariant: "#363636",
     border: "#404040", accent: "#EE7A64", onAccent: "#1E0B06", text: "#EDEDED", mutedText: "#A3A3A3", danger: "#F26A82", secondary: null,
-    font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 8, borderDp: 1,
+    font: "Rubik", fontWeight: "Medium", textScalePct: 92, cornerDp: 8, borderDp: 1,
     description: "Neutral charcoal greys with a coral accent; dense, an ops-console feel." },
 ];
 

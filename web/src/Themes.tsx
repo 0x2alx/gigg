@@ -243,7 +243,7 @@ function ThemeCard({ t, selected, onPick, actions }: { t: Theme; selected: boole
 
 // ---- editor
 
-const PRESETS = ["#000000", "#FFFFFF", "#100318", "#1C2529", "#F2F1EE", "#0C140D", "#0A0E14", "#BE5CFF", "#CDFFFB", "#3E4C59", "#F0B429",
+const PRESETS = ["#000000", "#FFFFFF", "#100318", "#1A2226", "#F2F1EE", "#0C140D", "#0A0E14", "#BE5CFF", "#CDFFFB", "#3E4C59", "#F0B429",
   "#FFE600", "#00E5FF", "#FFC107", "#FE2AFF", "#E5484D", "#46A758", "#0090FF"];
 
 function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () => void; onSave: (t: Theme) => Promise<void> }) {

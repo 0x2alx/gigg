@@ -364,12 +364,8 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             )}
           </div>
           <nav>
-            <NavLink href="/board" icon={<Icon name="board" />} label="Board" collapsed={collapsed} />
+            <NavLink href="/board" icon={<Icon name="board" />} label="Board" collapsed={collapsed} className="nav-primary" />
             <NavLink href="/dashboard" icon={<Icon name="dashboard" />} label="Dashboard" collapsed={collapsed} />
-            <NavLink href="/inbox" icon={<Icon name="inbox" />} label="Inbox" collapsed={collapsed}>
-              {inboxCount > 0 && <span className="count count-alert">{inboxCount}</span>}
-            </NavLink>
-            <BellButton collapsed={collapsed} />
             <NavLink href="/my" icon={<Icon name="check" />} label="My tasks" collapsed={collapsed} />
             {savedViews.length > 0 && (
               <div className="nav-sub" role="group" aria-label="Saved views">
@@ -378,6 +374,11 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
                 ))}
               </div>
             )}
+            <hr className="nav-sep" />
+            <NavLink href="/inbox" icon={<Icon name="inbox" />} label="Inbox" collapsed={collapsed}>
+              {inboxCount > 0 && <span className="count count-alert">{inboxCount}</span>}
+            </NavLink>
+            <BellButton collapsed={collapsed} />
           </nav>
           <div className="side-bottom">
             {me.admin && <NavLink href="/admin" icon={<Icon name="settings" />} label="Admin" collapsed={collapsed} />}
@@ -487,13 +488,13 @@ function SavedViewLink({ href, label, collapsed, title }: { href: string; label:
   );
 }
 
-function NavLink({ href, children, prefix, icon, label, collapsed, title }: {
-  href: string; children?: ReactNode; prefix?: boolean; icon: ReactNode; label: string; collapsed: boolean; title?: string;
+function NavLink({ href, children, prefix, icon, label, collapsed, title, className }: {
+  href: string; children?: ReactNode; prefix?: boolean; icon: ReactNode; label: string; collapsed: boolean; title?: string; className?: string;
 }) {
   const [loc] = useLocation();
   const active = prefix ? loc === href || loc.startsWith(href + "/") : loc === href;
   return (
-    <Link href={href} className={"nav-item" + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title ?? label} aria-label={collapsed ? label : undefined}>
+    <Link href={href} className={"nav-item" + (className ? " " + className : "") + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title ?? label} aria-label={collapsed ? label : undefined}>
       <span className="nav-icon" aria-hidden="true">{icon}</span>
       {!collapsed && <span className="nav-label">{label}</span>}
       {children}

@@ -180,6 +180,11 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .nav-item.selected { background: var(--selected); color: var(--text); }
 .nav-sub .nav-item { min-height: 1.8rem; font-size: var(--fs-sm); }
 .nav-sub .nav-icon { font-size: 0.9rem; }
+/* the Board entry is the main one: a taller row, a bigger icon and label */
+.nav-item.nav-primary { min-height: calc(var(--ctl-h) + 0.55rem); font-size: var(--fs-md); }
+.nav-primary .nav-icon { width: 1.4rem; height: 1.4rem; font-size: 1.4rem; }
+/* a hairline between the pages (Board, Dashboard, My tasks) and the inbox and notifications */
+.nav-sep { border: 0; border-top: 1px solid var(--line); margin: var(--sp-3) var(--sp-2); align-self: stretch; }
 /* line icons (icons.tsx) sit on the text baseline */
 .ico { display: inline-block; flex: none; vertical-align: -0.125em; }
 
@@ -236,6 +241,7 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   background: none; border: 0; border-radius: var(--radius-s); color: var(--muted); font: inherit; font-size: var(--fs-sm); cursor: pointer;
 }
 .column-add:hover, .column-add:focus-visible { color: var(--text); background: var(--hover); }
+.column-add-empty { visibility: hidden; pointer-events: none; }
 /* collapsed columns: small chips above the board (stage, name, count); click one to bring the column back */
 .collapsed-row { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: 0 0 var(--sp-4); }
 .collapsed-chip {
@@ -771,6 +777,7 @@ label.check input { width: auto; accent-color: var(--accent); }
   .shell.rail .side-bottom { border-top: 0; padding-top: 0; }
   .shell.rail .ws { display: flex; margin-top: 0; }
   .shell.rail .nav-sub { flex-direction: row; flex-wrap: wrap; }
+  .shell.rail .nav-sep { display: none; }
 }
 
 /* ---- task items: checklist, subtasks, dependencies, custom fields, templates, mentions ---- */
@@ -1145,6 +1152,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   }
   .topbar-menu { font-size: 1.25rem; width: 2.4rem; height: 2.4rem; display: inline-grid; place-items: center; }
   .shell.narrow .nav-item { min-height: 2.4rem; font-size: var(--fs-md); }
+  .shell.narrow .nav-item.nav-primary { min-height: 2.9rem; font-size: var(--fs-lg); }
   .topbar-brand { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0; }
   .topbar-bell { position: relative; width: 2.4rem; height: 2.4rem; display: inline-grid; place-items: center; text-decoration: none; font-size: 1.2rem; }
   .topbar-bell .count { position: absolute; top: 0.1rem; right: 0; font-size: 0.6rem; line-height: 1.45; padding: 0 0.25rem; min-width: 0; background: var(--accent); color: var(--on-accent); }
@@ -1191,8 +1199,15 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .dash-card { display: flex; flex-direction: column; gap: var(--sp-5); }
 .dash-card.paused { border-color: color-mix(in srgb, var(--danger) 70%, var(--surface)); }
 .dash-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); min-height: 1.67rem; }
-.dash-card-title { font-size: var(--fs-md); font-weight: var(--weight-strong); margin: 0; display: inline-flex; align-items: center; gap: 0.45rem; }
+.dash-card-title { font-size: var(--fs-lg); font-weight: var(--weight-strong); margin: 0; display: inline-flex; align-items: center; gap: 0.45rem; }
 .dash-card-ws { border-top: 2px solid color-mix(in srgb, var(--c) 70%, transparent); }
+.dash-card-title .avatar { flex: none; }
+.dash-card-dot { width: 1.1rem; height: 1.1rem; }
+/* the whole card opens the workspace's board; the name is the real link */
+.dash-card-link { cursor: pointer; transition: border-color 0.12s ease-out, background-color 0.12s ease-out; }
+.dash-card-link:hover { background: color-mix(in srgb, var(--surface) 92%, var(--text)); }
+.dash-card-name { color: inherit; text-decoration: none; }
+.dash-card-name:hover, .dash-card-link:hover .dash-card-name { text-decoration: underline; text-underline-offset: 0.18em; }
 .dash-state { display: inline-flex; align-items: center; gap: 0.35rem; font-size: var(--fs-sm); color: var(--muted); }
 .dash-state-paused { color: var(--danger); }
 .dash-state-paused .dot { background: var(--danger); }

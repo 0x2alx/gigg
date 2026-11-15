@@ -34,6 +34,13 @@
    "wait": 6000
   },
   {
+   "eval": "(() => { fetch('/api/v1/me', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preferences: { board_filters: null } }) }); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 800
+  },
+  {
    "eval": "(async () => { const r = await fetch('/api/v1/me/themes-selection', { method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({ selected_id: 'nightwalker', match_system: false }) }); return r.status; })()",
    "expect": 204
   },
@@ -243,6 +250,13 @@
   {
    "eval": "(async () => { const r = await fetch('/api/v1/me/themes-selection', { method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({ selected_id: 'daywalker', match_system: false }) }); return r.status; })()",
    "expect": 204
+  },
+  {
+   "eval": "(() => { fetch('/api/v1/me', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preferences: { board_filters: 'open' } }) }); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 800
   },
   {
    "goto": "/board?ws=acme&pr=2"

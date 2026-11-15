@@ -61,14 +61,16 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     },
     [loc, navigate, setPref],
   );
-  // a visit without a filter brings back the last one used (the URL stays shareable)
+  // a visit without a filter brings back the last one used (the URL stays shareable); arriving with one
+  // (a link, a dashboard card) makes it the last one used
   const restored = useRef(false);
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
     const saved = typeof prefs.board_filter === "string" ? prefs.board_filter : "";
     if (!search && saved.startsWith("?")) navigate(loc + saved, { replace: true });
-  }, [search, prefs.board_filter, loc, navigate]);
+    else if (search && qs !== saved) setPref("board_filter", qs);
+  }, [search, qs, prefs.board_filter, loc, navigate, setPref]);
 
   const inScope = useMemo(() => scope(tree, filter), [tree, filter]);
   const single = inScope.length === 1 ? inScope[0]! : null;
@@ -101,7 +103,8 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const [newIn, setNewIn] = useState<{ category: Category; statusId?: number } | null>(null);
   const [recurring, setRecurring] = useState<{ pid: number; highlight?: number } | null>(null);
   const [templates, setTemplates] = useState<number | null>(null);
-  const [archiveDone, setArchiveDone] = useState<number[] | null>(null);
+  // the archive dialog: the projects ticked to start with, and which finished tasks (both when unset)
+  const [archiveDone, setArchiveDone] = useState<{ ids: number[]; category?: "done" | "cancelled" } | null>(null);
   const [timings, setTimings] = useState<number | null>(null);
   const [trash, setTrash] = useState(false);
   const narrow = useNarrow();
@@ -238,14 +241,14 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     if (what === "new") setAdding(pid);
     else if (what === "recurring") setRecurring({ pid });
     else if (what === "templates") setTemplates(pid);
-    else setArchiveDone([pid]);
+    else setArchiveDone({ ids: [pid] });
   }, []);
   const archivable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "archive_tasks", x.ws.id));
-  const action = (what: ProjectAction | "schedules") => {
+  const action = (what: ProjectAction | "schedules", category?: "done" | "cancelled") => {
     if (what === "archive") {
       // one dialog for any number of projects: up to three in view start ticked; more start unticked, so
       // one stray click can't archive across every workspace ("All projects in view" is one tick away)
-      setArchiveDone(archivable.length <= 3 ? archivable.map((x) => x.project.id) : []);
+      setArchiveDone({ ids: archivable.length <= 3 ? archivable.map((x) => x.project.id) : [], category });
     } else if (what === "schedules") {
       if (wsInScope.length === 1) setTimings(wsInScope[0]!.id);
       else setPick("schedules");
@@ -337,6 +340,10 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const shown = narrow && active ? [active] : columns;
   // collapsed columns leave the grid and become small chips above it (wide screens; a phone shows one column)
   const openCols = narrow ? shown : shown.filter((c) => !collapsed.includes(c.id));
+  // which open column carries the "Archive done" / "Archive cancelled" footer: the last one of its category
+  // that has tasks (one project can have several done-stage columns; one footer each is enough)
+  const archiveCol: Partial<Record<string, string>> = {};
+  for (const c of openCols) if ((c.category === "done" || c.category === "cancelled") && c.tasks.length > 0) archiveCol[c.category] = c.key;
   const closedCols = narrow ? [] : shown.filter((c) => collapsed.includes(c.id));
   // the agent side of the tasks in view, in one line above the columns
   const pulse = { running: 0, answer: 0, failed: 0, queued: 0, total: 0 };
@@ -466,7 +473,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
         </button>
       )}
       {wsArchive && (
-        <button type="button" role="menuitem" data-tip="Archive the tasks in Done: they leave the board but stay searchable" onClick={() => action("archive")}>
+        <button type="button" role="menuitem" data-tip="Archive the tasks in Done and Cancelled: they leave the board but stay searchable" onClick={() => action("archive")}>
           <Icon name="archive" />
           Archive done
         </button>
@@ -688,6 +695,17 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                     <Icon name="plus" strokeWidth={2} /> New task
                   </button>
                 )}
+                {(c.category === "done" || c.category === "cancelled") &&
+                  // finished columns take no new tasks: their footer archives that category instead (once per
+                  // category: one project can have several done columns), or stays as an empty slot of the
+                  // same height so the columns line up
+                  (archiveCol[c.category] === c.key && archivable.length > 0 ? (
+                    <button type="button" className="column-add" onClick={() => action("archive", c.category as "done" | "cancelled")}>
+                      <Icon name="archive" /> {c.category === "done" ? "Archive done" : "Archive cancelled"}
+                    </button>
+                  ) : (
+                    writable.length > 0 && <div className="column-add column-add-empty" aria-hidden="true">{"\u00a0"}</div>
+                  ))}
               </div>
             </section>
           );
@@ -746,9 +764,10 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       {archiveDone !== null && (
         <ArchiveDoneModal
           options={archivable}
-          initial={archiveDone}
+          initial={archiveDone.ids}
+          category={archiveDone.category}
           onClose={() => setArchiveDone(null)}
-          onDone={(n) => changed(n === 0 ? "Nothing to archive" : `Archived ${n} done task${n === 1 ? "" : "s"}`)}
+          onDone={(n) => changed(n === 0 ? "Nothing to archive" : `Archived ${n} task${n === 1 ? "" : "s"}`)}
         />
       )}
       {trash && <TrashModal scope={inScope} onClose={() => setTrash(false)} onRestored={(key) => changed(`Restored ${key}`)} />}
@@ -785,10 +804,10 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
   narrow: boolean;
 }) {
   const { users, prefs, setPref } = useApp();
-  // folded: one line with the filters that are on (removable), or just the Filters button. On wide screens the
-  // choice is saved; on a phone the row starts folded each time.
+  // folded: one line with the filters that are on (removable), or just the Filters button. The row starts
+  // folded; on wide screens opening it is saved, on a phone it starts folded each time.
   const [narrowOpen, setNarrowOpen] = useState(false);
-  const shut = narrow ? !narrowOpen : prefs.board_filters === "folded";
+  const shut = narrow ? !narrowOpen : prefs.board_filters !== "open";
   const fold = (v: boolean) => (narrow ? setNarrowOpen(!v) : setPref("board_filters", v ? "folded" : "open"));
   const [text, setText] = useState(filter.q);
   useEffect(() => setText(filter.q), [filter.q]);
@@ -1081,14 +1100,17 @@ function PickModal({ what, options, workspaces, onPick, onClose }: {
   );
 }
 
-// ArchiveDoneModal: archive the done tasks of the projects ticked (all those in view to start with), one call
-// per project; a failure stops there and says which projects were done.
-function ArchiveDoneModal({ options, initial, onClose, onDone }: {
+// ArchiveDoneModal: archive the finished tasks (done, cancelled, or both when `category` is unset) of the
+// projects ticked, one call per project; a failure stops there and says which projects were done.
+function ArchiveDoneModal({ options, initial, category, onClose, onDone }: {
   options: { ws: WorkspaceTree; project: { id: number; key: string; name: string } }[];
   initial: number[];
+  category?: "done" | "cancelled";
   onClose: () => void;
   onDone: (n: number) => void;
 }) {
+  const what = category ?? "done and cancelled";
+  const verb = category === "cancelled" ? "Cancelled" : category === "done" ? "Done" : "Finished";
   const [days, setDays] = useState(7);
   const [ticked, setTicked] = useState<number[]>(initial);
   const [err, setErr] = useState("");
@@ -1112,7 +1134,7 @@ function ArchiveDoneModal({ options, initial, onClose, onDone }: {
     setErr("");
     for (const { project } of options.filter((o) => picked.includes(o.project.id))) {
       try {
-        total.current += (await api.archiveDone(project.id, days)).archived;
+        total.current += (await api.archiveDone(project.id, days, category)).archived;
         setTicked((p) => p.filter((x) => x !== project.id)); // done: a retry skips it
       } catch (e: unknown) {
         const why = e instanceof ApiError ? e.message : "it failed";
@@ -1126,9 +1148,9 @@ function ArchiveDoneModal({ options, initial, onClose, onDone }: {
     onClose();
   };
   return (
-    <Modal title="Archive done tasks" onClose={close}>
+    <Modal title={`Archive ${what} tasks`} onClose={close}>
       <p className="small">
-        Archived tasks leave the board and lists; they stay searchable and can be unarchived from the task. Every done task of the projects ticked is
+        Archived tasks leave the board and lists; they stay searchable and can be unarchived from the task. Every {what} task of the projects ticked is
         archived: the assignee, label, priority and search filters don't apply here.
       </p>
       {options.length === 0 ? (
@@ -1152,10 +1174,10 @@ function ArchiveDoneModal({ options, initial, onClose, onDone }: {
           </fieldset>
         )
       )}
-      <div className="archive-days" role="radiogroup" aria-label="Done for at least">
+      <div className="archive-days" role="radiogroup" aria-label={`${verb} at least this long ago`}>
         {[0, 7, 30].map((d) => (
           <button key={d} type="button" role="radio" aria-checked={days === d} className={"assignee" + (days === d ? " on" : "")} onClick={() => setDays(d)}>
-            {d === 0 ? "All done" : `Done ${d}+ days ago`}
+            {d === 0 ? `All ${what}` : `${verb} ${d}+ days ago`}
           </button>
         ))}
       </div>
