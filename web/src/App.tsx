@@ -57,8 +57,11 @@ export interface Themes {
 }
 
 // toTheme: a stored custom theme (already sanitised by the server) as a Theme.
+// The base fills fields the stored theme lacks; the gigg-only extras are not filled in (absent means
+// "follow the corners", "auto" and "none"), so Nightwalker's pill shape doesn't leak into other themes.
 export function toTheme(id: string, o: Record<string, unknown>): Theme {
-  return sane({ ...(BUILTINS[1] as Theme), ...(o as Partial<Theme>), secondary: (o.secondary as string | undefined) ?? null, id, description: "" });
+  const { controlShape: _s, laneColor: _l, laneBorder: _b, ...base } = BUILTINS[1] as Theme;
+  return sane({ ...base, ...(o as Partial<Theme>), secondary: (o.secondary as string | undefined) ?? null, id, description: "" });
 }
 
 const Ctx = createContext<AppCtx | null>(null);
@@ -364,7 +367,7 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             )}
           </div>
           <nav>
-            <NavLink href="/board" icon={<Icon name="board" />} label="Board" collapsed={collapsed} className="nav-primary" />
+            <NavLink href="/board" prefix icon={<Icon name="board" />} label="Board" collapsed={collapsed} className="nav-primary" />
             <NavLink href="/dashboard" icon={<Icon name="dashboard" />} label="Dashboard" collapsed={collapsed} />
             <NavLink href="/my" icon={<Icon name="check" />} label="My tasks" collapsed={collapsed} />
             {savedViews.length > 0 && (
@@ -422,6 +425,9 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
               </Link>
             </header>
           )}
+          {/* a page change fades the new page in (keyed by the section, so a task opening on the board or a
+              tab inside Admin doesn't replay it) */}
+          <div className="page-anim" key={loc.split("/")[1] ?? ""}>
           <Switch>
             <Route path="/dashboard">
               <DashboardPage />
@@ -455,6 +461,7 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             <Route path="/w/:ws/p/:pid">{(params) => <Redirect replace to={`/board?p=${params.pid}`} />}</Route>
             <Route>{first ? <Redirect to="/board" /> : <Redirect to="/inbox" />}</Route>
           </Switch>
+          </div>
         </main>
         <CommandPalette />
       </div>

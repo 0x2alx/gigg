@@ -44,6 +44,21 @@
   /* type scale: 11 / 12 / 13 / 14 / 16 / 20 px at the 90% root (14.4px) */
   --fs-xs: 0.76rem; --fs-sm: 0.83rem; --fs-base: 0.9rem; --fs-md: 0.97rem; --fs-lg: 1.11rem; --fs-xl: 1.39rem;
   --ctl-h: 2.08rem; /* control height: buttons, selects, search (30px) */
+  /* the theme's "Buttons and badges" shape: the corners (default) or fully round (pill); applyTheme sets it */
+  --ctl-r: var(--radius-m);
+  /* board columns: the theme's own lane colour and outline, else a step between page and cards, no outline */
+  --lane: var(--low);
+  --lane-border: transparent;
+  /* cards and the sidebar panels carry the theme's border colour and width */
+  --edge: var(--border);
+  --edge-hover: color-mix(in srgb, var(--border) 60%, var(--text));
+  /* sidebar widths: open, and the collapsed rail */
+  --side-w: clamp(176px, 13rem, 240px);
+  --rail-w: 4.3rem;
+  /* motion: one easing and three durations for the whole app (all off under prefers-reduced-motion) */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --dur-1: 140ms; --dur-2: 220ms; --dur-3: 320ms;
 }
 
 * { box-sizing: border-box; }
@@ -74,11 +89,12 @@ input, textarea, select {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-m);
-  padding: 0.3rem 0.6rem;
+  border-radius: var(--ctl-r);
+  padding: 0.3rem var(--ctl-px, 0.6rem);
   width: 100%;
   transition: border-color 0.12s ease-out;
 }
+textarea { border-radius: var(--radius-m); padding-inline: 0.6rem; }
 /* :where keeps these at element weight, so any component rule overrides them */
 :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), select) { min-height: var(--ctl-h); }
 :where(input, textarea, select):where(:hover:not(:disabled, :focus)) { border-color: color-mix(in srgb, var(--text) 38%, var(--surface)); }
@@ -110,7 +126,7 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   background: var(--accent);
   color: var(--on-accent);
   border: 1px solid transparent;
-  border-radius: var(--radius-m);
+  border-radius: var(--ctl-r);
   padding: 0 0.9rem;
   font: inherit;
   font-size: var(--fs-base);
@@ -148,11 +164,11 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .login-mark { width: 6rem; height: 6rem; display: block; }
 
 /* Shell: a narrow sidebar and the content. */
-.shell { display: grid; grid-template-columns: clamp(176px, 13rem, 240px) minmax(0, 1fr); height: 100%; }
+.shell { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); height: 100%; transition: grid-template-columns var(--dur-3) var(--ease); }
 .sidebar {
-  background: var(--surface);
-  border-right: 1px solid var(--line);
+  background: var(--bg);
   padding: var(--sp-5) var(--sp-4);
+  gap: var(--sp-5);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -164,7 +180,13 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 }
 .brand-mark { flex: none; width: 1.5rem; height: 1.7rem; color: var(--accent); }
 .brand-word { line-height: 1; }
-.sidebar nav { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+/* the sidebar is two floating panels: the pages and messages at the top, settings and you at the bottom */
+.sidebar nav, .side-bottom {
+  display: flex; flex-direction: column; gap: 2px; flex: none;
+  background: var(--surface); border: var(--border-w) solid var(--edge); border-radius: var(--radius-xl);
+  padding: var(--sp-3);
+}
+.side-bottom { margin-top: auto; }
 .nav-sub { display: flex; flex-direction: column; gap: 1px; margin: 1px 0 var(--sp-2) 1.12rem; padding-left: var(--sp-3); border-left: 1px solid var(--line); }
 .shell.rail .nav-sub { margin-left: 0; padding-left: 0; border-left: 0; }
 /* Pages: wide ones fill the content area; reading-width ones are centred (never stuck to the left). */
@@ -177,14 +199,16 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   transition: background-color 0.12s ease-out, color 0.12s ease-out;
 }
 .nav-item:hover { background: var(--hover); color: var(--text); }
-.nav-item.selected { background: var(--selected); color: var(--text); }
+.nav-item.selected { background: var(--accent); color: var(--on-accent); }
+.nav-item.selected .count { color: var(--on-accent); }
+.nav-item.selected .count-alert, .shell.rail .nav-item.selected .count-alert { background: var(--on-accent); color: var(--accent); }
 .nav-sub .nav-item { min-height: 1.8rem; font-size: var(--fs-sm); }
 .nav-sub .nav-icon { font-size: 0.9rem; }
-/* the Board entry is the main one: a taller row, a bigger icon and label */
-.nav-item.nav-primary { min-height: calc(var(--ctl-h) + 0.55rem); font-size: var(--fs-md); }
-.nav-primary .nav-icon { width: 1.4rem; height: 1.4rem; font-size: 1.4rem; }
+/* the Board entry is the main one: about twice the others (row, icon, label) */
+.nav-item.nav-primary { min-height: calc(var(--ctl-h) * 1.9); font-size: 1.45rem; font-weight: var(--weight-strong); gap: var(--sp-5); }
+.nav-primary .nav-icon { width: 2.1rem; height: 2.1rem; font-size: 2.1rem; }
 /* a hairline between the pages (Board, Dashboard, My tasks) and the inbox and notifications */
-.nav-sep { border: 0; border-top: 1px solid var(--line); margin: var(--sp-3) var(--sp-2); align-self: stretch; }
+.nav-sep { border: 0; border-top: 1px solid var(--line); margin: var(--sp-2) var(--sp-3); align-self: stretch; }
 /* line icons (icons.tsx) sit on the text baseline */
 .ico { display: inline-block; flex: none; vertical-align: -0.125em; }
 
@@ -208,8 +232,8 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .board { display: grid; gap: var(--sp-5); align-items: start; overflow-x: clip; }
 /* a column is a lane one step off the page, without a frame; its cards sit one step lighter */
 .column {
-  background: var(--low);
-  border: 1px solid transparent;
+  background: var(--lane);
+  border: max(1px, var(--border-w)) solid var(--lane-border);
   border-radius: var(--radius-l);
   display: flex; flex-direction: column; min-width: 0;
 }
@@ -268,12 +292,12 @@ a.pulse-item:hover { color: var(--text); }
 .task-card {
   position: relative;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: max(1px, var(--border-w)) solid var(--edge); /* at least 1px: blocked, missed and archived show on it */
   border-radius: var(--radius-m);
   box-shadow: inset 3px 0 0 var(--card-c, transparent);
-  transition: border-color 0.12s ease-out, background-color 0.12s ease-out;
+  transition: border-color var(--dur-1) ease-out, background-color var(--dur-1) ease-out, box-shadow var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
 }
-.task-card:hover, .task-card:focus-within { border-color: var(--line-strong); background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
+.task-card:hover, .task-card:focus-within { border-color: var(--edge-hover); background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
 .task-card.dragging { box-shadow: var(--shadow-pop), inset 3px 0 0 var(--card-c, transparent); }
 .card-open {
   display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit;
@@ -352,7 +376,7 @@ a.pulse-item:hover { color: var(--text); }
   font-size: 0.72rem; font-weight: 400; background: var(--surface-variant); border-radius: var(--radius-s);
   padding: 0.05rem 0.4rem; display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%;
 }
-.card-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); flex-wrap: wrap; }
+.card-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: var(--sp-3); }
 .card-foot:has(> .meta:empty):not(:has(> .people)) { display: none; }
 /* who: 20px avatars stacked with a ring of the card colour; a person handing a task to an agent shows
    as creator, a small arrow, then the assignees */
@@ -489,12 +513,12 @@ a.pulse-item:hover { color: var(--text); }
    least 9.5px and tightly tracked so two letters read at the smallest size. */
 .avatar {
   position: relative; display: inline-grid; place-items: center; flex: none;
-  width: 1.75rem; height: 1.75rem; border-radius: 50%; font-size: 0.7rem; font-weight: var(--weight-strong);
+  width: 2.1rem; height: 2.1rem; border-radius: 50%; font-size: 0.8rem; font-weight: var(--weight-strong);
   letter-spacing: -0.02em; line-height: 1; border: 1.5px solid var(--surface);
 }
-.avatar-xs { width: 1.6rem; height: 1.6rem; font-size: 0.66rem; letter-spacing: -0.04em; }
-.avatar-l { width: 2.22rem; height: 2.22rem; font-size: 0.85rem; border-width: 2px; }
-.avatar-m { width: 3.33rem; height: 3.33rem; font-size: 1.15rem; border-width: 2px; }
+.avatar-xs { width: 1.95rem; height: 1.95rem; font-size: 0.74rem; letter-spacing: -0.04em; }
+.avatar-l { width: 2.7rem; height: 2.7rem; font-size: 1rem; border-width: 2px; }
+.avatar-m { width: 4.2rem; height: 4.2rem; font-size: 1.4rem; border-width: 2px; }
 /* agents are rounded squares (the shape says "agent" at every size); from s up a small robot mark
    sits on the lower-right corner, about a third of the avatar, outside the initials */
 .avatar-agent, .avatar-agent img { border-radius: 28%; }
@@ -574,15 +598,21 @@ a.pulse-item:hover { color: var(--text); }
   background: none; color: inherit; font-size: 1.11rem; line-height: 1;
 }
 .nav-icon .ico { vertical-align: 0; }
-.nav-icon .avatar { width: 1.25rem; height: 1.25rem; font-size: 0.55rem; border-width: 0; }
+.nav-icon .avatar { width: 1.6rem; height: 1.6rem; font-size: 0.62rem; border-width: 0; }
+.nav-icon:has(.avatar) { width: 1.6rem; height: 1.6rem; }
 .nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.side-bottom { border-top: 1px solid var(--line); padding-top: var(--sp-4); display: flex; flex-direction: column; gap: 1px; }
+
 .logout { align-self: flex-start; }
-.shell.collapsed { grid-template-columns: 3.4rem minmax(0, 1fr); }
+.shell.collapsed { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
 .shell.rail .sidebar { padding: var(--sp-5) var(--sp-3); align-items: center; }
+.shell.rail .sidebar nav, .shell.rail .side-bottom { align-items: center; padding: var(--sp-3) var(--sp-2); }
+.shell.rail .nav-item.nav-primary { width: calc(var(--ctl-h) * 1.3); min-height: calc(var(--ctl-h) * 1.3); }
+.shell.rail .sidebar { overflow-x: hidden; }
+.shell.rail .nav-primary .nav-icon { width: 1.6rem; height: 1.6rem; font-size: 1.6rem; }
+.shell.rail .nav-sep { margin: var(--sp-2) var(--sp-2); }
 .shell.rail .side-top { flex-direction: column; justify-content: center; gap: var(--sp-3); }
 .shell.rail .side-top .brand { padding: 0.15rem; }
-.shell.rail .nav-item { justify-content: center; padding: 0; width: var(--ctl-h); }
+.shell.rail .nav-item { justify-content: center; padding: 0; width: calc(var(--ctl-h) + 0.2rem); min-height: calc(var(--ctl-h) + 0.2rem); }
 .shell.rail .nav-sub { margin: 1px 0 var(--sp-2); }
 /* collapsed: the count sits on the icon's corner as a small solid number */
 .shell.rail .nav-item .count {
@@ -592,9 +622,10 @@ a.pulse-item:hover { color: var(--text); }
 .shell.rail .nav-item .count-alert { background: var(--accent); color: var(--on-accent); }
 .shell.rail .ws { margin-top: 0.5rem; }
 /* a collapsed sidebar peeks open while hovered or focused: full width over the page, the page doesn't move */
+.shell.collapsed .sidebar { width: var(--rail-w); transition: width var(--dur-3) var(--ease), box-shadow var(--dur-3) var(--ease); }
 .shell.collapsed.peek .sidebar {
-  position: relative; z-index: 40; width: clamp(176px, 13rem, 240px); /* over the task panel (30), under popovers (45) and dialogs (50) */
-  border-right-color: var(--line-strong); box-shadow: var(--shadow-pop);
+  position: relative; z-index: 40; width: var(--side-w); /* over the task panel (30), under popovers (45) and dialogs (50) */
+  box-shadow: var(--shadow-pop);
 }
 
 /* profile */
@@ -673,7 +704,7 @@ a.pulse-item:hover { color: var(--text); }
 .picture .row { align-items: center; gap: 0.8rem; flex-wrap: wrap; }
 .file-button { cursor: pointer; display: inline-flex; flex-direction: row; color: var(--on-secondary); font-size: 0.95rem; }
 .avatar-img { background: var(--surface-variant); }
-.avatar-img img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.avatar-img img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
 @media (max-width: 720px) { .editor-row { grid-template-columns: 1fr; } }
 
 /* ---- recurring tasks: repeat fields, schedules list, window badges ---- */
@@ -880,7 +911,8 @@ label.check input { width: auto; accent-color: var(--accent); }
 button.nav-item { background: none; border: 0; font: inherit; font-size: var(--fs-base); width: 100%; text-align: left; cursor: pointer; }
 button.nav-item:not(.selected) { color: var(--muted); }
 button.nav-item:hover { color: var(--text); }
-.shell.rail button.nav-item { width: var(--ctl-h); }
+button.nav-item.selected, button.nav-item.selected:hover { color: var(--on-accent); }
+.shell.rail button.nav-item { width: calc(var(--ctl-h) + 0.2rem); }
 /* The bell popover lives in <body> (portal). Layers: sticky bars 5, card menus 20, task panel 30,
    this 45, modals 50, palette/toasts 60. The background is solid even if a theme colour has alpha. */
 .bell-pop {
@@ -1016,10 +1048,10 @@ button.nav-item:hover { color: var(--text); }
 }
 .tp-key { flex: none; font-family: var(--mono); }
 /* a picture avatar of a user who picked a colour: a thin ring in it */
-.avatar-ring { box-shadow: 0 0 0 1.5px var(--ring); }
+.avatar-ring { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 80%, transparent); }
 .ws-chip { gap: 0.3rem; padding-left: 0.2rem; flex: none; }
 .ws-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ws-chip .avatar { width: 1rem; height: 1rem; font-size: 0.5rem; }
+.ws-chip .avatar { width: 1.35rem; height: 1.35rem; font-size: 0.55rem; }
 .ws-chip .dot { margin-left: 0.15rem; }
 .tp-badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); flex: 1; min-width: 0; }
 .tp-top .close { flex: none; margin-left: auto; }
@@ -1068,8 +1100,8 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 .tp-people .arrow { display: inline-flex; color: var(--muted); }
 .tp-people .muted { margin-left: var(--sp-3); font-size: var(--fs-sm); }
 .tp-expand { flex: none; }
-.panel-full { left: clamp(176px, 13rem, 240px); width: auto; box-shadow: none; }
-.shell.collapsed .panel-full { left: 3.4rem; }
+.panel-full { left: var(--side-w); width: auto; box-shadow: none; transition: left var(--dur-3) var(--ease); }
+.shell.collapsed .panel-full { left: var(--rail-w); }
 @container tpanel (min-width: 58rem) {
   .tp-body { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(19rem, 1fr); gap: 1.75rem; align-items: start; }
   .tp-side { margin-top: 0.8rem; }
@@ -1140,10 +1172,10 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   .shell.narrow .sidebar {
     position: fixed; top: 0; bottom: 0; left: 0; z-index: 70; width: min(18rem, 86vw); max-height: none;
     border-right: 1px solid var(--line-strong); border-bottom: 0; padding: var(--sp-5) var(--sp-4);
-    transform: translateX(-105%); visibility: hidden; transition: transform 0.2s ease, visibility 0s linear 0.2s;
+    transform: translateX(-105%); visibility: hidden; transition: transform var(--dur-3) var(--ease), visibility 0s linear var(--dur-3);
     box-shadow: var(--shadow-pop);
   }
-  .shell.narrow.drawer-open .sidebar { transform: none; visibility: visible; transition: transform 0.2s ease; }
+  .shell.narrow.drawer-open .sidebar { transform: none; visibility: visible; transition: transform var(--dur-3) var(--ease); }
   .drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 65; background: color-mix(in srgb, var(--bg) 55%, transparent); }
   .topbar {
     display: flex; align-items: center; gap: 0.4rem; position: sticky; top: -0.75rem; z-index: 25;
@@ -1152,7 +1184,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   }
   .topbar-menu { font-size: 1.25rem; width: 2.4rem; height: 2.4rem; display: inline-grid; place-items: center; }
   .shell.narrow .nav-item { min-height: 2.4rem; font-size: var(--fs-md); }
-  .shell.narrow .nav-item.nav-primary { min-height: 2.9rem; font-size: var(--fs-lg); }
+  .shell.narrow .nav-item.nav-primary { min-height: 3.9rem; font-size: 1.45rem; }
   .topbar-brand { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0; }
   .topbar-bell { position: relative; width: 2.4rem; height: 2.4rem; display: inline-grid; place-items: center; text-decoration: none; font-size: 1.2rem; }
   .topbar-bell .count { position: absolute; top: 0.1rem; right: 0; font-size: 0.6rem; line-height: 1.45; padding: 0 0.25rem; min-width: 0; background: var(--accent); color: var(--on-accent); }
@@ -1312,7 +1344,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .bf-chip.on { background: var(--selected); color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .bf-ws { --c: var(--muted); border-color: color-mix(in srgb, var(--c) 40%, var(--line)); }
 .bf-ws.on { background: color-mix(in srgb, var(--c) 20%, var(--surface)); border-color: var(--c); }
-.bf-chip .avatar-xs { width: 1.15rem; height: 1.15rem; font-size: 0.5rem; border-width: 0; }
+.bf-chip .avatar-xs { width: 1.45rem; height: 1.45rem; font-size: 0.56rem; border-width: 0; }
 /* Filters: the fold button leads the row; folded, the filters that are on follow it as removable chips */
 .bf-fold {
   display: inline-flex; align-items: center; gap: 0.35rem; height: var(--ctl-h); padding: 0 0.55rem; font: inherit; font-size: var(--fs-base);
@@ -1375,3 +1407,88 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .ck-actions { transition: opacity 0.12s ease-out; }
 .checklist li:not(:hover):not(:focus-within) .ck-actions { opacity: 0; }
 @media (hover: none) { .checklist li .ck-actions { opacity: 1; } }
+
+/* ======================================================================================================
+   Shape, board look and motion (2026-11-14). The theme's "Buttons and badges" shape: pill makes every
+   control, chip and badge fully round; the default follows the theme's corners as before.
+   ====================================================================================================== */
+[data-shape="pill"] :is(.pill, .chip-label, .chip, .badge, .bf-chip, .bf-active, .bf-toggle, .bf-fold, .bf-pick,
+  .seg, .seg button, .view-switch, .vs-item, .icon-button, .nav-item, .collapsed-chip, .column-add, .assignee,
+  .admin-seg-btn, .font-opt, .col-tab, .menu button, .menu a, .help-button, .count, .count-pill, .stage-label, .side-foot .logout) {
+  border-radius: 999px;
+}
+[data-shape="pill"] .menu, [data-shape="pill"] .bell-pop { border-radius: var(--radius-xl); }
+
+/* the board's column name: a filled label in the stage colour (--stage, text picked for contrast inline) */
+.stage-label {
+  display: inline-flex; align-items: center; gap: 0.35rem; min-width: 0; max-width: 100%;
+  padding: 0.12rem 0.55rem; border-radius: var(--radius-s); background: var(--stage);
+  font-size: var(--fs-sm); font-weight: var(--weight-strong); line-height: 1.45;
+}
+.stage-label .stage-icon { font-size: 0.85rem; --stage-check: var(--stage); }
+
+/* the board's top bar: soft controls on the page background (no hard edges), a little taller */
+.board-page > .page-head, .board-filters { --ctl-h: 2.45rem; }
+.board-page > .page-head .button { min-height: var(--ctl-h); }
+.board-page > .page-head .button.secondary { background: var(--surface); border-color: transparent; }
+.board-page > .page-head .button.secondary:hover { border-color: var(--line-strong); }
+.view-switch { height: var(--ctl-h); border-color: transparent; background: var(--surface); border-radius: var(--ctl-r); padding: 3px; gap: 3px; }
+.vs-item { border-radius: calc(var(--ctl-r) - 3px); padding: 0 0.95rem; }
+.vs-item.on { background: var(--accent); color: var(--on-accent); }
+.board-filters .bf-fold, .bf-toggle, .bf-pick, .bf-search input {
+  min-height: var(--ctl-h); background: var(--surface); border: 1px solid transparent; border-radius: var(--ctl-r);
+  transition: border-color var(--dur-1) ease-out, background-color var(--dur-1) ease-out;
+}
+.board-filters .bf-fold:hover, .bf-toggle:hover, .bf-pick:hover, .bf-search input:hover:not(:focus) { border-color: var(--line-strong); }
+.bf-fold { padding: 0 0.85rem; color: var(--text); font-weight: var(--weight-strong); }
+.bf-fold .ico:first-child { color: var(--muted); }
+.board-filters .bf-fold.on { background: var(--selected); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.bf-search input { height: var(--ctl-h); padding-left: 2.2rem; }
+.bf-search svg { left: 0.85rem; font-size: 1.05rem; }
+/* a select as a pill: its name in muted text, then the value and the chevron */
+.bf-pick { display: inline-flex; flex-direction: row; align-items: center; gap: 0.1rem; padding-left: 0.85rem; color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; max-width: 100%; min-width: 0; cursor: pointer; }
+.bf-fields .bf-pick select { min-width: 0; text-overflow: ellipsis; }
+.bf-pick-label::after { content: ":"; }
+.bf-fields .bf-pick select { height: calc(var(--ctl-h) - 2px); min-height: 0; border: 0; background-color: transparent; padding-left: 0.3rem; color: var(--text); font-weight: var(--weight-strong); }
+.bf-fields .bf-pick select:focus-visible { outline-offset: -2px; }
+.bf-pick:has(select.active) { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.bf-fields .bf-pick select.active { background-color: transparent; border: 0; }
+.bf-toggle { padding: 0 0.85rem; }
+
+/* ---- motion: pages, panels, dialogs, menus, columns and cards come in (and dialogs go out) softly ---- */
+@keyframes g-fade { from { opacity: 0; } }
+@keyframes g-rise { from { opacity: 0; transform: translateY(8px); } }
+/* pages rise with `top`, not a transform: a transform would make the page the frame of its fixed
+   children (the task panel, dialogs) while it runs */
+@keyframes g-page { from { opacity: 0; top: 10px; } }
+@keyframes g-pop { from { opacity: 0; transform: translateY(6px) scale(0.97); } }
+@keyframes g-pop-out { to { opacity: 0; transform: translateY(6px) scale(0.97); } }
+@keyframes g-fade-out { to { opacity: 0; } }
+@keyframes g-slide-in { from { opacity: 0.4; transform: translateX(32px); } }
+@keyframes g-slide-out { to { opacity: 0; transform: translateX(32px); } }
+.page-anim { position: relative; top: 0; animation: g-page var(--dur-3) var(--ease); }
+.modal-backdrop { animation: g-fade var(--dur-2) var(--ease); }
+.modal { animation: g-pop var(--dur-2) var(--ease); }
+.modal-backdrop.closing { animation: g-fade-out var(--dur-1) var(--ease-in) forwards; pointer-events: none; }
+/* a close the caller refused: back at once, without replaying the entrance */
+.modal-backdrop.reopen:not(.closing), .modal-backdrop.reopen:not(.closing) .modal { animation: none; }
+.modal-backdrop.closing .modal { animation: g-pop-out var(--dur-1) var(--ease-in) forwards; }
+.menu, .bell-pop, .mention-list, .search-results { animation: g-pop var(--dur-1) var(--ease); transform-origin: top right; }
+.panel { animation: g-slide-in var(--dur-3) var(--ease); }
+.panel.closing { animation: g-slide-out var(--dur-1) var(--ease-in) forwards; pointer-events: none; }
+.column, .collapsed-chip { animation: g-rise var(--dur-3) var(--ease) both; }
+.board-filters .bf-row { animation: g-fade var(--dur-2) var(--ease); }
+.nav-label { animation: g-fade var(--dur-3) var(--ease); }
+@keyframes g-toast { from { opacity: 0; transform: translate(-50%, 8px); } }
+.toast { animation: g-toast var(--dur-2) var(--ease); }
+/* the stagger of the columns on first paint */
+.board > .column:nth-child(2) { animation-delay: 30ms; }
+.board > .column:nth-child(3) { animation-delay: 60ms; }
+.board > .column:nth-child(4) { animation-delay: 90ms; }
+.board > .column:nth-child(n + 5) { animation-delay: 120ms; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important; scroll-behavior: auto !important;
+  }
+}

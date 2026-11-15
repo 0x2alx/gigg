@@ -81,3 +81,27 @@ func TestSaneClampsAndDrops(t *testing.T) {
 		t.Error("id rules")
 	}
 }
+
+// TestSaneExtras: the gigg-only keys (control shape, board column colours) survive when valid and
+// are dropped when not, so the apps' exports stay unchanged and junk can't reach the CSS.
+func TestSaneExtras(t *testing.T) {
+	base := `{"name":"X","dark":true,"background":"#000000","surface":"#111111","surfaceVariant":"#222222",
+	"border":"#333333","accent":"#444444","onAccent":"#555555","text":"#666666","mutedText":"#777777","danger":"#888888",
+	"font":"Inter","fontWeight":"Medium","textScalePct":90,"cornerDp":8,"borderDp":1`
+	out, err := Sane([]byte(base + `,"controlShape":"pill","laneColor":"#abcdef","laneBorder":"#123456"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"controlShape":"pill"`, `"laneColor":"#ABCDEF"`, `"laneBorder":"#123456"`} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("missing %s in %s", want, out)
+		}
+	}
+	out, err = Sane([]byte(base + `,"controlShape":"blob","laneColor":"red;}","laneBorder":null}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), "controlShape") || strings.Contains(string(out), "lane") {
+		t.Errorf("kept invalid extras: %s", out)
+	}
+}

@@ -77,6 +77,7 @@ const P: Record<string, ReactNode> = {
     </>
   ),
   list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
+  filter: <path d="M3.5 5h17l-6.5 8v5.5l-4 2V13z" />,
   sidebar: (
     <>
       <rect x="3" y="3" width="18" height="18" rx="2.5" />

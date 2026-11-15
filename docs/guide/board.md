@@ -1,6 +1,6 @@
 # The board
 
-The board shows the tasks of every workspace and project you can see, in one place. Open it from **Board**, the first and largest entry in the sidebar. Below it come **Dashboard** and **My tasks** (with your saved views), then, after a thin line, **Inbox** and **Notifications**.
+The board shows the tasks of every workspace and project you can see, in one place. Open it from **Board**, the first and largest entry in the sidebar. The sidebar is two panels: at the top **Board**, **Dashboard** and **My tasks** (with your saved views), then, after a thin line, **Inbox** and **Notifications**; at the bottom **Admin**, **Themes**, your profile and **Log out**. The page you are on is filled with the theme's accent colour.
 
 The sidebar button at its top (a square with a bar) collapses the sidebar to a strip of icons, or keeps it open. While it is collapsed, pointing at the strip (or tabbing into it) opens it over the page, and it folds back when the pointer leaves. The choice is saved on your account.
 
@@ -13,12 +13,12 @@ The sidebar button at its top (a square with a bar) collapses the sidebar to a s
 
 Cancelled tasks don't appear on the board. Use the table view to see them.
 
-Each column header shows the stage as a small ring in the column's colour (dashed for Backlog, empty for To-Do, half full for Doing, with a pause bar for Waiting, filled with a check for Done), the column's name and its number of tasks. Hovering over the header (or tabbing to it) shows two buttons on the right:
+Each column header shows the column's name on a label filled with its colour, with a small mark for the stage (a dashed ring for Backlog, an empty ring for To-Do, half full for Doing, a pause bar for Waiting, a check for Done), then its number of tasks. Hovering over the header (or tabbing to it) shows two buttons on the right:
 
 - **+**: a new task in this column. With several projects in view it first asks which project, and the task starts in that project's first status of the stage.
 - **Collapse** (two arrows pointing in): the column leaves the board and becomes a small button above it, with its name and count. Click the button to bring the column back. The board remembers collapsed columns per browser. You can drop a card on a collapsed column's button too.
 
-Each column also ends with **+ New task**. Done and Cancelled take no new tasks there: when they hold tasks they end with **Archive done** or **Archive cancelled** instead, which opens the archive dialog for that column's tasks only (see **Archive done** below). On a phone, the columns are tabs above the cards.
+Each column also ends with **+ New task**, except Done: when it holds tasks it ends with **Archive done** instead, which opens the archive dialog for done tasks only (see **Archive done** below). Cancelled tasks never show on the board; **⋯ → Archive done** archives them too. On a phone, the columns are tabs above the cards.
 
 ### Agent activity
 
@@ -28,13 +28,13 @@ When agents are at work on the tasks in view, a line under the filters sums it u
 
 ## Cards
 
-A card is quiet on purpose: a hairline border, the title first, a few facts under it. Hover over (or long-press) any mark to see its tooltip.
+A card is quiet on purpose: the theme's border colour and width, the title first, a few facts under it. When someone else or an agent moves a card, it slides to its new place. Hover over (or long-press) any mark to see its tooltip.
 
 - **Top row:** the priority as an icon (three bars for Low, Medium and High, a square with "!" for Urgent; High and Urgent are coloured), the agent state if there is one (see below), and, when several workspaces are in view, the task's workspace (a dot in its colour and its name). When the column is a stage and the task's own status is named differently (for example "Needs review"), that status follows in grey. The task's key (`KEY-12`: the project's key and the task's number) sits at the right, small; the card's **⋯** takes its place when you hover.
 - **Title:** up to two lines.
 - **Due date and labels:** the due date as a small outlined chip with a calendar (red when overdue), then up to two labels as tinted chips; "+3" stands for the rest (hover to list them).
 - **Agent block** (only when there is something to show, see below).
-- **Bottom row:** facts as small grey icons and numbers, then the people.
+- **Bottom row:** under a thin line, facts as small grey icons and numbers, then the people.
 - **The task's colour:** a coloured stripe on the card's left edge appears only when the task has a colour. A card that is blocked or missed has a red border, and an archived card a dashed one.
 - **⋯** (top right, shown when you hover the card or tab to it, and always on a touch screen): move the card (see below).
 

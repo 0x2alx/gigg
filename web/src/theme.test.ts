@@ -107,3 +107,19 @@ describe("contrast fixes", () => {
     expect(notes.some((n) => n.includes("hard to read"))).toBe(true);
   });
 });
+
+describe("gigg extras (control shape, board columns)", () => {
+  it("round-trip through Copy JSON and are left out when unset or invalid", () => {
+    const t = { ...BUILTINS[0]!, controlShape: "pill" as const, laneColor: "#112233", laneBorder: "#445566" };
+    const json = themeJSON(t);
+    expect(json).toContain('"controlShape": "pill"');
+    const back = fromObject(JSON.parse(json), current, []);
+    expect([back.controlShape, back.laneColor, back.laneBorder]).toEqual(["pill", "#112233", "#445566"]);
+    const notes: string[] = [];
+    const bad = fromObject({ ...JSON.parse(json), controlShape: "blob", laneColor: "nope" }, current, notes);
+    expect(bad.controlShape).toBeUndefined();
+    expect(bad.laneColor).toBeUndefined();
+    expect(notes.some((n) => n.includes("laneColor"))).toBe(true);
+    expect(themeJSON({ ...BUILTINS[0]! })).not.toContain("lane");
+  });
+});

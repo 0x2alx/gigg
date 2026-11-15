@@ -135,6 +135,17 @@ func Sane(raw []byte) ([]byte, error) {
 	put("textScalePct", clamp(m["textScalePct"], 85, 130, 100))
 	put("cornerDp", clamp(m["cornerDp"], 0, 28, 12))
 	put("borderDp", clamp(m["borderDp"], 0, 3, 1))
+	// gigg-only extras (the apps ignore unknown keys): kept when valid, dropped otherwise
+	if v, _ := m["controlShape"].(string); v == "pill" {
+		put("controlShape", "pill")
+	}
+	for _, k := range []string{"laneColor", "laneBorder"} {
+		if v, present := m[k]; present && v != nil {
+			if c, ok := ParseColour(v); ok {
+				put(k, c)
+			}
+		}
+	}
 	// widget: kept byte-for-byte (key order included) so it round-trips to the apps; rebuilt only
 	// when its opacity needs clamping.
 	var rawm map[string]json.RawMessage

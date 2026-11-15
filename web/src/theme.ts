@@ -22,7 +22,15 @@ export interface Theme {
   borderDp: number;
   description: string;
   widget?: Record<string, unknown>;
+  // gigg-only extras (the apps ignore unknown keys; exported only when set):
+  controlShape?: "pill" | "rounded"; // buttons, fields, pills and badges fully round, or following the corners
+  laneColor?: string | null; // the board's column background (unset: a step between page and cards)
+  laneBorder?: string | null; // the column outline (unset: none)
 }
+
+// laneOf / laneBorderOf: the column colours a theme ends up with (its own, or derived)
+export const laneOf = (t: Pick<Theme, "laneColor" | "background" | "surface">): string => t.laneColor ?? mix(t.background, t.surface, 0.5);
+export const laneBorderOf = (t: Pick<Theme, "laneBorder">): string | null => t.laneBorder ?? null;
 
 export const BUILTINS: Theme[] = [
   { id: "clumsy-clanker", name: "Clumsy Clanker", dark: true, background: "#100318", surface: "#1C0A2E", surfaceVariant: "#2A1247",
@@ -31,12 +39,12 @@ export const BUILTINS: Theme[] = [
     description: "The signature look: near-black purple, a neon violet edge and accent, amber text, magenta secondary text." },
   { id: "nightwalker", name: "Nightwalker", dark: true, background: "#1A2226", surface: "#253136", surfaceVariant: "#2F3D43",
     border: "#2D393E", accent: "#CDFFFB", onAccent: "#12302E", text: "#EEF8F7", mutedText: "#A3B6B8", danger: "#FF8A80", secondary: null,
-    font: "Rubik", fontWeight: "Medium", textScalePct: 93, cornerDp: 9, borderDp: 1,
-    description: "Slate blue-grey with a pale aqua accent. The default in dark mode." },
-  { id: "daywalker", name: "Daywalker", dark: false, background: "#F6F7F9", surface: "#FFFFFF", surfaceVariant: "#EEF0F4",
-    border: "#DCE0E7", accent: "#5967DB", onAccent: "#FFFFFF", text: "#1A1D24", mutedText: "#5A6372", danger: "#C62828", secondary: null,
-    font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 8, borderDp: 1,
-    description: "Clean near-white with soft grey edges and an indigo accent. The default in light mode." },
+    font: "Rubik", fontWeight: "Medium", textScalePct: 93, cornerDp: 9, borderDp: 1, controlShape: "pill",
+    description: "Slate blue-grey with a pale aqua accent, pill buttons. The default in dark mode." },
+  { id: "daywalker", name: "Daywalker", dark: false, background: "#EEF2F1", surface: "#FFFFFF", surfaceVariant: "#F2F5F4",
+    border: "#E1E7E5", accent: "#5967DB", onAccent: "#FFFFFF", text: "#1A1D24", mutedText: "#5A6372", danger: "#C62828", secondary: null,
+    font: "Inter", fontWeight: "Medium", textScalePct: 90, cornerDp: 12, borderDp: 1, controlShape: "pill", laneColor: "#E5EBE9",
+    description: "Soft mint-grey page, white panels and cards, pill buttons and an indigo accent. The default in light mode." },
   { id: "petty-officer", name: "Petty Officer", dark: true, background: "#0C140D", surface: "#141E15", surfaceVariant: "#1E2C1F",
     border: "#3C5A38", accent: "#F0B429", onAccent: "#1A1200", text: "#ECF3EA", mutedText: "#A9BFA2", danger: "#FF5C52", secondary: "#3E6B3A",
     font: "Michroma", fontWeight: "Medium", textScalePct: 90, cornerDp: 6, borderDp: 1,
@@ -47,12 +55,12 @@ export const BUILTINS: Theme[] = [
     description: "Black, white and yellow, thick borders." },
   { id: "neon", name: "Neon", dark: true, background: "#0A0E14", surface: "#111826", surfaceVariant: "#18213A",
     border: "#26365C", accent: "#00E5FF", onAccent: "#00151A", text: "#E6F7FF", mutedText: "#8FA6C7", danger: "#FF3DCB", secondary: null,
-    font: "Oxanium", fontWeight: "Medium", textScalePct: 90, cornerDp: 10, borderDp: 1,
-    description: "Deep navy with a cyan accent." },
+    font: "Oxanium", fontWeight: "Medium", textScalePct: 90, cornerDp: 10, borderDp: 1, controlShape: "pill",
+    description: "Deep navy with a cyan accent, pill buttons." },
   { id: "carbon", name: "Carbon", dark: true, background: "#1C1C1C", surface: "#2B2B2B", surfaceVariant: "#363636",
     border: "#404040", accent: "#EE7A64", onAccent: "#1E0B06", text: "#EDEDED", mutedText: "#A3A3A3", danger: "#F26A82", secondary: null,
-    font: "Rubik", fontWeight: "Medium", textScalePct: 92, cornerDp: 8, borderDp: 1,
-    description: "Neutral charcoal greys with a coral accent; dense, an ops-console feel." },
+    font: "Rubik", fontWeight: "Medium", textScalePct: 92, cornerDp: 8, borderDp: 1, controlShape: "pill",
+    description: "Neutral charcoal greys with a coral accent and pill buttons; an ops-console feel." },
 ];
 
 const RETIRED: Record<string, string> = { graphite: "nightwalker", daylight: "daywalker", signature: "clumsy-clanker" };
@@ -178,6 +186,11 @@ export function applyTheme(t: Theme): void {
   set("--secondary", secondary);
   set("--on-secondary", onSecondary);
   set("--low", mix(t.background, t.surface, 0.5));
+  set("--lane", laneOf(t));
+  set("--lane-border", laneBorderOf(t) ?? "transparent");
+  set("--ctl-r", t.controlShape === "pill" ? "999px" : "var(--radius-m)");
+  set("--ctl-px", t.controlShape === "pill" ? "0.85rem" : "0.6rem");
+  document.documentElement.dataset.shape = t.controlShape === "pill" ? "pill" : "rounded";
   set("--high", mix(t.surface, t.surfaceVariant, 0.5));
   set("--faint", mix(t.border, t.surface, 0.5));
   set("--error-container", mix(t.danger, t.surface, 0.75));
@@ -254,12 +267,21 @@ export const DATA_COLORS: string[] = [...new Set([...PALETTE, ...Object.values(C
 // =====================================================================================
 
 export const COLOUR_KEYS = ["background", "surface", "surfaceVariant", "border", "accent", "onAccent", "text", "mutedText", "danger"] as const;
-export type ColourKey = (typeof COLOUR_KEYS)[number] | "secondary";
+export type ColourKey = (typeof COLOUR_KEYS)[number] | "secondary" | "laneColor" | "laneBorder";
 
 export const ROLE_LABEL: Record<ColourKey, string> = {
   background: "Background", surface: "Cards", surfaceVariant: "Inputs and chips", border: "Borders", accent: "Accent",
   onAccent: "Text on the accent", secondary: "Secondary buttons", text: "Text", mutedText: "Secondary text", danger: "Warnings",
+  laneColor: "Board columns", laneBorder: "Column borders",
 };
+
+// colourOf: a role's colour as shown (secondary and the board columns fall back to their derived colour)
+export function colourOf(t: Theme, k: ColourKey): string {
+  if (k === "secondary") return secondaryOf(t);
+  if (k === "laneColor") return laneOf(t);
+  if (k === "laneBorder") return laneBorderOf(t) ?? laneOf(t);
+  return t[k];
+}
 
 export const BUNDLED_FONTS = ["Inter", "Audiowide", "Oxanium", "Orbitron", "Michroma", "Tektur", "Rubik", "Rajdhani", "Chakra Petch", "Share Tech Mono",
   "Nunito", "Comfortaa", "Caveat", "Pacifico", "Playfair Display", "Lora", "Bebas Neue", "Righteous", "Space Grotesk", "Press Start 2P"];
@@ -302,6 +324,13 @@ export function sane(t: Theme): Theme {
   out.secondary = out.secondary === null ? null : parseColour(out.secondary);
   if (!WEIGHT_NAMES.includes(out.fontWeight)) out.fontWeight = "Regular";
   if (!/^[A-Za-z0-9 ]{1,60}$/.test(out.font)) out.font = "Phone default";
+  // the extras: kept when valid, otherwise left out (not null), so a theme without them stays as it was
+  if (out.controlShape !== "pill") delete out.controlShape;
+  for (const k of ["laneColor", "laneBorder"] as const) {
+    const c = out[k] ? parseColour(out[k]) : null;
+    if (c) out[k] = c;
+    else delete out[k];
+  }
   if (out.widget && typeof out.widget === "object") {
     const w = { ...out.widget };
     if (typeof w.opacityPct === "number") w.opacityPct = clamp(w.opacityPct, 0, 100, 100);
@@ -320,6 +349,9 @@ export function themeJSON(t: Theme): string {
   o.textScalePct = t.textScalePct;
   o.cornerDp = t.cornerDp;
   o.borderDp = t.borderDp;
+  if (t.controlShape === "pill") o.controlShape = "pill";
+  if (t.laneColor) o.laneColor = t.laneColor;
+  if (t.laneBorder) o.laneBorder = t.laneBorder;
   if (t.widget) o.widget = t.widget;
   return JSON.stringify(o, null, 4);
 }
@@ -347,7 +379,10 @@ export function contrastProblems(t: Theme): Problem[] {
     ["accent", "background", 3, "The accent doesn't stand out from the background"],
   ];
   if (t.secondary) pairs.push(["text", "secondary", 4.5, "Text on secondary buttons is hard to read"]);
-  const col = (k: ColourKey) => (k === "secondary" ? secondaryOf(t) : t[k]);
+  // on the columns sit muted text ("Nothing here", "+ New task", counts); listed lane first, so the editor's
+  // Fix adjusts the column colour, not the app's secondary text
+  if (t.laneColor) pairs.push(["laneColor", "mutedText", 3, "Secondary text on the board columns is hard to read"]);
+  const col = (k: ColourKey) => colourOf(t, k);
   return pairs
     .map(([fg, bg, need, label]) => ({ fg, bg, need, label, have: ratio(col(fg), col(bg)) }))
     .filter((p) => p.have < p.need);
@@ -417,6 +452,9 @@ const RESET_SECONDARY = ["accent", "surface", "background", "text", "dark"];
 export function fromObject(o: Record<string, unknown>, current: Theme, notes: string[]): Theme {
   const name = typeof o.name === "string" && o.name.trim() ? o.name.trim().slice(0, 40) : "My theme";
   const t: Theme = { ...current, id: "", name, description: "", widget: undefined };
+  delete t.controlShape;
+  delete t.laneColor;
+  delete t.laneBorder;
   if (typeof o.dark === "boolean") t.dark = o.dark;
   for (const k of COLOUR_KEYS) {
     if (!(k in o)) continue;
@@ -442,6 +480,13 @@ export function fromObject(o: Record<string, unknown>, current: Theme, notes: st
   if (typeof o.fontWeight === "string" && (WEIGHT_NAMES as readonly string[]).includes(o.fontWeight)) t.fontWeight = o.fontWeight as Theme["fontWeight"];
   for (const k of ["textScalePct", "cornerDp", "borderDp"] as const) if (typeof o[k] === "number") t[k] = o[k] as number;
   if (o.widget && typeof o.widget === "object" && !Array.isArray(o.widget)) t.widget = o.widget as Record<string, unknown>;
+  if (o.controlShape === "pill") t.controlShape = "pill";
+  for (const k of ["laneColor", "laneBorder"] as const) {
+    if (!(k in o) || o[k] === null) continue;
+    const c = parseColour(o[k]);
+    if (c) t[k] = c;
+    else notes.push(`${name}: ${k} isn't a colour, so it was left out.`);
+  }
   if (typeof o.id === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(o.id) && !findTheme(o.id)) t.id = o.id;
   const s = sane(t);
   for (const p of contrastProblems(s)) notes.push(`${s.name}: ${p.label.charAt(0).toLowerCase() + p.label.slice(1)}.`);

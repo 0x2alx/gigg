@@ -9,7 +9,7 @@ import { ChecklistSection, CustomFieldsSection, DependenciesSection, SubtasksSec
 import { describeRule } from "./recurrence";
 import { CATEGORY_COLOR } from "./theme";
 import { EffortSelect, ModelInput, ToolsInput } from "./runsettings";
-import { Avatar, LabelChip, Pill, PriorityBadge, StatusBadge, TaskBadges, UserBadge } from "./ui";
+import { Avatar, EXIT_MS, LabelChip, Pill, PriorityBadge, StatusBadge, TaskBadges, UserBadge, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
@@ -144,6 +144,28 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   }, []);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  // closing slides the panel out first; opening another task meanwhile cancels it
+  // (the closing state names the task being closed, so a newly opened task never renders as closing)
+  const [closingKey, setClosingKey] = useState<string | null>(null);
+  const closing = closingKey === taskKey;
+  const keyRef = useRef(taskKey);
+  keyRef.current = taskKey;
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const close = useCallback(() => {
+    if (reducedMotion()) return closeRef.current();
+    if (closeTimer.current) return;
+    setClosingKey(keyRef.current);
+    closeTimer.current = setTimeout(() => {
+      closeTimer.current = undefined;
+      closeRef.current();
+    }, EXIT_MS);
+  }, []);
+  useEffect(() => {
+    clearTimeout(closeTimer.current);
+    closeTimer.current = undefined;
+    setClosingKey(null);
+  }, [taskKey]);
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
   const editingRef = useRef(editing);
   editingRef.current = editing;
 
@@ -153,11 +175,11 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"], .modal-backdrop')) return;
       if (flashDirty()) return;
       if (editingRef.current) setEditing("");
-      else closeRef.current();
+      else close();
     };
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
-  }, [flashDirty]);
+  }, [flashDirty, close]);
 
   // A click on the board outside the panel closes it, like ✕. Not when the press started inside
   // (drag-select), not in modals, popovers or menus, not when the click opened something else (the
@@ -177,7 +199,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       down = null;
       if (path === null || e.button !== 0 || !outside(e.target) || window.location.pathname !== path) return;
       if (flashDirty()) return;
-      closeRef.current();
+      close();
     };
     document.addEventListener("pointerdown", onDown, true);
     document.addEventListener("click", onClick);
@@ -185,7 +207,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       document.removeEventListener("pointerdown", onDown, true);
       document.removeEventListener("click", onClick);
     };
-  }, [flashDirty]);
+  }, [flashDirty, close]);
 
   // Focus: the panel takes focus when it opens or shows another task (keyboard users land in it);
   // on close, focus goes back to what had it before (the card), if that is still on the page.
@@ -215,8 +237,8 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
 
   if (!task) {
     return (
-      <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "")} aria-label="Task">
-        <button type="button" className="icon-button close" onClick={onClose} aria-label="Close">
+      <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "") + (closing ? " closing" : "")} inert={closing || undefined} aria-label="Task">
+        <button type="button" className="icon-button close" onClick={close} aria-label="Close">
           <Icon name="x" />
         </button>
         <p className={err ? "danger" : "muted"}>{err || "Loading…"}</p>
@@ -240,7 +262,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   };
 
   return (
-    <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "")} aria-label={`Task ${task.key}`} style={task.color ? ({ "--panel-c": task.color } as CSSProperties) : undefined}>
+    <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "") + (closing ? " closing" : "")} inert={closing || undefined} aria-label={`Task ${task.key}`} style={task.color ? ({ "--panel-c": task.color } as CSSProperties) : undefined}>
       <div className="tp-top">
         <WorkspaceBadge ws={ws} />
         <span className="pill pill-key tp-key" title={`Task key ${task.key}`}>
@@ -268,7 +290,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
         >
           <Icon name={full ? "shrink" : "expand"} />
         </button>
-        <button type="button" className="icon-button close" onClick={onClose} aria-label="Close" title="Close (Esc)">
+        <button type="button" className="icon-button close" onClick={close} aria-label="Close" title="Close (Esc)">
           <Icon name="x" />
         </button>
       </div>

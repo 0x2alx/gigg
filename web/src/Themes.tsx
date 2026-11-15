@@ -6,7 +6,7 @@ import { api, ApiError } from "./api";
 import { useApp, toTheme } from "./App";
 import {
   BUILTINS, BUNDLED_FONTS, COLOUR_KEYS, ROLE_LABEL, SYSTEM_FONTS, aiPrompt, contrastProblems, findTheme, importText, mix, nearestPassing,
-  parseColour, ratio, readableOn, sane, secondaryOf, themeJSON, type ColourKey, type Theme,
+  colourOf as roleColour, laneOf, parseColour, ratio, readableOn, sane, secondaryOf, themeJSON, type ColourKey, type Theme,
 } from "./theme";
 import { Modal } from "./ui";
 import { HelpButton } from "./help";
@@ -181,6 +181,7 @@ interface CardAction {
 // MiniPreview: a small card drawn in the theme's own colours (data colours, set inline).
 function MiniPreview({ t, flush }: { t: Theme; flush?: boolean }) {
   const r = t.cornerDp;
+  const ctl = t.controlShape === "pill" ? 999 : (3 * r) / 4;
   return (
     <span className="tg-mini" style={{ background: t.background, color: t.text, fontFamily: fontStack(t.font), borderRadius: flush ? 0 : r }}>
       <span className="theme-mini" style={{ background: t.surface, border: `${t.borderDp}px solid ${t.border}`, borderRadius: r }}>
@@ -188,7 +189,7 @@ function MiniPreview({ t, flush }: { t: Theme; flush?: boolean }) {
         <span className="theme-mini-muted" style={{ color: t.mutedText }}>
           Secondary text
         </span>
-        <span className="theme-mini-button" style={{ background: t.accent, color: t.onAccent, borderRadius: (3 * r) / 4 }}>
+        <span className="theme-mini-button" style={{ background: t.accent, color: t.onAccent, borderRadius: ctl }}>
           Button
         </span>
       </span>
@@ -258,7 +259,8 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
     setFlash(highlight);
     window.setTimeout(() => setFlash((f) => (f === highlight ? "" : f)), 600);
   };
-  const colourOf = (k: ColourKey) => (k === "secondary" ? secondaryOf(t) : t[k]);
+  const colourOf = (k: ColourKey) => roleColour(t, k);
+  const auto = (k: ColourKey) => (k === "secondary" && t.secondary === null) || (k === "laneColor" && !t.laneColor) || (k === "laneBorder" && !t.laneBorder);
   const save = () => onSave(sane(t)).catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't save the theme."));
   useEffect(() => {
     for (const f of BUNDLED_FONTS) loadPreviewFont(f);
@@ -286,7 +288,7 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
           <input type="checkbox" checked={t.dark} onChange={(e) => set({ dark: e.target.checked }, "background")} />
           <span>Dark theme</span>
         </label>
-        {([...COLOUR_KEYS.filter((k) => k !== "accent" && k !== "onAccent" && k !== "text" && k !== "mutedText" && k !== "danger"), "accent", "onAccent", "secondary", "text", "mutedText", "danger"] as ColourKey[]).map((k) => (
+        {([...COLOUR_KEYS.filter((k) => k !== "accent" && k !== "onAccent" && k !== "text" && k !== "mutedText" && k !== "danger"), "accent", "onAccent", "secondary", "text", "mutedText", "danger", "laneColor", "laneBorder"] as ColourKey[]).map((k) => (
           <div key={k} className="editor-row">
             <span>{ROLE_LABEL[k]}</span>
             <div className="swatches">
@@ -297,9 +299,23 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
                   A
                 </button>
               )}
+              {k === "laneColor" && (
+                <button type="button" className={"swatch auto" + (!t.laneColor ? " on" : "")} aria-label={`${ROLE_LABEL[k]}: Auto${!t.laneColor ? ", selected" : ""}`}
+                  title="Auto: halfway between the background and the cards; it follows them when you change them." style={{ background: laneOf({ ...t, laneColor: null }) }}
+                  onClick={() => set({ laneColor: null }, k)}>
+                  A
+                </button>
+              )}
+              {k === "laneBorder" && (
+                <button type="button" className={"swatch auto" + (!t.laneBorder ? " on" : "")} aria-label={`${ROLE_LABEL[k]}: None${!t.laneBorder ? ", selected" : ""}`}
+                  title="None: columns without an outline." style={{ background: laneOf(t) }}
+                  onClick={() => set({ laneBorder: null }, k)}>
+                  ∅
+                </button>
+              )}
               {dedupe([colourOf(k), ...PRESETS]).map((c) => (
-                <button key={c} type="button" className={"swatch" + (colourOf(k) === c && !(k === "secondary" && t.secondary === null) ? " on" : "")} style={{ background: c }}
-                  aria-label={`${ROLE_LABEL[k]}: ${c}${colourOf(k) === c ? ", selected" : ""}`} onClick={() => set({ [k]: c } as Partial<Theme>, k)} />
+                <button key={c} type="button" className={"swatch" + (colourOf(k) === c && !auto(k) ? " on" : "")} style={{ background: c }}
+                  aria-label={`${ROLE_LABEL[k]}: ${c}${colourOf(k) === c && !auto(k) ? ", selected" : ""}`} onClick={() => set({ [k]: c } as Partial<Theme>, k)} />
               ))}
               <button type="button" className="swatch custom" aria-label={`${ROLE_LABEL[k]}: custom colour`} onClick={() => setDialog(k)}>
                 ✎
@@ -354,6 +370,25 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
           <input type="range" min={0} max={3} value={t.borderDp} onChange={(e) => set({ borderDp: Number(e.target.value) }, "border")} />
         </label>
         <div className="editor-row">
+          <span id="shape-label">Buttons and badges</span>
+          <div className="seg" role="group" aria-labelledby="shape-label">
+            {(
+              [
+                ["rounded", "Follow the corners"],
+                ["pill", "Pill (fully round)"],
+              ] as const
+            ).map(([v, label]) => {
+              const on = (t.controlShape ?? "rounded") === v;
+              return (
+                <button key={v} type="button" aria-pressed={on} className={"seg-btn" + (on ? " on" : "")}
+                  onClick={() => set({ controlShape: v === "pill" ? "pill" : undefined }, "accent")}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="editor-row">
           <span>Contrast</span>
           {problems.length === 0 ? (
             <span className="pill" style={{ background: "#46A758", color: readableOn("#46A758") }}>
@@ -407,6 +442,7 @@ function loadPreviewFont(f: string) {
 // that a row changes flashes for ~600 ms.
 function Preview({ t, flash }: { t: Theme; flash: string }) {
   const r = t.cornerDp;
+  const ctl = t.controlShape === "pill" ? 999 : (3 * r) / 4;
   const sec = secondaryOf(t);
   const onSec = ratio(t.text, sec) >= 4.5 ? t.text : t.accent;
   const fw = { Light: 300, Regular: 400, Medium: 500, Bold: 700 }[t.fontWeight];
@@ -425,18 +461,18 @@ function Preview({ t, flash }: { t: Theme; flash: string }) {
           Secondary text
         </div>
         <div className="preview-row">
-          <span className={"preview-input" + hl("surfaceVariant")} style={{ background: t.surfaceVariant, borderRadius: (3 * r) / 4 }}>
+          <span className={"preview-input" + hl("surfaceVariant")} style={{ background: t.surfaceVariant, borderRadius: ctl }}>
             Inputs
           </span>
-          <span className={"preview-chip" + hl("surfaceVariant")} style={{ background: t.surfaceVariant, borderRadius: r / 2 }}>
+          <span className={"preview-chip" + hl("surfaceVariant")} style={{ background: t.surfaceVariant, borderRadius: t.controlShape === "pill" ? 999 : r / 2 }}>
             Chips
           </span>
         </div>
         <div className="preview-row">
-          <span className={"preview-button" + hl("accent") + hl("onAccent")} style={{ background: t.accent, color: t.onAccent, borderRadius: (3 * r) / 4 }}>
+          <span className={"preview-button" + hl("accent") + hl("onAccent")} style={{ background: t.accent, color: t.onAccent, borderRadius: ctl }}>
             Accent
           </span>
-          <span className={"preview-button" + hl("secondary")} style={{ background: sec, color: onSec, borderRadius: (3 * r) / 4 }}>
+          <span className={"preview-button" + hl("secondary")} style={{ background: sec, color: onSec, borderRadius: ctl }}>
             Secondary buttons
           </span>
         </div>

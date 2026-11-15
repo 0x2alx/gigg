@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { api, ApiError, fmtTime, hasCap, priorityNames, type Board, type Category, type CustomField, type Status, type Tag, type Task } from "./api";
 import { fmtDue } from "./dates";
@@ -28,8 +28,8 @@ import { TemplatesModal } from "./Templates";
 import { TaskModal } from "./TaskModal";
 import { TaskPanel } from "./TaskPanel";
 import { viewsApi } from "./views/viewsApi";
-import { CATEGORY_COLOR, colorFor } from "./theme";
-import { Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, TaskBadges } from "./ui";
+import { CATEGORY_COLOR, colorFor, readableOn } from "./theme";
+import { Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, TaskBadges, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
@@ -324,6 +324,86 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     sendMove(taskId, { category }, next);
   };
 
+  // cards glide to a new place (a drop, a move another user or an agent made): a card that changed column,
+  // or changed position in a column whose number of cards stayed the same (a reorder), animates from where
+  // it was. Cards that only shift because another one came or went (a filter, a new task) don't move.
+  // Positions are relative to the board (scrolling isn't a move) and re-read when the board resizes; the
+  // layout is only read when the placements changed, and not while a card is being dragged.
+  const boardRef = useRef<HTMLDivElement>(null);
+  type Spot = { col: string; i: number; n: number; x: number; y: number };
+  const placed = useRef(new Map<string, Spot>());
+  const placedSig = useRef("");
+  const placedCols = useRef("");
+  const lastDragged = useRef<number | null>(null);
+  if (drag !== null) lastDragged.current = drag;
+  const measure = useCallback((animate: boolean, force = false) => {
+    const root = boardRef.current;
+    if (!root) return;
+    const slots = [...root.querySelectorAll<HTMLElement>(".card-slot[data-slot]")];
+    const sig = slots.map((el) => el.dataset.slot + "@" + el.dataset.place).join("|");
+    if (!force && sig === placedSig.current) {
+      lastDragged.current = null;
+      return;
+    }
+    placedSig.current = sig;
+    // another set of columns (one project in view instead of several, a column collapsed): a new layout,
+    // not a move
+    const cols = [...root.querySelectorAll<HTMLElement>(".column[data-col]")].map((el) => el.dataset.col).join("|");
+    if (cols !== placedCols.current) animate = false;
+    placedCols.current = cols;
+    // offsets, not rects: they ignore transforms, so a card mid-glide (or a column rising in) still
+    // reports its real place and nothing has to be cancelled
+    const at = (el: HTMLElement | null) => {
+      let x = 0;
+      let y = 0;
+      for (let e = el; e; e = e.offsetParent as HTMLElement | null) {
+        x += e.offsetLeft;
+        y += e.offsetTop;
+      }
+      return { x, y };
+    };
+    const origin = at(root);
+    const next = new Map<string, Spot>();
+    for (const el of slots) {
+      const parts = (el.dataset.place ?? "").split(":"); // the column key may hold ":" itself
+      const n = parts.pop() ?? "0";
+      const i = parts.pop() ?? "0";
+      const col = parts.join(":");
+      const p = at(el);
+      const now: Spot = { col, i: Number(i), n: Number(n), x: p.x - origin.x, y: p.y - origin.y };
+      const was = placed.current.get(el.dataset.slot!);
+      next.set(el.dataset.slot!, now);
+      if (!animate || !was || String(lastDragged.current) === el.dataset.slot) continue;
+      if (was.col === now.col && (was.i === now.i || was.n !== now.n)) continue;
+      const dx = was.x - now.x;
+      const dy = was.y - now.y;
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) continue;
+      el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+    }
+    placed.current = next;
+    lastDragged.current = null;
+  }, []);
+  useLayoutEffect(() => {
+    if (drag === null) measure(!reducedMotion());
+  });
+  useEffect(() => {
+    const root = boardRef.current;
+    if (!root || typeof ResizeObserver === "undefined") return;
+    // only a change of width moves cards sideways (a card moving changes the board's height: not a resize)
+    let frame = 0;
+    let width = root.offsetWidth;
+    const ro = new ResizeObserver(() => {
+      if (root.offsetWidth === width) return;
+      width = root.offsetWidth;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => measure(false, true));
+    });
+    ro.observe(root);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [measure, loaded]);
   if (tree.every((w) => w.projects.length === 0)) return <p className="muted">No projects yet.</p>;
   if (!loaded) return <p className="muted">Loading…</p>;
 
@@ -340,10 +420,10 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const shown = narrow && active ? [active] : columns;
   // collapsed columns leave the grid and become small chips above it (wide screens; a phone shows one column)
   const openCols = narrow ? shown : shown.filter((c) => !collapsed.includes(c.id));
-  // which open column carries the "Archive done" / "Archive cancelled" footer: the last one of its category
-  // that has tasks (one project can have several done-stage columns; one footer each is enough)
-  const archiveCol: Partial<Record<string, string>> = {};
-  for (const c of openCols) if ((c.category === "done" || c.category === "cancelled") && c.tasks.length > 0) archiveCol[c.category] = c.key;
+  // which open column carries the "Archive done" footer: the last done-stage column that has tasks (one
+  // project can have several; one footer is enough)
+  let archiveCol: string | undefined;
+  for (const c of openCols) if (c.category === "done" && c.tasks.length > 0) archiveCol = c.key;
   const closedCols = narrow ? [] : shown.filter((c) => collapsed.includes(c.id));
   // the agent side of the tasks in view, in one line above the columns
   const pulse = { running: 0, answer: 0, failed: 0, queued: 0, total: 0 };
@@ -403,6 +483,8 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     if (drop?.col === c.key && !e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null);
   };
   const colColor = (c: BoardColumn): string => c.color ?? CATEGORY_COLOR[c.category] ?? "var(--muted)";
+  // the column name sits on a filled label of its stage colour (a hex colour, so the text colour can be picked)
+  const stageBg = (c: BoardColumn): string => c.color ?? CATEGORY_COLOR[c.category] ?? CATEGORY_COLOR.backlog!;
   // a column's "+": one project in view opens the form in that status; several ask which project first
   const writable = inScope.filter((x) => canWriteIn(x.ws));
   const canAddIn = (c: BoardColumn) => writable.length > 0 && c.category !== "cancelled";
@@ -541,7 +623,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                 action("new");
               }}
             >
-              + New task
+              <Icon name="plus" strokeWidth={2.2} /> New task
             </button>
           )}
           {!narrow && (
@@ -635,7 +717,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
         </div>
       )}
       {openCols.length === 0 && closedCols.length > 0 && <p className="muted">Every column is collapsed: click one above to show it.</p>}
-      <div className="board" style={{ gridTemplateColumns: `repeat(${Math.max(1, openCols.length)}, minmax(0, 1fr))` }}>
+      <div className="board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${Math.max(1, openCols.length)}, minmax(0, 1fr))` }}>
         {openCols.map((c) => {
           const others = c.tasks.filter((t) => t.id !== drag);
           const line = drop?.col === c.key ? drop.index : -1;
@@ -645,6 +727,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
             <section
               key={c.key}
               className={"column" + (drop?.col === c.key ? " drag-over" : "")}
+              data-col={c.key}
               aria-label={c.name}
               role={narrow ? "tabpanel" : undefined}
               onDragOver={(e) => dragOver(e, c)}
@@ -653,8 +736,10 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
             >
               <div className="column-head">
                 <h2 className="column-title" tabIndex={-1} data-col-focus={c.id}>
-                  <StageIcon category={c.category} color={colColor(c)} />
-                  <span className="column-name">{c.name}</span>
+                  <span className="stage-label" style={{ "--stage": stageBg(c), color: readableOn(stageBg(c)) } as CSSProperties}>
+                    <StageIcon category={c.category} color="currentColor" />
+                    <span className="column-name">{c.name}</span>
+                  </span>
                   <span className="count-pill" aria-label={`${c.tasks.length} task${c.tasks.length === 1 ? "" : "s"}`}>
                     {c.tasks.length}
                   </span>
@@ -677,7 +762,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                   if (t.id !== drag) k++;
                   const showLine = manual && c.statusId !== undefined && t.id !== drag && k === line;
                   return (
-                    <div key={t.id} className="card-slot">
+                    <div key={t.id} className="card-slot" data-slot={t.id} data-place={`${c.key}:${i}:${c.tasks.length}`}>
                       {showLine && <div className="drop-line" aria-hidden="true" />}
                       {cardFor(t, c, i, false)}
                     </div>
@@ -695,13 +780,13 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                     <Icon name="plus" strokeWidth={2} /> New task
                   </button>
                 )}
-                {(c.category === "done" || c.category === "cancelled") &&
-                  // finished columns take no new tasks: their footer archives that category instead (once per
-                  // category: one project can have several done columns), or stays as an empty slot of the
-                  // same height so the columns line up
-                  (archiveCol[c.category] === c.key && archivable.length > 0 ? (
-                    <button type="button" className="column-add" onClick={() => action("archive", c.category as "done" | "cancelled")}>
-                      <Icon name="archive" /> {c.category === "done" ? "Archive done" : "Archive cancelled"}
+                {c.category === "done" &&
+                  // Done takes no new tasks: its footer archives the done tasks instead (once: one project can
+                  // have several done columns), or stays as an empty slot of the same height so the columns
+                  // line up. The board never shows cancelled tasks, so they have no column or footer.
+                  (archiveCol === c.key && archivable.length > 0 ? (
+                    <button type="button" className="column-add" onClick={() => action("archive", "done")}>
+                      <Icon name="archive" /> Archive done
                     </button>
                   ) : (
                     writable.length > 0 && <div className="column-add column-add-empty" aria-hidden="true">{"\u00a0"}</div>
@@ -852,7 +937,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
       data-tip={shut ? "Show the filters" : "Fold the filters: only those that are on stay in view"}
       onClick={() => fold(!shut)}
     >
-      <Icon name="settings" />
+      <Icon name="filter" />
       Filters
       {shut && active.length > 0 && <span className="count">{active.length}</span>}
       <Icon name={shut ? "chevron-right" : "chevron-down"} />
@@ -892,32 +977,41 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
           </svg>
           <input type="search" aria-label="Search tasks" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
         </span>
-        <select className={sel(filter.a)} aria-label="Assignee" value={filter.a} onChange={(e) => setFilter({ ...filter, a: e.target.value })}>
-          <option value="">Anyone</option>
-          <option value="me">Assigned to me</option>
-          <option value="none">Unassigned</option>
-          {people.map((u) => (
-            <option key={u.id} value={String(u.id)}>
-              {u.display_name || u.username}
-            </option>
-          ))}
-        </select>
-        <select className={sel(filter.l)} aria-label="Label" value={filter.l} onChange={(e) => setFilter({ ...filter, l: e.target.value })}>
-          <option value="">Any label</option>
-          {labelNames.map((l) => (
-            <option key={l} value={l}>
-              {l}
-            </option>
-          ))}
-        </select>
-        <select className={sel(filter.pr)} aria-label="Priority" value={filter.pr} onChange={(e) => setFilter({ ...filter, pr: Number(e.target.value) })}>
-          <option value={0}>Any priority</option>
-          {priorityNames.slice(1).map((n, i) => (
-            <option key={n} value={i + 1}>
-              {i + 1 === 4 ? n : `${n} or higher`}
-            </option>
-          ))}
-        </select>
+        <label className="bf-pick">
+          <span className="bf-pick-label" aria-hidden="true">Assignee</span>
+          <select className={sel(filter.a)} aria-label="Assignee" value={filter.a} onChange={(e) => setFilter({ ...filter, a: e.target.value })}>
+            <option value="">Anyone</option>
+            <option value="me">Assigned to me</option>
+            <option value="none">Unassigned</option>
+            {people.map((u) => (
+              <option key={u.id} value={String(u.id)}>
+                {u.display_name || u.username}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="bf-pick">
+          <span className="bf-pick-label" aria-hidden="true">Label</span>
+          <select className={sel(filter.l)} aria-label="Label" value={filter.l} onChange={(e) => setFilter({ ...filter, l: e.target.value })}>
+            <option value="">Any label</option>
+            {labelNames.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="bf-pick">
+          <span className="bf-pick-label" aria-hidden="true">Priority</span>
+          <select className={sel(filter.pr)} aria-label="Priority" value={filter.pr} onChange={(e) => setFilter({ ...filter, pr: Number(e.target.value) })}>
+            <option value={0}>Any priority</option>
+            {priorityNames.slice(1).map((n, i) => (
+              <option key={n} value={i + 1}>
+                {i + 1 === 4 ? n : `${n} or higher`}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           className={"bf-toggle" + (filter.arch ? " on" : "")}
@@ -1236,7 +1330,7 @@ function StageIcon({ category, color }: { category: Category; color: string }) {
       {category === "done" && (
         <>
           <circle cx="8" cy="8" r="7" fill="currentColor" />
-          <path d="m5 8.2 2 2 4-4.2" fill="none" stroke="var(--surface)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="m5 8.2 2 2 4-4.2" fill="none" stroke="var(--stage-check, var(--surface))" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
         </>
       )}
       {category === "cancelled" && (

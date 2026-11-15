@@ -1,6 +1,6 @@
 // Small shared pieces: colour-coded badges and a modal. Data colours (labels, statuses, priorities,
 // users) come from theme.ts; their text colour is chosen for contrast so they read on any theme.
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { avatarURL, priorityNames, type Category, type CustomField, type Tag, type Task, type User } from "./api";
 import { cardChips } from "./items";
 import { windowBadge } from "./recurrence";
@@ -144,18 +144,57 @@ export function UserBadge({ user }: { user: Pick<User, "username" | "display_nam
   );
 }
 
+// reducedMotion: the user asked the system for less motion (exit animations then close at once)
+export const reducedMotion = (): boolean => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// EXIT_MS: how long a dialog or the task panel takes to animate out before it really closes
+export const EXIT_MS = 150;
+
 export function Modal({ title, onClose, children, wide, xl, help }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; xl?: boolean; help?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   // onClose through a ref: the focus setup runs once per dialog, not on every render of a caller that
   // passes a new function each time (that sent the focus back to the first button at each click)
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  // the dialog's own ways out (×, Esc, the backdrop) fade it out first; a caller that refuses to close
+  // (busy) leaves it mounted, and it comes back
+  const [closing, setClosing] = useState(false);
+  const [reopen, setReopen] = useState(false);
+  const alive = useRef(true);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const close = useCallback(() => {
+    if (reducedMotion()) return closeRef.current();
+    if (timer.current) return;
+    setReopen(false);
+    setClosing(true);
+    timer.current = setTimeout(() => {
+      closeRef.current();
+      setTimeout(() => {
+        timer.current = undefined;
+        if (alive.current) {
+          setReopen(true);
+          setClosing(false);
+          // inert dropped the focus: put it back in the dialog
+          requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>("input, textarea, select, button:not(.help-button)")?.focus());
+        }
+      }, 30);
+    }, EXIT_MS);
+  }, []);
+  const animatedClose = useRef(close);
+  animatedClose.current = close;
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      clearTimeout(timer.current);
+    };
+  }, []);
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     (ref.current?.querySelector<HTMLElement>("[autofocus], [data-autofocus]") ??
       ref.current?.querySelector<HTMLElement>("input, textarea, select, button:not(.help-button)"))?.focus();
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeRef.current();
+      if (e.key === "Escape") animatedClose.current();
     };
     document.addEventListener("keydown", esc);
     return () => {
@@ -164,12 +203,12 @@ export function Modal({ title, onClose, children, wide, xl, help }: { title: str
     };
   }, []);
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={"modal-backdrop" + (closing ? " closing" : "") + (reopen ? " reopen" : "")} inert={closing || undefined} onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className={"modal" + (xl ? " modal-xl" : wide ? " modal-wide" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <div className="modal-head">
           <h2>{title}</h2>
           {help}
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
+          <button type="button" className="icon-button" onClick={close} aria-label="Close">
             <Icon name="x" />
           </button>
         </div>
