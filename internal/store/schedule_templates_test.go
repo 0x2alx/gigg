@@ -187,7 +187,7 @@ func TestScheduleTemplateMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.TemplateName != "Water the plants" || r.ScheduleName != "Every day all day (America/New_York)" || r.Freq != "daily" || r.WindowMinutes != 1440 || r.Title != "Water the plants" || r.DescriptionMD != "Both rooms" ||
+	if r.TemplateName != "Water the plants" || r.ScheduleName != "Every day all day" || r.Freq != "daily" || r.WindowMinutes != 1440 || r.Title != "Water the plants" || r.DescriptionMD != "Both rooms" ||
 		r.Priority != 2 || r.Color == nil || *r.Color != "#00aa00" || len(r.Labels) != 1 || len(r.Assignees) != 1 ||
 		r.Model != "haiku" || r.Effort != "low" || !r.AlwaysRun {
 		t.Fatalf("migrated schedule: %+v", r)

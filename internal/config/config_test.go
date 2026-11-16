@@ -52,8 +52,8 @@ func TestListenersAndHosts(t *testing.T) {
 		t.Fatalf("fonts/proxies: %+v", c)
 	}
 	// the backup zone follows the default zone unless set
-	c, err = load(env(map[string]string{"GIGG_DEFAULT_TZ": "Europe/Bucharest"}))
-	if err != nil || c.DefaultTZ != "Europe/Bucharest" || c.BackupTZ.String() != "Europe/Bucharest" {
+	c, err = load(env(map[string]string{"GIGG_DEFAULT_TZ": "Asia/Tokyo"}))
+	if err != nil || c.DefaultTZ != "Asia/Tokyo" || c.BackupTZ.String() != "Asia/Tokyo" {
 		t.Fatalf("default zone: %v %+v", err, c)
 	}
 }

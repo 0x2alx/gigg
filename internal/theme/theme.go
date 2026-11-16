@@ -135,7 +135,7 @@ func Sane(raw []byte) ([]byte, error) {
 	put("textScalePct", clamp(m["textScalePct"], 85, 130, 100))
 	put("cornerDp", clamp(m["cornerDp"], 0, 28, 12))
 	put("borderDp", clamp(m["borderDp"], 0, 3, 1))
-	// gigg-only extras (the apps ignore unknown keys): kept when valid, dropped otherwise
+	// gigg-only extras (other apps that share the theme format ignore unknown keys): kept when valid, dropped otherwise
 	if v, _ := m["controlShape"].(string); v == "pill" {
 		put("controlShape", "pill")
 	}
@@ -146,7 +146,7 @@ func Sane(raw []byte) ([]byte, error) {
 			}
 		}
 	}
-	// widget: kept byte-for-byte (key order included) so it round-trips to the apps; rebuilt only
+	// widget: kept byte-for-byte (key order included) so it round-trips to other apps that share the theme format; rebuilt only
 	// when its opacity needs clamping.
 	var rawm map[string]json.RawMessage
 	_ = json.Unmarshal(raw, &rawm)

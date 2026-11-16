@@ -4,7 +4,7 @@ Thanks for wanting to help. Issues with clear steps to reproduce are as welcome 
 
 ## Ground rules
 
-- gigg is licensed under the **AGPL-3.0** (`LICENSE`). Contributions are accepted under the
+- gigg is licensed under the **AGPL-3.0-only** (`LICENSE`). Contributions are accepted under the
   **contributor license agreement** in `CLA.md`, which lets the maintainer also offer gigg under other
   terms. Add the agreement line from `CLA.md` to your first pull request.
 - Keep changes focused: one subject per pull request, with tests for behaviour changes.

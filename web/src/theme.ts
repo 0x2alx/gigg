@@ -23,7 +23,7 @@ export interface Theme {
   borderDp: number;
   description: string;
   widget?: Record<string, unknown>;
-  // gigg-only extras (the apps ignore unknown keys; exported only when set):
+  // gigg-only extras (other apps that share the theme format ignore unknown keys; exported only when set):
   controlShape?: "pill" | "rounded"; // buttons, fields, pills and badges fully round, or following the corners
   laneColor?: string | null; // the board's column background (unset: a step between page and cards)
   laneBorder?: string | null; // the column outline (unset: none)

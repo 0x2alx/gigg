@@ -20,7 +20,7 @@ CREATE TABLE recurrences (
   interval_n      INTEGER NOT NULL DEFAULT 1 CHECK (interval_n BETWEEN 1 AND 365),
   weekdays        TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(weekdays)), -- weekly: 1=Mon .. 7=Sun
   month_day       INTEGER CHECK (month_day IS NULL OR month_day BETWEEN -1 AND 31 AND month_day != 0), -- -1 = last day
-  tz              TEXT NOT NULL DEFAULT 'America/New_York',
+  tz              TEXT NOT NULL DEFAULT 'UTC',
   window_start    TEXT NOT NULL DEFAULT '00:00' CHECK (window_start GLOB '[0-2][0-9]:[0-5][0-9]'),
   window_minutes  INTEGER NOT NULL DEFAULT 1440 CHECK (window_minutes BETWEEN 5 AND 44640),
   lead_minutes    INTEGER NOT NULL DEFAULT 0 CHECK (lead_minutes BETWEEN 0 AND 10080), -- create this early

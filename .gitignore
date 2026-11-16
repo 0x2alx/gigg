@@ -12,4 +12,12 @@ node_modules/
 *.db-wal
 *.db-shm
 .env
+.env.*
+# local runs from the README: binary, data, keys and certificates
+/gigg
+/data/
+*.key
+*.token
+*.pem
+*.crt
 /scratch/

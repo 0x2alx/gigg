@@ -83,7 +83,7 @@ func TestSaneClampsAndDrops(t *testing.T) {
 }
 
 // TestSaneExtras: the gigg-only keys (control shape, board column colours) survive when valid and
-// are dropped when not, so the apps' exports stay unchanged and junk can't reach the CSS.
+// are dropped when not, so exports to other apps that use the theme format stay unchanged and junk can't reach the CSS.
 func TestSaneExtras(t *testing.T) {
 	base := `{"name":"X","dark":true,"background":"#000000","surface":"#111111","surfaceVariant":"#222222",
 	"border":"#333333","accent":"#444444","onAccent":"#555555","text":"#666666","mutedText":"#777777","danger":"#888888",

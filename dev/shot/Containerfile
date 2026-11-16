@@ -1,4 +1,4 @@
-FROM docker.io/library/node:22-alpine
+FROM docker.io/library/node:24-alpine
 RUN apk add --no-cache chromium font-noto font-noto-emoji font-noto-symbols ttf-dejavu
 WORKDIR /opt/shot
 RUN npm i --no-fund --no-audit puppeteer-core@23.11.1
