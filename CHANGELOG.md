@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Crons**: shell commands an agent runs on a schedule (every N minutes or hours, optionally on
+  some weekdays between two times, or daily, weekly, monthly), in its sandbox, with a run history,
+  each run's output and no tasks. A **Crons** page lists them, failing first, with a panel for
+  runs and output and an editor. The permissions `crons` and `cron_unsandboxed`, the key scopes
+  `crons:read`, `crons:output`, `crons:write` and `crons:run`, API endpoints and MCP tools. The
+  executor that runs them is outside gigg (the server still never runs commands).
+- **Pause runs** has two boxes, task runs and cron runs; the Dashboard shows each workspace's crons
+  and how many are failing.
+- Schedules take `minutes` and `hours` timings (for crons only).
+
 - Dialogs opened from a table row (archive, make admin, revoke…) inherited the cell's right
   alignment and no-wrap, so titles sat on the right and text ran past the edge. Dialogs now render
   at the top of the page.

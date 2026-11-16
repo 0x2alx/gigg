@@ -1,8 +1,8 @@
 // Every schedule in reach, across the workspaces (an optional workspace filter): named timing (rule,
 // window, create-early) that recurring tasks pair with templates. List, new, edit (every recurring task
-// on it moves), delete when unused.
+// on it moves), delete when unused. Minutes/hours timings belong to crons and are left out (the Crons page has them).
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { api, ApiError, hasCap, type Schedule } from "./api";
+import { api, ApiError, hasCap, isTaskSchedule, type TaskSchedule as Schedule } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { optionOf, PlaceFilter, placeMatch, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
@@ -35,7 +35,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
       if (seq !== loadSeq.current) return; // a newer load is on its way
       const all: Schedule[] = [];
       const bad: string[] = [];
-      res.forEach((r, i) => (r.status === "fulfilled" ? all.push(...r.value.items) : bad.push(tree[i]!.name)));
+      res.forEach((r, i) => (r.status === "fulfilled" ? all.push(...r.value.items.filter(isTaskSchedule)) : bad.push(tree[i]!.name)));
       setItems(all.sort((a, b) => a.name.localeCompare(b.name)));
       setErr(bad.length ? `Couldn't load the schedules of ${bad.join(", ")}.` : "");
     });
@@ -112,6 +112,11 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                 <span className={"pill " + (s.uses > 0 ? "pill-accent" : "pill-muted")}>
                   ⟳ {s.uses} recurring task{s.uses === 1 ? "" : "s"}
                 </span>
+                {!!s.cron_uses && (
+                  <span className="pill pill-accent" data-tip="Crons run on this schedule too: changing it moves them">
+                    <Icon name="clock" /> {s.cron_uses} cron{s.cron_uses === 1 ? "" : "s"}
+                  </span>
+                )}
               </div>
               {canWrite && (
                 <div className="schedule-actions">
@@ -134,8 +139,8 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                         type="button"
                         className="button danger-button small"
                         onClick={() => setConfirm(s.id)}
-                        disabled={s.uses > 0}
-                        title={s.uses > 0 ? "Recurring tasks use this schedule: delete them or give them another schedule first" : undefined}
+                        disabled={s.uses > 0 || !!s.cron_uses}
+                        title={s.uses > 0 || s.cron_uses ? "Recurring tasks or crons use this schedule: delete them or give them another schedule first" : undefined}
                         aria-label={`Delete ${s.name}`}
                       >
                         <Icon name="trash" /> Delete

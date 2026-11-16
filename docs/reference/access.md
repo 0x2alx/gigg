@@ -29,7 +29,9 @@ same workspace: without it, it counts as not held.
 | `checklists` | Tasks | Add, tick and remove checklist items (with `edit_tasks`). An override alone doesn't give a viewer these: the admin page marks it "needs Edit tasks". |
 | `always_run` | Runner | Mark tasks to run whatever the usage budget. The task caps and pauses still apply. |
 | `allowed_tools` | Runner | Give tasks (templates, recurring tasks) the list of tools the agent runner may use for them, and change tasks that have one. |
-| `pause_runs` | Runner | Pause and resume new agent task runs; with an all-workspaces rule, in every workspace at once. Changing the caps stays with admins. |
+| `pause_runs` | Runner | Pause and resume new agent task runs and cron runs; with an all-workspaces rule, in every workspace at once. Changing the caps stays with admins. |
+| `crons` | Runner | Make, change, pause, run and delete crons; an agent's executor needs it to run its crons. |
+| `cron_unsandboxed` | Runner | Let a cron run outside the agent's sandbox. A cron loses the flag when someone without this permission changes it, and its runs fail while the person who set it lacks the permission. |
 | `schedules` | Planning | Create, change, pause and stop recurring tasks and schedules (recurring tasks also need `edit_tasks`, and `create_tasks` to make their tasks). |
 | `templates` | Planning | Create, change and delete task templates, with `edit_tasks` (using one only needs `create_tasks`). |
 | `custom_fields` | Planning | Define the workspace's custom fields. |

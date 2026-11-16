@@ -9,7 +9,7 @@ const Markdown = lazy(() => import("./markdown").then((m) => ({ default: m.Markd
 
 const pages = import.meta.glob("../../docs/guide/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 
-export type HelpTopic = "board" | "tasks" | "agents" | "recurring" | "dashboard" | "inbox" | "views" | "themes" | "profile" | "admin";
+export type HelpTopic = "board" | "tasks" | "agents" | "recurring" | "crons" | "dashboard" | "inbox" | "views" | "themes" | "profile" | "admin";
 
 export function helpPage(topic: HelpTopic): { title: string; body: string } {
   const src = pages[`../../docs/guide/${topic}.md`] ?? "";

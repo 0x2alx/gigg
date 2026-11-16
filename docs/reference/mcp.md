@@ -118,8 +118,22 @@ Defaults for timing: every 1 period, window from 00:00 for 1440 minutes, and the
 | Tool | Needs | Arguments | Does |
 |---|---|---|---|
 | `report_progress` | `runs:write`, `tasks:read` | `task`, `pct?` (0-100), `note?` | Finds the task's running run and posts a heartbeat/progress note to it; a tool error if no run is running. |
-| `pause_runs` | admin key with `admin:workspaces`, or `runs:write` and `pause_runs` anywhere | `workspaces?` (ids or slugs), `minutes` (0 = until resumed) | Pauses new task runs in those workspaces, or in every workspace you may pause. |
-| `resume_runs` | same | `workspaces?` | Lifts the pause. |
+| `pause_runs` | admin key with `admin:workspaces`, or `runs:write` and `pause_runs` anywhere | `workspaces?` (ids or slugs), `minutes` (0 = until resumed), `tasks?`, `crons?` (default true) | Pauses new task runs and cron runs in those workspaces, or in every workspace you may pause. Crons stay paused until resumed. |
+| `resume_runs` | same | `workspaces?`, `tasks?`, `crons?` | Lifts the pause. |
+
+### Crons
+
+| Tool | Needs | Arguments | Does |
+|---|---|---|---|
+| `list_crons` | `crons:read` | `workspace?` | Crons, failing first: state, schedule in words, worker, last run, next slot. |
+| `get_cron` | `crons:read` | `id` | One cron. |
+| `list_cron_runs` | `crons:read` | `id`, `before?`, `limit?` | Its runs, newest first. |
+| `get_cron_run` | `crons:read` | `id` | One run, with its output tail when the key has `crons:output`. |
+| `list_cron_templates` | `crons:read` | `workspace?` | Cron templates. |
+| `save_cron` | `crons:write`, `crons` anywhere | `id?` (change), `workspace?`, `template_id?` or `name`, `command`, `description_md?`, `timeout_s?`, `output?` (`gigg`/`host`), `unsandboxed?`; `schedule_id?` or `freq` (`minutes`/`hours`/`daily`/`weekly`/`monthly`), `interval?`, `weekdays?`, `month_day?`, `tz?`, `at?` (HH:MM), `for_minutes?` (minutes/hours: how long ticking lasts each day); `worker?`, `on_failure_task?`, `paused?` | Makes a cron, or changes one (omitted fields stay). |
+| `pause_cron` | same | `id`, `resume?` | Pauses or resumes a cron. |
+| `run_cron_now` | same | `id` | Runs it once at the executor's next poll. |
+| `delete_cron` | same | `id` | Deletes a cron. |
 
 `model`, `effort`, `always_run` and `allowed_tools` are described in
 [runner-protocol.md](runner-protocol.md#task-run-settings). Setting or changing `always_run` needs the

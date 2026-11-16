@@ -205,8 +205,8 @@ func (r Rule) Describe() string {
 	case "minutes", "hours":
 		unit := map[string]string{"minutes": "min", "hours": "h"}[r.Freq]
 		s = fmt.Sprintf("Every %d %s", n, unit)
-		if r.Freq == "hours" && n == 1 {
-			s = "Every hour"
+		if n == 1 {
+			s = map[string]string{"minutes": "Every minute", "hours": "Every hour"}[r.Freq]
 		}
 		if len(r.Weekdays) > 0 && len(r.Weekdays) < 7 {
 			names := []string{}

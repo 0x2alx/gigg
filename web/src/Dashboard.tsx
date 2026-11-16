@@ -1,5 +1,5 @@
 // Dashboard: what the agents' runners did in the last 24 hours, per workspace, against its caps;
-// the pause switch (PAUSE TASKS) and the caps for admins.
+// the pause switch (task runs and cron runs, two boxes), the crons' health, and the caps for admins.
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { fmtTime, hasCap } from "./api";
@@ -20,6 +20,9 @@ export interface RunnerSettings {
   paused_by: number | null;
   paused_at: number | null;
   paused: boolean;
+  crons_paused: boolean;
+  crons_paused_at: number | null;
+  crons_paused_by: number | null;
 }
 
 export interface RunnerUsage {
@@ -40,12 +43,20 @@ export interface RunnerState {
   name: string;
   settings: RunnerSettings;
   usage: RunnerUsage;
+  crons?: { total: number; failing: number };
+}
+
+// Boxes: which runs a pause or resume touches (both when omitted).
+export interface Boxes {
+  tasks: boolean;
+  crons: boolean;
 }
 
 export const runnerApi = {
   list: () => call<{ items: RunnerState[] }>("GET", "/runner"),
-  pause: (workspaces: number[] | undefined, minutes: number) => call<{ items: RunnerState[] }>("POST", "/runner/pause", { ...(workspaces ? { workspaces } : {}), minutes }),
-  resume: (workspaces: number[] | undefined) => call<{ items: RunnerState[] }>("POST", "/runner/resume", workspaces ? { workspaces } : {}),
+  pause: (workspaces: number[] | undefined, minutes: number, boxes?: Boxes) =>
+    call<{ items: RunnerState[] }>("POST", "/runner/pause", { ...(workspaces ? { workspaces } : {}), minutes, ...(boxes ?? {}) }),
+  resume: (workspaces: number[] | undefined, boxes?: Boxes) => call<{ items: RunnerState[] }>("POST", "/runner/resume", { ...(workspaces ? { workspaces } : {}), ...(boxes ?? {}) }),
   caps: (ws: number, daily_cap: number, night_cap: number) => call<RunnerState>("PATCH", `/workspaces/${ws}/runner`, { daily_cap, night_cap }),
 };
 
@@ -61,6 +72,14 @@ export const PAUSE_CHOICES: { minutes: number; label: string }[] = [
 // pausedText: "until resumed" or "until <time>".
 export function pausedText(s: Pick<RunnerSettings, "paused_open" | "paused_until">): string {
   return s.paused_open ? "until resumed" : s.paused_until ? `until ${fmtTime(s.paused_until)}` : "";
+}
+
+// pausedWhat: "tasks until 18:00, crons", "crons", "tasks until resumed".
+export function pausedWhat(s: Pick<RunnerSettings, "paused" | "paused_open" | "paused_until" | "crons_paused">): string {
+  const parts: string[] = [];
+  if (s.paused) parts.push(`tasks ${pausedText(s)}`);
+  if (s.crons_paused) parts.push("crons");
+  return parts.join(", ");
 }
 
 // pct: a 0-100 share for a meter (a 0 cap is full).
@@ -91,7 +110,7 @@ export function DashboardPage() {
     const t = setInterval(load, 60_000);
     return () => clearInterval(t);
   }, [load]);
-  const paused = (items ?? []).filter((i) => i.settings.paused);
+  const paused = (items ?? []).filter((i) => i.settings.paused || i.settings.crons_paused);
   const pausable = (items ?? []).filter((i) => canPause(i.workspace_id));
   const resumable = paused.filter((i) => canPause(i.workspace_id));
   const act = (p: Promise<unknown>) =>
@@ -102,12 +121,12 @@ export function DashboardPage() {
       <header className="page-head">
         <div>
           <h1>Dashboard<HelpButton topic="dashboard" label="Help: the dashboard and agent runs" /></h1>
-          <p className="muted small">Agent task runs in the last 24 hours, per workspace. Always-run tasks run day and night; the others at night, within the usage budget.</p>
+          <p className="muted small">Agent task runs in the last 24 hours, per workspace, and their crons. Always-run tasks run day and night; the others at night, within the usage budget.</p>
         </div>
         {pausable.length > 0 && (
-          <button type="button" className="button secondary dash-pause" data-tip="Stop agents from starting new tasks, for a while or until resumed. Runs already going finish." onClick={() => setPausing(true)}>
+          <button type="button" className="button secondary dash-pause" data-tip="Stop agents from starting new tasks and crons, for a while or until resumed. Runs already going finish." onClick={() => setPausing(true)}>
             <Icon name="pause" />
-            Pause tasks
+            Pause runs
           </button>
         )}
       </header>
@@ -116,12 +135,7 @@ export function DashboardPage() {
         <div className="banner banner-danger dash-banner" role="status">
           <Icon name="pause" className="dash-banner-icon" />
           <strong>Paused:</strong>{" "}
-          {paused.map((p, i) => (
-            <span key={p.workspace_id}>
-              {i > 0 && ", "}
-              {p.name} {pausedText(p.settings)}
-            </span>
-          ))}
+          <span>{paused.map((p) => `${p.name} (${pausedWhat(p.settings)})`).join(", ")}</span>
           {resumable.length > 0 && (
             <button type="button" className="button secondary small" onClick={() => act(runnerApi.resume(resumable.map((p) => p.workspace_id)))}>
               <Icon name="play" /> Resume {resumable.length > 1 ? "all" : ""}
@@ -139,9 +153,9 @@ export function DashboardPage() {
         <PauseModal
           items={pausable}
           onClose={() => setPausing(false)}
-          onPause={(ws, minutes) => {
+          onPause={(ws, minutes, boxes) => {
             setPausing(false);
-            act(runnerApi.pause(ws, minutes));
+            act(runnerApi.pause(ws, minutes, boxes));
           }}
         />
       )}
@@ -216,10 +230,10 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
             it.name
           )}
         </h2>
-        {s.paused ? (
-          <span className="dash-state dash-state-paused" data-tip="No new task runs start in this workspace">
+        {s.paused || s.crons_paused ? (
+          <span className="dash-state dash-state-paused" data-tip={s.paused && s.crons_paused ? "No new task or cron runs start in this workspace" : s.paused ? "No new task runs start in this workspace (crons still run)" : "No cron runs start in this workspace (tasks still run)"}>
             <span className="dot" aria-hidden="true" />
-            paused {pausedText(s)}
+            paused: {pausedWhat(s)}
           </span>
         ) : (
           <span className="dash-state" data-tip="The agent's runner may start tasks here (within the caps)">
@@ -228,7 +242,7 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
           </span>
         )}
         <span className="grow" />
-        {canPause && s.paused && (
+        {canPause && (s.paused || s.crons_paused) && (
           <button type="button" className="button secondary small" onClick={() => onAct(runnerApi.resume([it.workspace_id]))}>
             <Icon name="play" /> Resume
           </button>
@@ -255,6 +269,17 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
         <dd>${u.cost_usd_7d.toFixed(2)}</dd>
         <dt>Last run</dt>
         <dd>{u.last_run_at ? fmtTime(u.last_run_at) : "never"}</dd>
+        {it.crons && it.crons.total > 0 && (
+          <>
+            <dt data-tip="Commands the agent runs on a schedule (the Crons page)">Crons</dt>
+            <dd>
+              <Link href={it.crons.failing > 0 ? "/crons?state=failing" : "/crons"} className={it.crons.failing > 0 ? "danger" : undefined}>
+                {it.crons.total} cron{it.crons.total === 1 ? "" : "s"}
+                {it.crons.failing > 0 ? ` · ${it.crons.failing} failing` : " · all ok"}
+              </Link>
+            </dd>
+          </>
+        )}
       </dl>
       {admin &&
         (editing ? (
@@ -285,9 +310,10 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
   );
 }
 
-function PauseModal({ items, onClose, onPause }: { items: RunnerState[]; onClose: () => void; onPause: (ws: number[] | undefined, minutes: number) => void }) {
+function PauseModal({ items, onClose, onPause }: { items: RunnerState[]; onClose: () => void; onPause: (ws: number[] | undefined, minutes: number, boxes: Boxes) => void }) {
   const [picked, setPicked] = useState<Set<number>>(new Set(items.map((i) => i.workspace_id)));
   const [minutes, setMinutes] = useState(1440);
+  const [boxes, setBoxes] = useState<Boxes>({ tasks: true, crons: true });
   const all = picked.size === items.length;
   const toggle = (id: number) =>
     setPicked((s) => {
@@ -297,24 +323,37 @@ function PauseModal({ items, onClose, onPause }: { items: RunnerState[]; onClose
       return n;
     });
   return (
-    <Modal title="Pause task runs" onClose={onClose}>
+    <Modal title="Pause agent runs" onClose={onClose}>
       <div className="pause">
-        <p className="muted small">The runners keep firing but start no new task while paused, always-run ones included. A run already going finishes its current step.</p>
-        <button type="button" className="button danger pause-all" onClick={() => onPause(undefined, 1440)}>
-          <Icon name="pause" /> Pause all for 24 h
+        <p className="muted small">While paused the agents start no new task (always-run ones included) and no cron. A run already going finishes. Crons stay paused until resumed; missed slots aren't caught up.</p>
+        <button type="button" className="button danger pause-all" onClick={() => onPause(undefined, 1440, { tasks: true, crons: true })}>
+          <Icon name="pause" /> Pause everything for 24 h
         </button>
+        <fieldset className="pause-ws">
+          <legend className="field-label">Or choose: what</legend>
+          <label className="admin-check">
+            <input type="checkbox" checked={boxes.tasks} onChange={(e) => setBoxes((b) => ({ ...b, tasks: e.target.checked }))} />
+            <span>Task runs</span>
+          </label>
+          <label className="admin-check">
+            <input type="checkbox" checked={boxes.crons} onChange={(e) => setBoxes((b) => ({ ...b, crons: e.target.checked }))} />
+            <span>Cron runs</span>
+            <span className="muted small">(until resumed)</span>
+          </label>
+        </fieldset>
         <fieldset className="pause-ws">
           <legend className="field-label">Or choose: workspaces</legend>
           {items.map((i) => (
             <label key={i.workspace_id} className="admin-check">
               <input type="checkbox" checked={picked.has(i.workspace_id)} onChange={() => toggle(i.workspace_id)} />
               <span>{i.name}</span>
-              {i.settings.paused && <span className="pill pill-danger small">paused {pausedText(i.settings)}</span>}
+              {(i.settings.paused || i.settings.crons_paused) && <span className="pill pill-danger small">paused: {pausedWhat(i.settings)}</span>}
             </label>
           ))}
         </fieldset>
+        {boxes.tasks && (
         <fieldset className="pause-len">
-          <legend className="field-label">for</legend>
+          <legend className="field-label">for{boxes.crons ? " (task runs; crons pause until resumed)" : ""}</legend>
           <div className="admin-seg" role="radiogroup" aria-label="How long">
             {PAUSE_CHOICES.map((c) => (
               <button key={c.minutes} type="button" role="radio" aria-checked={minutes === c.minutes} className={"admin-seg-btn" + (minutes === c.minutes ? " on" : "")} onClick={() => setMinutes(c.minutes)}>
@@ -323,11 +362,12 @@ function PauseModal({ items, onClose, onPause }: { items: RunnerState[]; onClose
             ))}
           </div>
         </fieldset>
+        )}
         <div className="row end">
           <button type="button" className="button secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="button danger" disabled={picked.size === 0} onClick={() => onPause(all ? undefined : [...picked], minutes)}>
+          <button type="button" className="button danger" disabled={picked.size === 0 || (!boxes.tasks && !boxes.crons)} onClick={() => onPause(all ? undefined : [...picked], minutes, boxes)}>
             <Icon name="pause" /> Pause {all ? "all" : picked.size}
           </button>
         </div>

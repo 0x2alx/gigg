@@ -365,11 +365,11 @@ func ListCrons(ctx context.Context, q Q, ws int64) ([]*Cron, error) {
 		ORDER BY c.state = 'failing' DESC, t.name COLLATE NOCASE, c.id`, ws)
 }
 
-// CountFailingCrons counts a workspace's failing crons (the dashboard).
-func CountFailingCrons(ctx context.Context, q Q, ws int64) (int64, error) {
-	var n int64
-	err := q.QueryRowContext(ctx, `SELECT count(*) FROM crons WHERE workspace_id = ? AND deleted_at IS NULL AND state = 'failing'`, ws).Scan(&n)
-	return n, err
+// CountCrons counts a workspace's live crons and the failing ones (the dashboard).
+func CountCrons(ctx context.Context, q Q, ws int64) (total, failing int64, err error) {
+	err = q.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE state = 'failing') FROM crons WHERE workspace_id = ? AND deleted_at IS NULL`, ws).
+		Scan(&total, &failing)
+	return total, failing, err
 }
 
 // NewCron is what creating a cron takes: a template (TemplateID, or Template's content for a new

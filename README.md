@@ -92,6 +92,7 @@ To have agents work tasks unattended, run a runner next to them: a small script 
 [Tasks](docs/guide/tasks.md) ·
 [Agents](docs/guide/agents.md) ·
 [Recurring tasks](docs/guide/recurring.md) ·
+[Crons](docs/guide/crons.md) ·
 [Dashboard](docs/guide/dashboard.md) ·
 [Inbox and notifications](docs/guide/inbox.md) ·
 [Views](docs/guide/views.md) ·

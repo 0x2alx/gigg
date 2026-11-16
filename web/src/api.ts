@@ -342,12 +342,13 @@ export interface Recurrence {
   schedule_uses: number; // live recurring tasks on it, this one included
 }
 
-// Schedule: named timing of a workspace (rule, window, create-early); recurring tasks pair one with a template.
+// Schedule: named timing of a workspace (rule, window, create-early); recurring tasks pair one with a
+// template, crons run on one. minutes/hours timings are for crons only.
 export interface Schedule {
   id: number;
   workspace_id: number;
   name: string;
-  freq: "daily" | "weekly" | "monthly";
+  freq: "daily" | "weekly" | "monthly" | "minutes" | "hours";
   interval: number;
   weekdays: number[] | null;
   month_day: number | null;
@@ -357,7 +358,12 @@ export interface Schedule {
   lead_minutes: number;
   version: number;
   uses: number; // live recurring tasks on it
+  cron_uses?: number; // live crons on it
 }
+
+// TaskSchedule: a schedule recurring tasks can use (not a minutes/hours one).
+export type TaskSchedule = Schedule & { freq: "daily" | "weekly" | "monthly" };
+export const isTaskSchedule = (s: Schedule): s is TaskSchedule => s.freq === "daily" || s.freq === "weekly" || s.freq === "monthly";
 
 export interface ScheduleBody {
   name?: string;

@@ -43,7 +43,7 @@ var Permissions = []Permission{
 	{"allowed_tools", "Task tool allowlists", "Give tasks (templates, recurring tasks) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change tasks that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner"},
 	{"crons", "Crons", "Create, change, pause and delete crons (commands an agent's executor runs on a schedule, sandboxed) and cron templates. A cron's worker is yourself, or any agent with Manage the workspace.", "Runner"},
 	{"cron_unsandboxed", "No-sandbox crons", "Let a cron run outside its agent's sandbox. Any change to such a cron by someone without this permission turns its sandbox back on.", "Runner"},
-	{"pause_runs", "Pause task runs", "Pause and resume new agent task runs (PAUSE TASKS); with an all-workspaces rule, every workspace at once. Changing the caps stays with admins.", "Runner"},
+	{"pause_runs", "Pause task runs", "Pause and resume new agent task runs and cron runs; with an all-workspaces rule, every workspace at once. Changing the caps stays with admins.", "Runner"},
 	{"schedules", "Recurring tasks", "Create, change, pause and stop recurring task schedules (with Edit tasks; they make tasks with Create tasks).", "Planning"},
 	{"templates", "Task templates", "Create, change and delete task templates, with Edit tasks (using one only needs Create tasks).", "Planning"},
 	{"custom_fields", "Custom fields", "Define the workspace's custom fields.", "Planning"},

@@ -5,6 +5,7 @@ import { api, ApiError, SIGNED_OUT, type Me, type Project, type ThemeState, type
 import { NotificationsPage, TopBell } from "./Bell";
 import { badgeCount } from "./notifications";
 import { BoardPage } from "./Board";
+import { CronsPage } from "./Crons";
 import { DashboardPage } from "./Dashboard";
 import { InboxPage } from "./Inbox";
 import { countsChange, onActivity, treeChange, useLive, type LiveState } from "./live";
@@ -390,6 +391,7 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             <NavLink href="/board" prefix icon={<Icon name="board" />} label="Board" className="nav-primary" />
             <NavLink href="/dashboard" icon={<Icon name="dashboard" />} label="Dashboard" />
             <NavLink href="/my" icon={<Icon name="check" />} label="My tasks" />
+            <NavLink href="/crons" prefix icon={<Icon name="clock" />} label="Crons" />
             {savedViews.length > 0 && (
               <div className="nav-sub" role="group" aria-label="Saved views">
                 {savedViews.map((v) => (
@@ -456,6 +458,8 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             <Route path="/inbox">
               <InboxPage />
             </Route>
+            {/* one route, so opening a cron's panel keeps the page (and its filters) mounted */}
+            <Route path="/crons/:id?">{(params) => <CronsPage open={Number(params.id) || undefined} />}</Route>
             <Route path="/notifications">
               <NotificationsPage />
             </Route>

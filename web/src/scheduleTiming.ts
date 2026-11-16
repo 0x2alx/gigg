@@ -1,6 +1,6 @@
 // A schedule's timing and the repeat form: the body to send, the form state for a schedule, and whether
 // the form still holds a schedule's exact timing (pure functions, tested on their own).
-import type { Schedule, ScheduleBody } from "./api";
+import type { TaskSchedule as Schedule, ScheduleBody } from "./api";
 import { repeatFromRule, repeatRule, type RepeatState } from "./recurrence";
 
 // scheduleBody: a schedule's timing from the repeat form.

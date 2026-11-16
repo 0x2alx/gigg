@@ -1681,3 +1681,93 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 }
 /* subtask titles wrap next to their "blocks parent" switch instead of being cut off */
 .sub-list .rel-title { white-space: normal; overflow-wrap: anywhere; }
+
+/* ---- Crons page: a table (cards on a phone), the side panel with runs and output, the editor ---- */
+.crons { width: 100%; min-width: 0; }
+.crons .page-head p { margin: var(--sp-2) 0 0; max-width: 46rem; font-size: var(--fs-base); }
+.cron-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-5); }
+.cron-search { width: min(18rem, 100%); }
+.admin-seg-count.danger { color: var(--danger); font-weight: var(--weight-strong); }
+.cron-empty { padding: var(--sp-6); max-width: 46rem; }
+.cron-empty p { margin: 0 0 var(--sp-3); }
+.cron-table-card { padding: 0; overflow-x: auto; }
+.cron-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
+.cron-table th { text-align: left; font-size: var(--fs-sm); font-weight: var(--weight-strong); color: var(--muted); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.cron-table td { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); vertical-align: middle; }
+.cron-table th:first-child, .cron-table td:first-child { padding-left: var(--sp-5); }
+.cron-table tbody tr:last-child td { border-bottom: 0; }
+.cron-row { cursor: pointer; }
+.cron-row:hover, .cron-row.on { background: var(--hover); }
+.cron-row.cron-failing td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+.cron-row.cron-paused { color: var(--muted); }
+.cron-name-cell { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); min-width: 14rem; }
+.cron-name { font-weight: var(--weight-strong); color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.cron-name:hover { text-decoration: underline; }
+.cron-state { display: inline-flex; align-items: center; gap: 0.35rem; font-size: var(--fs-sm); color: var(--c); font-weight: var(--weight-strong); white-space: nowrap; }
+.cron-state .dot { background: var(--c); }
+.cron-name-cell .cron-state { width: 4.6rem; }
+.cron-sched { white-space: nowrap; }
+.cron-worker { white-space: nowrap; }
+.cron-worker, .cron-worker-name { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.cron-last { white-space: nowrap; }
+.cron-last-v > * + * { margin-left: var(--sp-3); }
+.cron-run-status { font-size: var(--fs-sm); font-weight: var(--weight-strong); white-space: nowrap; }
+.cron-run-ok { color: color-mix(in srgb, var(--ok) 75%, var(--text)); }
+.cron-run-bad { color: var(--danger); }
+.cron-run-muted { color: var(--muted); }
+.cron-run-running { color: var(--accent); }
+.cron-exit { font-family: var(--mono); font-weight: normal; }
+@media (max-width: 720px) {
+  .cron-table thead { display: none; }
+  .cron-table, .cron-table tbody, .cron-table tr, .cron-table td { display: block; }
+  .cron-table tr { padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--line); }
+  .cron-table tbody tr:last-child { border-bottom: 0; }
+  .cron-table td, .cron-table td:first-child { padding: 0; border: 0; }
+  .cron-table td + td { margin-top: var(--sp-2); }
+  .cron-table td[data-label] { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); }
+  .cron-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: var(--fs-sm); }
+  .cron-table td[data-label] > * { grid-column: 2; }
+  .cron-table td.cron-name-cell { display: flex; min-width: 0; margin-bottom: var(--sp-2); }
+  .cron-sched { white-space: normal; }
+  .cron-row.cron-failing td:first-child { box-shadow: none; }
+  .cron-row.cron-failing { box-shadow: inset 3px 0 0 var(--danger); }
+}
+.cron-panel .panel-title { margin-top: var(--sp-4); }
+.cron-actions { margin: 0 0 var(--sp-5); gap: var(--sp-3); align-items: center; }
+.cron-props { margin-top: var(--sp-4); }
+.cron-h { font-size: var(--fs-base); margin: var(--sp-6) 0 var(--sp-3); }
+.cron-cmd, .cron-out {
+  margin: 0; padding: var(--sp-4); background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-m);
+  font-family: var(--mono); font-size: var(--fs-sm); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto;
+}
+.cron-desc { white-space: pre-wrap; margin: var(--sp-4) 0 0; }
+.cron-runs { list-style: none; margin: 0 0 var(--sp-4); padding: 0; border: 1px solid var(--line); border-radius: var(--radius-m); }
+.cron-run + .cron-run { border-top: 1px solid var(--line); }
+.cron-run-head {
+  display: flex; align-items: center; gap: var(--sp-4); width: 100%; padding: var(--sp-3) var(--sp-4);
+  background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.cron-run-head:disabled { cursor: default; opacity: 1; }
+.cron-run-head:not(:disabled):hover { background: var(--hover); }
+.cron-run-head .cron-run-status { width: 6.5rem; flex: none; }
+.cron-run-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cron-run-meta { margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cron-run-chev { flex: none; color: var(--muted); }
+.cron-run-body { padding: 0 var(--sp-4) var(--sp-4); }
+.cron-run-body p { margin: 0 0 var(--sp-3); }
+@media (max-width: 720px) {
+  .cron-run-head { flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
+  .cron-run-meta { margin-left: 0; flex-basis: 100%; }
+  .cron-run-chev { position: absolute; right: var(--sp-5); }
+  .cron-run-head { position: relative; padding-right: var(--sp-8); }
+}
+.cron-cmd-input { font-family: var(--mono); font-size: var(--fs-sm); }
+.cron-tz { width: 14rem; max-width: 100%; }
+.cron-preview { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-3) 0 0; color: var(--muted); }
+.cron-opts { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.cron-unsandbox .banner { margin-bottom: 0; }
+.banner.small { font-size: var(--fs-sm); }
+.banner.cron-note { flex-wrap: nowrap; align-items: flex-start; }
+.banner.cron-note > svg { margin-top: 0.15em; }
+.cron-props { align-items: center; }
+.banner > .icon, .banner > svg { flex: none; }

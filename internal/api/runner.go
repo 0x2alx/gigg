@@ -22,6 +22,13 @@ type RunnerState struct {
 	Name        string                `json:"name"`
 	Settings    *store.RunnerSettings `json:"settings"`
 	Usage       *store.RunnerUsage    `json:"usage"`
+	Crons       CronCounts            `json:"crons"`
+}
+
+// CronCounts: a workspace's live crons and how many of them are failing.
+type CronCounts struct {
+	Total   int64 `json:"total"`
+	Failing int64 `json:"failing"`
 }
 
 type runnerList struct {
@@ -39,7 +46,11 @@ func (a *API) runnerState(ctx context.Context, w *store.Workspace) (RunnerState,
 	if err != nil {
 		return RunnerState{}, err
 	}
-	return RunnerState{WorkspaceID: w.ID, Slug: w.Slug, Name: w.Name, Settings: st, Usage: u}, nil
+	var cc CronCounts
+	if cc.Total, cc.Failing, err = store.CountCrons(ctx, a.st.R, w.ID); err != nil {
+		return RunnerState{}, err
+	}
+	return RunnerState{WorkspaceID: w.ID, Slug: w.Slug, Name: w.Name, Settings: st, Usage: u, Crons: cc}, nil
 }
 
 // PauseBody picks workspaces and a duration.

@@ -6,7 +6,7 @@
 // form), or a picked template left unchanged, which it then uses as is.
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { runBody, type RunSettings } from "./runsettings";
-import { api, ApiError, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, type Schedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubtask } from "./api";
+import { api, ApiError, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isTaskSchedule, type TaskSchedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubtask } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { assignable } from "./fields";
 import { cleanCustom, normSubs, sameAsTemplate } from "./items";
@@ -52,8 +52,8 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const [fields, setFields] = useState<CustomField[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [picked, setPicked] = useState<Template | null>(null);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [pickedSchedule, setPickedSchedule] = useState<Schedule | null>(null);
+  const [schedules, setSchedules] = useState<TaskSchedule[]>([]);
+  const [pickedSchedule, setPickedSchedule] = useState<TaskSchedule | null>(null);
   const [saveAs, setSaveAs] = useState<string | null>(null); // the name being typed for "Save as template"
   const [note, setNote] = useState("");
   const [projectStatuses, setProjectStatuses] = useState<Status[]>(statuses);
@@ -201,8 +201,9 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     api.schedules(ws.id).then(
       (r) => {
         if (!live) return;
-        setSchedules(r.items);
-        if (schedule) setPickedSchedule(r.items.find((x) => x.id === schedule.schedule_id) ?? null);
+        const items = r.items.filter(isTaskSchedule); // minutes/hours timings are for crons
+        setSchedules(items);
+        if (schedule) setPickedSchedule(items.find((x) => x.id === schedule.schedule_id) ?? null);
       },
       () => live && setSchedules([]),
     );

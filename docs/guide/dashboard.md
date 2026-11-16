@@ -21,6 +21,8 @@ Admins can set the caps on each card with **Change caps**.
 
 ## Pausing
 
-**Pause tasks** (top right) stops new task runs in the workspaces you pick, for a set time or until resumed. Runs that already started finish. A banner shows what's paused and until when, and **Resume** lifts it.
+**Pause runs** (top right) stops new task runs and cron runs in the workspaces you pick. Untick **Task runs** or **Cron runs** to pause only one of them. Task runs pause for a set time or until resumed; cron runs pause until resumed, and the slots they miss meanwhile are never run late. Runs that already started finish. A banner shows what's paused, and **Resume** lifts it.
 
-Admins can pause any workspace. Other people can pause the workspaces where they hold the *Pause task runs* permission (for a whole team, give it on all workspaces).
+**Crons** on a card counts the workspace's [crons](crons.md) and how many are failing; it opens the Crons page.
+
+Admins can pause any workspace. Other people can pause the workspaces where they hold the *Pause task runs* permission (it covers cron runs too) (for a whole team, give it on all workspaces).

@@ -76,6 +76,10 @@ permission in the workspace (see [access.md](access.md#api-keys-scopes-and-permi
 | `comments:read` | Reading comments (also needed for activity). |
 | `comments:write` | Writing comments, run reports, resume comments. |
 | `runs:write` | Recording runs (start, progress, finish, usage); pausing and resuming runs with the `pause_runs` permission. |
+| `crons:read` | Reading crons, cron templates and cron runs (without output). |
+| `crons:output` | Reading a cron run's output tail (with `crons:read`). |
+| `crons:write` | Making, changing, pausing, running now and deleting crons and cron templates (with the `crons` permission). |
+| `crons:run` | An agent's cron executor: claiming its own due runs and reporting them. |
 | `profile:write` | Your own profile, themes and picture. |
 | `keys:self` | Managing keys that act as yourself. |
 | `artifacts:write` | Accepted on keys. Note: not used by any endpoint yet. |
@@ -453,11 +457,34 @@ Markdown cut to 280 characters).
 | GET | `/recurrences/{id}` | A recurring task with its next five occurrences. |
 | PUT | `/recurrences/{id}` | Replace a recurring task; the next occurrence is recomputed from now (an occurrence already made is never made again). The editor becomes its owner, so this needs `create_tasks` too; new timing changes the shared schedule and needs what `PUT /schedules/{id}` needs. |
 | DELETE | `/recurrences/{id}` | Stop a recurring task. Its tasks stay; `?template=true` / `?schedule=true` also delete its template / schedule (409 and nothing deleted while another recurring task uses it). |
-| GET | `/workspaces/{ws}/schedules` | Schedules (named timing). |
+| GET | `/workspaces/{ws}/schedules` | Schedules (named timing; `minutes`/`hours` ones are for crons only). |
 | POST | `/workspaces/{ws}/schedules` | Make a schedule. |
 | GET | `/schedules/{id}` | A schedule. |
-| PUT | `/schedules/{id}` | Replace a schedule (every recurring task on it follows). |
-| DELETE | `/schedules/{id}` | Delete a schedule no recurring task uses. |
+| PUT | `/schedules/{id}` | Replace a schedule (every recurring task and cron on it follows; with crons on it, this also needs `crons`). |
+| DELETE | `/schedules/{id}` | Delete a schedule no recurring task or cron uses. |
+
+### crons
+
+Commands an agent's executor runs on a schedule, sandboxed, with a run history and no tasks (see
+[the guide](../guide/crons.md)). Reading needs view and `crons:read`; changing needs the `crons`
+permission and `crons:write`; `unsandboxed: true` also needs `cron_unsandboxed`. A change by someone
+without `cron_unsandboxed` turns the flag off.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/workspaces/{ws}/crons` | Crons, failing first, each with its schedule in words, next slot and last run. |
+| POST | `/workspaces/{ws}/crons` | Make a cron: `template_id` or content (`name`, `command`, `timeout_s` 10-3600, `output` `gigg`/`host`, `unsandboxed`), `schedule_id` or `rule` (`freq` `minutes`/`hours`/`daily`/`weekly`/`monthly`, `interval`, `weekdays`, `month_day`, `tz`, `window_start`, `window_minutes`), `worker` (default you; someone else needs `manage_workspace`), `on_failure_task`, `paused`. |
+| GET | `/crons/{id}` | A cron. |
+| PATCH | `/crons/{id}` | Change a cron (`If-Match`); content fields change its template, shared by the template's other crons. |
+| DELETE | `/crons/{id}` | Delete a cron and its runs (its template and schedule stay). |
+| POST | `/crons/{id}/pause`, `/crons/{id}/resume` | Pause; resume from the next slot (no catch-up). |
+| POST | `/crons/{id}/run-now` | Run once at the executor's next poll. |
+| GET | `/crons/{id}/runs?before=&limit=` | Runs, newest first. |
+| GET | `/cron-runs/{id}` | One run; `output_tail` only with `crons:output`. |
+| GET, POST | `/workspaces/{ws}/cron-templates` | Cron templates. |
+| GET, PUT, DELETE | `/cron-templates/{id}` | A cron template (delete: none uses it). |
+| POST | `/workspaces/{ws}/crons/claim` | The executor (`crons:run`, own crons only): start every due run. Returns `items` (run id, command, timeout, output, unsandboxed, who last set the command) and `paused`. Older missed slots are recorded as `missed`; a slot while the previous run is going as `skipped`. |
+| POST | `/cron-runs/{id}/finish` | The executor reports a run: `status` `ok`/`failed`/`timeout`, `exit_code`, `duration_ms`, `output_tail` (last 64 KiB; dropped for `host` output), `output_bytes`, `error`. Returns whether the cron became failing or recovered. |
 
 ### runs
 
@@ -477,8 +504,8 @@ See [runner-protocol.md](runner-protocol.md) for how these fit together.
 | GET | `/runner` | Runner caps, pause state and the last 24 hours, per workspace in reach. |
 | GET | `/workspaces/{ws}/runner` | The same for one workspace. |
 | PATCH | `/workspaces/{ws}/runner` | Change a workspace's task caps (admin). |
-| POST | `/runner/pause` | Pause new task runs in some or all workspaces (admin, or `pause_runs`). |
-| POST | `/runner/resume` | Lift the pause (admin, or `pause_runs`). |
+| POST | `/runner/pause` | Pause new task runs and cron runs in some or all workspaces (admin, or `pause_runs`); `tasks`/`crons` (default true) pick the boxes. Crons stay paused until resumed. |
+| POST | `/runner/resume` | Lift the pause (admin, or `pause_runs`); `tasks`/`crons` as above. |
 
 ### admin
 
