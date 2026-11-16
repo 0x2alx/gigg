@@ -11,6 +11,8 @@
 - **Pause runs** has two boxes, task runs and cron runs; the Dashboard shows each workspace's crons
   and how many are failing.
 - Schedules take `minutes` and `hours` timings (for crons only).
+- `gigg admin allow <user> <workspace|all> <permission>...` adds permissions to a user's rule and keeps
+  the rest (`access` replaces the rule).
 
 - Dialogs opened from a table row (archive, make admin, revoke…) inherited the cell's right
   alignment and no-wrap, so titles sat on the right and text ran past the edge. Dialogs now render

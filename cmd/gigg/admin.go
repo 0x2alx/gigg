@@ -30,6 +30,8 @@ const adminUsage = `gigg admin: first setup and recovery, working directly on th
   gigg admin member <workspace> <username> <viewer|commenter|member|manager|none>
   gigg admin access <username> <workspace|all> <preset|none> [permission=allow|deny ...]
                                                set the user's access rule there (replaces it)
+  gigg admin allow <username> <workspace|all> <permission> [...]
+                                               add permissions to the user's rule there (keeps the rest)
   gigg admin project-add <workspace> <slug> <name> <KEY>
   gigg admin key-add -user U [-workspace W] -scopes a,b [-listeners x,y] [-cidrs c] [-name N] [-days 365] [-out F]
   gigg admin key-rotate <key-id> [-out F]
@@ -255,6 +257,49 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 				ws = &w.ID
 			}
 			return store.SetRule(ctx, tx, a, "user", u.ID, ws, preset, over)
+		})
+	case "allow":
+		if len(args) < 3 {
+			return errors.New("usage: allow <username> <workspace|all> <permission> [...]")
+		}
+		return st.Tx(ctx, func(tx *sql.Tx) error {
+			u, err := store.GetUserByName(ctx, tx, args[0])
+			if err != nil {
+				return fmt.Errorf("user %s: %w", args[0], err)
+			}
+			var ws *int64
+			if args[1] != "all" {
+				w, err := store.GetWorkspaceBySlug(ctx, tx, args[1])
+				if err != nil {
+					return fmt.Errorf("workspace %s: %w", args[1], err)
+				}
+				ws = &w.ID
+			}
+			rules, err := store.RulesOfUser(ctx, tx, u.ID)
+			if err != nil {
+				return err
+			}
+			var rule *store.AccessRule
+			for _, r := range rules {
+				if (ws == nil && r.WorkspaceID == nil) || (ws != nil && r.WorkspaceID != nil && *r.WorkspaceID == *ws) {
+					rule = r
+				}
+			}
+			if rule == nil {
+				return fmt.Errorf("%s has no access rule for %s (make them a member first, or use access)", u.Username, args[1])
+			}
+			ov := map[string]bool{}
+			for k, v := range rule.Overrides {
+				ov[k] = v
+			}
+			for _, perm := range args[2:] {
+				ov[perm] = true
+			}
+			if err := store.SetRule(ctx, tx, a, "user", u.ID, ws, rule.Preset, ov); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "%s in %s: %s allowed\n", u.Username, args[1], strings.Join(args[2:], ", "))
+			return nil
 		})
 	case "project-add":
 		if len(args) != 4 {

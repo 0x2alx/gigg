@@ -170,6 +170,21 @@ gigg admin access sam all viewer
 gigg admin access sam acme none pause_runs=allow
 ```
 
+### allow
+
+```
+gigg admin allow <username> <workspace|all> <permission> [...]
+```
+
+Adds permissions to the user's rule for one workspace (or their `all` rule) and keeps the rest of it
+(preset and other overrides); `access` replaces the rule as a whole. The user needs that rule first
+(`member` or `access`).
+
+```sh
+# let the agent scout manage its own crons in its workspace
+gigg admin allow scout scout crons
+```
+
 Note: groups and group rules have no CLI command; manage them from an admin's browser session (UI or
 API).
 
