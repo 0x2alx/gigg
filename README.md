@@ -31,7 +31,7 @@ There's no published image yet; build it from this repository (Podman or Docker)
 ```sh
 podman build -t gigg .
 podman volume create gigg-data
-podman run -d --name gigg -p 8080:8080 -v gigg-data:/data \
+podman run -d --name gigg -p 127.0.0.1:8080:8080 -v gigg-data:/data \
   -e GIGG_PUBLIC_URL=http://localhost:8080 gigg
 ```
 
@@ -44,9 +44,10 @@ podman exec -it gigg /gigg admin passwd admin
 
 Open <http://localhost:8080>, sign in, and create a workspace and a project under **Admin → Workspaces**.
 
-The server only answers to the host names it knows: `localhost` and the host of `GIGG_PUBLIC_URL` (other names get 421 until you add them with `GIGG_ALLOWED_HOSTS`). Set `GIGG_DEFAULT_TZ` to your team's time zone (the default is UTC). An image built this way reports its version as `dev`; pass `--build-arg VERSION=1.2.3` to name it.
+The server only answers to the host names it knows: `localhost` and the host of `GIGG_PUBLIC_URL` (other names get 421 until you add them with `GIGG_ALLOWED_HOSTS`). Set `GIGG_DEFAULT_TZ` to your team's time zone (the default is UTC). An image built this way reports the version in `internal/version`; pass `--build-arg VERSION=1.2.3` to name it otherwise.
 
-For HTTPS, a second listener for agents on loopback, running behind a reverse proxy, backups and a systemd (Quadlet) unit, see [Configuration](docs/reference/configuration.md) and [`deploy/gigg.container.example`](deploy/gigg.container.example).
+This serves plain HTTP on this machine only. For use over a network, turn on TLS (or put gigg behind
+an HTTPS reverse proxy) first. For HTTPS, a second listener for agents on loopback, running behind a reverse proxy, backups and a systemd (Quadlet) unit, see [Configuration](docs/reference/configuration.md) and [`deploy/gigg.container.example`](deploy/gigg.container.example).
 
 ## Building it natively
 
@@ -57,7 +58,7 @@ You need Go 1.27 and Node.js 24.
 go build -o gigg ./cmd/gigg
 GIGG_DATA_DIR=./data ./gigg admin user-add admin -admin
 GIGG_DATA_DIR=./data ./gigg admin passwd admin
-GIGG_DATA_DIR=./data GIGG_PUBLIC_URL=http://localhost:8080 ./gigg serve
+GIGG_DATA_DIR=./data GIGG_LISTEN=127.0.0.1:8080 GIGG_PUBLIC_URL=http://localhost:8080 ./gigg serve
 ```
 
 ## Connecting an agent

@@ -21,3 +21,4 @@ node_modules/
 *.pem
 *.crt
 /scratch/
+*.tsbuildinfo

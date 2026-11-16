@@ -54,7 +54,7 @@ type (
 		Checklist     []string       `json:"checklist,omitempty"`
 		Subtasks      []subtaskArg   `json:"subtasks,omitempty" jsonschema:"Subtasks each task made from it gets: title, and blocks_parent when the task should wait for it"`
 		Custom        map[string]any `json:"custom,omitempty"`
-		Model         string         `json:"model,omitempty" jsonschema:"Model for the agent's claude -p (default: the agent's)"`
+		Model         string         `json:"model,omitempty" jsonschema:"Model a runner should ask for (default: the agent's)"`
 		Effort        string         `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh or max (default: the agent's)"`
 		AlwaysRun     bool           `json:"always_run,omitempty" jsonschema:"Tasks made from it run whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  []string       `json:"allowed_tools,omitempty" jsonschema:"Tool allowlist its tasks get for the runner (permission rules; on update omit to keep, [] clears; needs the allowed_tools permission)"`

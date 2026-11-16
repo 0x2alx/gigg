@@ -1,0 +1,17 @@
+# The build context: only the sources the Containerfile copies. Never local data, keys or builds.
+.git
+.claude
+.mcp.json
+CLAUDE.local.md
+data
+scratch
+out
+web/node_modules
+web/dist/*
+!web/dist/.keep
+*.key
+*.token
+*.pem
+*.crt
+.env
+.env.*

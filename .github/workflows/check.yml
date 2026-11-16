@@ -1,0 +1,34 @@
+# The same checks as a local run: the web build and tests, then dev/check.sh (gofmt, vet, the
+# no-outbound-calls rule, Go tests), each in the pinned build image the Containerfile uses.
+# No third-party actions: the checkout is plain git, so nothing outside this repository runs.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions: read-all
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_IMAGE: docker.io/library/node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
+      GO_IMAGE: docker.io/library/golang:1.27-alpine@sha256:ea30e25680a5470bac02b08bb0e0a735fb75bd0ab7d431b9b95ee0abef362586
+    steps:
+      - name: Check out
+        run: |
+          git init -q .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          git fetch -q --depth 1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Web build and tests
+        run: docker run --rm -v "$PWD:/w" -w /w/web "$NODE_IMAGE" sh -c 'npm ci --no-fund --no-audit && npm run build && npm test'
+      - name: Go checks
+        run: docker run --rm -v "$PWD:/src" -w /src "$GO_IMAGE" sh dev/check.sh

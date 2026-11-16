@@ -59,8 +59,8 @@ type templateBody struct {
 	Checklist     []string                `json:"checklist,omitempty" maxItems:"200"`
 	Subtasks      []store.TemplateSubtask `json:"subtasks,omitempty" maxItems:"50" doc:"Subtasks each task made from it gets (title; blocks_parent = the task waits for it)"`
 	Custom        map[string]any          `json:"custom,omitempty"`
-	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p (default: the agent's)"`
-	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort for claude -p (default: the agent's)"`
+	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
+	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
 	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Tasks made from it run whatever the usage budget (needs the always_run permission)"`
 	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its tasks get for the runner (permission rules); on update, omit to keep, [] clears. Needs the allowed_tools permission"`
 }

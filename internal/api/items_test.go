@@ -172,13 +172,14 @@ func TestWorkItems(t *testing.T) {
 	}
 }
 
-// TestReviewFixesBatch: the 2026-11-12 batch review findings stay fixed.
-func TestReviewFixesBatch(t *testing.T) {
+// TestBadInputAndIsolation: non-finite numbers are refused, one failing schedule doesn't stop the
+// others, credential routes aren't replayed, and a workspace-bound key stays in its workspace.
+func TestBadInputAndIsolation(t *testing.T) {
 	e := newEnv(t)
 	ada, scout := e.ada(), e.key("scout")
 	pid := e.ids["scout.p"]
 
-	// H1: NaN/Inf numbers are refused (they used to panic in JSON encoding), also through MCP
+	// NaN/Inf numbers are refused (they used to panic in JSON encoding), also through MCP
 	code, out, _ := e.req("POST", "/workspaces/scout/fields", `{"name":"Points","kind":"number"}`, ada)
 	e.ok(code, out, 201)
 	var f struct {
@@ -194,7 +195,7 @@ func TestReviewFixesBatch(t *testing.T) {
 		t.Fatalf("aliased field key accepted: %d", code)
 	}
 
-	// H2: a schedule in an archived project, and one whose task creation fails, don't stop the others
+	// a schedule in an archived project, and one whose task creation fails, don't stop the others
 	code, out, _ = e.req("POST", fmt.Sprintf("/projects/%d/recurrences", pid), `{"title":"ok","freq":"daily","tz":"UTC","window_start":"00:00","window_minutes":1440}`, ada)
 	e.ok(code, out, 201)
 	if code, _, _ := e.req("POST", fmt.Sprintf("/projects/%d/recurrences", pid), `{"title":"bad","freq":"daily","labels":[""]}`, ada); code != 422 {

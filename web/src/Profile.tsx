@@ -73,7 +73,22 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
       </form>
       <Password onLogout={onLogout} />
       <Sessions />
+      <About />
     </div>
+  );
+}
+
+// About: the version and where to get this server's source code (the AGPL asks a network service
+// to offer it to its users).
+function About() {
+  const { me } = useApp();
+  return (
+    <p className="profile-about muted">
+      gigg {me.version ?? ""} · free software under the AGPL-3.0 ·{" "}
+      <a href={me.source_url || "https://github.com/0x2alx/gigg"} target="_blank" rel="noopener noreferrer">
+        Source code
+      </a>
+    </p>
   );
 }
 

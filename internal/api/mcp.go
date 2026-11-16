@@ -148,10 +148,10 @@ type (
 		BlocksParent  bool           `json:"blocks_parent,omitempty" jsonschema:"With parent_id: the parent waits (isn't handed out) until this subtask is done"`
 		Checklist     []string       `json:"checklist,omitempty" jsonschema:"Checklist items"`
 		Custom        map[string]any `json:"custom,omitempty" jsonschema:"Custom field values by field id"`
-		Model         string         `json:"model,omitempty" jsonschema:"Model for the agent's claude -p: opus, sonnet, haiku, fable or a full id (default: the agent's)"`
+		Model         string         `json:"model,omitempty" jsonschema:"Model a runner should ask for: an alias such as opus or sonnet, or a full id (default: the agent's)"`
 		Effort        string         `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh or max (default: the agent's)"`
 		AlwaysRun     bool           `json:"always_run,omitempty" jsonschema:"Run it whatever the usage budget (needs the always_run permission)"`
-		AllowedTools  []string       `json:"allowed_tools,omitempty" jsonschema:"Tools the runner may use for it: Claude Code permission rules, one per entry (e.g. Read, Bash(git status *)); needs the allowed_tools permission"`
+		AllowedTools  []string       `json:"allowed_tools,omitempty" jsonschema:"The only tools a runner should allow for it: Claude Code-style permission rules, one per entry (e.g. Read, Bash(git status *)); needs the allowed_tools permission"`
 	}
 	updateTaskArgs struct {
 		Task          string   `json:"task" jsonschema:"Task id or key"`
@@ -163,7 +163,7 @@ type (
 		StartAt       int64    `json:"start_at,omitempty" jsonschema:"Unix ms"`
 		DueAt         int64    `json:"due_at,omitempty" jsonschema:"Unix ms"`
 		NotAfter      int64    `json:"not_after,omitempty" jsonschema:"Unix ms: the window closes (reopening a missed task clears missed)"`
-		Model         *string  `json:"model,omitempty" jsonschema:"Model for claude -p; empty = the agent's default"`
+		Model         *string  `json:"model,omitempty" jsonschema:"Model a runner should ask for; empty = the agent's default"`
 		Effort        *string  `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh, max; empty = the agent's default"`
 		AlwaysRun     *bool    `json:"always_run,omitempty" jsonschema:"Run it whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  []string `json:"allowed_tools,omitempty" jsonschema:"Replaces the runner tool allowlist ([] clears; needs the allowed_tools permission)"`
@@ -219,7 +219,7 @@ type (
 		MaxCount      *int64       `json:"max_count,omitempty" jsonschema:"Stop after this many tasks; 0 clears"`
 		Overlap       string       `json:"overlap,omitempty" jsonschema:"skip (default: no new task while the last is still open) or create"`
 		Paused        *bool        `json:"paused,omitempty"`
-		Model         *string      `json:"model,omitempty" jsonschema:"Model for claude -p; empty = the agent's default"`
+		Model         *string      `json:"model,omitempty" jsonschema:"Model a runner should ask for; empty = the agent's default"`
 		Effort        *string      `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh, max; empty = the agent's default"`
 		AlwaysRun     *bool        `json:"always_run,omitempty" jsonschema:"Its tasks run whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  []string     `json:"allowed_tools,omitempty" jsonschema:"Tool allowlist its tasks get for the runner (permission rules; [] clears; needs the allowed_tools permission)"`

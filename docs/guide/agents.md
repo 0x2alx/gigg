@@ -23,10 +23,10 @@ On a task, a template or a recurring task:
 
 | Setting | What it does |
 |---|---|
-| **Model** | The model the runner asks for (an alias like `opus` or `sonnet`, or a full model id). Empty: the agent's default. |
+| **Model** | The model a runner should ask for (an alias like `opus` or `sonnet`, or a full model id). Empty: the agent's default. |
 | **Effort** | The reasoning effort level (low, medium, high, xhigh, max). Empty: the agent's default. |
 | **Always run** | Runs it whatever the usage budget, day or night: for cron-like jobs. The daily cap and pauses still apply. Needs the *Always-run tasks* permission. |
-| **Allowed tools** | Gives the agent exactly these tools for this task and nothing else, one permission rule per line (for example `Read`, `Bash(git status *)`, `WebFetch(domain:example.com)`). The runner passes them to Claude Code as `--allowedTools` with `--permission-mode dontAsk`. Empty: the agent's usual setup. Needs the *Task tool allowlists* permission. |
+| **Allowed tools** | Gives the agent exactly these tools for this task and nothing else, one permission rule per line (for example `Read`, `Bash(git status *)`, `WebFetch(domain:example.com)`). A runner should pass them to the agent so that nothing else is allowed (for Claude Code: `--allowedTools` with `--permission-mode dontAsk`). Empty: the agent's usual setup. Needs the *Task tool allowlists* permission. |
 
 A list can only narrow what an agent may do: whatever limits the agent's own setup imposes (settings, sandbox) still apply. Setting **Always run** or **Allowed tools**, changing either one, or changing a task that has one (its fields, checklist, custom fields or dependencies), reopening, unarchiving, restoring or resuming it, needs the matching permission, and so does retiming a schedule such a recurring task uses. This means nobody without it can repoint a scheduled job at other work.
 

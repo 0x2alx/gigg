@@ -1,7 +1,7 @@
 // Package server runs gigg's HTTP listeners: the main one (UI, API, MCP; HTTPS from certificate
 // files or plain HTTP behind a proxy) and optional named extra listeners (API and MCP only).
 //
-// The server never starts processes and never opens outbound connections; `make check` fails the
+// The server never starts processes and never opens outbound connections; `dev/check.sh` fails the
 // build if a package under internal/ imports os/exec or creates an HTTP client.
 package server
 

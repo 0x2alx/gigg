@@ -1,5 +1,5 @@
 // How an agent runs a task: model and effort for claude -p, always-run (worked whatever the usage
-// budget, day or night) and a tool allowlist (the runner passes exactly those tools). Empty
+// budget, day or night) and a tool allowlist (a runner should allow exactly those tools). Empty
 // model/effort = the agent's default; no tools = the runner's usual mode.
 import { useEffect, useId, useRef, useState } from "react";
 

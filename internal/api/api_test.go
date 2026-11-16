@@ -660,8 +660,9 @@ func TestOpenAPIServed(t *testing.T) {
 	}
 }
 
-// Review findings (2026-11-12): each must stay fixed.
-func TestReviewFixes(t *testing.T) {
+// TestKeyAndSessionBoundaries: what a narrow key or a non-admin can and can't do with keys, admin
+// routes, comment text and key events.
+func TestKeyAndSessionBoundaries(t *testing.T) {
 	e := newEnv(t)
 	// an admin key with only admin:keys (internal listener) can't rotate a wider key and take its secret
 	code, out, _ := e.req("POST", "/keys", `{"name":"keymgr","scopes":["admin:keys"],"allowed_listeners":["internal"]}`, e.ada())
@@ -742,7 +743,7 @@ func TestForwardedForAllLines(t *testing.T) {
 	}
 }
 
-// Query filters must reach the store (huma doesn't bind embedded structs; found 2026-11-12).
+// Query filters must reach the store (huma doesn't bind embedded structs).
 func TestListFiltersApply(t *testing.T) {
 	e := newEnv(t)
 	k := e.key("scout")
@@ -947,4 +948,16 @@ func TestAuthLookupFailureIs503(t *testing.T) {
 			t.Fatalf("%s: no Retry-After", name)
 		}
 	}
+}
+
+// TestBadKeysLimited: an address that keeps sending invalid keys gets 429 before any lookup.
+func TestBadKeysLimited(t *testing.T) {
+	e := newEnv(t)
+	bad := cred{token: "not-a-key", listener: "internal"}
+	for i := 0; i < badKeyMax; i++ {
+		code, out, _ := e.req("GET", "/auth/me", "", bad)
+		e.ok(code, out, 401)
+	}
+	code, out, _ := e.req("GET", "/auth/me", "", bad)
+	e.ok(code, out, 429)
 }

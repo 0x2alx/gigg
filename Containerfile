@@ -19,10 +19,11 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 COPY web/embed.go web/
 COPY --from=web /src/web/dist/ web/dist/
-ARG VERSION=dev
+# empty: the version in internal/version (the release this tree is); set it to name a build
+ARG VERSION=
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -p 2 -trimpath \
-      -ldflags "-s -w -X github.com/0x2alx/gigg/internal/version.Version=${VERSION}" \
+      -ldflags "-s -w ${VERSION:+-X github.com/0x2alx/gigg/internal/version.Version=${VERSION}}" \
       -o /out/gigg ./cmd/gigg \
  && mkdir -p /out/data /out/run/gigg \
  && touch /out/run/gigg/tls.crt /out/run/gigg/tls.key   # mount points: the root filesystem is read-only

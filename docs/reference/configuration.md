@@ -22,6 +22,7 @@ variables are read by `gigg serve`, `gigg healthcheck` and `gigg admin`. An inva
 | `GIGG_STALE_RUN_HOURS` | `6` | A run that sends no heartbeat (start or progress) for this many hours (1-168) is closed as `interrupted` by the server's housekeeping. |
 | `GIGG_BACKUP_KEEP` | `7` | How many nightly snapshots to keep (1-365). |
 | `GIGG_REMOTE_FONTS` | on | The 20 fonts the theme editor offers are bundled, so pages never contact Google on their own; another Google Fonts family loads only after someone presses **Load from Google Fonts** on the Themes page (kept per browser). `off` removes Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`) from the Content-Security-Policy and hides that button. Any other value leaves them allowed. |
+| `GIGG_SOURCE_URL` | `https://github.com/0x2alx/gigg` | Where users get this server's source code, linked at the bottom of the profile page. gigg is under the AGPL-3.0: if you run a changed version for others, point this at your changed source. |
 
 Time zones: a schedule always stores its own zone. When a request names none, gigg uses the creator's
 time zone preference (set in Profile, stored as `timezone` in the user's preferences), else
@@ -90,6 +91,20 @@ The client address is used for API key network restrictions (`allowed_cidrs`), r
 records and the audit log. If the TCP peer is not in `GIGG_TRUSTED_PROXIES`, the peer address is used.
 If it is, gigg reads every `X-Forwarded-For` header line, walks the hops from right to left and takes
 the first address that is not a trusted proxy.
+
+Behind a proxy that isn't listed, every request seems to come from the proxy, so all users share
+one address's rate limits.
+
+### Rate limits
+
+Counted per minute, in memory (a restart resets them):
+
+- **Sign-in:** 5 attempts per address and user name, 30 per address, and 20 per user name from any
+  address. The last one means someone who knows a user name can keep that user from signing in for
+  as long as they keep trying; that user's existing sessions and API keys keep working.
+- **Change password:** 5 per user.
+- **API keys:** 300 requests per key. An address that sends 30 invalid keys gets 429 for every key
+  request for the rest of that minute, before any lookup.
 
 ## Security headers
 

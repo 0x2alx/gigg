@@ -644,6 +644,7 @@ a.pulse-item:hover { color: var(--text); }
 /* profile */
 .profile { max-width: 46rem; display: flex; flex-direction: column; gap: var(--sp-6); }
 .profile .row { align-items: center; gap: 0.8rem; }
+.profile-about { margin: 0; font-size: var(--fs-sm); text-align: center; }
 .session { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; padding: var(--sp-4) 0; border-top: 1px solid var(--line); font-size: var(--fs-base); }
 .session-ua { flex: 1; min-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1527,7 +1528,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 }
 
 /* ======================================================================================================
-   Sidebar rail and top bar (round 5). Wide screens: the sidebar is a fixed rail; each panel folds to its
+   Sidebar rail and top bar. Wide screens: the sidebar is a fixed rail; each panel folds to its
    icons and opens over the page on its own (SidePanel in App.tsx). A row's highlight is drawn by ::before:
    a circle (or rounded square) around the icon while folded, the whole row while open, so opening only
    reveals the labels and nothing jumps. On a phone the same panels sit in the drawer, always open.

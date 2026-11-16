@@ -320,6 +320,11 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 				unauth("Use Authorization: Bearer <key>.")
 				return
 			}
+			// an address that keeps sending bad keys gets 429 before any lookup (and stops filling the log)
+			if a.limiter.full("badkey:"+req.IP, badKeyMax) {
+				writeProblem(w, fail(429, "rate_limited", "Too many requests with invalid keys; slow down."))
+				return
+			}
 			p, why := a.keyPrincipal(ctx, tok, req)
 			if why == whyUnavailable && r.Context().Err() != nil {
 				w.WriteHeader(statusClientClosed) // the client left before the lookup finished
@@ -331,6 +336,7 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 				return
 			}
 			if p == nil {
+				a.limiter.allow("badkey:"+req.IP, badKeyMax) // count the failure
 				a.log.Info("key refused", "reason", why, "listener", req.Listener, "ip", req.IP, "request_id", req.RequestID)
 				unauth("Invalid, expired or revoked key, or not usable here.")
 				return
@@ -510,6 +516,17 @@ type limiter struct {
 
 func newLimiter() *limiter { return &limiter{m: map[string]*window{}} }
 
+// badKeyMax: refused API keys per client address and minute before further keys from it get 429.
+const badKeyMax = 30
+
+// full reports whether key already used up max events this minute, without counting one.
+func (l *limiter) full(key string, max int) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	w := l.m[key]
+	return w != nil && time.Since(w.start) <= time.Minute && w.n >= max
+}
+
 // allow counts one event for key in the current minute; false when over max.
 func (l *limiter) allow(key string, max int) bool {
 	l.mu.Lock()
@@ -617,7 +634,7 @@ func userTZ(p *access.Principal) string {
 }
 
 // toolsChange: giving a task (template, recurring task) a tool allowlist, changing it or clearing it
-// needs the allowed_tools permission: the list decides what the runner's claude -p may do.
+// needs the allowed_tools permission: the list decides what the runner lets the agent do.
 func toolsChange(p *access.Principal, ws int64, old, new []string) error {
 	if n, err := store.NormTools(new); err == nil && store.SameTools(n, old) {
 		return nil

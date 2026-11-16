@@ -60,10 +60,10 @@ type Task struct {
 	Labels            []TaskTag      `json:"labels"`
 	Assignees         []int64        `json:"assignees"`
 	Aliases           []string       `json:"aliases"`
-	Model             string         `json:"model" doc:"Model for the agent's claude -p ('' = the agent's default)"`
-	Effort            string         `json:"effort" doc:"Effort level for claude -p ('' = the agent's default)"`
+	Model             string         `json:"model" doc:"Model a runner should ask for ('' = the agent's default)"`
+	Effort            string         `json:"effort" doc:"Effort level a runner should ask for ('' = the agent's default)"`
 	AlwaysRun         bool           `json:"always_run" doc:"Worked whatever the usage budget, day or night (within the task cap and pauses)"`
-	AllowedTools      []string       `json:"allowed_tools" doc:"Tool allowlist for the runner's claude -p (permission rules); empty = the runner's usual mode"`
+	AllowedTools      []string       `json:"allowed_tools" doc:"The only tools a runner should allow (permission rules); empty = the runner's usual mode"`
 	Version           int64          `json:"version"`
 	LastRun           *RunBrief      `json:"last_run,omitempty" doc:"The task's latest run, in brief (absent when it has none)"`
 	Question          *QuestionBrief `json:"question,omitempty" doc:"Waiting tasks in lists and on the board, with the comments:read scope: the latest question or report nobody else has answered, in brief"`

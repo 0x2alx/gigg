@@ -12,8 +12,14 @@ podman run --rm -v "$PWD":/src:ro -v gigg-gomod:/go/pkg/mod -w /src docker.io/li
 podman run --rm -v "$PWD":/w -w /w/web docker.io/library/node:24-alpine sh -c "npm ci && npx tsc -b && npx vite build && npx vitest run"
 ```
 
-`dev/fmt.sh <out-dir>` gofmts a read-only copy of the tree and writes only the changed files to
-`<out-dir>`, for when the source is mounted read-only. `dev/secret-scan.sh` checks staged changes for
+CI (`.github/workflows/check.yml`) runs these two, in the same pinned images.
+
+The rest is for when the source is mounted read-only into the container (with a writable tree, plain
+`gofmt -w` and `go mod tidy` do the same): `dev/fmt.sh <out-dir>` gofmts a copy of the tree and
+writes only the changed files to `<out-dir>`; `dev/tidy.sh <out-dir> [module@version ...]` runs
+`go get` and `go mod tidy` on a copy and writes `go.mod` and `go.sum` there; `make sync DEST=<dir>`
+puts a clean copy of the source (no `.git`, local dependencies or build output) in `<dir>`, for a
+container to mount. `dev/secret-scan.sh` checks staged changes for
 anything that looks like a secret (it prints file, line and length only); run it before committing.
 
 ## A dev instance

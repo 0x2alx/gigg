@@ -47,6 +47,8 @@ export interface Me {
   workspaces: WorkspaceAccess[];
   capabilities?: string[]; // permissions held in at least one workspace
   remote_fonts?: boolean; // the server allows Google Fonts (GIGG_REMOTE_FONTS)
+  version?: string;
+  source_url?: string; // this server's source code (AGPL-3.0 §13; GIGG_SOURCE_URL)
 }
 
 // hasCap: whether this account may use a feature, in workspace ws when given (permissions are per

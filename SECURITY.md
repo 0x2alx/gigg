@@ -1,8 +1,8 @@
 # Security
 
 Please report vulnerabilities privately, not in a public issue: use GitHub's **Report a
-vulnerability** button on this repository (Security → Advisories). If that isn't available, open an
-issue that only asks for a private contact, without any details. Include what you found, how to
+vulnerability** button on this repository (Security → Advisories). If that isn't available, email
+0x2alx@proton.me with "gigg security" in the subject. Include what you found, how to
 reproduce it, and which version or commit you tested.
 
 You'll get an answer within a week. Fixes are released as soon as they're ready, with credit if you
@@ -17,3 +17,7 @@ want it.
   programs that use the API.
 - Browser sessions are cookie-based with a CSRF header check; the main listener sets a strict
   Content-Security-Policy.
+- Agents act on what they read. Anyone who can write a task, comment or checklist item that an agent
+  picks up can steer that agent: treat write access to an agent's workspace as the ability to direct
+  it. Give agents their own workspaces, add only people you trust as members, and use per-task tool
+  allowlists and the agent's own sandbox to limit what a misdirected run can do.

@@ -15,6 +15,7 @@ import (
 	"github.com/0x2alx/gigg/internal/access"
 	"github.com/0x2alx/gigg/internal/auth"
 	"github.com/0x2alx/gigg/internal/store"
+	"github.com/0x2alx/gigg/internal/version"
 )
 
 // MeBody describes the caller.
@@ -27,6 +28,8 @@ type MeBody struct {
 	// Capabilities: the permissions held in at least one workspace (see GET /permissions).
 	Capabilities []string `json:"capabilities"`
 	RemoteFonts  bool     `json:"remote_fonts" doc:"Whether pages may load fonts gigg doesn't bundle from Google Fonts (GIGG_REMOTE_FONTS)"`
+	Version      string   `json:"version" doc:"The server's version"`
+	SourceURL    string   `json:"source_url" doc:"Where to get this server's source code (GIGG_SOURCE_URL)"`
 }
 
 // WorkspaceAccess is a workspace in reach and the caller's role there.
@@ -61,7 +64,8 @@ func (a *API) meBody(ctx context.Context, p *access.Principal) (*MeBody, error) 
 	if err != nil {
 		return nil, err
 	}
-	b := &MeBody{User: p.User, Admin: p.IsInstanceAdmin(), Workspaces: []WorkspaceAccess{}, Listener: p.Req.Listener, RemoteFonts: a.cfg.RemoteFonts}
+	b := &MeBody{User: p.User, Admin: p.IsInstanceAdmin(), Workspaces: []WorkspaceAccess{}, Listener: p.Req.Listener, RemoteFonts: a.cfg.RemoteFonts,
+		Version: version.Version, SourceURL: a.cfg.SourceURL}
 	for _, w := range ws {
 		if !p.SeesWorkspace(w.ID) {
 			continue

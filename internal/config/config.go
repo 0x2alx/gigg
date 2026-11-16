@@ -42,6 +42,7 @@ type Config struct {
 	// StaleRunHours: a run with no heartbeat for this many hours is closed as interrupted.
 	StaleRunHours int
 	RemoteFonts   bool
+	SourceURL     string // where users get this server's source (AGPL-3.0 section 13)
 	// Nightly database snapshot (backups/nightly-*.db): local time of day, zone, how many to keep.
 	BackupAt   string // "HH:MM", or "" when GIGG_BACKUP_AT=off
 	BackupTZ   *time.Location
@@ -59,6 +60,7 @@ func load(get func(string) string, environ []string) (*Config, error) {
 		AllowedHosts: map[string]bool{"localhost": true, "127.0.0.1": true, "::1": true},
 		DefaultTZ:    or(get("GIGG_DEFAULT_TZ"), "UTC"),
 		RemoteFonts:  get("GIGG_REMOTE_FONTS") != "off",
+		SourceURL:    or(get("GIGG_SOURCE_URL"), "https://github.com/0x2alx/gigg"),
 		BackupAt:     or(get("GIGG_BACKUP_AT"), "03:30"),
 		BackupKeep:   7,
 	}
@@ -117,6 +119,9 @@ func load(get func(string) string, environ []string) (*Config, error) {
 		TLSCert: get("GIGG_TLS_CERT"), TLSKey: get("GIGG_TLS_KEY")}
 	if (main.TLSCert == "") != (main.TLSKey == "") {
 		errs = append(errs, errors.New("set both GIGG_TLS_CERT and GIGG_TLS_KEY, or neither"))
+	}
+	if u, err := url.Parse(c.SourceURL); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		errs = append(errs, fmt.Errorf("GIGG_SOURCE_URL must be an http(s) URL: %q", c.SourceURL))
 	}
 	if main.TLS() && c.PublicURL != nil && c.PublicURL.Scheme != "https" {
 		// the browser would see https while cookies and the origin check expect http

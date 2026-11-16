@@ -202,10 +202,10 @@ type TaskCreate struct {
 	BlocksParent  bool                    `json:"blocks_parent,omitempty" doc:"A subtask that holds its parent back while it is open (needs parent_id)"`
 	Labels        []string                `json:"labels,omitempty" maxItems:"20" doc:"Label names; missing ones are created"`
 	Assignees     []int64                 `json:"assignees,omitempty" maxItems:"50"`
-	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p, e.g. opus, sonnet, claude-opus-5-5 (default: the agent's)"`
-	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level for claude -p (default: the agent's)"`
+	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for, e.g. opus, sonnet or a full id (default: the agent's)"`
+	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
 	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Work it whatever the usage budget, day or night (needs the always_run permission)"`
-	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tools the runner's claude -p may use for it (Claude Code permission rules, one per entry, e.g. Read, Bash(git status *)); it then runs with --permission-mode dontAsk. Needs the allowed_tools permission"`
+	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"The only tools a runner should allow for it (Claude Code-style permission rules, one per entry, e.g. Read, Bash(git status *)). Needs the allowed_tools permission"`
 }
 
 type taskCreateIn struct {
@@ -228,8 +228,8 @@ type taskPatchIn struct {
 		BlocksParent  Opt[bool]     `json:"blocks_parent,omitempty" doc:"A subtask that holds its parent back while it is open"`
 		Labels        Opt[[]string] `json:"labels,omitempty" doc:"Replaces the task's labels (names)"`
 		Assignees     Opt[[]int64]  `json:"assignees,omitempty" doc:"Replaces the task's assignees (user ids)"`
-		Model         Opt[string]   `json:"model,omitempty" maxLength:"64" doc:"Model for claude -p; null or empty = the agent's default"`
-		Effort        Opt[string]   `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort for claude -p; null or empty = the agent's default"`
+		Model         Opt[string]   `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for; null or empty = the agent's default"`
+		Effort        Opt[string]   `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for; null or empty = the agent's default"`
 		AlwaysRun     Opt[bool]     `json:"always_run,omitempty" doc:"Work it whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  Opt[[]string] `json:"allowed_tools,omitempty" maxItems:"64" doc:"Replaces the runner's tool allowlist; null or [] clears (needs the allowed_tools permission)"`
 	}

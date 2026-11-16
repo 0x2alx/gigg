@@ -100,7 +100,7 @@ describe("import", () => {
 
 describe("contrast fixes", () => {
   it("Fix never makes another warning on the same colour worse", () => {
-    // the QA case: dark grey secondary text on a dark card, blue board columns
+    // dark grey secondary text on a dark card, blue board columns
     const t = { ...byName("nightwalker")!, mutedText: "#3E4C59", laneColor: "#0090FF" } as Theme;
     const before = contrastProblems(t).find((p) => p.label.startsWith("Secondary text on the board columns"))!;
     const fixed = { ...t, mutedText: fixFor(t, "mutedText") };

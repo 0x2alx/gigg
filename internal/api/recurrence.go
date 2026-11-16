@@ -31,8 +31,8 @@ type RecurrenceBody struct {
 	Color         *string                 `json:"color,omitempty"`
 	Labels        []string                `json:"labels,omitempty" maxItems:"20"`
 	Assignees     []int64                 `json:"assignees,omitempty" maxItems:"50"`
-	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p (default: the agent's)"`
-	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort for claude -p (default: the agent's)"`
+	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
+	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
 	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Its tasks run whatever the usage budget (needs the always_run permission)"`
 	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its tasks get for the runner (permission rules); omit to keep the template's, [] clears. Needs the allowed_tools permission"`
 	Freq          string                  `json:"freq,omitempty" enum:"daily,weekly,monthly," doc:"Required unless schedule_id is given"`

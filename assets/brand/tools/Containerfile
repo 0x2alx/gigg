@@ -1,3 +1,10 @@
-FROM docker.io/library/alpine:3.20
+FROM docker.io/library/alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 RUN apk add --no-cache imagemagick imagemagick-svg librsvg rsvg-convert font-noto fontconfig python3 py3-pillow
-RUN mkdir -p /usr/share/fonts/poppins && wget -q -O /usr/share/fonts/poppins/Poppins-Bold.ttf https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf && wget -q -O /usr/share/fonts/poppins/Poppins-Medium.ttf https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Medium.ttf && fc-cache -f && fc-list | grep -i poppins
+# Poppins (OFL-1.1), the Google Fonts TTFs as packaged on npm: a fixed version, checked by sha256
+ARG POPPINS_TGZ=https://registry.npmjs.org/@expo-google-fonts/poppins/-/poppins-0.4.1.tgz
+ARG POPPINS_SHA256=de5ee7515fec3f68ce73aea4ceec8dee1d51434a3791bcdf1b994e76385a3c89
+RUN wget -q -O /tmp/poppins.tgz "$POPPINS_TGZ" \
+ && echo "$POPPINS_SHA256  /tmp/poppins.tgz" | sha256sum -c - \
+ && mkdir -p /usr/share/fonts/poppins \
+ && tar -xzf /tmp/poppins.tgz -C /usr/share/fonts/poppins --strip-components=2 package/700Bold/Poppins_700Bold.ttf package/500Medium/Poppins_500Medium.ttf \
+ && rm /tmp/poppins.tgz && fc-cache -f && fc-list | grep -i poppins
