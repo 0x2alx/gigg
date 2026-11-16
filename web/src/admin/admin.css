@@ -53,7 +53,7 @@
 .admin-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .admin-actions { text-align: right; white-space: nowrap; }
 .admin-actions > * { margin-left: 0.3rem; }
-.admin-actions a.button { text-decoration: none; display: inline-block; }
+.admin-actions a.button { text-decoration: none; }
 .admin-nowrap { white-space: nowrap; }
 .admin-name { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text); text-decoration: none; margin-right: 0.4rem; }
 a.admin-name:hover { text-decoration: underline; }

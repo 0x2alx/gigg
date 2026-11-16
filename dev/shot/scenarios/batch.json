@@ -93,7 +93,7 @@
       "shot": "panel"
     },
     {
-      "eval": "(() => { const p = document.querySelector('aside.panel'); const order = [...p.querySelectorAll('.tp-desc,.comments,.tsecs,.tp-props,.tp-actions')].map(e => e.className.split(' ')[0]).join(','); return order === 'tp-desc,comments,tsecs,tp-props,tp-actions' && p.querySelector('.comment .avatar').getBoundingClientRect().width >= 30; })()",
+      "eval": "(() => { const p = document.querySelector('aside.panel'); const order = [...p.querySelectorAll('.tp-desc,.comments,.tsecs,.tp-props,.tp-actions')].map(e => ['tp-desc','comments','tsecs','tp-props','tp-actions'].find(c => e.classList.contains(c))).join(','); return /^tp-desc,comments,tp-props,tsecs,tp-props,(tsecs,)?tp-actions$/.test(order) && p.querySelector('.comment .avatar').getBoundingClientRect().width >= 30; })()",
       "expect": true
     },
     {

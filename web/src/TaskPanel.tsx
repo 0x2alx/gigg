@@ -14,7 +14,7 @@ import { EffortSelect, ModelInput, ToolsInput } from "./runsettings";
 import { Avatar, EXIT_MS, LabelChip, Pill, PriorityBadge, StatusBadge, TaskBadges, UserBadge, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
-import { Icon } from "./icons";
+import { Icon, type IconName } from "./icons";
 
 const kindBadge: Record<Comment["kind"], [string, string] | null> = {
   comment: null,
@@ -339,6 +339,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
 
       <div className="tp-body">
         <div className="tp-main">
+          <div className="tp-box tp-task">
           {editing === "text" ? (
             <TextForm task={task} users={candidates} onCancel={() => setEditing("")} onSave={(b) => act(api.patchTask(task.id, b))} />
           ) : (
@@ -381,9 +382,10 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               </span>
             </div>
           )}
-          <section className="comments" aria-label="Comments">
+          </div>
+          <section className="tp-box comments" aria-label="Comments">
             <h3>
-              Comments <span className="count">{comments.length}</span>
+              <Icon name="comment" /> Comments <span className="count">{comments.length}</span>
             </h3>
             {comments.length === 0 && <p className="muted">No comments yet.</p>}
             {comments.map((c) => {
@@ -413,7 +415,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
         </div>
         <div className="tp-side">
           <div className="tp-props">
-            <PropGroup title="Details">
+            <PropGroup icon="layers" title="Details">
               <Row label="Workspace">
                 <span className="pill pill-ws">{ws.name}</span>
               </Row>
@@ -458,7 +460,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               </Row>
             </PropGroup>
 
-            <PropGroup title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run tasks" />}>
+            <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run tasks" />}>
               <Row tip="Model for the agent’s run (an alias like opus or sonnet, or a full model id). Empty: the agent’s default" label="Model">
                 <ModelInput value={task.model ?? ""} disabled={!canWrite} onCommit={(v) => act(api.patchTask(task.id, { model: v }))} />
               </Row>
@@ -486,7 +488,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               )}
             </PropGroup>
 
-            <PropGroup title="People">
+            <PropGroup icon="users" title="People">
               <Row label="Assignees" wide>
                 {editing === "assignees" ? (
                   <InlineAssignees task={task} candidates={candidates} onSave={(v) => act(api.patchTask(task.id, { assignees: v }))} onCancel={() => setEditing("")} />
@@ -512,7 +514,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               </Row>
             </PropGroup>
 
-            <PropGroup title="Schedule">
+            <PropGroup icon="calendar" title="Schedule">
               <Row wide label={task.not_after ? "Window opens" : "Start"}>
                 <DateTimeInput value={task.start_at} defaultTime={DEFAULT_START_TIME} label={task.not_after ? "Window opens" : "Start"} disabled={!canWrite} onChange={(v) => act(api.patchTask(task.id, { start_at: v }))} />
               </Row>
@@ -568,7 +570,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
             <HistorySection task={task} />
           </div>
           <div className="tp-props">
-            <PropGroup title="Look">
+            <PropGroup icon="theme" title="Look">
               <Row label="Labels" wide>
                 {editing === "labels" ? (
                   <InlineLabels task={task} known={labels} onSave={(v) => act(api.patchTask(task.id, { labels: v }))} onCancel={() => setEditing("")} />
@@ -602,6 +604,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               <Section
                 label="Agent session"
                 title="Agent session"
+                icon="play"
                 // folded, except when the agent is waiting for an answer: the answer box is in here
                 defaultOpen={waitingRun > 0}
                 openOn={waitingRun}
@@ -831,11 +834,11 @@ function AddComment({ taskId, users, onDone }: { taskId: number; users: User[]; 
   );
 }
 
-function PropGroup({ title, children, help }: { title: string; children: ReactNode; help?: ReactNode }) {
+function PropGroup({ icon, title, children, help }: { icon: IconName; title: string; children: ReactNode; help?: ReactNode }) {
   return (
-    <section className="tp-group" aria-label={title}>
+    <section className="tp-box tp-group" aria-label={title}>
       <h4 className="tp-gh">
-        {title}
+        <Icon name={icon} /> {title}
         {help}
       </h4>
       <div className="tp-grid">{children}</div>

@@ -92,7 +92,7 @@ export function WorkspaceChip({ ws, owner }: { ws: { slug: string; name: string;
   );
 }
 
-// Avatar sizes: xs (20px) for cards and dense rows, s (default, 24px) for lists, l (32px) for comments
+// Avatar sizes (at the 16px root): xs (about 31px) for cards and dense rows, s (default, about 34px) for lists, l (about 43px) for comments, m (about 67px) for profiles
 // and the task header, m (48px) for profile pages. People are round, agents rounded squares; the agent
 // mark (a small robot head on the lower right) shows from s up, the shape says it at xs.
 export function Avatar({ user, size, tip }: { user: Pick<User, "username" | "display_name" | "color" | "kind"> & { id?: number; has_avatar?: boolean; version?: number }; size?: "xs" | "s" | "l" | "m"; tip?: string }) {

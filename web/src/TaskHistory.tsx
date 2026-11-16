@@ -70,7 +70,7 @@ export function HistorySection({ task }: { task: Task }) {
 
   const shown = items && !all ? items.slice(0, 15) : items;
   return (
-    <Section title="History" label="History" defaultOpen={false} onOpenChange={setOpen}>
+    <Section title="History" icon="clock" label="History" defaultOpen={false} onOpenChange={setOpen}>
       <div aria-live="polite">
         {err ? (
           <p className="muted small">{err}</p>

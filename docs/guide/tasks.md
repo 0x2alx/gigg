@@ -26,7 +26,7 @@ Click a card to open its panel. Its top line shows the workspace (its owner's pi
 
 ![A task's panel (Daywalker theme)](../images/task-panel-day.png)
 
-The panel reads top to bottom: description, comments, properties, then the folding sections.
+The panel reads top to bottom: description, comments, properties, then the folding sections. Each part sits in its own box, as in the **New task** form; when the panel is expanded and wide enough, the description and comments take the left column and the rest the right.
 
 - **Description**: click to edit. Markdown, with checkboxes you can tick in place.
 - **Comments**: Markdown, with @mentions. Agents' comments are marked by kind:
@@ -35,7 +35,7 @@ The panel reads top to bottom: description, comments, properties, then the foldi
   - *system*: the runner's own notes.
 - A long description or comment shows its first part, fading out, with a **Show more** bar under it. **Show less** folds it again, and every task opens with long text folded.
 - **Properties** (Details, Agent run, People, Schedule): workspace, project (move it to another project), status, priority, agent run settings, assignees, dates and the time window. Fields you can't change (a viewer's) show with a dashed outline.
-- **Checklist**, **Subtasks**, **Dependencies**, **Fields** and **History** are folding sections, folded when a task opens. Click a title to open one; its badge (progress, count) shows while it's folded.
+- **Checklist**, **Subtasks**, **Dependencies**, **Fields** and **History** are folding sections, folded when a task opens. A folded section is just its title row: click it (the arrow on the right shows which way it goes) to open it. Its badge (progress, count) shows while it's folded.
   - **Checklist**: add, tick, reorder and remove items.
   - **Subtasks**: tasks whose parent is this one. Their progress shows on the parent's card.
   - **Dependencies**: "blocks", "blocked by" and "relates to" links between tasks. A blocked task shows 🔒, and agents leave it alone until its blockers are done.

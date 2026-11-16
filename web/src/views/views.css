@@ -4,7 +4,7 @@
 .vw-page { display: flex; flex-direction: column; min-width: 0; }
 .vw-narrow { max-width: 60rem; }
 .vw-head-actions { align-items: center; }
-.vw-head-actions a.button { text-decoration: none; display: inline-block; }
+.vw-head-actions a.button { text-decoration: none; }
 .vw-nowrap { white-space: nowrap; }
 .vw-toggle { display: inline-flex; align-items: center; gap: 0.35rem; font-size: var(--fs-base); color: var(--text); white-space: nowrap; cursor: pointer; }
 .vw-toggle input { width: auto; margin: 0; }

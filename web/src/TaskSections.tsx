@@ -5,14 +5,14 @@ import { api, ApiError, type ChecklistItem, type CustomField, type Relation, typ
 import { formatCustom, fromInput, moveAfter, progress, reorder, splitLines, toInput } from "./items";
 import { CATEGORY_COLOR } from "./theme";
 import { Pill, StatusBadge } from "./ui";
-import { Icon } from "./icons";
+import { Icon, type IconName } from "./icons";
 
 export const errText = (e: unknown, fallback = "That didn't work.") => (e instanceof ApiError ? e.message : fallback);
 
 // Section: a compact collapsible block with a title row of badges (the badges show while it is folded).
 // openOn: a value that opens the section each time it changes to a new non-zero value. keepMounted:
 // folding hides the body instead of removing it, so text typed in it survives.
-export function Section({ title, badges, children, defaultOpen = true, label, onOpenChange, openOn = 0, keepMounted = false }: { title: string; badges?: ReactNode; children: ReactNode; defaultOpen?: boolean; label: string; onOpenChange?: (open: boolean) => void; openOn?: number; keepMounted?: boolean }) {
+export function Section({ title, icon, badges, children, defaultOpen = true, label, onOpenChange, openOn = 0, keepMounted = false }: { title: string; icon: IconName; badges?: ReactNode; children: ReactNode; defaultOpen?: boolean; label: string; onOpenChange?: (open: boolean) => void; openOn?: number; keepMounted?: boolean }) {
   const [open, setOpenState] = useState(defaultOpen);
   const bodyId = useId();
   const setOpen = (v: boolean) => {
@@ -28,13 +28,16 @@ export function Section({ title, badges, children, defaultOpen = true, label, on
     seen.current = openOn;
   }, [openOn, onOpenChange]);
   return (
-    <section className={"tsec" + (open ? " open" : "")} aria-label={label}>
+    <section className={"tp-box tsec" + (open ? " open" : "")} aria-label={label}>
       <button type="button" className="tsec-head" aria-expanded={open} aria-controls={open || keepMounted ? bodyId : undefined} onClick={() => setOpen(!open)}>
-        <span className="tsec-caret" aria-hidden="true">
-          <Icon name={open ? "chevron-down" : "chevron-right"} strokeWidth={2.2} />
+        <Icon name={icon} />
+        <span className="tsec-lead">
+          <span className="tsec-title">{title}</span>
+          {badges}
         </span>
-        <span className="tsec-title">{title}</span>
-        {badges}
+        <span className="tsec-caret" aria-hidden="true">
+          <Icon name={open ? "chevron-up" : "chevron-down"} strokeWidth={2.2} />
+        </span>
       </button>
       {(open || keepMounted) && (
         <div className="tsec-body" id={bodyId} hidden={!open}>
@@ -121,6 +124,7 @@ export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdi
       defaultOpen={false}
       label="Checklist"
       title="Checklist"
+      icon="checklist"
       badges={
         total > 0 && (
           <>
@@ -263,6 +267,7 @@ export function SubtasksSection({ task, wsId, canCreate, onOpen, onChanged }: { 
       defaultOpen={false}
       label="Subtasks"
       title="Subtasks"
+      icon="subtasks"
       badges={
         total > 0 && (
           <>
@@ -423,6 +428,7 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
       defaultOpen={false}
       label="Dependencies"
       title="Dependencies"
+      icon="link"
       badges={
         <>
           {!!task.blocked_by && (
@@ -536,7 +542,7 @@ export function CustomFieldsSection({ task, fields, canEdit, onTask }: { task: T
   };
   const set = fields.filter((f) => formatCustom(f, task.custom?.[String(f.id)]) !== "").length;
   return (
-    <Section defaultOpen={false} label="Custom fields" title="Fields" badges={<span className="tsec-count">{set}/{fields.length} set</span>}>
+    <Section defaultOpen={false} label="Custom fields" title="Fields" icon="fields" badges={<span className="tsec-count">{set}/{fields.length} set</span>}>
       {err && (
         <p className="danger small" role="alert">
           {err}

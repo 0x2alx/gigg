@@ -79,7 +79,7 @@ export function WorkspacesPage() {
       {rows === null && !error && <p className="muted">Loading…</p>}
       {rows && (
         <div className="card admin-table-card">
-          <table className="admin-table">
+          <table className="admin-table ws-table">
             <thead>
               <tr>
                 <th>Workspace</th>
@@ -101,15 +101,15 @@ export function WorkspacesPage() {
                     </Link>
                     {ws.archived && <span className="pill pill-muted">archived</span>}
                   </td>
-                  <td>
+                  <td className="ws-slug">
                     <span className="pill pill-key">{ws.slug}</span>
                   </td>
-                  <td data-label="Owner">
+                  <td className="ws-owner" data-label="Owner">
                     <OwnerBadge id={ws.owner_id} users={users} />
                   </td>
-                  <td className="num" data-label="Members">{members ?? "?"}</td>
-                  <td className="num" data-label="Projects">{projects ?? "?"}</td>
-                  <td className="muted small" data-label="Created">{fmtDate(ws.created_at)}</td>
+                  <td className="num ws-members" data-label="Members">{members ?? "?"}</td>
+                  <td className="num ws-projects" data-label="Projects">{projects ?? "?"}</td>
+                  <td className="muted small ws-created" data-label="Created">{fmtDate(ws.created_at)}</td>
                   <td className="admin-actions">
                     <Link href={`/workspaces/${ws.id}`} className="button secondary small">
                       Manage
