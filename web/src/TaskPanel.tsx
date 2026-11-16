@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { api, ApiError, fmtTime, hasCap, priorityNames, resumeCommand, type Comment, type CustomField, type Recurrence, type Run, type Status, type Tag, type Task, type User } from "./api";
+import { api, ApiError, fmtTime, hasCap, resumeCommand, type Comment, type CustomField, type Recurrence, type Run, type Status, type Tag, type Task, type User } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
-import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, assignable, withCurrent } from "./fields";
-import { DEFAULT_DUE_TIME, DEFAULT_START_TIME } from "./dates";
+import { assignable } from "./fields";
 import { Markdown, setMentionUsers } from "./markdown";
 import { MarkdownEditor } from "./MarkdownEditor";
-import { AgentRunGroup, ChecklistSection, CustomFieldsSection, DependenciesSection, PropGroup, Row, Section, SubtasksSection } from "./TaskSections";
+import { ChecklistSection, CustomFieldsSection, DependenciesSection, Row, Section, SubtasksSection } from "./TaskSections";
+import { TaskEditor } from "./TaskEditor";
 import { Clamp } from "./Clamp";
 import { HistorySection } from "./TaskHistory";
 import { describeRule } from "./recurrence";
 import { CATEGORY_COLOR } from "./theme";
-import { Avatar, EXIT_MS, LabelChip, Pill, PriorityBadge, StatusBadge, TaskBadges, UserBadge, reducedMotion } from "./ui";
+import { Avatar, EXIT_MS, Pill, PriorityBadge, StatusBadge, TaskBadges, UserBadge, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { Icon } from "./icons";
 
@@ -46,7 +46,6 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   const [comments, setComments] = useState<Comment[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [err, setErr] = useState("");
-  const [editing, setEditing] = useState<"" | "text">("");
   const [schedule, setSchedule] = useState<Recurrence | "gone" | null>(null);
   // full: the panel covers the whole view next to the sidebar (remembered per browser)
   const [full, setFull] = useState(() => {
@@ -181,15 +180,15 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     setClosingKey(null);
   }, [taskKey]);
   useEffect(() => () => clearTimeout(closeTimer.current), []);
-  const editingRef = useRef(editing);
-  editingRef.current = editing;
 
   // Esc closes (not over a modal; an open inline editor closes first; unsaved text is flashed).
   useEffect(() => {
     const esc = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"], .modal-backdrop')) return;
       if (flashDirty()) return;
-      if (editingRef.current) setEditing("");
+      // an open title/description editor (no changes, else flashed above) closes first
+      const cancel = panelRef.current?.querySelector<HTMLButtonElement>('form[aria-label="Edit task"] [data-cancel]');
+      if (cancel) cancel.click();
       else close();
     };
     document.addEventListener("keydown", esc);
@@ -240,16 +239,21 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
   }, [taskKey]);
 
-  const act = (p: Promise<Task>, after?: (t: Task) => void) =>
+  // act: saves a change; resolves to whether it worked (the error shows at the top)
+  const act = (p: Promise<Task>, after?: (t: Task) => void): Promise<boolean> =>
     p
       .then((t) => {
         setTask(t);
-        setEditing("");
+        setErr("");
         onChanged();
         after?.(t);
         load();
+        return true;
       })
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "That didn't work."));
+      .catch((e: unknown) => {
+        setErr(e instanceof ApiError ? e.message : "That didn't work.");
+        return false;
+      });
 
   // labels and assignees save on each click: show the change at once and send the saves one at a
   // time, each with the latest list (two quick clicks never undo each other)
@@ -274,10 +278,8 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   const waitingRun = task.last_run?.status === "needs_human" ? task.last_run.id : 0;
   // the newest question of a waiting task is never folded: it's the thing to answer
   const openQuestion = task.status_category === "waiting" ? [...comments].reverse().find((c) => c.kind === "question" && !c.deleted)?.id : undefined;
-  const project = ws.projects.find((p) => p.id === task.project_id);
   const creator = users.get(task.created_by);
   const candidates = assignable(users, members.get(ws.id) ?? []);
-  const labelFor = (l: Tag) => labels.find((x) => x.id === l.id) ?? l;
   const status = statuses.find((s) => s.id === task.status_id);
   const overdue = task.due_at !== null && task.due_at < Date.now() && task.status_category !== "done";
   const can = (cap: string) => canWrite && hasCap(me, cap, task.workspace_id);
@@ -342,57 +344,69 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
         </div>
       )}
 
-      <div className="tp-body">
-        <div className="tp-main">
-          <div className="tp-box tp-task">
-          {editing === "text" ? (
-            <TextForm task={task} users={candidates} onCancel={() => setEditing("")} onSave={(b) => act(api.patchTask(task.id, b))} />
-          ) : (
-            <>
-              <div className="tp-titlebar">
-                <h2 className="panel-title">{task.title}</h2>
-                {canWrite && (
-                  <button type="button" className="icon-button" aria-label="Edit title and description" title="Edit title and description" onClick={() => setEditing("text")}>
-                    <Icon name="pencil" />
-                  </button>
-                )}
-              </div>
-              {task.aliases.length > 0 && <p className="muted small tp-aliases">formerly {task.aliases.join(", ")}</p>}
-              <section className="tp-desc" aria-label="Description">
-                {task.description_md ? (
-                  <Clamp key={task.id} label="description" maxRem={18}>
-                    <Markdown source={task.description_md} className="description" />
-                  </Clamp>
-                ) : canWrite ? (
-                  <button type="button" className="tp-desc-empty" onClick={() => setEditing("text")}>
-                    Add a description…
-                  </button>
-                ) : (
-                  <p className="muted tp-desc-empty">No description.</p>
-                )}
-              </section>
-            </>
-          )}
+      <TaskEditor
+        key={task.id}
+        mode="task"
+        v={{
+          title: task.title,
+          description_md: task.description_md,
+          priority: task.priority,
+          labels: liveLabels,
+          assignees: liveAssignees,
+          color: task.color,
+          start_at: task.start_at,
+          due_at: task.due_at,
+          not_after: task.not_after ?? null,
+          project: task.project_id,
+          status: task.status_id,
+          run: { model: task.model ?? "", effort: task.effort ?? "", always_run: !!task.always_run, allowed_tools: task.allowed_tools ?? [] },
+        }}
+        set={(c) => {
+          if (c.project !== undefined) act(api.moveTask(task.id, { project: c.project }), (t) => onMoved(t));
+          else if (c.status !== undefined) act(api.moveTask(task.id, { status: c.status }));
+          else if (c.labels) setLiveLabels(c.labels);
+          else if (c.assignees) setLiveAssignees(c.assignees);
+          else act(api.patchTask(task.id, c));
+        }}
+        setRun={(c) => act(api.patchTask(task.id, c))}
+        saveText={(title, description_md) => act(api.patchTask(task.id, { title, description_md }))}
+        canWrite={canWrite}
+        ws={ws}
+        statuses={statuses}
+        currentStatus={{ name: task.status_name, category: task.status_category }}
+        labelTags={task.labels}
+        dates
+        knownLabels={labels}
+        candidates={candidates}
+        alwaysLocked={!can("always_run")}
+        canTools={can("allowed_tools")}
+        overdue={overdue}
+        aliases={task.aliases}
+        people={
+          <>
           {(creator || task.assignees.length > 0) && (
-            <div className="tp-people" aria-label="People">
-              {creator && <Avatar user={creator} size="l" />}
-              {task.assignees.length > 0 && <span className="arrow" aria-hidden="true"><Icon name="arrow-right" /></span>}
-              {task.assignees.map((id) => {
-                const u = users.get(id);
-                return u ? <Avatar key={id} user={u} size="l" /> : null;
-              })}
-              <span className="muted small">
-                {creator ? `${creator.display_name || creator.username}` : ""}
-                {task.assignees.length > 0 ? ` → ${task.assignees.map((id) => users.get(id)?.display_name || users.get(id)?.username || "#" + id).join(", ")}` : ""}
-              </span>
-            </div>
-          )}
-          </div>
-          {/* folded by default; keyed by task so a newly opened task starts folded again */}
-          <div className="tsecs" key={"secs-" + task.id}>
+              <div className="tp-people" aria-label="People">
+                {creator && <Avatar user={creator} size="l" />}
+                {task.assignees.length > 0 && <span className="arrow" aria-hidden="true"><Icon name="arrow-right" /></span>}
+                {task.assignees.map((id) => {
+                  const u = users.get(id);
+                  return u ? <Avatar key={id} user={u} size="l" /> : null;
+                })}
+                <span className="muted small">
+                  {creator ? `${creator.display_name || creator.username}` : ""}
+                  {task.assignees.length > 0 ? ` → ${task.assignees.map((id) => users.get(id)?.display_name || users.get(id)?.username || "#" + id).join(", ")}` : ""}
+                </span>
+              </div>
+            )}
+          </>
+        }
+        leftSecs={
+          <>
             <ChecklistSection task={task} canEdit={can("checklists")} onTask={onTask} />
             <SubtasksSection task={task} wsId={ws.id} canCreate={can("create_tasks") && !task.deleted} canEdit={can("relations") && !task.deleted} assignable={candidates.map((u) => u.id)} onOpen={onMoved} onTask={onTask} onChanged={onChanged} />
-          </div>
+          </>
+        }
+        mainEnd={
           <section className="tp-box comments" aria-label="Comments">
             <h3>
               <Icon name="comment" /> Comments <span className="count">{comments.length}</span>
@@ -422,53 +436,9 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
             })}
             {ws.role !== "viewer" && <AddComment taskId={task.id} users={candidates} onDone={load} />}
           </section>
-        </div>
-        <div className="tp-side">
-          <div className="tp-props">
-            <PropGroup icon="layers" title="Where">
-              <Row label="Workspace">
-                <span className="pill pill-ws">{ws.name}</span>
-              </Row>
-              <Row label="Project">
-                {canWrite ? (
-                  <select value={task.project_id} onChange={(e) => act(api.moveTask(task.id, { project: Number(e.target.value) }), (t) => onMoved(t))} aria-label="Project">
-                    {ws.projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.key} · {p.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  project?.name
-                )}
-              </Row>
-              <Row label="Status">
-                {canWrite ? (
-                  <select value={task.status_id} onChange={(e) => act(api.moveTask(task.id, { status: Number(e.target.value) }))} aria-label="Status">
-                    {statuses.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <StatusBadge name={task.status_name} category={task.status_category} />
-                )}
-              </Row>
-            </PropGroup>
-
-            <PropGroup icon="calendar" title="When">
-              <Row wide label={task.not_after ? "Window opens" : "Start"}>
-                <DateTimeInput value={task.start_at} defaultTime={DEFAULT_START_TIME} label={task.not_after ? "Window opens" : "Start"} disabled={!canWrite} onChange={(v) => act(api.patchTask(task.id, { start_at: v }))} />
-              </Row>
-              <Row wide label={<>Due {overdue && <Pill color="#E5484D">overdue</Pill>}</>}>
-                <DateTimeInput value={task.due_at} defaultTime={DEFAULT_DUE_TIME} label="Due" disabled={!canWrite} onChange={(v) => act(api.patchTask(task.id, { due_at: v }))} />
-              </Row>
-              {(canWrite || !!task.not_after) && (
-                <Row tip="After this moment the task can’t be started any more; untouched, it is marked missed" wide label="Window closes">
-                  <DateTimeInput value={task.not_after ?? null} defaultTime={DEFAULT_DUE_TIME} label="Window closes" disabled={!canWrite} onChange={(v) => act(api.patchTask(task.id, { not_after: v }))} />
-                </Row>
-              )}
+        }
+        whenEnd={
+          <>
               {!!task.missed_at && (
                 <Row tip="Its window closed before anyone started it" label="Missed" wide className="missed-row">
                   <span className="pill pill-danger">missed {fmtTime(task.missed_at)}</span>
@@ -502,72 +472,20 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                   {!!task.occurrence_at && <span className="pill pill-muted">occurrence {fmtTime(task.occurrence_at)}</span>}
                 </Row>
               )}
-            </PropGroup>
-
-            <PropGroup icon="users" title="Details">
-              <Row label="Priority">
-                {canWrite ? (
-                  <select value={task.priority} onChange={(e) => act(api.patchTask(task.id, { priority: Number(e.target.value) }))} aria-label="Priority">
-                    {priorityNames.map((n, i) => (
-                      <option key={n} value={i}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <PriorityBadge priority={task.priority} showNone />
-                )}
-              </Row>
-              {/* the same pickers as the task form; each change saves */}
-              <Row label="Labels" wide>
-                {canWrite ? (
-                  <LabelInput value={liveLabels} onChange={setLiveLabels} known={labels} autosave />
-                ) : (
-                  <div className="chips">
-                    {task.labels.map((l) => (
-                      <LabelChip key={l.id} label={labelFor(l)} />
-                    ))}
-                    {task.labels.length === 0 && <span className="muted">none</span>}
-                  </div>
-                )}
-              </Row>
-              <Row label="Assignees" wide>
-                {canWrite ? (
-                  <AssigneePicker value={liveAssignees} onChange={setLiveAssignees} candidates={withCurrent(candidates, liveAssignees, users)} />
-                ) : (
-                  <div className="chips">
-                    {task.assignees.map((id) => (
-                      <UserBadge key={id} user={users.get(id)} />
-                    ))}
-                    {task.assignees.length === 0 && <span className="muted">nobody</span>}
-                  </div>
-                )}
-              </Row>
-              <Row label="Colour" wide>
-                {canWrite ? (
-                  <ColorPicker value={task.color} onChange={(c) => act(api.patchTask(task.id, { color: c }))} />
-                ) : task.color ? (
-                  <span className="swatch on" style={{ background: task.color }} />
-                ) : (
-                  <span className="muted">none</span>
-                )}
-              </Row>
+          </>
+        }
+        detailsEnd={
+          <>
               <Row label="Created by" wide className="created">
                 <UserBadge user={creator} /> <span className="muted small">{fmtTime(task.created_at)}</span>
               </Row>
               <Row label="Updated" wide className="muted small">
                 {fmtTime(task.updated_at)}
               </Row>
-            </PropGroup>
-
-            <AgentRunGroup
-              value={{ model: task.model ?? "", effort: task.effort ?? "", always_run: !!task.always_run, allowed_tools: task.allowed_tools ?? [] }}
-              canWrite={canWrite}
-              alwaysLocked={!can("always_run")}
-              canTools={can("allowed_tools")}
-              onChange={(p) => act(api.patchTask(task.id, p))}
-            />
-          </div>
+          </>
+        }
+        sideMid={
+          <>
           {(cmd || runs.length > 0) && (
             <div className="tsecs" key={"agent-" + task.id}>
               <Section
@@ -628,11 +546,17 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               </Section>
             </div>
           )}
-          <div className="tsecs" key={"side-" + task.id}>
+          </>
+        }
+        rightSecs={
+          <>
             <DependenciesSection task={task} wsId={ws.id} canEdit={can("relations")} onTask={onTask} onOpen={onMoved} />
             <CustomFieldsSection task={task} fields={fields} canEdit={canWrite} onTask={onTask} />
             <HistorySection task={task} />
-          </div>
+          </>
+        }
+        sideEnd={
+          <>
           {canWrite && (
             <div className="tp-actions">
               <button type="button" className="button secondary" onClick={() => act(api.cloneTask(task.id), (t) => onMoved(t))}>
@@ -660,47 +584,10 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               )}
             </div>
           )}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function TextForm({ task, users, onCancel, onSave }: { task: Task; users: User[]; onCancel: () => void; onSave: (b: Record<string, unknown>) => void }) {
-  const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description_md);
-  const dirty = title !== task.title || description !== task.description_md;
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    onSave({ title, description_md: description });
-  };
-  return (
-    <form className="edit tp-edit" onSubmit={submit} aria-label="Edit task" data-dirty={dirty ? "" : undefined}>
-      <input className="tp-title-input" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={250} aria-label="Title" autoFocus />
-      <MarkdownEditor
-        value={description}
-        onChange={setDescription}
-        users={users}
-        minRows={6}
-        aria-label="Description (Markdown)"
-        placeholder="Description (Markdown) · @ to mention"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            e.currentTarget.form?.requestSubmit();
-          }
-        }}
+          </>
+        }
       />
-      <div className="row end">
-        <span className="muted small grow">{"Ctrl+Enter saves · Esc with no changes cancels"}</span>
-        <button type="button" className="button secondary" onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="submit" className="button">
-          Save
-        </button>
-      </div>
-    </form>
+    </aside>
   );
 }
 

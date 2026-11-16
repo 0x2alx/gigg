@@ -1612,7 +1612,6 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 }
 /* the form's task box: the template rows, then the title and description as the panel edits them */
 .tp-task > .te-head { margin-bottom: var(--sp-4); }
-.tp-task > .te-text { margin: 0; }
 .tp-task .tpl-pick select { width: auto; flex: 0 1 auto; max-width: 100%; }
 .tsec-note { margin: 0; }
 /* Repeat inside a When group: its rows join the group's label | value columns */
@@ -1645,8 +1644,8 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 /* the whole page: the dialog scrolls inside itself, so its sticky footer stays within its border */
 .modal.modal-full { width: min(100%, 110rem); max-width: none; height: calc(100dvh - 2rem); overflow-y: auto; display: flex; flex-direction: column; }
 .modal-full .tm-form { flex: 1; }
-.modal-full .te-text .mde textarea { min-height: 18rem; }
 @media (min-width: 721px) { .modal-full .tm-foot { bottom: calc(-1 * var(--sp-7)); } } /* the dialog scrolls itself: stick over its bottom padding */
+.modal-full .tm-foot { margin-top: auto; } /* a short form: the footer stays at the bottom of the full view */
 @media (max-width: 720px) {
   .tp-box { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
   /* the phone sheet's padding: 0.9rem, 1rem + the safe area at the bottom */

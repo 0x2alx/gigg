@@ -8,7 +8,7 @@ Click **New task** on the board. You can also press **Ctrl+K** (⌘K on a Mac) a
 
 ![The new task form (Nightwalker theme)](../images/task-new-night.png)
 
-The form is laid out exactly like an open task's [panel](#the-task-panel): the same boxes in the same order, with the same rows and controls. The **New/Edit template** and **New/Edit recurring task** dialogs use it too; each shows only the boxes that apply (a template has no **When**, only a single new task has **Dependencies**).
+The form is an open task's [panel](#the-task-panel): the same editor, with the same boxes in the same order and the same rows and controls. The **New/Edit template** and **New/Edit recurring task** dialogs are the same editor too; each shows only the boxes that apply (a template has no **When**, only a single new task has **Dependencies**). The title and description show as the task will read, the description folded when long (**show more** opens it), with the pencil to edit them; a new task starts in the editor, and **Done** folds it back.
 
 - **The task**: **From template** (when there are templates: fill the form from one, or create the task from it as is), the **Title** and the **Description** (Markdown; type `@` to mention someone, and they get a notification). A template also has its **Template name** here.
 - **Checklist**: add items one by one, or paste several lines at once; reorder and remove them.
