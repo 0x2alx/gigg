@@ -17,7 +17,7 @@ type (
 		ID            int64  `json:"id,omitempty" jsonschema:"An existing schedule to change (omit to make one); fields you omit stay as they are"`
 		Workspace     string `json:"workspace,omitempty" jsonschema:"New schedule: workspace id or slug; omit to use your key's workspace"`
 		Name          string `json:"name,omitempty" jsonschema:"Default: described from the rule"`
-		Freq          string `json:"freq,omitempty" jsonschema:"daily, weekly or monthly (required for a new schedule)"`
+		Freq          string `json:"freq,omitempty" jsonschema:"minutes or hours (crons only), daily, weekly or monthly (required for a new schedule)"`
 		Interval      int64  `json:"interval,omitempty" jsonschema:"Every N days/weeks/months (default 1)"`
 		Weekdays      []int  `json:"weekdays,omitempty" jsonschema:"Weekly: 1=Mon .. 7=Sun"`
 		MonthDay      *int64 `json:"month_day,omitempty" jsonschema:"Monthly: 1-31, -1 = last day"`

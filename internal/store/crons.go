@@ -18,21 +18,21 @@ import (
 
 // CronTemplate is a cron's content.
 type CronTemplate struct {
-	ID            int64  `json:"id"`
-	WorkspaceID   int64  `json:"workspace_id"`
-	Name          string `json:"name"`
-	DescriptionMD string `json:"description_md"`
-	Command       string `json:"command" doc:"Run by bash in the agent's sandbox (or unsandboxed, see unsandboxed)"`
-	TimeoutS      int64  `json:"timeout_s" doc:"Seconds before the executor kills it (10-3600)"`
-	Output        string `json:"output" enum:"gigg,host" doc:"gigg: the output's last 64 KiB is stored with the run; host: only the exit code and timing reach gigg, the output stays on the agent's host"`
-	Unsandboxed   bool   `json:"unsandboxed" doc:"Run outside the agent's sandbox (needs the No-sandbox crons permission; any change by someone without it turns it off)"`
-	CommandSetBy  int64  `json:"command_set_by" doc:"Who last changed the command, timeout or sandbox flag"`
+	ID               int64  `json:"id"`
+	WorkspaceID      int64  `json:"workspace_id"`
+	Name             string `json:"name"`
+	DescriptionMD    string `json:"description_md"`
+	Command          string `json:"command" doc:"Run by bash in the agent's sandbox (or unsandboxed, see unsandboxed)"`
+	TimeoutS         int64  `json:"timeout_s" doc:"Seconds before the executor kills it (10-3600)"`
+	Output           string `json:"output" enum:"gigg,host" doc:"gigg: the output's last 64 KiB is stored with the run; host: only the exit code and timing reach gigg, the output stays on the agent's host"`
+	Unsandboxed      bool   `json:"unsandboxed" doc:"Run outside the agent's sandbox (needs the No-sandbox crons permission; any change by someone without it turns it off)"`
+	CommandSetBy     int64  `json:"command_set_by" doc:"Who last changed the command, timeout or sandbox flag"`
 	CommandSetByName string `json:"command_set_by_username"`
-	CommandSetAt  int64  `json:"command_set_at"`
-	CreatedBy     int64  `json:"created_by"`
-	CreatedAt     int64  `json:"created_at"`
-	Version       int64  `json:"version"`
-	Uses          int64  `json:"uses" doc:"Live crons using this template"`
+	CommandSetAt     int64  `json:"command_set_at"`
+	CreatedBy        int64  `json:"created_by"`
+	CreatedAt        int64  `json:"created_at"`
+	Version          int64  `json:"version"`
+	Uses             int64  `json:"uses" doc:"Live crons using this template"`
 }
 
 // CronRun is one run (or a missed or skipped slot) of a cron.
@@ -93,9 +93,9 @@ type Cron struct {
 const (
 	CronCommandMax     = 16384
 	CronOutputMax      = 65536
-	CronKeepRuns       = 200            // newest runs kept per cron ...
-	CronKeepDays       = 14             // ... and every run newer than this
-	cronStaleGraceMS   = 5 * 60 * 1000  // a run with no report this long past its timeout is closed
+	CronKeepRuns       = 200           // newest runs kept per cron ...
+	CronKeepDays       = 14            // ... and every run newer than this
+	cronStaleGraceMS   = 5 * 60 * 1000 // a run with no report this long past its timeout is closed
 	cronsPerWorkspace  = 500
 	cronTemplatesPerWS = 500
 )
@@ -296,7 +296,7 @@ func scanCron(row interface{ Scan(...any) error }) (*Cron, int64, error) {
 	}
 	c.NextAt, c.RunNowAt, c.FailingSince, c.Rule.MonthDay = ptrInt(next), ptrInt(now), ptrInt(since), ptrInt(md)
 	c.Rule.Weekdays = parseWeekdays(weekdays)
-	c.ScheduleText = c.Rule.Describe()
+	c.ScheduleText = c.Rule.DescribeCron()
 	var lastID int64
 	if last.Valid {
 		lastID = last.Int64
@@ -813,7 +813,7 @@ func insertCronRun(ctx context.Context, q Q, c *Cron, slot *int64, status, msg s
 
 // CronFinish is the executor's report of a run.
 type CronFinish struct {
-	Status      string  // ok | failed | timeout
+	Status      string // ok | failed | timeout
 	ExitCode    *int64
 	DurationMS  int64
 	OutputTail  *string // nil when the cron keeps its output on the host

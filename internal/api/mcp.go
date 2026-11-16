@@ -552,6 +552,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 	}
 	addItemTools(s, p, call, ws)
 	addRunnerTools(s, p, call)
+	addCronTools(s, p, call, ws)
 	return s
 }
 

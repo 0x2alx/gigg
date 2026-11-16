@@ -78,6 +78,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger) *API {
 	a.registerItems()
 	a.registerFeed()
 	a.registerRunner()
+	a.registerCrons()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		p := fail(404, "not_found", "No such API endpoint.")
 		writeProblem(w, p)

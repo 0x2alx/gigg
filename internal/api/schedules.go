@@ -16,9 +16,9 @@ import (
 // ScheduleBody creates or replaces a schedule.
 type ScheduleBody struct {
 	Name          string `json:"name,omitempty" maxLength:"80" doc:"Default: described from the rule"`
-	Freq          string `json:"freq" enum:"daily,weekly,monthly"`
-	Interval      int64  `json:"interval,omitempty" minimum:"0" maximum:"365" doc:"Every N days/weeks/months (default 1)"`
-	Weekdays      []int  `json:"weekdays,omitempty" doc:"Weekly: 1=Mon .. 7=Sun"`
+	Freq          string `json:"freq" enum:"minutes,hours,daily,weekly,monthly" doc:"minutes and hours: for crons only"`
+	Interval      int64  `json:"interval,omitempty" minimum:"0" maximum:"365" doc:"Every N minutes (1-360), hours (1-24), days, weeks or months (default 1)"`
+	Weekdays      []int  `json:"weekdays,omitempty" doc:"Weekly: 1=Mon .. 7=Sun; minutes/hours: only on these days (empty: every day)"`
 	MonthDay      *int64 `json:"month_day,omitempty" doc:"Monthly: 1-31, -1 = last day"`
 	TZ            string `json:"tz,omitempty" doc:"IANA time zone (default: the user's time zone preference, else the instance default GIGG_DEFAULT_TZ)"`
 	WindowStart   string `json:"window_start,omitempty" pattern:"^[0-2][0-9]:[0-5][0-9]$" doc:"When the window opens, local HH:MM (default 00:00)"`
@@ -174,6 +174,11 @@ func (a *API) registerSchedules() {
 		}
 		if err := toolsGuard(p, s.WorkspaceID, tools); err != nil {
 			return nil, err
+		}
+		if s.CronUses > 0 { // retiming a schedule retimes its crons too
+			if err := require(p, s.WorkspaceID, "crons", "crons:write"); err != nil {
+				return nil, err
+			}
 		}
 		v, err := ifMatch(in.IfMatch)
 		if err != nil {

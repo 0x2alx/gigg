@@ -45,7 +45,9 @@ func (a *API) runnerState(ctx context.Context, w *store.Workspace) (RunnerState,
 // PauseBody picks workspaces and a duration.
 type PauseBody struct {
 	Workspaces []int64 `json:"workspaces,omitempty" doc:"Workspace ids; omit for every workspace you may pause"`
-	Minutes    int64   `json:"minutes,omitempty" minimum:"0" maximum:"525600" doc:"How long; 0 or omitted = until resumed"`
+	Minutes    int64   `json:"minutes,omitempty" minimum:"0" maximum:"525600" doc:"How long; 0 or omitted = until resumed (task runs only: crons pause until resumed)"`
+	Tasks      *bool   `json:"tasks,omitempty" doc:"The task box (default true)"`
+	Crons      *bool   `json:"crons,omitempty" doc:"The cron box (default true)"`
 }
 
 func (a *API) registerRunner() {
@@ -205,12 +207,23 @@ func (a *API) pauseOrResume(ctx context.Context, b PauseBody, pause bool) (*runn
 		until = &u
 	}
 	if err := a.tx(ctx, func(tx *sql.Tx) error {
+		tasks, crons := b.Tasks == nil || *b.Tasks, b.Crons == nil || *b.Crons
 		for _, w := range chosen {
 			var err error
-			if pause {
+			switch {
+			case pause && tasks:
 				err = store.PauseRunner(ctx, tx, p.Actor(), w.ID, until)
-			} else {
+			case !pause && tasks:
 				err = store.ResumeRunner(ctx, tx, p.Actor(), w.ID)
+			}
+			if err != nil {
+				return err
+			}
+			switch {
+			case pause && crons:
+				err = store.PauseCrons(ctx, tx, p.Actor(), w.ID)
+			case !pause && crons:
+				err = store.ResumeCrons(ctx, tx, p.Actor(), w.ID)
 			}
 			if err != nil {
 				return err

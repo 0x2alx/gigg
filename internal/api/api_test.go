@@ -125,6 +125,18 @@ func newEnv(t *testing.T) *env {
 				return err
 			}
 			e.ids[name+".field"], e.ids[name+".template"], e.ids[name+".filter"] = fld.ID, tpl.ID, flt.ID
+			cr, err := store.CreateCron(ctx, tx, a, store.NewCron{WorkspaceID: w.ID, WorkerID: ag.ID, ScheduleID: rec.ScheduleID,
+				Template: &store.CronTemplate{Name: name + " secret cron", Command: "echo " + name + " secret"}}, store.CronEdit{})
+			if err != nil {
+				return err
+			}
+			res, err := tx.ExecContext(ctx, `INSERT INTO cron_runs (cron_id, workspace_id, worker_id, status, output_tail, created_at) VALUES (?,?,?,'ok',?,?)`,
+				cr.ID, w.ID, ag.ID, name+" secret output", store.Now())
+			if err != nil {
+				return err
+			}
+			e.ids[name+".cron"], e.ids[name+".crontpl"] = cr.ID, cr.TemplateID
+			e.ids[name+".cronrun"], _ = res.LastInsertId()
 			sts, _ := store.Statuses(ctx, tx, p.ID)
 			e.ids[name+".user"], e.ids[name+".ws"], e.ids[name+".p"], e.ids[name+".p2"] = ag.ID, w.ID, p.ID, p2.ID
 			e.ids[name+".task"], e.ids[name+".comment"], e.ids[name+".run"], e.ids[name+".status"] = tk.ID, c.ID, r.ID, sts[0].ID
@@ -539,6 +551,9 @@ func (e *env) fingerprint(ws int64) string {
 		`SELECT group_concat(id || text || COALESCE(done_at,'') || position, '|') FROM checklist_items WHERE workspace_id = ?`,
 		`SELECT group_concat(from_task_id || to_task_id || kind, '|') FROM task_relations WHERE workspace_id = ?`,
 		`SELECT group_concat(task_id || field_id || value, '|') FROM task_custom_values v JOIN tasks t ON t.id = v.task_id WHERE t.workspace_id = ?`,
+		`SELECT group_concat(id || template_id || schedule_id || worker_id || version || COALESCE(paused_at,'') || COALESCE(run_now_at,'') || COALESCE(deleted_at,''), '|') FROM crons WHERE workspace_id = ?`,
+		`SELECT group_concat(id || name || command || unsandboxed || version || COALESCE(deleted_at,''), '|') FROM cron_templates WHERE workspace_id = ?`,
+		`SELECT group_concat(id || status || COALESCE(output_tail,''), '|') FROM cron_runs WHERE workspace_id = ?`,
 	} {
 		var s sql.NullString
 		if err := e.st.R.QueryRow(q, ws).Scan(&s); err != nil {
@@ -562,7 +577,21 @@ func TestIsolationSweep(t *testing.T) {
 		"/tasks/": e.ids[b+".task"], "/comments/": e.ids[b+".comment"], "/runs/": e.ids[b+".run"], "/labels/": e.ids[b+".label"],
 		"/statuses/": e.ids[b+".status"], "/keys/": e.ids[b+".key"], "/me/keys/": e.ids[b+".key"], "/users/": e.ids[b+".user"],
 		"/sessions/": 1, "/auth/sessions/": 1, "/groups/": 1, "/fields/": e.ids[b+".field"], "/templates/": e.ids[b+".template"], "/me/filters/": e.ids[b+".filter"], "/recurrences/": e.ids[b+".rec"], "/schedules/": e.ids[b+".sched"],
+		"/crons/": e.ids[b+".cron"], "/cron-templates/": e.ids[b+".crontpl"], "/cron-runs/": e.ids[b+".cronrun"],
 	}
+	// scout's key with every non-admin scope: a route must refuse atlas's objects by workspace, not by scope
+	var scopes []string
+	for _, s := range store.AllScopes {
+		if !store.IsAdminScope(s) {
+			scopes = append(scopes, `"`+s+`"`)
+		}
+	}
+	code, out, _ := e.req("POST", "/keys", fmt.Sprintf(`{"name":"sweep","user_id":%d,"workspace":"scout","scopes":[%s],"allowed_listeners":["internal"]}`,
+		e.ids["scout.user"], strings.Join(scopes, ",")), e.ada())
+	e.ok(code, out, 201)
+	var kc KeyCreated
+	_ = json.Unmarshal(out, &kc)
+	sweepKey := cred{token: kc.Token, listener: "internal"}
 	bodies := `{"title":"pwned","body_md":"pwned","name":"pwned","slug":"pwned","key":"PWN","status":"done","category":"done","role":"member",` +
 		`"scopes":["tasks:read"],"password":"pwned pwned pwned","ids":[1],"comment_md":"pwned","project":` + fmt.Sprint(e.ids[b+".p"]) + `}`
 	before := e.fingerprint(e.ids[b+".ws"])
@@ -603,7 +632,7 @@ func TestIsolationSweep(t *testing.T) {
 			if m != "GET" && m != "DELETE" {
 				body = bodies
 			}
-			code, out, _ := e.req(m, concrete, body, e.key("scout"))
+			code, out, _ := e.req(m, concrete, body, sweepKey)
 			checked++
 			if code < 400 {
 				t.Errorf("%s %s (as scout's key): %d %s", m, concrete, code, out)
@@ -629,8 +658,9 @@ func TestIsolationSweep(t *testing.T) {
 		}
 	}
 	// lists never include atlas's objects
-	for _, p := range []string{"/workspaces", "/inbox", "/users", "/me/keys", "/workspaces/current/tasks?q=secret", "/workspaces/current/runs", "/workspaces/current/activity"} {
-		code, out, _ := e.req("GET", p, "", e.key("scout"))
+	for _, p := range []string{"/workspaces", "/inbox", "/users", "/me/keys", "/workspaces/current/tasks?q=secret", "/workspaces/current/runs", "/workspaces/current/activity",
+		"/workspaces/current/crons", "/workspaces/current/cron-templates"} {
+		code, out, _ := e.req("GET", p, "", sweepKey)
 		if code >= 400 && code != 403 {
 			t.Errorf("GET %s: %d %s", p, code, out)
 		}

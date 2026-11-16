@@ -12,18 +12,18 @@ import (
 
 // RunnerSettings is a workspace's limits and pause state.
 type RunnerSettings struct {
-	WorkspaceID int64  `json:"workspace_id"`
-	DailyCap    int64  `json:"daily_cap" doc:"Distinct tasks per rolling 24 hours, of any kind"`
-	NightCap    int64  `json:"night_cap" doc:"Of those, tasks that aren't always-run (budget-dependent)"`
-	PausedUntil *int64 `json:"paused_until" doc:"Unix ms; null = not paused (see paused_open)"`
-	PausedOpen  bool   `json:"paused_open" doc:"Paused until someone resumes it"`
-	PausedBy    *int64 `json:"paused_by"`
-	PausedAt    *int64 `json:"paused_at"`
-	Paused      bool   `json:"paused" doc:"Paused right now"`
+	WorkspaceID   int64  `json:"workspace_id"`
+	DailyCap      int64  `json:"daily_cap" doc:"Distinct tasks per rolling 24 hours, of any kind"`
+	NightCap      int64  `json:"night_cap" doc:"Of those, tasks that aren't always-run (budget-dependent)"`
+	PausedUntil   *int64 `json:"paused_until" doc:"Unix ms; null = not paused (see paused_open)"`
+	PausedOpen    bool   `json:"paused_open" doc:"Paused until someone resumes it"`
+	PausedBy      *int64 `json:"paused_by"`
+	PausedAt      *int64 `json:"paused_at"`
+	Paused        bool   `json:"paused" doc:"Paused right now"`
 	CronsPaused   bool   `json:"crons_paused" doc:"Cron runs are paused (until resumed)"`
 	CronsPausedAt *int64 `json:"crons_paused_at"`
 	CronsPausedBy *int64 `json:"crons_paused_by"`
-	Version     int64  `json:"version"`
+	Version       int64  `json:"version"`
 }
 
 // Runner defaults when a workspace has no row.

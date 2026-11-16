@@ -162,7 +162,11 @@ func TestCronClaimAndFinish(t *testing.T) {
 	eq(t, c.runs(cr.ID), "failed", "skipped", "missed", "failed", "ok")
 	// run now: once, whatever the schedule
 	Now = func() int64 { return ny(t, "2026-11-16 14:41") }
-	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error { cur, _ := GetCron(f.ctx, tx, cr.ID); _, err := RunCronNow(f.ctx, tx, f.a, cur); return err }))
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		cur, _ := GetCron(f.ctx, tx, cr.ID)
+		_, err := RunCronNow(f.ctx, tx, f.a, cur)
+		return err
+	}))
 	got = c.claim("2026-11-16 14:41")
 	if len(got) != 1 || got[0].ScheduledFor != nil {
 		t.Fatalf("run now: %+v", got)

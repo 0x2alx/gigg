@@ -278,6 +278,21 @@ func (r Rule) Describe() string {
 	return templateName(s)
 }
 
+// DescribeCron names a rule as a cron reads it: a daily/weekly/monthly cron runs at the window's
+// start ("Every day at 03:30"), the window and create-early don't apply.
+func (r Rule) DescribeCron() string {
+	if r.Frequent() {
+		return r.Describe()
+	}
+	x := r
+	x.LeadMinutes = 0
+	s := x.Describe()
+	if w := windowText(x.WindowStart, x.WindowMinutes); w != "" {
+		s = strings.Replace(s, " "+w, " at "+x.WindowStart, 1)
+	}
+	return s
+}
+
 func ordinal(n int64) string {
 	suf := "th"
 	if n%100 < 11 || n%100 > 13 {
