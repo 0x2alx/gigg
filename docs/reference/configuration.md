@@ -115,7 +115,7 @@ and background work.
 `GET /healthz` on any listener, without authentication (the `Host` check still applies):
 
 ```json
-{"status": "ok", "version": "1.2.3", "listener": "main", "schema": 11}
+{"status": "ok", "version": "1.2.3", "listener": "main", "schema": 12}
 ```
 
 It answers 503 with `"status": "error"` when the database doesn't respond. `gigg healthcheck` calls it

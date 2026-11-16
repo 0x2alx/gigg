@@ -65,6 +65,6 @@ A task can have a window: it may only be started between its start time and **Wi
 
 ## Archiving and deleting
 
-- **Archive** (at the bottom of the panel, or **Archive done** on the board): the task leaves the board and lists, stays searchable, and can be unarchived.
+- **Archive** (at the bottom of the panel, or **Archive done** on the board): the task leaves the board and lists, stays searchable, and can be unarchived. An archived task no longer blocks anything (as a dependency or a **blocks parent** subtask).
 - **Delete** moves the task to the trash. **Trash** on the board lists the deleted tasks of the projects in view, with **Restore**. A deleted task opened from a link shows **Restore** too.
 - Every change is recorded with its old and new values: the API's task activity (`GET /tasks/{id}/activity`) and, for admins, **Admin → Audit**.

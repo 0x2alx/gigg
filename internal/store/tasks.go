@@ -111,7 +111,7 @@ const taskCols = `t.id, p.key || '-' || t.number, t.workspace_id, t.project_id, 
 	(SELECT count(*) FROM checklist_items ci WHERE ci.task_id = t.id),
 	(SELECT count(*) FROM checklist_items ci WHERE ci.task_id = t.id AND ci.done_at IS NOT NULL),
 	(SELECT count(*) FROM task_relations r JOIN tasks b ON b.id = r.from_task_id JOIN statuses bs ON bs.id = b.status_id
-		WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND bs.category NOT IN ('done','cancelled')),
+		WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled')),
 	` + blockingSubtasks + `,
 	t.model, t.effort, t.always_run, t.allowed_tools, t.blocks_parent`
 
@@ -123,8 +123,9 @@ const blockingSubtasks = `(SELECT count(*) FROM tasks c JOIN statuses cs ON cs.i
 		AND NOT EXISTS (SELECT 1 FROM task_relations r WHERE r.from_task_id = c.id AND r.to_task_id = t.id AND r.kind = 'blocks'))`
 
 // blockedCond: t has an open blocker, a "blocks" dependency or a subtask that blocks its parent.
+// Archived blockers don't count (as with subtasks): archiving parks a task, so it would block forever.
 const blockedCond = `(EXISTS (SELECT 1 FROM task_relations r JOIN tasks b ON b.id = r.from_task_id JOIN statuses bs ON bs.id = b.status_id
-		WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND bs.category NOT IN ('done','cancelled'))
+		WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled'))
 	OR EXISTS (SELECT 1 FROM tasks c JOIN statuses cs ON cs.id = c.status_id
 		WHERE c.parent_id = t.id AND c.blocks_parent = 1 AND c.deleted_at IS NULL AND c.archived_at IS NULL AND cs.category NOT IN ('done','cancelled')))`
 
@@ -257,14 +258,16 @@ func ParseTaskKey(k string) (string, int64, bool) {
 }
 
 // TaskIDsByKey returns the ids of tasks whose current key or alias is key, within the given workspaces
-// (nil = all). More than one id means the key is ambiguous across workspaces.
+// (nil = all). More than one id means the key is ambiguous across workspaces. Tasks of a deleted project
+// don't count: its key may belong to a new project now.
 func TaskIDsByKey(ctx context.Context, q Q, key string, workspaces []int64) ([]int64, error) {
 	pk, n, ok := ParseTaskKey(key)
 	if !ok {
 		return nil, ErrNotFound
 	}
-	query := `SELECT t.id, t.workspace_id FROM tasks t JOIN projects p ON p.id = t.project_id WHERE p.key = ? AND t.number = ?
-		UNION SELECT a.task_id, a.workspace_id FROM task_aliases a WHERE a.project_key = ? AND a.number = ?`
+	query := `SELECT t.id, t.workspace_id FROM tasks t JOIN projects p ON p.id = t.project_id WHERE p.key = ? AND t.number = ? AND p.deleted_at IS NULL
+		UNION SELECT a.task_id, a.workspace_id FROM task_aliases a JOIN tasks t ON t.id = a.task_id JOIN projects p ON p.id = t.project_id
+			WHERE a.project_key = ? AND a.number = ? AND p.deleted_at IS NULL`
 	rows, err := q.QueryContext(ctx, query, pk, n, pk, n)
 	if err != nil {
 		return nil, err

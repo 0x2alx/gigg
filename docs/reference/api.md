@@ -364,7 +364,7 @@ in [access.md](access.md).
 | POST | `/workspaces/{ws}/projects` | Create a project (managers). |
 | GET | `/projects/{p}` | A project. |
 | PATCH | `/projects/{p}` | Change a project (managers). |
-| DELETE | `/projects/{p}` | Delete an empty project (managers). |
+| DELETE | `/projects/{p}` | Delete an empty project (managers). It can't be restored; its slug and key are free for a new project (the key stays taken while moved tasks still answer to old keys with it). |
 | GET | `/projects/{p}/board` | The board: statuses with their tasks, and the workspace's labels. Up to 5000 unarchived tasks; past that, `truncated: true` (the rest are in task lists). |
 | GET | `/projects/{p}/statuses` | Statuses in board order. |
 | POST | `/projects/{p}/statuses` | Add a status (managers). |

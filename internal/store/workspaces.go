@@ -345,7 +345,9 @@ func CreateProject(ctx context.Context, q Q, a Actor, ws int64, slug, name, key 
 
 func aliasTaken(ctx context.Context, q Q, ws int64, key string) (bool, error) {
 	var n int
-	err := q.QueryRowContext(ctx, `SELECT count(*) FROM task_aliases WHERE workspace_id = ? AND project_key = ?`, ws, key).Scan(&n)
+	// old keys of tasks that live on (in a project that isn't deleted) keep resolving, so their key stays taken
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM task_aliases a JOIN tasks t ON t.id = a.task_id JOIN projects p ON p.id = t.project_id
+		WHERE a.workspace_id = ? AND a.project_key = ? AND p.deleted_at IS NULL`, ws, key).Scan(&n)
 	return n > 0, err
 }
 
@@ -361,11 +363,6 @@ func firstOf(t []StatusTemplate, cat string) int {
 // GetProject loads a project.
 func GetProject(ctx context.Context, q Q, id int64) (*Project, error) {
 	return scanProject(q.QueryRowContext(ctx, "SELECT "+projCols+" FROM projects WHERE id = ?", id))
-}
-
-// GetProjectBySlug loads a project by workspace and slug.
-func GetProjectBySlug(ctx context.Context, q Q, ws int64, slug string) (*Project, error) {
-	return scanProject(q.QueryRowContext(ctx, "SELECT "+projCols+" FROM projects WHERE workspace_id = ? AND slug = ?", ws, slug))
 }
 
 // ListProjects returns a workspace's projects (not deleted); only = optional narrowing.

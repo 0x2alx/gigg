@@ -127,3 +127,77 @@ func TestOccurrenceNotMadeTwice(t *testing.T) {
 		t.Fatalf("next not advanced: %v", got.NextAt)
 	}
 }
+
+// TestArchivedBlockerFrees: an open blocker that gets archived no longer blocks (as with subtasks).
+func TestArchivedBlockerFrees(t *testing.T) {
+	f := newFixture(t)
+	blocker := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "blocker"})
+	held := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "held"})
+	f.tx(t, func(tx *sql.Tx) error { return AddRelation(f.ctx, tx, f.a, blocker, held, "blocks") })
+	got := f.get(t, held.ID)
+	if got.BlockedBy != 1 {
+		t.Fatalf("blocked_by = %d before archiving, want 1", got.BlockedBy)
+	}
+	f.tx(t, func(tx *sql.Tx) error {
+		cur, err := GetTask(f.ctx, tx, blocker.ID)
+		if err != nil {
+			return err
+		}
+		_, err = ArchiveTask(f.ctx, tx, f.a, cur, true)
+		return err
+	})
+	if got = f.get(t, held.ID); got.BlockedBy != 0 {
+		t.Fatalf("blocked_by = %d after archiving the blocker, want 0", got.BlockedBy)
+	}
+}
+
+// TestDeletedProjectFreesNames: a deleted project's slug and key can be used again, and its key then
+// resolves to the new project's tasks only.
+func TestDeletedProjectFreesNames(t *testing.T) {
+	f := newFixture(t)
+	var old *Project
+	f.tx(t, func(tx *sql.Tx) error {
+		var err error
+		old, err = CreateProject(f.ctx, tx, f.a, f.ws.ID, "infra", "Infra", "INF", nil)
+		return err
+	})
+	gone := f.task(t, NewTask{ProjectID: old.ID, Title: "old"})
+	f.tx(t, func(tx *sql.Tx) error {
+		cur, err := GetTask(f.ctx, tx, gone.ID)
+		if err != nil {
+			return err
+		}
+		if _, err = TrashTask(f.ctx, tx, f.a, cur, false); err != nil {
+			return err
+		}
+		return DeleteProject(f.ctx, tx, f.a, old)
+	})
+	// a live project still holds its names
+	err := f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := CreateProject(f.ctx, tx, f.a, f.ws.ID, "gigg", "again", "GIG", nil)
+		return err
+	})
+	if err == nil {
+		t.Fatal("a live project's slug and key were taken twice")
+	}
+	var fresh *Project
+	f.tx(t, func(tx *sql.Tx) error {
+		var err error
+		fresh, err = CreateProject(f.ctx, tx, f.a, f.ws.ID, "infra", "Infra again", "INF", nil)
+		return err
+	})
+	now := f.task(t, NewTask{ProjectID: fresh.ID, Title: "new"})
+	ids, err := TaskIDsByKey(f.ctx, f.s.R, "INF-1", nil)
+	if err != nil || len(ids) != 1 || ids[0] != now.ID {
+		t.Fatalf("INF-1 = %v (%v), want only the new project's task %d", ids, err, now.ID)
+	}
+}
+
+func (f *fixture) get(t *testing.T, id int64) *Task {
+	t.Helper()
+	tk, err := GetTask(f.ctx, f.s.R, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tk
+}
