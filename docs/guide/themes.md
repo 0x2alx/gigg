@@ -4,7 +4,7 @@
 
 ![The themes page (Daywalker theme)](../images/themes-day.png)
 
-- **Built-in** themes: Nightwalker (dark), Daywalker (light), Clumsy Clanker, Petty Officer, Neon, Carbon (neutral charcoal with a coral accent) and High contrast. Daywalker, Neon and Carbon use pill-shaped buttons; the others, Nightwalker included, follow their corners.
+- **Built-in** themes: Nightwalker (dark), Daywalker (light), Clumsy Clanker (violet and fuchsia, square buttons), Petty Officer, Neon, Carbon (neutral charcoal with a coral accent) and High contrast. Daywalker, Neon and Carbon use pill-shaped buttons; the others, Nightwalker included, follow their corners.
 - **Match the system** switches between a light and a dark theme when your device does.
 - **Your themes**: **New theme** starts from colours you pick; **Duplicate** copies any theme to edit. Each colour field shows its contrast against the text, so a theme stays readable.
 - **Import**: paste a theme's JSON. gigg also finds the JSON inside surrounding text. **Copy JSON** shares one.

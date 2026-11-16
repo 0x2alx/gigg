@@ -27,9 +27,9 @@ import { SchedulesModal } from "./Schedules";
 import { TemplatesModal } from "./Templates";
 import { TaskModal, lastProject } from "./TaskModal";
 import { TaskPanel } from "./TaskPanel";
-import { viewsApi } from "./views/viewsApi";
+import { backTo, viewsApi } from "./views/viewsApi";
 import { CATEGORY_COLOR, colorFor, readableOn } from "./theme";
-import { Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, TaskBadges, reducedMotion } from "./ui";
+import { ClearFilters, Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, TaskBadges, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
@@ -833,9 +833,15 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           statuses={openStatuses(panelBoard)}
           labels={panelBoard.labels}
           canWrite={canWriteIn(panel.ws)}
-          onClose={() => navigate(boardURL)}
+          // opened from the table, My tasks or the bell: closing goes back there
+          onClose={() => {
+            // opened from a list (pushed from there): step back to it, so Back afterwards doesn't
+            // reopen the panel; a task moved meanwhile replaced its entry, so one step is enough
+            if (backTo()) history.back();
+            else navigate(boardURL);
+          }}
           onChanged={changed}
-          onMoved={(t) => navigate(`/board/p/${t.project_id}/t/${t.key}${qs}`)}
+          onMoved={(t) => navigate(`/board/p/${t.project_id}/t/${t.key}${qs}`, backTo() ? { state: history.state, replace: true } : undefined)}
           onOpenSchedule={(id) => setRecurring({ highlight: id })}
         />
       )}
@@ -992,11 +998,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
           <Icon name="archive" />
           Archived
         </button>
-        {isFiltered(filter) && (
-          <button type="button" className="link bf-clear" onClick={() => setFilter({ ...EMPTY_FILTER, arch: filter.arch })}>
-            Clear filters
-          </button>
-        )}
+        <ClearFilters className="bf-clear" active={isFiltered(filter)} onClear={() => setFilter({ ...EMPTY_FILTER, arch: filter.arch })} />
       </div>
       {(tree.length > 1 || projects.length > 1) && (
         <div className="bf-row bf-scope">

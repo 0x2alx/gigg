@@ -6,7 +6,7 @@ import { useApp, type WorkspaceTree } from "./App";
 import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { TaskModal } from "./TaskModal";
-import { Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
+import { ClearFilters, Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
@@ -91,6 +91,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
       )}
       <div className="list-bar">
         <PlaceFilter value={place} onChange={setPlace} tree={tree} />
+        <ClearFilters active={place !== ""} onClear={() => setPlace("")} />
         {items && <span className="muted small">{shown.length === items.length ? `${items.length} template${items.length === 1 ? "" : "s"}` : `${shown.length} of ${items.length}`}</span>}
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}

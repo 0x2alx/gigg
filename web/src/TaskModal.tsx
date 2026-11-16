@@ -12,7 +12,7 @@ import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, assignable } fr
 import { DEFAULT_DUE_TIME, DEFAULT_START_TIME } from "./dates";
 import { cleanCustom, sameAsTemplate, splitLines } from "./items";
 import { MarkdownEditor } from "./MarkdownEditor";
-import { RepeatFields } from "./RepeatFields";
+import { RepeatFields, RfRow } from "./RepeatFields";
 import { repeatOfSchedule, sameTiming } from "./scheduleTiming";
 import { CustomInput } from "./TaskSections";
 import { defaultRepeat, fmtInstant, localTZ, repeatFromRule, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
@@ -55,7 +55,6 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const [pickedSchedule, setPickedSchedule] = useState<Schedule | null>(null);
   const [saveAs, setSaveAs] = useState<string | null>(null); // the name being typed for "Save as template"
   const [note, setNote] = useState("");
-  const [moreOpen, setMoreOpen] = useState(!!cleanCustom(schedule?.custom ?? tpl?.custom ?? {}));
   const [projectStatuses, setProjectStatuses] = useState<Status[]>(statuses);
   const [title, setTitle] = useState(schedule?.title ?? tpl?.title ?? "");
   const [description, setDescription] = useState(schedule?.description_md ?? tpl?.description_md ?? "");
@@ -225,7 +224,6 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     setRun({ model: t.model ?? "", effort: t.effort ?? "", always_run: !!t.always_run, allowed_tools: t.allowed_tools ?? [] });
     setChecklist((t.checklist ?? []).join("\n"));
     setCustom(t.custom ?? {});
-    if (cleanCustom(t.custom ?? {})) setMoreOpen(true);
   };
 
   const templateBody = (name: string): TemplateBody => {
@@ -412,25 +410,11 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
                 <MarkdownEditor value={description} onChange={setDescription} users={candidates} minRows={editing ? 3 : 5} aria-label="Description" />
               </div>
             </Section>
-            <Section icon="checklist" title="Checklist and fields" id="check">
+            <Section icon="checklist" title="Checklist" id="check">
               <label>
-                <span>
-                  Checklist <span className="muted small">one item per line{repeating ? ", on every task" : ""}</span>
-                </span>
+                <span className="muted small">One item per line{repeating ? ", on every task" : ""}</span>
                 <textarea value={checklist} onChange={(e) => setChecklist(e.target.value)} rows={Math.min(6, Math.max(2, checklist.split("\n").length))} placeholder={"First step\nSecond step"} />
               </label>
-              {fields.length > 0 && (
-                <details className="more-fields" open={moreOpen} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>
-                  <summary>
-                    ⚑ More fields <span className="pill pill-muted">{setCount}/{fields.length} set</span>
-                  </summary>
-                  <dl className="props custom-props">
-                    {fields.map((f) => (
-                      <FieldRow key={f.id} field={f} value={custom[String(f.id)] ?? null} onSave={(v) => v !== undefined && setCustom((c) => ({ ...c, [String(f.id)]: v }))} />
-                    ))}
-                  </dl>
-                </details>
-              )}
             </Section>
           </div>
           <div className="tm-side">
@@ -499,28 +483,27 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
                 )}
                 {canRepeat && <RepeatFields value={repeat} onChange={setRepeat} allowNever={!editing} showPaused={editing}>
                   {schedules.length > 0 && (
-                    <div className="repeat-row">
-                      <label className="inline">
-                        Schedule
-                        <select value={pickedSchedule?.id ?? ""} onChange={(e) => (e.target.value ? pickSchedule(Number(e.target.value)) : setPickedSchedule(null))} aria-label="Schedule">
-                          {!editing && <option value="">custom timing</option>}
-                          {schedules.map((x) => (
-                            <option key={x.id} value={x.id}>
-                              {x.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <span className="muted small">
-                        {usesSchedule
+                    <RfRow label="Schedule">
+                      <select value={pickedSchedule?.id ?? ""} onChange={(e) => (e.target.value ? pickSchedule(Number(e.target.value)) : setPickedSchedule(null))} aria-label="Schedule">
+                        {!editing && <option value="">custom timing</option>}
+                        {schedules.map((x) => (
+                          <option key={x.id} value={x.id}>
+                            {x.name}
+                          </option>
+                        ))}
+                      </select>
+                      {(() => {
+                        // the select already says which schedule it runs on; say only what saving will do
+                        const hint = usesSchedule
                           ? editing && schedule && pickedSchedule!.id !== schedule.schedule_id
                             ? `Switches to “${pickedSchedule!.name}”.`
-                            : `Runs on “${pickedSchedule!.name}”.`
+                            : ""
                           : editing && schedule
                             ? `Timing changes are saved to “${schedule.schedule_name}”.`
-                            : "Saved as a new schedule (or the existing one with exactly this timing)."}
-                      </span>
-                    </div>
+                            : "Saved as a new schedule (or the existing one with exactly this timing).";
+                        return hint && <span className="muted small rf-note">{hint}</span>;
+                      })()}
+                    </RfRow>
                   )}
                 </RepeatFields>}
               </Section>
@@ -536,15 +519,15 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
                   ))}
                 </select>
               </label>
-              <div className="field">
-                <span className="field-label">Assignees</span>
-                <AssigneePicker value={assignees} onChange={setAssignees} candidates={candidates} />
-              </div>
-              <div className="field">
+              <div className="field tm-wide">
                 <span className="field-label">Labels</span>
                 <LabelInput value={taskLabels} onChange={setTaskLabels} known={known} />
               </div>
-              <div className="field">
+              <div className="field tm-wide">
+                <span className="field-label">Assignees</span>
+                <AssigneePicker value={assignees} onChange={setAssignees} candidates={candidates} />
+              </div>
+              <div className="field tm-wide">
                 <span className="field-label">Colour</span>
                 <ColorPicker value={color} onChange={setColor} />
               </div>
@@ -552,6 +535,15 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
             <Section icon="bot" title="Agent run" id="agent" aside={<HelpButton topic="agents" label="Help: how agents run tasks" />}>
               <RunSettingsFields value={run} onChange={setRun} canAlways={hasCap(me, "always_run", ws.id)} canTools={hasCap(me, "allowed_tools", ws.id)} bare />
             </Section>
+            {fields.length > 0 && (
+              <Section icon="fields" title="Fields" id="fields" aside={<span className="pill pill-muted tm-h-count">{setCount}/{fields.length} set</span>}>
+                <dl className="props custom-props">
+                  {fields.map((f) => (
+                    <FieldRow key={f.id} field={f} value={custom[String(f.id)] ?? null} onSave={(v) => v !== undefined && setCustom((c) => ({ ...c, [String(f.id)]: v }))} />
+                  ))}
+                </dl>
+              </Section>
+            )}
           </div>
         </div>
         {(err || (statusErr && !repeating && !noStatus)) && (

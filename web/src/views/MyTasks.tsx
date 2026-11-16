@@ -8,7 +8,7 @@ import { CATEGORY_COLOR, colorFor } from "../theme";
 import { PriorityIcon, StatusDot } from "../ui";
 import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
-import { BUCKETS, dueBucket, errMsg, isClosed, taskHref, tasksAcross, type DueBucket } from "./viewsApi";
+import { BUCKETS, dueBucket, errMsg, fromHere, isClosed, taskHref, tasksAcross, type DueBucket } from "./viewsApi";
 import "./views.css";
 import { HelpButton } from "../help";
 
@@ -52,7 +52,7 @@ export function MyTasks() {
   const wsOf = (id: number) => tree.find((w) => w.id === id);
 
   return (
-    <div className="vw-page vw-narrow">
+    <div className="vw-page">
       <header className="page-head">
         <div>
           <div className="crumb">
@@ -103,7 +103,7 @@ export function MyTasks() {
                 const late = b.id === "overdue" && !isClosed(t.status_category);
                 return (
                   <li key={t.id}>
-                    <Link href={taskHref(tree, t)} className="vw-list-row" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
+                    <Link href={taskHref(tree, t)} state={fromHere().state} className="vw-list-row" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
                       <span className="vw-key">{t.key}</span>
                       <span className={"vw-list-title" + (isClosed(t.status_category) ? " vw-closed" : "")}>{t.title}</span>
                       <span className="vw-list-meta">

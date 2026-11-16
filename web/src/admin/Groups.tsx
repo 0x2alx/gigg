@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useApp } from "../App";
 import { accessApi, RULE_ORDER, ruleSummary, type Group, type Permission } from "../access";
-import { Avatar, Modal } from "../ui";
+import { Avatar, ClearFilters, Modal } from "../ui";
 import { adminApi, errMsg, type AdminUser } from "./adminApi";
 import { AdminPage, ConfirmButton, Empty, ErrorLine } from "./common";
 import { GroupAccessModal } from "./Permissions";
@@ -179,7 +179,10 @@ function EditGroup({ group, users, onClose, onDone }: {
           <legend>
             Members <span className="pill pill-muted">{members.size}</span>
           </legend>
-          <input type="search" placeholder="Filter users…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Filter users" />
+          <div className="grp-filter">
+            <input type="search" placeholder="Filter users…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Filter users" />
+            <ClearFilters active={query !== ""} onClear={() => setQuery("")} />
+          </div>
           <ul className="grp-picker">
             {shown.map((u) => (
               <li key={u.id}>

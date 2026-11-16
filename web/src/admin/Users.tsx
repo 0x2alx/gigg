@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type Keyboard
 import { Link } from "wouter";
 import { useApp } from "../App";
 import { ColorPicker } from "../fields";
-import { Avatar, Modal } from "../ui";
+import { ClearFilters, Avatar, Modal } from "../ui";
 import { adminApi, errMsg, type AdminUser } from "./adminApi";
 import { AdminPage, ConfirmButton, Empty, ErrorLine, Field, FormActions, InfoLine, TimeAgo } from "./common";
 import { followName, PICTURE_TYPES, pictureProblem, usernameFrom } from "./forms";
@@ -80,6 +80,13 @@ export function UsersPage() {
           ))}
         </div>
         <input className="admin-search" type="search" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search users" />
+        <ClearFilters
+          active={filter !== "all" || query !== ""}
+          onClear={() => {
+            setFilter("all");
+            setQuery("");
+          }}
+        />
       </div>
       <ErrorLine error={error} />
       {items === null && !error && <p className="muted">Loading…</p>}

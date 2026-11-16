@@ -5,11 +5,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type CSSProperties } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { fmtDue } from "../dates";
-import { api, fmtTime, hasCap, priorityNames, type Category, type Tag, type Task } from "../api";
+import { api, fmtTime, hasCap, priorityNames, type Board, type Category, type Tag, type Task } from "../api";
+import { TaskPanel } from "../TaskPanel";
+import { RecurringModal } from "../Recurring";
 import { useApp, type WorkspaceTree } from "../App";
 import { assignable } from "../fields";
 import { CATEGORY_COLOR, colorFor } from "../theme";
-import { Avatar, LabelChip, Modal, PriorityIcon, StatusDot } from "../ui";
+import { ClearFilters, Avatar, LabelChip, Modal, PriorityIcon, StatusDot } from "../ui";
 import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
 import { CATEGORY_LABEL } from "../boardModel";
@@ -103,6 +105,34 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const [capped, setCapped] = useState(false); // all workspaces: some had more than MAX_PAGES pages
   const [labels, setLabels] = useState<Tag[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  // a task opens in the panel over the table (closing it leaves the table as it was); the panel needs
+  // its project's statuses and labels
+  const [openTask, setOpenTask] = useState<{ pid: number; key: string } | null>(null);
+  const [openBoard, setOpenBoard] = useState<Board | null>(null);
+  const [recurring, setRecurring] = useState<number | null>(null);
+  // a task opens over the table when its project is in this user's tree; otherwise its link decides
+  const open = (t: Task) => (tree.some((w) => w.projects.some((p) => p.id === t.project_id)) ? setOpenTask({ pid: t.project_id, key: t.key }) : navigate(taskHref(tree, t)));
+  // an edit in the panel refreshes just that row (a reload would drop the pages loaded with Load more)
+  const refreshRow = (key: string) => {
+    const row = rows?.find((r) => r.key === key);
+    if (!row) return;
+    api
+      .task(row.id)
+      .then((t) => setRows((cur) => cur && cur.map((r) => (r.id === t.id ? t : r))))
+      .catch(() => setRows((cur) => cur && cur.filter((r) => r.id !== row.id))); // deleted or out of reach
+  };
+  const openWs = openTask ? tree.find((w) => w.projects.some((p) => p.id === openTask.pid)) : undefined;
+  useEffect(() => {
+    if (!openTask) return setOpenBoard(null);
+    let live = true;
+    api
+      .board(openTask.pid)
+      .then((b) => live && setOpenBoard(b))
+      .catch(() => live && navigate(`/board/p/${openTask.pid}/t/${openTask.key}`)); // the board page shows why
+    return () => {
+      live = false;
+    };
+  }, [openTask?.pid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // debounce the text search
   useEffect(() => {
@@ -316,11 +346,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
             {k.replace("_", " ")}: {extra[k]}
           </span>
         ))}
-        {filtered && (
-          <button type="button" className="link small" onClick={reset}>
-            Clear filters
-          </button>
-        )}
+        <ClearFilters active={filtered} onClear={reset} />
         {canSave && (
           <button type="button" className="button secondary small vw-save" onClick={() => setSaving(true)}>
             ★ Save view
@@ -394,7 +420,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
               const href = taskHref(tree, t);
               const on = selected.has(t.id);
               return (
-                <tr key={t.id} className={on ? "vw-on" : undefined} onClick={(e) => !(e.target as HTMLElement).closest("a, button, input, label") && navigate(href)}>
+                <tr key={t.id} className={on ? "vw-on" : undefined} data-opens-task="" onClick={(e) => !(e.target as HTMLElement).closest("a, button, input, label") && open(t)}>
                   {canWrite && (
                     <td className="vw-check">
                       {canWriteTask(t) && <input type="checkbox" checked={on} onChange={() => toggle(t.id)} aria-label={`Select ${t.key}`} />}
@@ -402,7 +428,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
                   )}
                   <td className="vw-nowrap vw-key">{t.key}</td>
                   <td className="vw-title">
-                    <Link href={href} className="vw-title-link" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
+                    <Link href={href} className="vw-title-link" onClick={(e) => (e.preventDefault(), open(t))} style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
                       {t.title}
                     </Link>
                   </td>
@@ -461,6 +487,20 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           </div>
         )}
       </div>
+      {openTask && openWs && openBoard && (
+        <TaskPanel
+          taskKey={openTask.key}
+          ws={openWs}
+          statuses={openBoard.statuses.filter((x) => x.category !== "cancelled")}
+          labels={openBoard.labels}
+          canWrite={writableWs(openWs)}
+          onClose={() => setOpenTask(null)}
+          onChanged={() => refreshRow(openTask.key)}
+          onMoved={(t) => setOpenTask({ pid: t.project_id, key: t.key })}
+          onOpenSchedule={(id) => setRecurring(id)}
+        />
+      )}
+      {recurring !== null && <RecurringModal highlight={recurring} onClose={() => setRecurring(null)} onChanged={load} />}
     </div>
   );
 }

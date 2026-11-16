@@ -8,7 +8,7 @@ import { WorkspaceBadge } from "./WorkspaceBadge";
 import { describeRule, fmtInstant, localTZ } from "./recurrence";
 import { TaskModal } from "./TaskModal";
 import { SCHEDULE_COLOR } from "./theme";
-import { Avatar, LabelChip, Modal, Pill, PriorityBadge } from "./ui";
+import { ClearFilters, Avatar, LabelChip, Modal, Pill, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
@@ -124,6 +124,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
       )}
       <div className="list-bar">
         <PlaceFilter value={place} onChange={setPlace} tree={tree} />
+        <ClearFilters active={place !== ""} onClear={() => setPlace("")} />
         {items && <span className="muted small">{shown.length === items.length ? `${items.length} recurring` : `${shown.length} of ${items.length}`}</span>}
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}

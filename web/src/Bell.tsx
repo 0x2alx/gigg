@@ -10,7 +10,7 @@ import { countsChange, onActivity } from "./live";
 import { badgeCount, kindInfo, notificationsApi, notificationText, placeBelow, type Notification, type Placement } from "./notifications";
 import { Avatar } from "./ui";
 import { Icon } from "./icons";
-import { errMsg, relTime, taskHref } from "./views/viewsApi";
+import { errMsg, fromHere, relTime, taskHref } from "./views/viewsApi";
 import { HelpButton } from "./help";
 
 const POLL_MS = 60_000;
@@ -195,7 +195,7 @@ function NotificationList({ compact, onNavigate }: { compact?: boolean; onNaviga
     try {
       const t = await api.task(ref);
       onNavigate?.();
-      navigate(taskHref(tree, t));
+      navigate(taskHref(tree, t), fromHere());
     } catch (e) {
       setError(`${n.task_key ?? "Task"}: ${errMsg(e)}`);
     }

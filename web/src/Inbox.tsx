@@ -5,6 +5,7 @@ import { useApp } from "./App";
 import { Markdown } from "./markdown";
 import { Avatar, PriorityBadge, StatusBadge } from "./ui";
 import { HelpButton } from "./help";
+import { fromHere } from "./views/viewsApi";
 
 // Everything waiting for a human, across the workspaces in reach, with the latest question.
 export function InboxPage() {
@@ -40,7 +41,7 @@ export function InboxPage() {
         return (
           <article key={it.task.id} className="card inbox-item">
             <div className="inbox-head">
-              <Link href={`/board/p/${it.task.project_id}/t/${it.task.key}`} className="inbox-title">
+              <Link href={`/board/p/${it.task.project_id}/t/${it.task.key}`} state={fromHere().state} className="inbox-title">
                 <span className="inbox-key">{it.task.key}</span> {it.task.title}
               </Link>
               <div className="chips">

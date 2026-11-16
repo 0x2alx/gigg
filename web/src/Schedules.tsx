@@ -9,7 +9,7 @@ import { WorkspaceBadge } from "./WorkspaceBadge";
 import { RepeatFields } from "./RepeatFields";
 import { defaultRepeat, describeRule, localTZ, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
 import { repeatOfSchedule, scheduleBody } from "./scheduleTiming";
-import { Modal } from "./ui";
+import { ClearFilters, Modal } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
@@ -84,6 +84,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
       )}
       <div className="list-bar">
         <PlaceFilter value={place} onChange={setPlace} tree={tree} projects={false} />
+        <ClearFilters active={place !== ""} onClear={() => setPlace("")} />
         {items && <span className="muted small">{shown.length === items.length ? `${items.length} schedules` : `${shown.length} of ${items.length}`}</span>}
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}
@@ -202,7 +203,9 @@ function ScheduleModal({ ws: ws0, choices, schedule, onClose, onSaved }: { ws: W
           </label>
         )}
         <label className="span2">
-          Name <span className="muted small">leave empty to name it after the timing</span>
+          <span>
+            Name <span className="muted small">leave empty to name it after the timing</span>
+          </span>
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder={repeat.freq ? describeRule({ ...repeatRule(repeat), weekdays: repeatRule(repeat).weekdays ?? null, month_day: repeatRule(repeat).month_day ?? null }) : ""} data-autofocus="" />
         </label>
         <RepeatFields value={repeat} onChange={setRepeat} allowNever={false} timingOnly />

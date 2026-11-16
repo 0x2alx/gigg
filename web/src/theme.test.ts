@@ -136,6 +136,6 @@ describe("gigg extras (control shape, board columns)", () => {
     expect(bad.controlShape).toBeUndefined();
     expect(bad.laneColor).toBeUndefined();
     expect(notes.some((n) => n.includes("laneColor"))).toBe(true);
-    expect(themeJSON({ ...BUILTINS[0]! })).not.toContain("lane");
+    expect(themeJSON({ ...findTheme("nightwalker")! })).not.toContain("lane");
   });
 });

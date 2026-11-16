@@ -31,42 +31,41 @@ export function RepeatFields({ value: s, onChange, allowNever = true, showPaused
 
   return (
     <div className="repeat span2" role="group" aria-label="Repeat">
-      <div className="repeat-row">
-        <span className="field-label">{timingOnly ? "⏱ Timing" : "⟳ Repeat"}</span>
-        <div className="seg" role="radiogroup" aria-label="Repeat">
-          {allowNever && (
-            <button type="button" role="radio" aria-checked={!s.freq} className={!s.freq ? "on" : ""} onClick={() => set({ freq: "" })}>
-              Never
-            </button>
-          )}
-          {FREQS.map(([f, label]) => (
-            <button key={f} type="button" role="radio" aria-checked={s.freq === f} className={s.freq === f ? "on" : ""} onClick={() => set({ freq: f })}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {s.freq && (
-        <>
-          {children}
-          <div className="repeat-row">
-            <label className="inline">
-              every
+      <div className="rf">
+        <RfRow label={timingOnly ? "Timing" : "Repeat"}>
+          <div className="seg" role="radiogroup" aria-label="Repeat">
+            {allowNever && (
+              <button type="button" role="radio" aria-checked={!s.freq} className={!s.freq ? "on" : ""} onClick={() => set({ freq: "" })}>
+                Never
+              </button>
+            )}
+            {FREQS.map(([f, label]) => (
+              <button key={f} type="button" role="radio" aria-checked={s.freq === f} className={s.freq === f ? "on" : ""} onClick={() => set({ freq: f })}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </RfRow>
+        {s.freq && (
+          <>
+            {children}
+            <RfRow label="Every">
               <input type="number" className="num" min={1} max={365} value={s.interval} onChange={(e) => set({ interval: int(e.target.value, 1) })} aria-label="Repeat every" />
-              {UNIT[s.freq][s.interval === 1 ? 0 : 1]}
-            </label>
+              <span className="rf-unit">{UNIT[s.freq][s.interval === 1 ? 0 : 1]}</span>
+            </RfRow>
             {s.freq === "weekly" && (
-              <div className="wd-chips" role="group" aria-label="Weekdays">
-                {WEEKDAYS.map((d, i) => (
-                  <button key={d} type="button" className={"wd-chip" + (s.weekdays.includes(i + 1) ? " on" : "")} aria-pressed={s.weekdays.includes(i + 1)} aria-label={d} onClick={() => toggleDay(i + 1)}>
-                    {d.slice(0, 2)}
-                  </button>
-                ))}
-              </div>
+              <RfRow label="On">
+                <div className="wd-chips" role="group" aria-label="Weekdays">
+                  {WEEKDAYS.map((d, i) => (
+                    <button key={d} type="button" className={"wd-chip" + (s.weekdays.includes(i + 1) ? " on" : "")} aria-pressed={s.weekdays.includes(i + 1)} aria-label={d} onClick={() => toggleDay(i + 1)}>
+                      {d.slice(0, 2)}
+                    </button>
+                  ))}
+                </div>
+              </RfRow>
             )}
             {s.freq === "monthly" && (
-              <label className="inline">
-                on
+              <RfRow label="On">
                 <select value={s.monthDay} onChange={(e) => set({ monthDay: Number(e.target.value) })} aria-label="Day of month">
                   {Array.from({ length: 31 }, (_, i) => (
                     <option key={i + 1} value={i + 1}>
@@ -75,91 +74,96 @@ export function RepeatFields({ value: s, onChange, allowNever = true, showPaused
                   ))}
                   <option value={-1}>the last day</option>
                 </select>
-              </label>
+              </RfRow>
             )}
-          </div>
-          <div className="repeat-row">
-            <div className="seg" role="radiogroup" aria-label="Window">
-              <button type="button" role="radio" aria-checked={s.allDay} className={s.allDay ? "on" : ""} onClick={() => set({ allDay: true })}>
-                All day
-              </button>
-              <button type="button" role="radio" aria-checked={!s.allDay} className={!s.allDay ? "on" : ""} onClick={() => set({ allDay: false })}>
-                Time window
-              </button>
-            </div>
+            <RfRow label="Time">
+              <div className="seg" role="radiogroup" aria-label="Window">
+                <button type="button" role="radio" aria-checked={s.allDay} className={s.allDay ? "on" : ""} onClick={() => set({ allDay: true })}>
+                  All day
+                </button>
+                <button type="button" role="radio" aria-checked={!s.allDay} className={!s.allDay ? "on" : ""} onClick={() => set({ allDay: false })}>
+                  Time window
+                </button>
+              </div>
+            </RfRow>
             {!s.allDay && (
-              <>
-                <label className="inline">
-                  from
-                  <input type="time" className="time" value={s.start} onChange={(e) => set({ start: e.target.value })} aria-label="Window opens at" required />
-                </label>
-                <label className="inline">
-                  for
+              <RfRow label="From">
+                <input type="time" className="time" value={s.start} onChange={(e) => set({ start: e.target.value })} aria-label="Window opens at" required />
+                <span className="rf-pair">
+                  <span className="rf-unit">for</span>
                   <input type="number" className="num" min={1} value={s.len} onChange={(e) => set({ len: int(e.target.value, 1) })} aria-label="Window length" />
                   <select value={s.unit} onChange={(e) => set({ unit: e.target.value as "h" | "m" })} aria-label="Window length unit">
                     <option value="h">hours</option>
                     <option value="m">minutes</option>
                   </select>
-                </label>
-              </>
-            )}
-          </div>
-          <div className="repeat-row">
-            <label className="inline">
-              create
-              <input type="number" className="num" min={0} max={10080} value={s.lead} onChange={(e) => set({ lead: int(e.target.value, 0) })} aria-label="Create minutes early" />
-              min early
-            </label>
-            {!timingOnly && (
-            <label className="inline">
-              ends
-              <select value={s.endMode} onChange={(e) => set({ endMode: e.target.value as RepeatState["endMode"] })} aria-label="Ends">
-                <option value="never">never</option>
-                <option value="date">on date</option>
-                <option value="count">after</option>
-              </select>
-              {s.endMode === "date" && <input type="date" className="date" value={s.endDate} onChange={(e) => set({ endDate: e.target.value })} aria-label="End date" />}
-              {s.endMode === "count" && (
-                <>
-                  <input type="number" className="num" min={1} value={s.count} onChange={(e) => set({ count: int(e.target.value, 1) })} aria-label="End after N times" />
-                  times
-                </>
-              )}
-            </label>
-            )}
-          </div>
-          {!timingOnly && (
-          <div className="repeat-row">
-            <label className="check">
-              <input type="checkbox" checked={s.overlap === "create"} onChange={(e) => set({ overlap: e.target.checked ? "create" : "skip" })} />
-              also when the previous one is still open
-            </label>
-            {showPaused && (
-              <label className="check">
-                <input type="checkbox" checked={s.paused} onChange={(e) => set({ paused: e.target.checked })} />
-                paused
-              </label>
-            )}
-          </div>
-          )}
-          {problem ? (
-            <p className="danger small" role="alert">
-              {problem}
-            </p>
-          ) : (
-            <div className="repeat-preview" aria-label="Next occurrences">
-              <span className="muted small">Next</span>
-              {preview.map((ms) => (
-                <span key={ms} className="pill pill-muted">
-                  {fmtWallWindow(ms, minutes)}
                 </span>
-              ))}
-              {preview.length === 0 && <span className="pill pill-danger">no more occurrences</span>}
-              {s.tz !== localTZ() && <span className="pill pill-ws">{s.tz}</span>}
-            </div>
-          )}
-        </>
-      )}
+              </RfRow>
+            )}
+            <RfRow label="Create">
+              <input type="number" className="num" min={0} max={10080} value={s.lead} onChange={(e) => set({ lead: int(e.target.value, 0) })} aria-label="Create minutes early" />
+              <span className="rf-unit">min early</span>
+            </RfRow>
+            {!timingOnly && (
+              <RfRow label="Ends">
+                <select value={s.endMode} onChange={(e) => set({ endMode: e.target.value as RepeatState["endMode"] })} aria-label="Ends">
+                  <option value="never">never</option>
+                  <option value="date">on date</option>
+                  <option value="count">after</option>
+                </select>
+                {s.endMode === "date" && <input type="date" className="date" value={s.endDate} onChange={(e) => set({ endDate: e.target.value })} aria-label="End date" />}
+                {s.endMode === "count" && (
+                  <span className="rf-pair">
+                    <input type="number" className="num" min={1} value={s.count} onChange={(e) => set({ count: int(e.target.value, 1) })} aria-label="End after N times" />
+                    <span className="rf-unit">times</span>
+                  </span>
+                )}
+              </RfRow>
+            )}
+            {!timingOnly && (
+              <RfRow label="Options" stack>
+                <label className="check">
+                  <input type="checkbox" checked={s.overlap === "create"} onChange={(e) => set({ overlap: e.target.checked ? "create" : "skip" })} />
+                  also when the previous one is still open
+                </label>
+                {showPaused && (
+                  <label className="check">
+                    <input type="checkbox" checked={s.paused} onChange={(e) => set({ paused: e.target.checked })} />
+                    paused
+                  </label>
+                )}
+              </RfRow>
+            )}
+            <RfRow label="Next">
+              {problem ? (
+                <p className="danger small" role="alert">
+                  {problem}
+                </p>
+              ) : (
+                <div className="repeat-preview" aria-label="Next occurrences">
+                  {preview.map((ms) => (
+                    <span key={ms} className="pill pill-muted">
+                      {fmtWallWindow(ms, minutes)}
+                    </span>
+                  ))}
+                  {preview.length === 0 && <span className="pill pill-danger">no more occurrences</span>}
+                  {s.tz !== localTZ() && <span className="pill pill-ws">{s.tz}</span>}
+                </div>
+              )}
+            </RfRow>
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+// RfRow: one row of the repeat grid, a label in the first column and its controls in the second
+// (stacked under the label when the block is narrow). `stack` puts the controls one per line.
+export function RfRow({ label, stack, children }: { label: ReactNode; stack?: boolean; children: ReactNode }) {
+  return (
+    <>
+      <span className="rf-l">{label}</span>
+      <div className={"rf-c" + (stack ? " rf-stack" : "")}>{children}</div>
+    </>
   );
 }

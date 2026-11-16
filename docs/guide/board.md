@@ -83,7 +83,7 @@ The toolbar above the columns narrows the board, in one row:
 - **Assignee**: anyone, assigned to you, unassigned, or a person.
 - **Label** and **Priority** (a minimum: "High or higher"). A filter that is on is tinted.
 - **Archived**: a toggle that shows archived tasks, greyed out, in their columns.
-- **Clear filters**: appears only while a filter is on, and resets everything except the archived toggle.
+- **Clear filters**: resets everything except the archived toggle; greyed out while nothing is filtered. Every page with filters has one (the table, the recurring tasks, templates and schedules lists, the admin users list and audit log).
 
 With the filters open, small chips under the toolbar scope the board: **Workspaces** and **Projects**. Click a chip to show only that one; click more chips to add them. **All workspaces** / **All projects** clears the selection. The workspace chips show the workspace's owner picture and colour.
 

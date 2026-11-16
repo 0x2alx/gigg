@@ -2,27 +2,27 @@
    switchable per user. Components use only these variables, never colour literals. */
 :root {
   color-scheme: dark;
-  --bg: #100318;
-  --surface: #1c0a2e;
-  --surface-variant: #2a1247;
-  --border: #be5cff;
-  --accent: #be5cff;
-  --on-accent: #16052a;
-  --text: #ffc107;
-  --muted: #fe2aff;
-  --danger: #ff4d6d;
+  --bg: #120a1f;
+  --surface: #1d1230;
+  --surface-variant: #2a1a45;
+  --border: #4a3275;
+  --accent: #a77bff;
+  --on-accent: #160a2b;
+  --text: #f1ecfa;
+  --muted: #d9afcf;
+  --danger: #ff5c7a;
   --low: color-mix(in srgb, var(--bg) 50%, var(--surface));
   --high: color-mix(in srgb, var(--surface) 50%, var(--surface-variant));
   --faint: color-mix(in srgb, var(--border) 50%, var(--surface));
   --secondary: color-mix(in srgb, var(--accent) 28%, var(--surface));
   --on-secondary: var(--text);
-  --r: 12px;
+  --r: 4px;
   --radius-xs: calc(var(--r) / 4);
   --radius-s: calc(var(--r) / 2);
   --radius-m: calc(var(--r) * 3 / 4);
   --radius-l: var(--r);
   --radius-xl: calc(var(--r) * 1.5);
-  --border-w: 2px;
+  --border-w: 1px;
   --font: system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --ok: #30a46c; /* a running agent (the same green in every theme; text uses it mixed toward --text) */
@@ -164,6 +164,9 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .button:disabled { opacity: 0.6; cursor: default; }
 .button.danger-button:disabled, .button.secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 .link, .icon-button { background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer; padding: 0.2rem; }
+/* every filtered list has one; greyed out while nothing is filtered */
+.clear-filters { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; font-size: var(--fs-sm); }
+.clear-filters:disabled { color: var(--muted); opacity: 0.6; cursor: default; }
 .icon-button { color: var(--muted); font-size: 1.1rem; line-height: 1; border-radius: var(--radius-s); transition: background-color 0.12s ease-out, color 0.12s ease-out; }
 .icon-button:hover { background: var(--hover); color: var(--text); }
 
@@ -203,7 +206,9 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .side-bottom { margin-top: auto; }
 .nav-sub { display: flex; flex-direction: column; gap: 1px; margin: 1px 0 var(--sp-2); }
 /* Pages: wide ones fill the content area; reading-width ones are centred (never stuck to the left). */
-.inbox, .profile, .theme-editor, .vw-narrow { margin-inline: auto; width: 100%; }
+.inbox, .profile, .theme-editor { margin-inline: auto; width: 100%; }
+/* full-width pages keep running text to a readable line length */
+.inbox-item .md, .notif-page .notif-body { max-width: 80ch; }
 /* nav rows: 30px, a bare 16px line icon, muted until hovered or selected */
 .nav-item {
   position: relative; display: flex; align-items: center; gap: var(--sp-4); min-height: var(--ctl-h);
@@ -492,7 +497,6 @@ a.pulse-item:hover { color: var(--text); }
 .md strong { color: var(--text); font-weight: var(--weight-strong); }
 .md blockquote { border-left: 3px solid var(--line-strong); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--muted); }
 
-.inbox { max-width: 52rem; }
 .inbox-item { margin-bottom: 0.75rem; }
 .inbox-head { display: flex; flex-direction: column; gap: 0.2rem; }
 .inbox-title { color: var(--text); text-decoration: none; font-size: var(--fs-md); font-weight: var(--weight-strong); }
@@ -571,8 +575,10 @@ a.pulse-item:hover { color: var(--text); }
   position: fixed; inset: 0; z-index: 50; display: grid; place-items: start center; padding: 8vh 1rem 1rem;
   background: color-mix(in srgb, var(--bg) 62%, transparent); overflow-y: auto;
 }
+/* position: relative makes the dialog the containing block of its absolutely placed bits (hidden
+   legends, avatar badges), so they scroll inside it instead of stretching the backdrop below it */
 .modal {
-  width: min(34rem, 100%); background: var(--surface); border: var(--border-w) solid var(--line-strong);
+  position: relative; width: min(34rem, 100%); background: var(--surface); border: var(--border-w) solid var(--line-strong);
   border-radius: var(--radius-xl); padding: var(--sp-6) var(--sp-7) var(--sp-7); box-shadow: var(--shadow-pop);
 }
 .modal-wide { width: min(46rem, 100%); }
@@ -726,7 +732,22 @@ a.pulse-item:hover { color: var(--text); }
   display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0;
   background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-m); padding: var(--sp-5);
 }
-.repeat-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; min-width: 0; }
+/* the repeat grid: a label column and a control column, every control starting on the same line;
+   narrow (a phone, a slim side column), each label sits above its controls */
+.repeat { container: rf / inline-size; }
+.rf { display: grid; grid-template-columns: 5.2rem minmax(0, 1fr); gap: var(--sp-4) var(--sp-5); align-items: start; }
+/* a label lines up with the first line of its controls, however many lines they wrap to */
+.rf-l { min-height: var(--ctl-h); display: flex; align-items: center; font-weight: var(--weight-strong); color: var(--muted); font-size: var(--fs-sm); }
+.rf-c { min-height: var(--ctl-h); display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); min-width: 0; }
+.rf-c.rf-stack { flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--sp-3); }
+.repeat .rf-c > select, .repeat .rf-pair > select { width: auto; max-width: 100%; }
+.rf-pair { display: inline-flex; align-items: center; gap: var(--sp-3); }
+.rf-unit { color: var(--muted); font-size: var(--fs-base); }
+.rf-note { flex-basis: 100%; }
+@container rf (max-width: 22rem) {
+  .rf { grid-template-columns: minmax(0, 1fr); row-gap: var(--sp-2); }
+  .rf-c { margin-bottom: var(--sp-3); }
+}
 /* segmented controls: one outlined group, the chosen part a tint (like the Board | Table switch) */
 .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border: 1px solid var(--line-strong); border-radius: var(--radius-m); background: var(--surface); max-width: 100%; }
 .seg button {
@@ -897,9 +918,6 @@ label.check input { width: auto; accent-color: var(--accent); }
 .mention-list button.on, .mention-list button:hover { background: color-mix(in srgb, var(--text) 10%, var(--high)); }
 .mention-list .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mention { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--text); display: inline-block; padding: 0 0.35rem; border-radius: 999px; font-size: 0.9em; font-weight: var(--weight-strong); line-height: 1.4; }
-.more-fields { border: 1px solid var(--line); border-radius: var(--radius-m); padding: var(--sp-3) var(--sp-5); }
-.more-fields summary { cursor: pointer; color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
-.more-fields[open] summary { margin-bottom: 0.5rem; }
 .tpl-pick { background: var(--low); border: 1px dashed var(--line-strong); border-radius: var(--radius-m); padding: var(--sp-4) var(--sp-5); }
 .save-tpl { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .save-tpl .link { padding: 0; }
@@ -945,7 +963,7 @@ button.nav-item.selected, button.nav-item.selected:hover { color: var(--on-accen
   background: var(--surface); border-bottom: 1px solid var(--line);
 }
 .bell-pop .notif-item.unread { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
-.notif-page { max-width: 46rem; margin-inline: auto; width: 100%; }
+.notif-page { width: 100%; min-width: 0; }
 .notif-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .notif-head h1, .notif-head h2 { margin: 0; }
 .notif-head h2 { font-size: var(--fs-md); }
@@ -1238,10 +1256,11 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 }
 
 /* ---- dashboard: runners, caps, pause ---- */
-.dash { margin-inline: auto; width: 100%; max-width: 64rem; }
+/* pages use the whole width the screen gives them; grids fit as many cards as there is room for, never wider */
+.dash { width: 100%; min-width: 0; }
 .dash .page-head p { margin: var(--sp-2) 0 0; max-width: 46rem; font-size: var(--fs-base); }
 .dash-pause .ico { color: var(--danger); }
-.dash-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: var(--sp-5); }
+.dash-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr)); gap: var(--sp-5); }
 .dash-card { display: flex; flex-direction: column; gap: var(--sp-5); }
 .dash-card.paused { border-color: color-mix(in srgb, var(--danger) 70%, var(--surface)); }
 .dash-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); min-height: 1.67rem; }
@@ -1588,8 +1607,8 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .tm-body { display: flex; flex-direction: column; gap: var(--sp-5); }
 .tm-main, .tm-side { display: contents; }
 .tpl-pick, .tm-body .sched-tpl { order: 0; margin: 0; }
-/* one column: the sections in source order (the tab order): Task, Checklist and fields, Where, When, Details,
-   Agent run; the full page puts the first two on the left */
+/* one column: the sections in source order (the tab order): Task, Checklist, Where, When, Details,
+   Agent run, Fields; the full page puts the first two on the left, like the task panel */
 /* the New task form's sections and the task panel's boxes share one look */
 .tm-section, .tp-box {
   background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-l);
@@ -1603,14 +1622,14 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .tm-h .help-button { margin-left: auto; text-transform: none; letter-spacing: 0; }
 .tm-stack { display: flex; flex-direction: column; gap: var(--sp-5); }
 .tm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: var(--sp-5) var(--sp-6); align-items: start; }
-.tm-s-people .tm-grid { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
-.tm-s-people .tm-grid > :last-child { grid-column: 1 / -1; }
+.tm-s-people .tm-grid { grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+.tm-grid > .tm-wide { grid-column: 1 / -1; }
+.tm-h .tm-h-count { margin-left: auto; text-transform: none; letter-spacing: 0; }
 .tm-stack > .tm-grid { margin-bottom: 0; }
 .tm-section select { width: 100%; }
 /* the repeat block and the run settings sit flat inside their section */
 .tm-section .repeat { background: none; border: 0; padding: 0; }
 .run-settings.bare { border: 0; padding: 0; margin: 0; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--sp-5) var(--sp-6); }
-.tm-section .more-fields { background: var(--surface); }
 /* the actions stay in view at the bottom while the form scrolls */
 .tm-foot {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); position: sticky; bottom: 0; z-index: 2;

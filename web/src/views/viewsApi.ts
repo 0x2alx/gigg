@@ -88,6 +88,18 @@ export function errMsg(e: unknown): string {
   return "Request failed.";
 }
 
+// fromHere: navigation state that brings a task opened from a list (the table, My tasks, the bell, the
+// palette) back to that page when its panel closes; the board's own links don't need it.
+export function fromHere(): { state: { back: string } | null } {
+  const here = location.pathname + location.search;
+  return { state: location.pathname.startsWith("/board") ? null : { back: here } };
+}
+// backTo: where a closing task panel goes, when it was opened by fromHere.
+export function backTo(): string | null {
+  const b = (history.state as { back?: unknown } | null)?.back;
+  return typeof b === "string" && /^\/(?![/\\])/.test(b) && !b.includes("\\") ? b : null;
+}
+
 // taskHref: the board URL with the task panel open.
 export function taskHref(tree: WorkspaceTree[], t: Pick<Task, "workspace_id" | "project_id" | "key">): string {
   return tree.some((w) => w.id === t.workspace_id) ? `/board/p/${t.project_id}/t/${t.key}` : "/";

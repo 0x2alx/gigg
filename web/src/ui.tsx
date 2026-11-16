@@ -7,6 +7,16 @@ import { windowBadge } from "./recurrence";
 import { CATEGORY_COLOR, PRIORITY_COLOR, SCHEDULE_COLOR, WINDOW_OPEN_COLOR, colorFor, readableOn } from "./theme";
 import { Icon } from "./icons";
 
+// ClearFilters: the one "Clear filters" button of every filtered list. Always there, so the bar
+// doesn't jump; greyed out while nothing is filtered.
+export function ClearFilters({ active, onClear, className }: { active: boolean; onClear: () => void; className?: string }) {
+  return (
+    <button type="button" className={"link small clear-filters" + (className ? " " + className : "")} disabled={!active} onClick={onClear} title={active ? "Show everything again" : "Nothing is filtered"}>
+      <Icon name="x" /> Clear filters
+    </button>
+  );
+}
+
 type ItemCounts = Pick<Task, "checklist_total" | "checklist_done" | "subtask_count" | "subtask_done" | "blocked_by" | "custom">;
 
 // Pill: a tinted badge. The data colour goes in --c; theme.css turns it into a 14% tint with text of

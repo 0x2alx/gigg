@@ -7,7 +7,7 @@ import { useApp, type WorkspaceTree } from "../App";
 import { colorFor } from "../theme";
 import { Pill, PriorityBadge, StatusBadge } from "../ui";
 import { summary, viewHref } from "./savedViews";
-import { errMsg, fuzzy, taskHref, tasksAcross } from "./viewsApi";
+import { errMsg, fromHere, fuzzy, taskHref, tasksAcross } from "./viewsApi";
 import "./views.css";
 
 interface Item {
@@ -66,8 +66,8 @@ function Palette({ onClose }: { onClose: () => void }) {
   }, []);
 
   const go = useCallback(
-    (href: string) => {
-      navigate(href);
+    (href: string, opts?: { state: unknown }) => {
+      navigate(href, opts);
       onClose();
     },
     [navigate, onClose],
@@ -99,7 +99,7 @@ function Palette({ onClose }: { onClose: () => void }) {
           setError("");
           try {
             const t = await api.task(key);
-            go(taskHref(tree, t));
+            go(taskHref(tree, t), fromHere());
           } catch (e) {
             setError(`${key}: ${errMsg(e)}`);
           } finally {
@@ -125,7 +125,7 @@ function Palette({ onClose }: { onClose: () => void }) {
               <PriorityBadge priority={t.priority} />
             </>
           ),
-          run: () => go(taskHref(tree, t)),
+          run: () => go(taskHref(tree, t), fromHere()),
         });
       }
     }

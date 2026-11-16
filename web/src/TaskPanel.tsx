@@ -200,13 +200,14 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
 
   // A click on the board outside the panel closes it, like ✕. Not when the press started inside
   // (drag-select), not in modals, popovers or menus, not when the click opened something else (the
-  // URL changed: another task, another page), and not while a field holds unsaved text.
+  // URL changed: another task, another page; or a table row, which opens another task in place),
+  // and not while a field holds unsaved text.
   useEffect(() => {
     let down: string | null = null;
     const outside = (t: EventTarget | null) => {
       const panel = panelRef.current;
       if (!panel || !(t instanceof Element) || !t.isConnected || panel.contains(t)) return false;
-      return !t.closest('.modal-backdrop, [role="dialog"], [aria-modal="true"], .bell-pop, .menu, .mention-list, .toast, .sidebar');
+      return !t.closest('.modal-backdrop, [role="dialog"], [aria-modal="true"], .bell-pop, .menu, .mention-list, .toast, .sidebar, [data-opens-task]');
     };
     const onDown = (e: PointerEvent) => {
       down = e.button === 0 && !document.querySelector('[aria-modal="true"]') && outside(e.target) ? window.location.pathname : null;
@@ -383,6 +384,11 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
             </div>
           )}
           </div>
+          {/* folded by default; keyed by task so a newly opened task starts folded again */}
+          <div className="tsecs" key={"secs-" + task.id}>
+            <ChecklistSection task={task} canEdit={can("checklists")} onTask={onTask} />
+            <SubtasksSection task={task} wsId={ws.id} canCreate={can("create_tasks") && !task.deleted} onOpen={onMoved} onChanged={onChanged} />
+          </div>
           <section className="tp-box comments" aria-label="Comments">
             <h3>
               <Icon name="comment" /> Comments <span className="count">{comments.length}</span>
@@ -415,7 +421,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
         </div>
         <div className="tp-side">
           <div className="tp-props">
-            <PropGroup icon="layers" title="Details">
+            <PropGroup icon="layers" title="Where">
               <Row label="Workspace">
                 <span className="pill pill-ws">{ws.name}</span>
               </Row>
@@ -445,76 +451,9 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                   <StatusBadge name={task.status_name} category={task.status_category} />
                 )}
               </Row>
-              <Row label="Priority">
-                {canWrite ? (
-                  <select value={task.priority} onChange={(e) => act(api.patchTask(task.id, { priority: Number(e.target.value) }))} aria-label="Priority">
-                    {priorityNames.map((n, i) => (
-                      <option key={n} value={i}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <PriorityBadge priority={task.priority} showNone />
-                )}
-              </Row>
             </PropGroup>
 
-            <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run tasks" />}>
-              <Row tip="Model for the agent’s run (an alias like opus or sonnet, or a full model id). Empty: the agent’s default" label="Model">
-                <ModelInput value={task.model ?? ""} disabled={!canWrite} onCommit={(v) => act(api.patchTask(task.id, { model: v }))} />
-              </Row>
-              <Row tip="Reasoning effort for the agent’s run (low to max). Empty: the agent’s default" label="Effort">
-                <EffortSelect value={task.effort ?? ""} disabled={!canWrite} onChange={(v) => act(api.patchTask(task.id, { effort: v }))} />
-              </Row>
-              <Row tip="Run it whatever the usage budget, day or night, like a cron job. The daily cap and pauses still apply" label="Always run" wide>
-                <label className="admin-check run-always" title={can("always_run") ? "Runs whatever the usage budget, day or night" : "Changing it needs the Always-run tasks permission"}>
-                  <input type="checkbox" checked={!!task.always_run} disabled={!can("always_run")} onChange={(e) => act(api.patchTask(task.id, { always_run: e.target.checked }))} />
-                  <span className="muted small">whatever the usage budget, day or night</span>
-                </label>
-              </Row>
-              {(can("allowed_tools") || (task.allowed_tools ?? []).length > 0) && (
-                <Row tip="The agent gets exactly these tools for this task (Claude Code permission rules), nothing else. Empty: its usual setup" label="Allowed tools" wide>
-                  {can("allowed_tools") ? (
-                    <ToolsInput value={task.allowed_tools ?? []} onCommit={(v) => act(api.patchTask(task.id, { allowed_tools: v }))} />
-                  ) : (
-                    <span className="tools-list" title="Changing this task needs the Task tool allowlists permission">
-                      {(task.allowed_tools ?? []).map((r) => (
-                        <code key={r}>{r}</code>
-                      ))}
-                    </span>
-                  )}
-                </Row>
-              )}
-            </PropGroup>
-
-            <PropGroup icon="users" title="People">
-              <Row label="Assignees" wide>
-                {editing === "assignees" ? (
-                  <InlineAssignees task={task} candidates={candidates} onSave={(v) => act(api.patchTask(task.id, { assignees: v }))} onCancel={() => setEditing("")} />
-                ) : (
-                  <div className="chips editable">
-                    {task.assignees.map((id) => (
-                      <UserBadge key={id} user={users.get(id)} />
-                    ))}
-                    {task.assignees.length === 0 && <span className="muted">nobody</span>}
-                    {canWrite && (
-                      <button type="button" className="icon-button" aria-label="Edit assignees" onClick={() => setEditing("assignees")}>
-                        <Icon name="pencil" />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </Row>
-              <Row label="Created by" wide className="created">
-                <UserBadge user={creator} /> <span className="muted small">{fmtTime(task.created_at)}</span>
-              </Row>
-              <Row label="Updated" wide className="muted small">
-                {fmtTime(task.updated_at)}
-              </Row>
-            </PropGroup>
-
-            <PropGroup icon="calendar" title="Schedule">
+            <PropGroup icon="calendar" title="When">
               <Row wide label={task.not_after ? "Window opens" : "Start"}>
                 <DateTimeInput value={task.start_at} defaultTime={DEFAULT_START_TIME} label={task.not_after ? "Window opens" : "Start"} disabled={!canWrite} onChange={(v) => act(api.patchTask(task.id, { start_at: v }))} />
               </Row>
@@ -560,17 +499,21 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                 </Row>
               )}
             </PropGroup>
-          </div>
-          {/* folded by default; keyed by task so a newly opened task starts folded again */}
-          <div className="tsecs" key={"secs-" + task.id}>
-            <ChecklistSection task={task} canEdit={can("checklists")} onTask={onTask} />
-            <SubtasksSection task={task} wsId={ws.id} canCreate={can("create_tasks") && !task.deleted} onOpen={onMoved} onChanged={onChanged} />
-            <DependenciesSection task={task} wsId={ws.id} canEdit={can("relations")} onTask={onTask} onOpen={onMoved} />
-            <CustomFieldsSection task={task} fields={fields} canEdit={canWrite} onTask={onTask} />
-            <HistorySection task={task} />
-          </div>
-          <div className="tp-props">
-            <PropGroup icon="theme" title="Look">
+
+            <PropGroup icon="users" title="Details">
+              <Row label="Priority">
+                {canWrite ? (
+                  <select value={task.priority} onChange={(e) => act(api.patchTask(task.id, { priority: Number(e.target.value) }))} aria-label="Priority">
+                    {priorityNames.map((n, i) => (
+                      <option key={n} value={i}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <PriorityBadge priority={task.priority} showNone />
+                )}
+              </Row>
               <Row label="Labels" wide>
                 {editing === "labels" ? (
                   <InlineLabels task={task} known={labels} onSave={(v) => act(api.patchTask(task.id, { labels: v }))} onCancel={() => setEditing("")} />
@@ -588,6 +531,23 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                   </div>
                 )}
               </Row>
+              <Row label="Assignees" wide>
+                {editing === "assignees" ? (
+                  <InlineAssignees task={task} candidates={candidates} onSave={(v) => act(api.patchTask(task.id, { assignees: v }))} onCancel={() => setEditing("")} />
+                ) : (
+                  <div className="chips editable">
+                    {task.assignees.map((id) => (
+                      <UserBadge key={id} user={users.get(id)} />
+                    ))}
+                    {task.assignees.length === 0 && <span className="muted">nobody</span>}
+                    {canWrite && (
+                      <button type="button" className="icon-button" aria-label="Edit assignees" onClick={() => setEditing("assignees")}>
+                        <Icon name="pencil" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </Row>
               <Row label="Colour" wide>
                 {canWrite ? (
                   <ColorPicker value={task.color} onChange={(c) => act(api.patchTask(task.id, { color: c }))} />
@@ -597,6 +557,40 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                   <span className="muted">none</span>
                 )}
               </Row>
+              <Row label="Created by" wide className="created">
+                <UserBadge user={creator} /> <span className="muted small">{fmtTime(task.created_at)}</span>
+              </Row>
+              <Row label="Updated" wide className="muted small">
+                {fmtTime(task.updated_at)}
+              </Row>
+            </PropGroup>
+
+            <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run tasks" />}>
+              <Row tip="Model for the agent’s run (an alias like opus or sonnet, or a full model id). Empty: the agent’s default" label="Model">
+                <ModelInput value={task.model ?? ""} disabled={!canWrite} onCommit={(v) => act(api.patchTask(task.id, { model: v }))} />
+              </Row>
+              <Row tip="Reasoning effort for the agent’s run (low to max). Empty: the agent’s default" label="Effort">
+                <EffortSelect value={task.effort ?? ""} disabled={!canWrite} onChange={(v) => act(api.patchTask(task.id, { effort: v }))} />
+              </Row>
+              <Row tip="Run it whatever the usage budget, day or night, like a cron job. The daily cap and pauses still apply" label="Always run" wide>
+                <label className="admin-check run-always" title={can("always_run") ? "Runs whatever the usage budget, day or night" : "Changing it needs the Always-run tasks permission"}>
+                  <input type="checkbox" checked={!!task.always_run} disabled={!can("always_run")} onChange={(e) => act(api.patchTask(task.id, { always_run: e.target.checked }))} />
+                  <span className="muted small">whatever the usage budget, day or night</span>
+                </label>
+              </Row>
+              {(can("allowed_tools") || (task.allowed_tools ?? []).length > 0) && (
+                <Row tip="The agent gets exactly these tools for this task (Claude Code permission rules), nothing else. Empty: its usual setup" label="Allowed tools" wide>
+                  {can("allowed_tools") ? (
+                    <ToolsInput value={task.allowed_tools ?? []} onCommit={(v) => act(api.patchTask(task.id, { allowed_tools: v }))} />
+                  ) : (
+                    <span className="tools-list" title="Changing this task needs the Task tool allowlists permission">
+                      {(task.allowed_tools ?? []).map((r) => (
+                        <code key={r}>{r}</code>
+                      ))}
+                    </span>
+                  )}
+                </Row>
+              )}
             </PropGroup>
           </div>
           {(cmd || runs.length > 0) && (
@@ -659,6 +653,11 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               </Section>
             </div>
           )}
+          <div className="tsecs" key={"side-" + task.id}>
+            <DependenciesSection task={task} wsId={ws.id} canEdit={can("relations")} onTask={onTask} onOpen={onMoved} />
+            <CustomFieldsSection task={task} fields={fields} canEdit={canWrite} onTask={onTask} />
+            <HistorySection task={task} />
+          </div>
           {canWrite && (
             <div className="tp-actions">
               <button type="button" className="button secondary" onClick={() => act(api.cloneTask(task.id), (t) => onMoved(t))}>

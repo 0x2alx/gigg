@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmtTime } from "../api";
 import { colorFor } from "../theme";
-import { Avatar, Pill } from "../ui";
+import { ClearFilters, Avatar, Pill } from "../ui";
 import { adminApi, errMsg, type AdminUser, type AuditItem } from "./adminApi";
 import { ActionPill, AdminPage, Empty, ErrorLine, TimeAgo } from "./common";
 import { Icon } from "../icons";
@@ -63,6 +63,7 @@ export function AuditPage() {
             </button>
           ))}
         </div>
+        <ClearFilters active={prefix !== ""} onClear={() => setPrefix("")} />
         {prefix && <span className="muted small">Filters the {items.length} loaded entries.</span>}
       </div>
       <ErrorLine error={error} />
