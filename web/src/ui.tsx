@@ -1,6 +1,8 @@
 // Small shared pieces: colour-coded badges and a modal. Data colours (labels, statuses, priorities,
 // users) come from theme.ts; their text colour is chosen for contrast so they read on any theme.
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useNarrow } from "./narrow";
 import { avatarURL, priorityNames, type Category, type CustomField, type Tag, type Task, type User } from "./api";
 import { cardChips } from "./items";
 import { windowBadge } from "./recurrence";
@@ -187,6 +189,7 @@ export const EXIT_MS = 150;
 // remembered on this device for the next expandable dialog.
 export function Modal({ title, onClose, children, wide, xl, help, expandable }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; xl?: boolean; help?: ReactNode; expandable?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  const narrow = useNarrow();
   const [full, setFull] = useState(() => !!expandable && readFull());
   const toggleFull = () => {
     writeFull(!full);
@@ -245,8 +248,10 @@ export function Modal({ title, onClose, children, wide, xl, help, expandable }: 
       prev?.focus();
     };
   }, []);
-  return (
-    <div className={"modal-backdrop" + (closing ? " closing" : "") + (reopen ? " reopen" : "")} inert={closing || undefined} onMouseDown={(e) => e.target === e.currentTarget && close()}>
+  // Rendered into <body>, not where it's used: a dialog opened from a table cell inherited the cell's
+  // text-align, white-space and weight. It carries the shell's "narrow" itself, for the phone rules.
+  return createPortal(
+    <div className={"modal-backdrop" + (narrow ? " narrow" : "") + (closing ? " closing" : "") + (reopen ? " reopen" : "")} inert={closing || undefined} onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className={"modal" + (xl ? " modal-xl" : wide ? " modal-wide" : "") + (full ? " modal-full" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <div className="modal-head">
           <h2>{title}</h2>
@@ -262,7 +267,8 @@ export function Modal({ title, onClose, children, wide, xl, help, expandable }: 
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

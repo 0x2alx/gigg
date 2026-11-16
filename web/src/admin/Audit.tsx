@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmtTime } from "../api";
 import { colorFor } from "../theme";
 import { ClearFilters, Avatar, Pill } from "../ui";
-import { adminApi, errMsg, type AdminUser, type AuditItem } from "./adminApi";
+import { adminApi, errMsg, type AdminUser, type ApiKey, type AuditItem } from "./adminApi";
 import { ActionPill, AdminPage, Empty, ErrorLine, TimeAgo } from "./common";
 import { Icon } from "../icons";
 
@@ -13,6 +13,7 @@ const PREFIXES = ["task", "comment", "run", "key", "user", "member", "workspace"
 export function AuditPage() {
   const [items, setItems] = useState<AuditItem[]>([]);
   const [users, setUsers] = useState<Map<number, AdminUser>>(new Map());
+  const [keys, setKeys] = useState<Map<number, ApiKey>>(new Map());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [more, setMore] = useState(true);
@@ -36,6 +37,11 @@ export function AuditPage() {
     adminApi
       .users()
       .then((r) => setUsers(new Map(r.items.map((u) => [u.id, u]))))
+      .catch(() => undefined);
+    // key names for the "acted with a key" badge (needs admin:keys; without it the badge shows the id)
+    adminApi
+      .keys()
+      .then((r) => setKeys(new Map(r.items.map((k) => [k.id, k]))))
       .catch(() => undefined);
   }, [page]);
 
@@ -81,7 +87,7 @@ export function AuditPage() {
           </thead>
           <tbody>
             {shown.map((it) => (
-              <AuditRow key={it.id} it={it} actor={it.actor_user_id !== null ? users.get(it.actor_user_id) : undefined} />
+              <AuditRow key={it.id} it={it} actor={it.actor_user_id !== null ? users.get(it.actor_user_id) : undefined} apiKey={it.key_id !== null ? keys.get(it.key_id) : undefined} />
             ))}
           </tbody>
         </table>
@@ -99,7 +105,7 @@ export function AuditPage() {
   );
 }
 
-function AuditRow({ it, actor }: { it: AuditItem; actor: AdminUser | undefined }) {
+function AuditRow({ it, actor, apiKey }: { it: AuditItem; actor: AdminUser | undefined; apiKey: ApiKey | undefined }) {
   const [open, setOpen] = useState(false);
   const json = it.data === null || it.data === undefined ? "" : JSON.stringify(it.data);
   const summary = summarize(it.data);
@@ -109,21 +115,26 @@ function AuditRow({ it, actor }: { it: AuditItem; actor: AdminUser | undefined }
         <TimeAgo ms={it.at} />
       </td>
       <td>
-        {it.actor_user_id === null ? (
-          <span className="pill pill-muted">system</span>
-        ) : actor ? (
-          <span className="user-badge">
-            <Avatar user={actor} size="xs" />
-            <span>{actor.username}</span>
-          </span>
-        ) : (
-          <span className="muted">user #{it.actor_user_id}</span>
-        )}
-        {it.key_id !== null && (
-          <span className="pill pill-key" title="Acted with an API key">
-            ⚿ #{it.key_id}
-          </span>
-        )}
+        <span className="audit-actor">
+          {it.actor_user_id === null ? (
+            <span className="pill pill-muted">system</span>
+          ) : actor ? (
+            <span className="user-badge">
+              <Avatar user={actor} size="xs" />
+              <span>{actor.username}</span>
+            </span>
+          ) : (
+            <span className="muted">user #{it.actor_user_id}</span>
+          )}
+          {it.key_id !== null && (
+            <span
+              className="pill pill-key"
+              title={apiKey ? `Acted with the API key "${apiKey.name}" (#${apiKey.id}, ${apiKey.prefix}…${apiKey.revoked ? ", revoked" : ""})` : `Acted with API key #${it.key_id}`}
+            >
+              ⚿ {apiKey ? apiKey.name : "#" + it.key_id}
+            </span>
+          )}
+        </span>
       </td>
       <td>
         <ActionPill action={it.action} />

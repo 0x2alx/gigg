@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Dialogs opened from a table row (archive, make admin, revoke…) inherited the cell's right
+  alignment and no-wrap, so titles sat on the right and text ran past the edge. Dialogs now render
+  at the top of the page.
+- Audit log: the API key badge shows the key's name (its id in the tooltip) and lines up with the
+  actor.
+
 ## 0.1.0 (2026-11-16)
 
 The first public release.

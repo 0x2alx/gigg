@@ -138,7 +138,9 @@ a.admin-name:hover { text-decoration: underline; }
 
 /* audit */
 .admin-audit td { font-size: var(--fs-sm); }
-.admin-audit .user-badge { margin-right: 0.25rem; }
+/* actor, then the key it acted with: one row, centred on the avatar (the pill sat on the text baseline) */
+.audit-actor { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.25rem 0.4rem; }
+.admin-audit .audit-actor .user-badge { margin-right: 0; }
 .admin-data { max-width: 28rem; min-width: 12rem; }
 .admin-data-sum {
   background: none; border: 0; padding: 0; font: inherit; font-size: 0.8rem; font-weight: 400; color: var(--muted);
