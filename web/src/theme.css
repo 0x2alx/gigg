@@ -16,7 +16,7 @@
   --faint: color-mix(in srgb, var(--border) 50%, var(--surface));
   --secondary: color-mix(in srgb, var(--accent) 28%, var(--surface));
   --on-secondary: var(--text);
-  --r: 4px;
+  --r: 8px;
   --radius-xs: calc(var(--r) / 4);
   --radius-s: calc(var(--r) / 2);
   --radius-m: calc(var(--r) * 3 / 4);
@@ -1256,11 +1256,15 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 }
 
 /* ---- dashboard: runners, caps, pause ---- */
-/* pages use the whole width the screen gives them; grids fit as many cards as there is room for, never wider */
+/* pages use the whole width the screen gives them, never wider; the dashboard shows at most 4 cards a
+   row (7 cards: 4 + 3), fewer when a card would get narrower than 17rem */
 .dash { width: 100%; min-width: 0; }
 .dash .page-head p { margin: var(--sp-2) 0 0; max-width: 46rem; font-size: var(--fs-base); }
 .dash-pause .ico { color: var(--danger); }
-.dash-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr)); gap: var(--sp-5); }
+.dash-cards {
+  display: grid; gap: var(--sp-5);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(17rem, (100% - 3 * var(--sp-5)) / 4)), 1fr));
+}
 .dash-card { display: flex; flex-direction: column; gap: var(--sp-5); }
 .dash-card.paused { border-color: color-mix(in srgb, var(--danger) 70%, var(--surface)); }
 .dash-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); min-height: 1.67rem; }

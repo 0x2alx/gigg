@@ -41,8 +41,8 @@ export const logoOf = (t: Pick<Theme, "logoColor" | "accent">): string => t.logo
 export const BUILTINS: Theme[] = [
   { id: "clumsy-clanker", name: "Clumsy Clanker", dark: true, background: "#120A1F", surface: "#1D1230", surfaceVariant: "#2A1A45",
     border: "#4A3275", accent: "#A77BFF", onAccent: "#160A2B", text: "#F1ECFA", mutedText: "#D9AFCF", danger: "#FF5C7A", secondary: "#7A2370",
-    font: "Oxanium", fontWeight: "Medium", textScalePct: 92, cornerDp: 4, borderDp: 1, laneColor: "#170E27", laneBorder: "#33214F", logoColor: "#7FF5E0",
-    description: "The signature look, alien-temple violet: deep plum panels, a violet accent, fuchsia secondary, pale pink secondary text and a pale aqua glow; square buttons." },
+    font: "Oxanium", fontWeight: "Bold", textScalePct: 92, cornerDp: 8, borderDp: 1, laneColor: "#170E27", laneBorder: "#33214F", logoColor: "#7FF5E0",
+    description: "The signature look, alien-temple violet: deep plum panels, a violet accent, fuchsia secondary, pale pink secondary text, a pale aqua glow and bold Oxanium; square buttons." },
   { id: "nightwalker", name: "Nightwalker", dark: true, background: "#1A2226", surface: "#253136", surfaceVariant: "#2F3D43",
     border: "#2D393E", accent: "#CDFFFB", onAccent: "#12302E", text: "#EEF8F7", mutedText: "#A3B6B8", danger: "#FF8A80", secondary: null,
     font: "Oxanium", fontWeight: "Bold", textScalePct: 93, cornerDp: 9, borderDp: 1,
