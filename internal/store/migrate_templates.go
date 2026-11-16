@@ -61,7 +61,7 @@ func init() { postSteps[8] = nameMigratedSchedules }
 
 // nameMigratedSchedules names the schedules 0008 made from recurrences after their rule.
 func nameMigratedSchedules(ctx context.Context, tx *sql.Tx) error {
-	rows, err := tx.QueryContext(ctx, "SELECT "+schCols+" FROM schedules WHERE name GLOB 'schedule [0-9]*'")
+	rows, err := tx.QueryContext(ctx, "SELECT "+schColsPre13+", 0 FROM schedules WHERE name GLOB 'schedule [0-9]*'")
 	if err != nil {
 		return err
 	}

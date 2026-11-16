@@ -143,6 +143,9 @@ func (r *Recurrence) Validate() error {
 	if err := rule.Validate(); err != nil {
 		return err
 	}
+	if rule.Frequent() {
+		return Invalid("recurring tasks repeat daily, weekly or monthly; minute and hour schedules are for crons")
+	}
 	r.SetRule(rule)
 	if r.Overlap == "" {
 		r.Overlap = "skip"
@@ -644,6 +647,9 @@ func (s *Store) Housekeeping(ctx context.Context, now int64) (JanitorResult, err
 		res.Errors = append(res.Errors, "stale runs: "+err.Error())
 	} else {
 		res.Stale = n
+	}
+	if err := s.Tx(ctx, func(tx *sql.Tx) error { cronHousekeeping(ctx, tx, now, &res); return nil }); err != nil {
+		res.Errors = append(res.Errors, "crons: "+err.Error())
 	}
 	err := s.Tx(ctx, func(tx *sql.Tx) error {
 		// missed first: a task whose window closed must not count as "still open" for overlap

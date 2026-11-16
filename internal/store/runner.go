@@ -20,6 +20,9 @@ type RunnerSettings struct {
 	PausedBy    *int64 `json:"paused_by"`
 	PausedAt    *int64 `json:"paused_at"`
 	Paused      bool   `json:"paused" doc:"Paused right now"`
+	CronsPaused   bool   `json:"crons_paused" doc:"Cron runs are paused (until resumed)"`
+	CronsPausedAt *int64 `json:"crons_paused_at"`
+	CronsPausedBy *int64 `json:"crons_paused_by"`
 	Version     int64  `json:"version"`
 }
 
@@ -37,13 +40,14 @@ func (r *RunnerSettings) IsPaused(now int64) bool {
 // GetRunnerSettings loads a workspace's settings (defaults when it has none).
 func GetRunnerSettings(ctx context.Context, q Q, ws int64) (*RunnerSettings, error) {
 	r := &RunnerSettings{WorkspaceID: ws, DailyCap: DefaultDailyCap, NightCap: DefaultNightCap}
-	var until, by, at sql.NullInt64
-	err := q.QueryRowContext(ctx, `SELECT daily_cap, night_cap, paused_until, paused_open, paused_by, paused_at, version
-		FROM runner_settings WHERE workspace_id = ?`, ws).Scan(&r.DailyCap, &r.NightCap, &until, &r.PausedOpen, &by, &at, &r.Version)
+	var until, by, at, cat, cby sql.NullInt64
+	err := q.QueryRowContext(ctx, `SELECT daily_cap, night_cap, paused_until, paused_open, paused_by, paused_at, crons_paused_at, crons_paused_by, version
+		FROM runner_settings WHERE workspace_id = ?`, ws).Scan(&r.DailyCap, &r.NightCap, &until, &r.PausedOpen, &by, &at, &cat, &cby, &r.Version)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 	r.PausedUntil, r.PausedBy, r.PausedAt = ptrInt(until), ptrInt(by), ptrInt(at)
+	r.CronsPausedAt, r.CronsPausedBy, r.CronsPaused = ptrInt(cat), ptrInt(cby), cat.Valid
 	r.Paused = r.IsPaused(Now())
 	return r, nil
 }

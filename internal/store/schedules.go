@@ -14,9 +14,9 @@ import (
 
 // Rule is when occurrences happen: the frequency, the days, and the time window in a zone.
 type Rule struct {
-	Freq          string `json:"freq" enum:"daily,weekly,monthly"`
-	Interval      int64  `json:"interval" doc:"Every N days/weeks/months"`
-	Weekdays      []int  `json:"weekdays" doc:"Weekly: 1=Mon .. 7=Sun"`
+	Freq          string `json:"freq" enum:"minutes,hours,daily,weekly,monthly" doc:"minutes and hours: crons only"`
+	Interval      int64  `json:"interval" doc:"Every N minutes (1-360), hours (1-24), days, weeks or months"`
+	Weekdays      []int  `json:"weekdays" doc:"Weekly: 1=Mon .. 7=Sun; minutes/hours: only on these days (empty: every day)"`
 	MonthDay      *int64 `json:"month_day" doc:"Monthly: 1-31, -1 = last day (short months use their last day)"`
 	TZ            string `json:"tz" doc:"IANA time zone"`
 	WindowStart   string `json:"window_start" doc:"When the window opens, local HH:MM"`
@@ -58,6 +58,23 @@ func (r *Rule) Validate() error {
 		return Invalid("lead_minutes: 0 to 10080 (7 days)")
 	}
 	switch r.Freq {
+	case "minutes", "hours":
+		// ticks every N from window_start while the window is open, every day or on the weekdays given
+		if r.Freq == "minutes" && r.Interval > 360 {
+			return Invalid("minutes: every 1-360 minutes")
+		}
+		if r.Freq == "hours" && r.Interval > 24 {
+			return Invalid("hours: every 1-24 hours")
+		}
+		if r.WindowMinutes > 1440 {
+			return Invalid("minute and hour schedules: the daily window is at most 1440 minutes")
+		}
+		r.MonthDay, r.LeadMinutes = nil, 0
+		days, err := normWeekdays(r.Weekdays)
+		if err != nil {
+			return err
+		}
+		r.Weekdays = days
 	case "daily":
 		r.Weekdays, r.MonthDay = []int{}, nil
 	case "weekly":
@@ -84,9 +101,82 @@ func (r *Rule) Validate() error {
 		}
 		r.Weekdays = []int{}
 	default:
-		return Invalid("freq is daily, weekly or monthly")
+		return Invalid("freq is minutes, hours, daily, weekly or monthly")
 	}
 	return nil
+}
+
+// Frequent reports a minute or hour rule (crons only).
+func (r Rule) Frequent() bool { return r.Freq == "minutes" || r.Freq == "hours" }
+
+func normWeekdays(in []int) ([]int, error) {
+	seen := map[int]bool{}
+	for _, d := range in {
+		if d < 1 || d > 7 {
+			return nil, Invalid("weekdays are 1 (Mon) to 7 (Sun)")
+		}
+		seen[d] = true
+	}
+	days := []int{}
+	for d := 1; d <= 7; d++ {
+		if seen[d] {
+			days = append(days, d)
+		}
+	}
+	return days, nil
+}
+
+// Step is the time between two slots of a rule (minutes/hours: the interval; otherwise a day).
+func (r Rule) Step() time.Duration {
+	switch r.Freq {
+	case "minutes":
+		return time.Duration(max(r.Interval, 1)) * time.Minute
+	case "hours":
+		return time.Duration(max(r.Interval, 1)) * time.Hour
+	}
+	return 24 * time.Hour
+}
+
+// Next returns the first slot at or after `after` (unix ms): for minute/hour rules a tick, otherwise
+// the start of an occurrence window. startsOn anchors "every N days/weeks/months".
+func (r Rule) Next(startsOn, after int64) (int64, bool) {
+	if !r.Frequent() {
+		rec := &Recurrence{StartsOn: startsOn}
+		rec.SetRule(r)
+		return rec.NextOccurrence(after)
+	}
+	loc, err := time.LoadLocation(r.TZ)
+	if err != nil {
+		return 0, false
+	}
+	hm, err := time.Parse("15:04", r.WindowStart)
+	if err != nil {
+		return 0, false
+	}
+	step := r.Step().Milliseconds()
+	from := time.UnixMilli(after).In(loc)
+	for i := -1; i < 9; i++ { // yesterday's window may run past midnight
+		d := time.Date(from.Year(), from.Month(), from.Day()+i, 12, 0, 0, 0, loc)
+		if len(r.Weekdays) > 0 {
+			wd := int(d.Weekday())
+			if wd == 0 {
+				wd = 7
+			}
+			if !slices.Contains(r.Weekdays, wd) {
+				continue
+			}
+		}
+		open := time.Date(d.Year(), d.Month(), d.Day(), hm.Hour(), hm.Minute(), 0, 0, loc).UnixMilli()
+		end := open + r.WindowMinutes*60_000
+		t := open
+		if after > open {
+			t = open + (after-open+step-1)/step*step
+		}
+		if t < end {
+			return t, true
+		}
+	}
+	return 0, false
 }
 
 // Same reports two rules that create the same occurrences (both validated).
@@ -112,6 +202,29 @@ func (r Rule) Describe() string {
 	}
 	var s string
 	switch r.Freq {
+	case "minutes", "hours":
+		unit := map[string]string{"minutes": "min", "hours": "h"}[r.Freq]
+		s = fmt.Sprintf("Every %d %s", n, unit)
+		if r.Freq == "hours" && n == 1 {
+			s = "Every hour"
+		}
+		if len(r.Weekdays) > 0 && len(r.Weekdays) < 7 {
+			names := []string{}
+			for _, d := range r.Weekdays {
+				names = append(names, weekdayNames[d-1])
+			}
+			s += " on " + strings.Join(names, ", ")
+			if fmt.Sprint(r.Weekdays) == "[1 2 3 4 5]" {
+				s = strings.TrimSuffix(s, " on Mon, Tue, Wed, Thu, Fri") + " on weekdays"
+			}
+		}
+		if w := windowText(r.WindowStart, r.WindowMinutes); w != "" && w != "all day" {
+			s += ", " + w
+		}
+		if r.TZ != "" && r.TZ != DefaultTZ {
+			s += " (" + r.TZ + ")"
+		}
+		return templateName(s)
 	case "daily":
 		s = "Every day"
 		if n > 1 {
@@ -215,17 +328,21 @@ type Schedule struct {
 	CreatedAt int64 `json:"created_at"`
 	Version   int64 `json:"version"`
 	Uses      int64 `json:"uses" doc:"Live recurring tasks using this schedule"`
+	CronUses  int64 `json:"cron_uses" doc:"Live crons using this schedule"`
 }
 
-const schCols = `id, workspace_id, name, freq, interval_n, weekdays, month_day, tz, window_start, window_minutes, lead_minutes, created_by, created_at, version,
+// schColsPre13 is the column list without the cron count (migration steps before 0013 add ", 0").
+const schColsPre13 = `id, workspace_id, name, freq, interval_n, weekdays, month_day, tz, window_start, window_minutes, lead_minutes, created_by, created_at, version,
 	(SELECT count(*) FROM recurrences r WHERE r.schedule_id = schedules.id AND r.deleted_at IS NULL)`
+
+const schCols = schColsPre13 + `, (SELECT count(*) FROM crons c WHERE c.schedule_id = schedules.id AND c.deleted_at IS NULL)`
 
 func scanSchedule(row interface{ Scan(...any) error }) (*Schedule, error) {
 	s := &Schedule{}
 	var weekdays string
 	var md sql.NullInt64
 	if err := row.Scan(&s.ID, &s.WorkspaceID, &s.Name, &s.Freq, &s.Interval, &weekdays, &md, &s.TZ, &s.WindowStart, &s.WindowMinutes, &s.LeadMinutes,
-		&s.CreatedBy, &s.CreatedAt, &s.Version, &s.Uses); err != nil {
+		&s.CreatedBy, &s.CreatedAt, &s.Version, &s.Uses, &s.CronUses); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -324,6 +441,9 @@ func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) 
 		if expect != 0 && expect != cur.Version {
 			return nil, ErrVersion
 		}
+		if s.Rule.Frequent() && cur.Uses > 0 {
+			return nil, Invalid("recurring tasks use this schedule: minute and hour schedules are for crons only")
+		}
 		if s.Name == cur.Name && cur.Name == cur.Rule.Describe() {
 			s.Name = s.Rule.Describe() // a name describing the rule follows it (unless renamed)
 		}
@@ -371,7 +491,7 @@ func rescheduleAll(ctx context.Context, q Q, schedule int64) error {
 			return err
 		}
 	}
-	return nil
+	return rescheduleCrons(ctx, q, "schedule_id", schedule)
 }
 
 // DeleteSchedule removes a schedule no recurring task uses.
@@ -395,6 +515,9 @@ func DeleteSchedule(ctx context.Context, q Q, a Actor, s *Schedule) error {
 	rows.Close()
 	if len(names) > 0 {
 		return Conflict("recurring tasks use this schedule: %s. Delete them or give them another schedule first", strings.Join(names, ", "))
+	}
+	if s.CronUses > 0 {
+		return Conflict("%d cron(s) use this schedule. Delete them or give them another schedule first", s.CronUses)
 	}
 	if _, err := q.ExecContext(ctx, `UPDATE schedules SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), s.ID); err != nil {
 		return err
