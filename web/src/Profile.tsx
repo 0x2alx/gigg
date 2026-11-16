@@ -78,6 +78,7 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
 }
 
 function Password({ onLogout }: { onLogout: () => void }) {
+  const { me } = useApp();
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
@@ -96,13 +97,15 @@ function Password({ onLogout }: { onLogout: () => void }) {
   return (
     <form className="card form-grid" onSubmit={submit} aria-label="Change password">
       <h2 className="span2">Password</h2>
+      {/* for password managers: which account the new password belongs to */}
+      <input type="text" name="username" autoComplete="username" value={me.user.username} readOnly hidden />
       <label className="span2">
         Current password
         <input type="password" autoComplete="current-password" value={cur} onChange={(e) => setCur(e.target.value)} required />
       </label>
       <label>
-        New password <span className="muted small">12+ characters</span>
-        <input type="password" autoComplete="new-password" minLength={12} value={next} onChange={(e) => setNext(e.target.value)} required />
+        New password
+        <input type="password" autoComplete="new-password" minLength={12} placeholder="12+ characters" value={next} onChange={(e) => setNext(e.target.value)} required />
       </label>
       <label>
         Again

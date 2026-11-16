@@ -160,7 +160,8 @@ function KeyCard({
         ) : <span className="pill pill-ws">{ws?.name ?? `workspace #${k.workspace_id}`}</span>}
         <span className="grow" />
         {st === "live" && (
-          <>
+          // the two actions stay together when the header wraps (phone)
+          <span className="admin-key-actions">
             <ConfirmButton
               label="Rotate"
               danger={false}
@@ -176,7 +177,7 @@ function KeyCard({
               confirmLabel="Revoke"
               onConfirm={onRevoke}
             />
-          </>
+          </span>
         )}
       </header>
       <dl className="admin-props">

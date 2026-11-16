@@ -120,7 +120,18 @@ var codeFor = map[int]string{400: "bad_request", 401: "unauthorized", 403: "forb
 	409: "conflict", 412: "version_conflict", 413: "too_large", 415: "unsupported_media_type", 422: "invalid", 428: "precondition_required",
 	429: "rate_limited", 500: "internal"}
 
+// statusClientClosed: the client went away before the answer (nginx's 499). Nobody reads the
+// response; the status keeps a cancelled request from looking like a server failure in the logs.
+const statusClientClosed = 499
+
 func newProblem(status int, msg string, errs ...error) huma.StatusError {
+	if status == http.StatusInternalServerError {
+		for _, e := range errs {
+			if errors.Is(e, context.Canceled) {
+				return fail(statusClientClosed, "client_closed", "The request was cancelled.")
+			}
+		}
+	}
 	p := &Problem{Type: "about:blank", Title: http.StatusText(status), Status: status, Code: codeFor[status], Detail: msg}
 	if p.Code == "" {
 		p.Code = "error"
@@ -283,6 +294,10 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 				return
 			}
 			p, why := a.keyPrincipal(ctx, tok, req)
+			if why == whyUnavailable && r.Context().Err() != nil {
+				w.WriteHeader(statusClientClosed) // the client left before the lookup finished
+				return
+			}
 			if why == whyUnavailable {
 				a.log.Error("key lookup failed", "listener", req.Listener, "request_id", req.RequestID)
 				unavailable(w, req.RequestID)
@@ -303,6 +318,10 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 
 		if c, err := r.Cookie(a.cookieName()); err == nil && a.listener(req.Listener).UI {
 			p, err := a.sessionPrincipal(ctx, c.Value, req)
+			if err != nil && errors.Is(err, context.Canceled) {
+				w.WriteHeader(statusClientClosed) // the client left (a page change): nothing failed
+				return
+			}
 			if err != nil {
 				// a database error is not a logged-out user: 503, so the page retries instead of
 				// sending the user to the login page

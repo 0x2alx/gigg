@@ -128,6 +128,7 @@ a.admin-name:hover { text-decoration: underline; }
 .admin-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(26rem, 100%), 1fr)); gap: 1rem; margin-bottom: 0.75rem; }
 .admin-key { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
 .admin-key-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.admin-key-actions { display: inline-flex; gap: 0.4rem; margin-left: auto; }
 .admin-key-name { font-weight: var(--weight-strong); font-size: var(--fs-md); margin-right: 0.2rem; overflow-wrap: anywhere; }
 .admin-props { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-3) var(--sp-6); margin: 0; font-size: var(--fs-base); }
 .admin-props dt { color: var(--muted); font-size: var(--fs-sm); padding-top: 0.1rem; }

@@ -1095,8 +1095,10 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 .tp-value { min-width: 0; min-height: 2rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; overflow-wrap: anywhere; }
 .tp-value > select, .tp-value > input { width: 100%; }
 .tp-value > .inline-edit, .tp-value > .chips, .tp-value > .label-input { flex: 1 1 100%; min-width: 0; }
-@container tpsec (min-width: 34rem) {
-  .tp-grid { grid-template-columns: 7.5rem minmax(0, 1fr) 7.5rem minmax(0, 1fr); }
+/* two pairs a row only when each value still has room for a project name or "agent default"; the
+   second label column fits its labels (Project, Effort) */
+@container tpsec (min-width: 38rem) {
+  .tp-grid { grid-template-columns: 7.5rem minmax(0, 1fr) max-content minmax(0, 1fr); }
 }
 @container tpsec (max-width: 24rem) {
   .tp-grid { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
@@ -1420,7 +1422,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   font: inherit; font-size: var(--fs-xs); font-weight: var(--weight-strong); line-height: 1;
 }
 .help-button:hover, .help-button:focus-visible { color: var(--accent); border-color: var(--accent); }
-.page-head h1 .help-button { margin-left: 0.5rem; vertical-align: middle; }
+h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } /* every page title: the same gap before its help and count */
 .help-body { max-height: min(70vh, 40rem); overflow-y: auto; font-size: 0.92rem; line-height: 1.5; }
 .help-body .md p, .help-body .md li { font-size: inherit; margin: 0.35rem 0; }
 .help-body .md ul { padding-left: 1.2rem; margin: 0.35rem 0; }

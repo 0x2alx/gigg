@@ -51,11 +51,13 @@ From a client container on the same network (it needs the dev CA and the bootstr
 
 ```sh
 podman build -t localhost/gigg-client dev/client
-podman run --rm --network gigg-dev -v "$PWD/scratch":/s:ro -v "$PWD/scratch/ca":/ca:ro \
+podman run --rm --user 65532 --network gigg-dev -v "$PWD/scratch":/s:ro -v "$PWD/scratch/ca":/ca:ro \
   -v "$PWD/dev/e2e.sh":/e2e.sh:ro localhost/gigg-client sh /e2e.sh
 ```
 
-It needs a fresh data volume (it expects the first task to be `GIG-1`). `dev/probe.sh` checks the
+It needs a fresh data volume (it expects the first task to be `GIG-1`): rerun the bootstrap on a new
+volume before each run. `--user 65532`: the key file the bootstrap wrote is readable only by the
+image's user. `dev/probe.sh` checks the
 listeners the same way (TLS, headers, host checks).
 
 ## UI scenarios and screenshots
