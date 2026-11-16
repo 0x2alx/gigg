@@ -469,7 +469,8 @@ Commands an agent's executor runs on a schedule, sandboxed, with a run history a
 [the guide](../guide/crons.md)). Reading needs view and `crons:read`; changing needs the `crons`
 permission and `crons:write`; `unsandboxed: true` also needs `cron_unsandboxed`. A change by someone
 without `cron_unsandboxed` turns the flag off (on a template other crons share: on a sandboxed copy for
-that cron), and so do they not resume or run-now a no-sandbox cron, nor retime its schedule.
+that cron); they can't resume or run-now a no-sandbox cron, retime its schedule, or `PUT` a no-sandbox
+template directly (403: edit a cron that uses it instead).
 `command_set_by` changes only with the command text; `unsandboxed_set_by` is who turned the sandbox
 off. Sending a `host` cron's output to gigg needs the command's author or `manage_workspace`; changing
 a cron's worker needs `manage_workspace`; its failure task, the worker or `manage_workspace`.

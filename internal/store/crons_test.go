@@ -320,6 +320,29 @@ func TestCronProvenance(t *testing.T) {
 	must(t, err)
 	two, err := c.create(NewCron{WorkspaceID: f.ws.ID, WorkerID: f.agent.ID, TemplateID: one.TemplateID, Rule: every}, true)
 	must(t, err)
+	// asking to keep the flag on doesn't skip the copy, and changes the shared template nowhere
+	on, cmd := true, "curl evil"
+	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := UpdateCron(f.ctx, tx, agent, two.ID, 0, CronChange{Unsandboxed: &on, Command: &cmd}, CronEdit{})
+		return err
+	})
+	if !errors.Is(err, ErrInvalid) {
+		t.Fatalf("non-holder sending unsandboxed=true: %v", err)
+	}
+	// nor straight on the template
+	shared, _ := GetCronTemplate(f.ctx, f.s.R, one.TemplateID)
+	edited := *shared
+	edited.Command = "curl evil"
+	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := SaveCronTemplate(f.ctx, tx, agent, &edited, 0, CronEdit{})
+		return err
+	})
+	if !errors.Is(err, ErrDenied) {
+		t.Fatalf("non-holder saving a no-sandbox template: %v", err)
+	}
+	if shared, _ = GetCronTemplate(f.ctx, f.s.R, one.TemplateID); shared.Command != "curl 127.0.0.1" || !shared.Unsandboxed {
+		t.Fatalf("shared template changed: %+v", shared)
+	}
 	// the agent retimes the second: it gets a sandboxed copy, the first keeps the shared template
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
 		_, err := UpdateCron(f.ctx, tx, agent, two.ID, 0, CronChange{Rule: &Rule{Freq: "minutes", Interval: 10, TZ: "America/New_York"}}, CronEdit{})

@@ -184,8 +184,9 @@ type CronEdit struct {
 //   - command_set_by changes only with the command text (a timeout or name edit by a trusted user
 //     never makes someone else's command look like theirs);
 //   - unsandboxed_set_by is who turned the sandbox off (the claim checks they still may); only someone
-//     holding cron_unsandboxed turns it off, and any change by someone without it turns it back on
-//     without re-attributing the command;
+//     holding cron_unsandboxed turns it off or changes a no-sandbox template at all. Without it, a
+//     change goes through a cron (UpdateCron: the cron gets a sandboxed copy, or a sole-use template
+//     goes back in the sandbox), never straight to the template;
 //   - output host -> gigg (the output starts reaching gigg) only by the command's author or a manager.
 func SaveCronTemplate(ctx context.Context, q Q, a Actor, t *CronTemplate, expect int64, e CronEdit) (*CronTemplate, error) {
 	if err := t.Validate(); err != nil {
@@ -230,9 +231,10 @@ func SaveCronTemplate(ctx context.Context, q Q, a Actor, t *CronTemplate, expect
 	if t.Unsandboxed && !cur.Unsandboxed && !e.CanUnsandbox {
 		return nil, Invalid("only people with the No-sandbox crons permission can turn the sandbox off")
 	}
-	cleared := false
 	if cur.Unsandboxed && !e.CanUnsandbox {
-		t.Unsandboxed, cleared = false, true // any change by someone without the permission turns it off
+		// other crons may share it: they'd get content they never had reviewed. Through a cron, the
+		// change lands on a sandboxed copy instead (UpdateCron)
+		return nil, Denied("this template runs without the sandbox: changing it needs No-sandbox crons (edit a cron that uses it instead: it gets a sandboxed copy)")
 	}
 	if cur.Output == "host" && t.Output == "gigg" && a.UserID != cur.CommandSetBy && !e.CanManage {
 		return nil, Denied("only the command's author or someone with Manage the workspace can send a host-only cron's output to gigg")
@@ -254,9 +256,6 @@ func SaveCronTemplate(ctx context.Context, q Q, a Actor, t *CronTemplate, expect
 		return nil, err
 	}
 	data := map[string]any{"name": t.Name, "command_changed": t.Command != cur.Command, "unsandboxed": t.Unsandboxed}
-	if cleared {
-		data["unsandboxed_cleared"] = true
-	}
 	if _, err := Activity(ctx, q, a, &t.WorkspaceID, nil, "cron_template.updated", "cron_template", t.ID, data); err != nil {
 		return nil, err
 	}
@@ -564,7 +563,7 @@ func UpdateCron(ctx context.Context, q Q, a Actor, id, expect int64, ch CronChan
 		}
 		tplID = t.ID
 	}
-	if !e.CanUnsandbox && !(ch.Unsandboxed != nil && *ch.Unsandboxed) {
+	if !e.CanUnsandbox { // asking to turn it on doesn't skip the copy: the save below refuses that
 		if tplID, err = sandboxedFor(ctx, q, a, tplID, c.ID, tplID != c.TemplateID); err != nil {
 			return nil, err
 		}

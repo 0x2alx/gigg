@@ -538,7 +538,7 @@ func (a *API) registerCrons() {
 		return &cronTemplateOut{ETag: etag(t.Version), Body: t}, nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "update-cron-template", Method: "PUT", Path: "/cron-templates/{id}", Tags: []string{"crons"},
-		Summary: "Replace a cron template (every cron using it changes). Someone without No-sandbox crons saving it turns its sandbox back on"},
+		Summary: "Replace a cron template (every cron using it changes). A no-sandbox template: only with No-sandbox crons (403 otherwise; edit a cron instead)"},
 		func(ctx context.Context, in *struct {
 			ID      int64  `path:"id"`
 			IfMatch string `header:"If-Match"`

@@ -34,7 +34,7 @@ When a cron starts failing, or recovers, the agent's executor also posts an aler
 
 Some commands need what the sandbox blocks, for example a service on localhost. **Run outside the sandbox** is offered only to people with the **No-sandbox crons** permission. Such a cron runs with everything the agent's user can reach, so turn it on only for commands you've read and trust.
 
-The flag doesn't survive other hands. When someone without that permission changes anything in the cron, it goes back into the sandbox (if other crons share its template, this cron gets a sandboxed copy and theirs stay as they were). They can pause it, but not resume it, run it now or retime its schedule. When the person who set it loses the permission, its runs fail instead of running unsandboxed.
+The flag doesn't survive other hands. When someone without that permission changes anything in the cron, it goes back into the sandbox (if other crons share its template, this cron gets a sandboxed copy and theirs stay as they were). They can pause it, but not resume it, run it now, retime its schedule or edit its template directly. When the person who set it loses the permission, its runs fail instead of running unsandboxed.
 
 ## Pausing everything
 
