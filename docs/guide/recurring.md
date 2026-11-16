@@ -25,7 +25,7 @@ You can also pick an existing **template** and an existing **schedule** in the s
 
 - Editing a **template** changes what every recurring task that uses it creates from then on. The same goes for a **schedule** and its timing.
 - When you edit a recurring task, the form tells you who else uses its template and schedule. You can change them in place for everyone, or switch this recurring task to another template or schedule.
-- A template or schedule that's in use can't be deleted. Deleting a recurring task leaves its template and schedule in place.
+- A template or schedule that's in use can't be deleted. Deleting a recurring task leaves its template and schedule in place, unless you tick **Also delete its template** / **Also delete its schedule** in the confirmation; those are offered only when no other recurring task uses them.
 - **Pause** on a recurring task stops new occurrences; the ones already made stay.
 
 ## Templates

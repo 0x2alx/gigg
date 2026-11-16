@@ -302,21 +302,65 @@ func (a *API) registerRecurrence() {
 		return a.recurrenceOut(r), nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-recurrence", Method: "DELETE", Path: "/recurrences/{id}", Tags: []string{"recurrence"},
-		Summary: "Stop a recurring task (its tasks, template and schedule stay)", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
-		p, err := me(ctx)
-		if err != nil {
-			return nil, err
-		}
-		r, err := a.recurrence(ctx, p, in.ID)
-		if err != nil {
-			return nil, err
-		}
-		if err := require(p, r.WorkspaceID, access.Member, "tasks:write"); err != nil {
-			return nil, err
-		}
-		if err := allowed(p, r.WorkspaceID, "schedules"); err != nil {
-			return nil, err
-		}
-		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteRecurrence(ctx, tx, p.Actor(), r) })
-	})
+		Summary: "Stop a recurring task (its tasks stay; its template and schedule too, unless asked)", DefaultStatus: 204,
+		Description: "`template=true` / `schedule=true` also delete its template / schedule, refused (409, nothing deleted) when another recurring task uses it."},
+		func(ctx context.Context, in *struct {
+			ID       int64 `path:"id"`
+			Template bool  `query:"template" doc:"Also delete its template (when no other recurring task uses it)"`
+			Schedule bool  `query:"schedule" doc:"Also delete its schedule (when no other recurring task uses it)"`
+		}) (*struct{}, error) {
+			p, err := me(ctx)
+			if err != nil {
+				return nil, err
+			}
+			r, err := a.recurrence(ctx, p, in.ID)
+			if err != nil {
+				return nil, err
+			}
+			if err := require(p, r.WorkspaceID, access.Member, "tasks:write"); err != nil {
+				return nil, err
+			}
+			if err := allowed(p, r.WorkspaceID, "schedules"); err != nil {
+				return nil, err
+			}
+			var tpl *store.Template
+			if in.Template {
+				// as for changing its content: someone else's template needs Task templates, and a key
+				// limited to some projects can't delete one for every project
+				t, err := store.GetTemplate(ctx, a.st.R, r.TemplateID)
+				if err != nil {
+					return nil, storeErr(err)
+				}
+				if r.TemplateBy != p.User.ID {
+					if err := allowed(p, r.WorkspaceID, "templates"); err != nil {
+						return nil, err
+					}
+				}
+				if p.Narrowed() && t.ProjectID == nil {
+					return nil, errForbidden("A key limited to some projects only changes templates of those projects.")
+				}
+				tpl = t
+			}
+			return nil, a.tx(ctx, func(tx *sql.Tx) error {
+				if err := store.DeleteRecurrence(ctx, tx, p.Actor(), r); err != nil {
+					return err
+				}
+				// each refuses (and the whole delete rolls back) while another recurring task uses it
+				if tpl != nil {
+					if err := store.DeleteTemplate(ctx, tx, p.Actor(), tpl); err != nil {
+						return err
+					}
+				}
+				if in.Schedule {
+					s, err := store.GetSchedule(ctx, tx, r.ScheduleID)
+					if err != nil {
+						return err
+					}
+					if err := store.DeleteSchedule(ctx, tx, p.Actor(), s); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		})
 }

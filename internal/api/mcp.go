@@ -526,9 +526,24 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				return toolResult(call("PUT", fmt.Sprintf("/recurrences/%d", in.ID), nil, in.merge(b)))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "delete_recurring", Description: "Stop a recurring task. Tasks it already created, its template and its schedule stay.", Annotations: rw("Delete recurring task", true)},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in recArg) (*mcp.CallToolResult, any, error) {
-				return toolResult(call("DELETE", fmt.Sprintf("/recurrences/%d", in.ID), nil, nil))
+		mcp.AddTool(s, &mcp.Tool{Name: "delete_recurring", Description: "Stop a recurring task. Tasks it already created stay; its template and schedule too, unless also_template / also_schedule (refused while another recurring task uses them).", Annotations: rw("Delete recurring task", true)},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in struct {
+				ID           int64 `json:"id"`
+				AlsoTemplate bool  `json:"also_template,omitempty" jsonschema:"also delete its template (when no other recurring task uses it)"`
+				AlsoSchedule bool  `json:"also_schedule,omitempty" jsonschema:"also delete its schedule (when no other recurring task uses it)"`
+			}) (*mcp.CallToolResult, any, error) {
+				q := []string{}
+				if in.AlsoTemplate {
+					q = append(q, "template=true")
+				}
+				if in.AlsoSchedule {
+					q = append(q, "schedule=true")
+				}
+				path := fmt.Sprintf("/recurrences/%d", in.ID)
+				if len(q) > 0 {
+					path += "?" + strings.Join(q, "&")
+				}
+				return toolResult(call("DELETE", path, nil, nil))
 			})
 	}
 	addScheduleTools(s, p, call, ws)

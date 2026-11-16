@@ -631,7 +631,8 @@ func (a *API) registerTasks() {
 			if p.Key != nil {
 				via = &p.Key.ID
 			}
-			return store.CloneTask(ctx, tx, p.Actor(), t, proj, in.Body.Title, via)
+			// the checklist comes along when the caller may add one (as when creating a task)
+			return store.CloneTask(ctx, tx, p.Actor(), t, proj, in.Body.Title, via, p.Allowed(t.WorkspaceID, "checklists"))
 		})
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-task", Method: "DELETE", Path: "/tasks/{id}", Tags: []string{"tasks"},

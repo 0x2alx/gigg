@@ -508,7 +508,9 @@ export const api = {
   createRecurrence: (p: number, body: RecurrenceBody) => call<Recurrence>("POST", `/projects/${p}/recurrences`, body),
   putRecurrence: (id: number, body: RecurrenceBody, version?: number) =>
     call<Recurrence>("PUT", `/recurrences/${id}`, body, version ? { "If-Match": `"${version}"` } : undefined),
-  deleteRecurrence: (id: number) => call<void>("DELETE", `/recurrences/${id}`),
+  // also: its template and/or schedule too (refused while another recurring task uses them)
+  deleteRecurrence: (id: number, also: { template?: boolean; schedule?: boolean } = {}) =>
+    call<void>("DELETE", `/recurrences/${id}${also.template || also.schedule ? "?" + [also.template && "template=true", also.schedule && "schedule=true"].filter(Boolean).join("&") : ""}`),
   schedules: (ws: string | number) => call<{ items: Schedule[] }>("GET", `/workspaces/${ws}/schedules`),
   createSchedule: (ws: string | number, body: ScheduleBody) => call<Schedule>("POST", `/workspaces/${ws}/schedules`, body),
   putSchedule: (id: number, body: ScheduleBody, version?: number) =>

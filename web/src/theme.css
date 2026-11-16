@@ -783,6 +783,7 @@ label.check input { width: auto; accent-color: var(--accent); }
 .schedule-rule { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; color: var(--text); font-size: 0.9rem; }
 .schedule .chips { margin: 0; align-items: center; }
 .schedule-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.rec-delete { display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem; } /* the delete confirm: question, the "also delete" ticks, the buttons */
 .schedule-ref { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .schedule-ref .link { padding: 0; text-align: left; overflow-wrap: anywhere; }
 .window { display: flex; flex-direction: column; gap: 0.4rem; }

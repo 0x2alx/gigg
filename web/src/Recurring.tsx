@@ -27,6 +27,12 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState<Recurrence | "new" | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null);
+  // the confirm's "also delete" ticks (start unticked each time it opens)
+  const [also, setAlso] = useState<{ template: boolean; schedule: boolean }>({ template: false, schedule: false });
+  const askDelete = (id: number) => {
+    setAlso({ template: false, schedule: false });
+    setConfirm(id);
+  };
   const [busy, setBusy] = useState<number | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const closeEdit = useCallback(() => setEditing(null), []);
@@ -84,7 +90,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
     setBusy(r.id);
     setErr("");
     api
-      .deleteRecurrence(r.id)
+      .deleteRecurrence(r.id, also)
       .then(() => {
         setItems((xs) => xs?.filter((x) => x.id !== r.id) ?? null);
         setConfirm(null);
@@ -192,15 +198,36 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
               {canWrite && (
                 <div className="schedule-actions">
                   {confirm === r.id ? (
-                    <>
-                      <span className="small">Delete this recurring task? Its tasks, template and schedule stay.</span>
-                      <button type="button" className="button danger-button small" disabled={busy === r.id} onClick={() => remove(r)}>
-                        Delete
-                      </button>
-                      <button type="button" className="button secondary small" onClick={() => setConfirm(null)}>
-                        Keep
-                      </button>
-                    </>
+                    <div className="rec-delete">
+                      <span className="small">Delete this recurring task? The tasks it already made stay.</span>
+                      {/* its template and schedule can go too, when no other recurring task uses them */}
+                      {r.template_uses <= 1 ? (
+                        (r.template_created_by === me.user.id || hasCap(me, "templates", r.workspace_id)) && (
+                          <label className="check small">
+                            <input type="checkbox" checked={also.template} onChange={(e) => setAlso((a) => ({ ...a, template: e.target.checked }))} />
+                            Also delete its template “{r.template_name}”
+                          </label>
+                        )
+                      ) : (
+                        <span className="muted small">Its template “{r.template_name}” stays: {r.template_uses - 1} other recurring task{r.template_uses === 2 ? " uses" : "s use"} it.</span>
+                      )}
+                      {r.schedule_uses <= 1 ? (
+                        <label className="check small">
+                          <input type="checkbox" checked={also.schedule} onChange={(e) => setAlso((a) => ({ ...a, schedule: e.target.checked }))} />
+                          Also delete its schedule “{r.schedule_name}”
+                        </label>
+                      ) : (
+                        <span className="muted small">Its schedule “{r.schedule_name}” stays: {r.schedule_uses - 1} other recurring task{r.schedule_uses === 2 ? " uses" : "s use"} it.</span>
+                      )}
+                      <div className="row">
+                        <button type="button" className="button danger-button small" disabled={busy === r.id} onClick={() => remove(r)}>
+                          Delete
+                        </button>
+                        <button type="button" className="button secondary small" onClick={() => setConfirm(null)}>
+                          Keep
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <>
                       <button type="button" className="button secondary small" disabled={busy === r.id} onClick={() => togglePause(r)} aria-label={`${r.paused ? "Resume" : "Pause"} ${r.title}`}>
@@ -210,7 +237,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                       <button type="button" className="button secondary small" onClick={() => setEditing(r)} aria-label={`Edit ${r.title}`}>
                         <Icon name="pencil" /> Edit
                       </button>
-                      <button type="button" className="button danger-button small" onClick={() => setConfirm(r.id)} aria-label={`Delete ${r.title}`}>
+                      <button type="button" className="button danger-button small" onClick={() => askDelete(r.id)} aria-label={`Delete ${r.title}`}>
                         <Icon name="trash" /> Delete
                       </button>
                     </>

@@ -46,7 +46,7 @@ The panel has the same layout as the **New task** form, each part in its own box
   - **Fields**: the workspace's custom fields (text, number, date, select, checkbox, link).
   - **History**: who changed what and when, newest first: edits, moves, links, checklist changes, comments and agent runs. It updates live. The admin audit log keeps the rest (which key, from where).
 - **Agent session** (folding): the resume command, each run with status, duration and cost, and the transcript path. **Resume** asks the agent to continue its previous session, with your text as the next instruction. It's folded unless the agent is waiting for your answer.
-- **Clone**, **Archive** / **Unarchive** and **Delete** are at the bottom of the panel.
+- **Clone**, **Archive** / **Unarchive** and **Delete** are at the bottom of the panel. **Clone** copies the task's content, labels, assignees, dates, custom fields and checklist (every item unticked), but not its subtasks, dependencies, comments or runs.
 
 ## Subtasks and dependencies
 

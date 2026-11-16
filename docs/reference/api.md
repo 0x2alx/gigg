@@ -382,7 +382,7 @@ in [access.md](access.md).
 | GET | `/tasks/{id}` | A task, by id or key. |
 | PATCH | `/tasks/{id}` | Change a task's fields (`null` clears). |
 | POST | `/tasks/{id}/move` | Move a task: status, position, or another project of the workspace. |
-| POST | `/tasks/{id}/clone` | Copy a task (optionally into another project). |
+| POST | `/tasks/{id}/clone` | Copy a task (optionally into another project): content, labels, assignees, dates, custom field values, and the checklist unticked (with the Checklists permission). |
 | DELETE | `/tasks/{id}` | Move a task to the trash. |
 | POST | `/tasks/{id}/restore` | Restore a task from the trash. |
 | POST | `/tasks/{id}/archive` | Archive a task (off the board and lists; not trash). |
@@ -452,7 +452,7 @@ Markdown cut to 280 characters).
 | POST | `/projects/{p}/recurrences` | Create a recurring task. |
 | GET | `/recurrences/{id}` | A recurring task with its next five occurrences. |
 | PUT | `/recurrences/{id}` | Replace a recurring task; the next occurrence is recomputed from now. |
-| DELETE | `/recurrences/{id}` | Stop a recurring task (its tasks, template and schedule stay). |
+| DELETE | `/recurrences/{id}` | Stop a recurring task. Its tasks stay; `?template=true` / `?schedule=true` also delete its template / schedule (409 and nothing deleted while another recurring task uses it). |
 | GET | `/workspaces/{ws}/schedules` | Schedules (named timing). |
 | POST | `/workspaces/{ws}/schedules` | Make a schedule. |
 | GET | `/schedules/{id}` | A schedule. |

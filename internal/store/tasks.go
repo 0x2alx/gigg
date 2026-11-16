@@ -1074,9 +1074,11 @@ func MoveTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, m Move) 
 }
 
 // CloneTask copies a task into a project of the same workspace (default: its own), at the bottom of
-// the target's default status. Title, description, priority, colour, dates, labels, assignees, model and
-// effort are copied; always_run and allowed_tools are not (setting those needs their own permissions).
-func CloneTask(ctx context.Context, q Q, a Actor, t *Task, project *int64, title *string, viaKey *int64) (*Task, error) {
+// the target's default status. Title, description, priority, colour, dates, labels, assignees, model,
+// effort and custom field values are copied, and with checklist the checklist (every item unticked);
+// always_run and allowed_tools are not (setting those needs their own permissions), nor subtasks,
+// dependencies, comments or runs.
+func CloneTask(ctx context.Context, q Q, a Actor, t *Task, project *int64, title *string, viaKey *int64, checklist bool) (*Task, error) {
 	n := NewTask{ProjectID: t.ProjectID, Title: t.Title, DescriptionMD: t.DescriptionMD, Priority: t.Priority, Color: t.Color, Model: t.Model, Effort: t.Effort,
 		StartAt: t.StartAt, DueAt: t.DueAt, Assignees: t.Assignees, ClonedFromID: &t.ID, CreatedViaKey: viaKey}
 	if project != nil {
@@ -1093,7 +1095,27 @@ func CloneTask(ctx context.Context, q Q, a Actor, t *Task, project *int64, title
 	for _, l := range t.Labels {
 		n.Labels = append(n.Labels, l.Name)
 	}
-	return CreateTask(ctx, q, a, n)
+	c, err := CreateTask(ctx, q, a, n)
+	if err != nil {
+		return nil, err
+	}
+	var items []string
+	if checklist {
+		ck, err := Checklist(ctx, q, t.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, it := range ck {
+			items = append(items, it.Text)
+		}
+	}
+	if len(items) == 0 && len(t.Custom) == 0 {
+		return c, nil
+	}
+	if err := templateExtras(ctx, q, a, c, items, t.Custom, nil); err != nil {
+		return nil, err
+	}
+	return GetTask(ctx, q, c.ID)
 }
 
 // TrashTask soft-deletes (restore = false) or restores a task.
