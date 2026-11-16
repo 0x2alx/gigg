@@ -61,6 +61,7 @@ export interface Cron {
   output: "gigg" | "host";
   unsandboxed: boolean;
   command_set_by: number | null;
+  unsandboxed_set_by: number | null;
   template_uses: number;
   schedule_id: number;
   schedule_name: string;

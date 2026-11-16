@@ -175,6 +175,8 @@ func storeErr(err error) error {
 		return fail(422, "invalid", strings.TrimPrefix(err.Error(), "invalid: "))
 	case errors.Is(err, store.ErrConflict):
 		return fail(409, "conflict", strings.TrimPrefix(err.Error(), "conflict: "))
+	case errors.Is(err, store.ErrDenied):
+		return fail(403, "forbidden", strings.TrimPrefix(err.Error(), "forbidden: "))
 	case errors.Is(err, store.ErrPaused):
 		return fail(423, "paused", "Task runs are paused for this workspace; an admin resumes them from the dashboard.")
 	}

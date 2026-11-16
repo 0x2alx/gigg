@@ -83,7 +83,7 @@ type cronTemplateOut struct {
 }
 
 func (a *API) cronEdit(p *access.Principal, ws int64) store.CronEdit {
-	return store.CronEdit{CanUnsandbox: p.Can(ws, "cron_unsandboxed", "crons:write")}
+	return store.CronEdit{CanUnsandbox: p.Can(ws, "cron_unsandboxed", "crons:write"), CanManage: allowed(p, ws, access.Manager) == nil}
 }
 
 func (a *API) cron(ctx context.Context, p *access.Principal, id int64) (*store.Cron, error) {
@@ -242,7 +242,8 @@ func (a *API) registerCrons() {
 			if err != nil {
 				return nil, err
 			}
-			ch := store.CronChange{TemplateID: b.TemplateID, ScheduleID: b.ScheduleID, OnFailureTask: b.OnFailureTask}
+			ch := store.CronChange{TemplateID: b.TemplateID, ScheduleID: b.ScheduleID, Name: b.Name, DescriptionMD: b.DescriptionMD,
+				Command: b.Command, TimeoutS: b.TimeoutS, Output: b.Output, Unsandboxed: b.Unsandboxed}
 			if b.Rule != nil {
 				if b.Rule.TZ == "" {
 					b.Rule.TZ = c.Rule.TZ
@@ -254,39 +255,24 @@ func (a *API) registerCrons() {
 				if err != nil {
 					return nil, err
 				}
-				if id != c.WorkerID && id != p.User.ID {
+				if id != c.WorkerID {
+					// taking a cron over (even for yourself) is giving it to another agent's executor
 					if err := allowed(p, c.WorkspaceID, access.Manager); err != nil {
-						return nil, err
+						return nil, errForbidden("Only people with Manage the workspace can change a cron's worker.")
 					}
 				}
 				ch.WorkerID = &id
 			}
-			if b.Name != nil || b.DescriptionMD != nil || b.Command != nil || b.TimeoutS != nil || b.Output != nil || b.Unsandboxed != nil {
-				t := &store.CronTemplate{Name: c.Name, DescriptionMD: c.DescriptionMD, Command: c.Command, TimeoutS: c.TimeoutS, Output: c.Output,
-					Unsandboxed: c.Unsandboxed}
-				if b.TemplateID != nil && *b.TemplateID != c.TemplateID {
-					return nil, fail(422, "invalid", "Change the template or its content, not both at once.")
+			if b.OnFailureTask != nil && *b.OnFailureTask != c.OnFailureTask && p.User.ID != c.WorkerID {
+				// the failure task lands on the worker's board, made as the worker
+				if err := allowed(p, c.WorkspaceID, access.Manager); err != nil {
+					return nil, errForbidden("Only the cron's worker or someone with Manage the workspace can change its failure task.")
 				}
-				set := func(dst *string, src *string) {
-					if src != nil {
-						*dst = *src
-					}
-				}
-				set(&t.Name, b.Name)
-				set(&t.DescriptionMD, b.DescriptionMD)
-				set(&t.Command, b.Command)
-				set(&t.Output, b.Output)
-				if b.TimeoutS != nil {
-					t.TimeoutS = *b.TimeoutS
-				}
-				if b.Unsandboxed != nil {
-					t.Unsandboxed = *b.Unsandboxed
-				}
-				ch.Template = t
 			}
+			ch.OnFailureTask = b.OnFailureTask
 			if err := a.tx(ctx, func(tx *sql.Tx) error {
 				var err error
-				c, err = store.UpdateCron(ctx, tx, p.Actor(), c, v, ch, a.cronEdit(p, c.WorkspaceID))
+				c, err = store.UpdateCron(ctx, tx, p.Actor(), c.ID, v, ch, a.cronEdit(p, c.WorkspaceID))
 				return err
 			}); err != nil {
 				return nil, err
@@ -325,6 +311,12 @@ func (a *API) registerCrons() {
 			}
 			if err := cronEditGuard(p, c.WorkspaceID, false); err != nil {
 				return nil, err
+			}
+			if c.Unsandboxed && act.path != "pause" {
+				// starting a no-sandbox command (or letting it start again) is for people who may set one
+				if err := require(p, c.WorkspaceID, "cron_unsandboxed", "crons:write"); err != nil {
+					return nil, errForbidden("This cron runs without the sandbox: resuming it or running it now needs No-sandbox crons.")
+				}
 			}
 			if err := a.tx(ctx, func(tx *sql.Tx) error {
 				var err error
@@ -393,7 +385,12 @@ func (a *API) registerCrons() {
 
 	// the executor
 	huma.Register(a.h, huma.Operation{OperationID: "claim-crons", Method: "POST", Path: "/workspaces/{ws}/crons/claim", Tags: []string{"crons"},
-		Summary: "Start every due run of your own crons (the executor polls this every minute); paused: no items"}, func(ctx context.Context, in *wsPath) (*struct {
+		Summary: "Start due runs of your own crons (the executor polls this every minute); paused: no items"}, func(ctx context.Context, in *struct {
+		WS   string `path:"ws"`
+		Body *struct {
+			Limit int `json:"limit,omitempty" minimum:"0" maximum:"100" doc:"Start at most this many runs (the executor's free slots); the rest stay due. 0: all"`
+		}
+	}) (*struct {
 		Body struct {
 			Items  []*store.ClaimedCron `json:"items"`
 			Paused bool                 `json:"paused" doc:"The workspace's crons are paused"`
@@ -418,7 +415,11 @@ func (a *API) registerCrons() {
 		}{}
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			var err error
-			out.Body.Items, err = store.ClaimCrons(ctx, tx, p.User.ID, w.ID)
+			limit := 0
+			if in.Body != nil {
+				limit = in.Body.Limit
+			}
+			out.Body.Items, err = store.ClaimCrons(ctx, tx, p.User.ID, w.ID, limit)
 			return err
 		})
 		if errors.Is(err, store.ErrCronsPaused) {

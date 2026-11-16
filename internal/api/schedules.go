@@ -179,6 +179,14 @@ func (a *API) registerSchedules() {
 			if err := require(p, s.WorkspaceID, "crons", "crons:write"); err != nil {
 				return nil, err
 			}
+			// ... and when a no-sandbox cron uses it, that's deciding when a no-sandbox command runs
+			if n, err := store.UnsandboxedCronUses(ctx, a.st.R, s.ID); err != nil {
+				return nil, err
+			} else if n > 0 {
+				if err := require(p, s.WorkspaceID, "cron_unsandboxed", "crons:write"); err != nil {
+					return nil, errForbidden("A cron without the sandbox uses this schedule: changing it needs No-sandbox crons.")
+				}
+			}
 		}
 		v, err := ifMatch(in.IfMatch)
 		if err != nil {

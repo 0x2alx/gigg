@@ -468,7 +468,11 @@ Markdown cut to 280 characters).
 Commands an agent's executor runs on a schedule, sandboxed, with a run history and no tasks (see
 [the guide](../guide/crons.md)). Reading needs view and `crons:read`; changing needs the `crons`
 permission and `crons:write`; `unsandboxed: true` also needs `cron_unsandboxed`. A change by someone
-without `cron_unsandboxed` turns the flag off.
+without `cron_unsandboxed` turns the flag off (on a template other crons share: on a sandboxed copy for
+that cron), and so do they not resume or run-now a no-sandbox cron, nor retime its schedule.
+`command_set_by` changes only with the command text; `unsandboxed_set_by` is who turned the sandbox
+off. Sending a `host` cron's output to gigg needs the command's author or `manage_workspace`; changing
+a cron's worker needs `manage_workspace`; its failure task, the worker or `manage_workspace`.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -483,8 +487,8 @@ without `cron_unsandboxed` turns the flag off.
 | GET | `/cron-runs/{id}` | One run; `output_tail` only with `crons:output`. |
 | GET, POST | `/workspaces/{ws}/cron-templates` | Cron templates. |
 | GET, PUT, DELETE | `/cron-templates/{id}` | A cron template (delete: none uses it). |
-| POST | `/workspaces/{ws}/crons/claim` | The executor (`crons:run`, own crons only): start every due run. Returns `items` (run id, command, timeout, output, unsandboxed, who last set the command) and `paused`. Older missed slots are recorded as `missed`; a slot while the previous run is going as `skipped`. |
-| POST | `/cron-runs/{id}/finish` | The executor reports a run: `status` `ok`/`failed`/`timeout`, `exit_code`, `duration_ms`, `output_tail` (last 64 KiB; dropped for `host` output), `output_bytes`, `error`. Returns whether the cron became failing or recovered. |
+| POST | `/workspaces/{ws}/crons/claim` | The executor (`crons:run`, own crons only): start due runs, at most `limit` (optional body; its free slots), the rest stay due. Returns `items` (run id, command, timeout, output, unsandboxed, `command_set_by`, `unsandboxed_set_by`) and `paused`. Older missed slots are recorded as `missed`; a slot while the previous run is going as `skipped`. |
+| POST | `/cron-runs/{id}/finish` | The executor reports a run: `status` `ok`/`failed`/`timeout`, `exit_code`, `duration_ms`, `output_tail` (last 64 KiB, cut on a character boundary if longer; dropped for `host` output), `output_bytes`, `error`. Returns whether the cron became failing or recovered. |
 
 ### runs
 

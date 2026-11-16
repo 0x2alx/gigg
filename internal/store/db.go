@@ -23,7 +23,13 @@ var (
 	ErrConflict = errors.New("conflict")
 	ErrVersion  = errors.New("version mismatch")
 	ErrInvalid  = errors.New("invalid")
+	ErrDenied   = errors.New("forbidden")
 )
+
+// Denied wraps ErrDenied (403) with a message for the client.
+func Denied(format string, a ...any) error {
+	return fmt.Errorf("%w: %s", ErrDenied, fmt.Sprintf(format, a...))
+}
 
 // Invalid wraps ErrInvalid with a message for the client.
 func Invalid(format string, a ...any) error {

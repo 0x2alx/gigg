@@ -39,8 +39,9 @@ CREATE TABLE cron_templates (
   timeout_s       INTEGER NOT NULL DEFAULT 300 CHECK (timeout_s BETWEEN 10 AND 3600),
   output          TEXT NOT NULL DEFAULT 'gigg' CHECK (output IN ('gigg', 'host')), -- host: only exit code and timing reach gigg
   unsandboxed     INTEGER NOT NULL DEFAULT 0 CHECK (unsandboxed IN (0, 1)),
-  command_set_by  INTEGER NOT NULL REFERENCES users(id), -- who last changed the command, timeout or sandbox flag
+  command_set_by  INTEGER NOT NULL REFERENCES users(id), -- who last changed the command text (the executor trusts commands by it)
   command_set_at  INTEGER NOT NULL,
+  unsandboxed_set_by INTEGER REFERENCES users(id),      -- who turned the sandbox off (NULL while it's on)
   created_by      INTEGER NOT NULL REFERENCES users(id),
   created_at      INTEGER NOT NULL,
   deleted_at      INTEGER,

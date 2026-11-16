@@ -27,6 +27,7 @@ const cron = (p: Partial<Cron> = {}): Cron => ({
   output: "gigg",
   unsandboxed: false,
   command_set_by: 3,
+  unsandboxed_set_by: null,
   template_uses: 1,
   schedule_id: 1,
   schedule_name: "Every 5 min",

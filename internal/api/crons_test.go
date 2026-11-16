@@ -124,6 +124,29 @@ func TestCronsAPI(t *testing.T) {
 	if strings.Contains(string(out), "secret") || strings.Contains(string(out), `"has_output":true`) {
 		t.Fatalf("host output stored: %s", out)
 	}
+	// no-sandbox crons: scout (Crons, not No-sandbox crons) may pause one, not resume it or run it now,
+	// nor retime its schedule
+	code, out, _ = e.req("POST", fmt.Sprintf("/crons/%d/run-now", tts.ID), "", scout)
+	if code != 403 || !strings.Contains(string(out), "No-sandbox") {
+		t.Fatalf("run-now of a no-sandbox cron by scout: %d %s", code, out)
+	}
+	code, out, _ = e.req("POST", fmt.Sprintf("/crons/%d/pause", tts.ID), "", scout)
+	e.ok(code, out, 200)
+	code, out, _ = e.req("POST", fmt.Sprintf("/crons/%d/resume", tts.ID), "", scout)
+	if code != 403 {
+		t.Fatalf("resume of a no-sandbox cron by scout: %d %s", code, out)
+	}
+	code, out, _ = e.req("POST", fmt.Sprintf("/crons/%d/resume", tts.ID), "{}", ada)
+	e.ok(code, out, 200)
+	code, out, _ = e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"crons":true,"schedules":true}}`, ws), ada)
+	e.ok(code, out, 200)
+	code, out, _ = e.req("PUT", fmt.Sprintf("/schedules/%d", tts.ScheduleID), `{"freq":"daily","window_start":"04:00","tz":"America/New_York"}`, scout)
+	if code != 403 || !strings.Contains(string(out), "No-sandbox") {
+		t.Fatalf("retiming a no-sandbox cron's schedule by scout: %d %s", code, out)
+	}
+	// the claim takes a limit (the executor's free slots)
+	code, out, _ = e.req("POST", "/workspaces/current/crons/claim", `{"limit":1}`, scout)
+	e.ok(code, out, 200)
 	// scout edits ada's unsandboxed cron (its name only): the sandbox comes back on
 	code, out, _ = e.req("PATCH", fmt.Sprintf("/crons/%d", tts.ID), `{"name":"tts health"}`, scout)
 	e.ok(code, out, 200)

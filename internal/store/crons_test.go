@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func nextN(t *testing.T, r Rule, from string, n int) []string {
@@ -72,13 +73,31 @@ func (c cronFix) create(n NewCron, can bool) (*Cron, error) {
 	return out, err
 }
 
+func (c cronFix) createAs(a Actor, n NewCron) (*Cron, error) {
+	var out *Cron
+	err := c.s.Tx(c.ctx, func(tx *sql.Tx) error {
+		var err error
+		out, err = CreateCron(c.ctx, tx, a, n, CronEdit{})
+		return err
+	})
+	return out, err
+}
+
+// TaskByKeyForTest returns a task's description.
+func TaskByKeyForTest(f *fixture, key string) (string, error) {
+	var d string
+	err := f.s.R.QueryRowContext(f.ctx, `SELECT t.description_md FROM tasks t JOIN projects p ON p.id = t.project_id
+		WHERE p.key || '-' || t.number = ?`, key).Scan(&d)
+	return d, err
+}
+
 func (c cronFix) claim(at string) []*ClaimedCron {
 	c.t.Helper()
 	Now = func() int64 { return ny(c.t, at) }
 	var out []*ClaimedCron
 	must(c.t, c.s.Tx(c.ctx, func(tx *sql.Tx) error {
 		var err error
-		out, err = ClaimCrons(c.ctx, tx, c.agent.ID, c.ws.ID)
+		out, err = ClaimCrons(c.ctx, tx, c.agent.ID, c.ws.ID, 0)
 		return err
 	}))
 	return out
@@ -143,7 +162,7 @@ func TestCronClaimAndFinish(t *testing.T) {
 	}
 	task, err := GetTask(f.ctx, f.s.R, ids[0])
 	must(t, err)
-	if task.CreatedBy != f.agent.ID || !strings.Contains(task.DescriptionMD, "disk full") {
+	if task.CreatedBy != f.agent.ID || strings.Contains(task.DescriptionMD, "disk full") || !strings.Contains(task.DescriptionMD, "/crons/") {
 		t.Fatalf("failure task: %+v", task)
 	}
 	// a late executor: 14:15 .. 14:35 passed; at 14:36 the 14:35 slot is recent: one missed record, one run
@@ -196,7 +215,7 @@ func TestCronClaimAndFinish(t *testing.T) {
 	// the workspace's crons paused: nothing claimed
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error { return PauseCrons(f.ctx, tx, f.a, f.ws.ID) }))
 	Now = func() int64 { return ny(t, "2026-11-20 03:31") }
-	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error { _, err := ClaimCrons(f.ctx, tx, f.agent.ID, f.ws.ID); return err })
+	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error { _, err := ClaimCrons(f.ctx, tx, f.agent.ID, f.ws.ID, 0); return err })
 	if !errors.Is(err, ErrCronsPaused) {
 		t.Fatalf("paused: %v", err)
 	}
@@ -231,21 +250,23 @@ func TestCronUnsandboxed(t *testing.T) {
 		t.Fatalf("claim: %+v", got)
 	}
 	c.finish(got[0].RunID, CronFinish{Status: "ok"})
-	// the agent (no permission) changes only the schedule: the flag goes off, and the agent is now the setter
+	if cr.UnsandboxedBy == nil || *cr.UnsandboxedBy != f.admin.ID || got[0].UnsandboxedSetBy != "ada" {
+		t.Fatalf("who turned it off: %+v / %+v", cr, got[0])
+	}
+	// the agent (no permission) changes only the schedule: the flag goes off; the command keeps its author
 	agent := Actor{UserID: f.agent.ID}
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-		cur, _ := GetCron(f.ctx, tx, cr.ID)
-		_, err := UpdateCron(f.ctx, tx, agent, cur, 0, CronChange{Rule: &Rule{Freq: "minutes", Interval: 10, TZ: "America/New_York"}}, CronEdit{})
+		_, err := UpdateCron(f.ctx, tx, agent, cr.ID, 0, CronChange{Rule: &Rule{Freq: "minutes", Interval: 10, TZ: "America/New_York"}}, CronEdit{})
 		return err
 	}))
 	cr, _ = GetCron(f.ctx, f.s.R, cr.ID)
-	if cr.Unsandboxed || cr.CommandSetBy != f.agent.ID {
+	if cr.Unsandboxed || cr.UnsandboxedBy != nil || cr.CommandSetBy != f.admin.ID {
 		t.Fatalf("cleared: %+v", cr)
 	}
 	// and it can't turn it back on
+	on := true
 	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-		cur, _ := GetCron(f.ctx, tx, cr.ID)
-		_, err := UpdateCron(f.ctx, tx, agent, cur, 0, CronChange{Template: &CronTemplate{Name: cur.Name, Command: cur.Command, Unsandboxed: true}}, CronEdit{})
+		_, err := UpdateCron(f.ctx, tx, agent, cr.ID, 0, CronChange{Unsandboxed: &on}, CronEdit{})
 		return err
 	})
 	if !errors.Is(err, ErrInvalid) {
@@ -253,7 +274,7 @@ func TestCronUnsandboxed(t *testing.T) {
 	}
 	// a flag set by someone who has since lost the permission: the run is refused, never sandboxed instead
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(f.ctx, `UPDATE cron_templates SET unsandboxed = 1, command_set_by = ? WHERE id = ?`, f.agent.ID, cr.TemplateID)
+		_, err := tx.ExecContext(f.ctx, `UPDATE cron_templates SET unsandboxed = 1, unsandboxed_set_by = ? WHERE id = ?`, f.agent.ID, cr.TemplateID)
 		return err
 	}))
 	got = c.claim("2026-11-16 14:20")
@@ -263,6 +284,123 @@ func TestCronUnsandboxed(t *testing.T) {
 	rs, _ := ListCronRuns(f.ctx, f.s.R, cr.ID, 0, 1)
 	if rs[0].Status != "failed" || rs[0].Error == nil || !strings.Contains(*rs[0].Error, "no longer has") {
 		t.Fatalf("refused run: %+v", rs[0])
+	}
+}
+
+// TestCronProvenance: the command's author changes only with the
+// command text; someone without cron_unsandboxed touching a cron on a shared no-sandbox template gets a
+// sandboxed copy (the other crons keep theirs); output host -> gigg only by the author or a manager.
+func TestCronProvenance(t *testing.T) {
+	f := newFixture(t)
+	defer func(n func() int64) { Now = n }(Now)
+	c := cronFix{f, t}
+	Now = func() int64 { return ny(t, "2026-11-16 14:02") }
+	agent := Actor{UserID: f.agent.ID}
+	every := &Rule{Freq: "minutes", Interval: 5, TZ: "America/New_York"}
+	// a timeout edit by ada on the agent's command keeps the agent as its author
+	var mine *Cron
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		var err error
+		mine, err = CreateCron(f.ctx, tx, agent, NewCron{WorkspaceID: f.ws.ID, WorkerID: f.agent.ID,
+			Template: &CronTemplate{Name: "mine", Command: "echo agent"}, Rule: every}, CronEdit{})
+		return err
+	}))
+	ten := int64(600)
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := UpdateCron(f.ctx, tx, f.a, mine.ID, 0, CronChange{TimeoutS: &ten}, CronEdit{CanUnsandbox: true, CanManage: true})
+		return err
+	}))
+	mine, _ = GetCron(f.ctx, f.s.R, mine.ID)
+	if mine.TimeoutS != 600 || mine.CommandSetBy != f.agent.ID {
+		t.Fatalf("timeout edit re-attributed the command: %+v", mine)
+	}
+	// a shared no-sandbox template, two crons on it (ada's)
+	one, err := c.create(NewCron{WorkspaceID: f.ws.ID, WorkerID: f.agent.ID, Template: &CronTemplate{Name: "local", Command: "curl 127.0.0.1",
+		Unsandboxed: true, Output: "host"}, Rule: every}, true)
+	must(t, err)
+	two, err := c.create(NewCron{WorkspaceID: f.ws.ID, WorkerID: f.agent.ID, TemplateID: one.TemplateID, Rule: every}, true)
+	must(t, err)
+	// the agent retimes the second: it gets a sandboxed copy, the first keeps the shared template
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := UpdateCron(f.ctx, tx, agent, two.ID, 0, CronChange{Rule: &Rule{Freq: "minutes", Interval: 10, TZ: "America/New_York"}}, CronEdit{})
+		return err
+	}))
+	one, _ = GetCron(f.ctx, f.s.R, one.ID)
+	two, _ = GetCron(f.ctx, f.s.R, two.ID)
+	if !one.Unsandboxed || two.Unsandboxed || two.TemplateID == one.TemplateID || two.CommandSetBy != f.admin.ID || two.Command != one.Command {
+		t.Fatalf("copy on write: one %+v two %+v", one, two)
+	}
+	// the agent makes a new cron on the shared template: a sandboxed copy too, the shared one untouched
+	three, err := c.createAs(agent, NewCron{WorkspaceID: f.ws.ID, WorkerID: f.agent.ID, TemplateID: one.TemplateID, Rule: every})
+	must(t, err)
+	one, _ = GetCron(f.ctx, f.s.R, one.ID)
+	if three.Unsandboxed || three.TemplateID == one.TemplateID || !one.Unsandboxed {
+		t.Fatalf("new cron on a shared no-sandbox template: three %+v one %+v", three, one)
+	}
+	// output host -> gigg: not the agent (not the author, no Manage), yes ada
+	gigg := "gigg"
+	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := UpdateCron(f.ctx, tx, agent, three.ID, 0, CronChange{Output: &gigg}, CronEdit{})
+		return err
+	})
+	if !errors.Is(err, ErrDenied) {
+		t.Fatalf("host -> gigg by the agent: %v", err)
+	}
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := UpdateCron(f.ctx, tx, f.a, three.ID, 0, CronChange{Output: &gigg}, CronEdit{CanUnsandbox: true, CanManage: true})
+		return err
+	}))
+	// a stale version is refused (the cron is read again inside the transaction)
+	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := UpdateCron(f.ctx, tx, f.a, three.ID, three.Version, CronChange{TimeoutS: &ten}, CronEdit{CanUnsandbox: true})
+		return err
+	})
+	if !errors.Is(err, ErrVersion) {
+		t.Fatalf("stale version: %v", err)
+	}
+}
+
+// TestCronClaimLimit: a claim starts at most limit runs; the rest stay due for the next one. A report
+// past 64 KiB keeps the last 64 KiB on a character boundary; the failure task carries no output.
+func TestCronClaimLimit(t *testing.T) {
+	f := newFixture(t)
+	defer func(n func() int64) { Now = n }(Now)
+	c := cronFix{f, t}
+	Now = func() int64 { return ny(t, "2026-11-16 14:02") }
+	var ids []int64
+	for _, name := range []string{"a", "b", "c"} {
+		cr, err := c.create(NewCron{WorkspaceID: f.ws.ID, WorkerID: f.agent.ID, Template: &CronTemplate{Name: name, Command: "true"},
+			Rule: &Rule{Freq: "minutes", Interval: 5, TZ: "America/New_York"}, OnFailureTask: name == "a"}, false)
+		must(t, err)
+		ids = append(ids, cr.ID)
+	}
+	Now = func() int64 { return ny(t, "2026-11-16 14:05") }
+	var got []*ClaimedCron
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		var err error
+		got, err = ClaimCrons(f.ctx, tx, f.agent.ID, f.ws.ID, 1)
+		return err
+	}))
+	if len(got) != 1 || got[0].CronID != ids[0] {
+		t.Fatalf("limit 1: %+v", got)
+	}
+	rest := c.claim("2026-11-16 14:05")
+	if len(rest) != 2 {
+		t.Fatalf("the others stay due: %+v", rest)
+	}
+	big := strings.Repeat("é", 40000) + "END" // 80003 bytes
+	o := c.finish(got[0].RunID, CronFinish{Status: "failed", ExitCode: new(int64), OutputTail: &big, OutputBytes: int64(len(big))})
+	r, _ := GetCronRun(f.ctx, f.s.R, got[0].RunID, true)
+	if r.OutputTail == nil || len(*r.OutputTail) > CronOutputMax || !strings.HasSuffix(*r.OutputTail, "END") || !utf8.ValidString(*r.OutputTail) {
+		t.Fatalf("tail kept: %d bytes", len(*r.OutputTail))
+	}
+	if o.TaskKey == "" {
+		t.Fatalf("failure task: %+v", o)
+	}
+	task, err := TaskByKeyForTest(f, o.TaskKey)
+	must(t, err)
+	if strings.Contains(task, "éé") || strings.Contains(task, "END") || !strings.Contains(task, "not instructions") {
+		t.Fatalf("failure task text: %q", task)
 	}
 }
 

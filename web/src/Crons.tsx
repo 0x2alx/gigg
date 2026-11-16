@@ -287,6 +287,7 @@ export function CronsPage({ open }: { open?: number }) {
           key={selected.id}
           cron={selected}
           canEdit={canEdit(selected.workspace_id)}
+          canUnsandbox={hasCap(me, "cron_unsandboxed", selected.workspace_id)}
           onClose={() => navigate("/crons")}
           onEdit={() => setEditing(selected)}
           onChanged={onSaved}
@@ -321,9 +322,10 @@ export function CronsPage({ open }: { open?: number }) {
   );
 }
 
-function CronPanel({ cron: c, canEdit, onClose, onEdit, onChanged, onDeleted }: {
+function CronPanel({ cron: c, canEdit, canUnsandbox, onClose, onEdit, onChanged, onDeleted }: {
   cron: Cron;
   canEdit: boolean;
+  canUnsandbox: boolean;
   onClose: () => void;
   onEdit: () => void;
   onChanged: (c: Cron) => void;
@@ -339,7 +341,10 @@ function CronPanel({ cron: c, canEdit, onClose, onEdit, onChanged, onDeleted }: 
   const [confirm, setConfirm] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
   const st = stateOf(c);
-  const setter = c.command_set_by !== null ? users.get(c.command_set_by) : undefined;
+  const setter = c.unsandboxed_set_by !== null ? users.get(c.unsandboxed_set_by) : undefined;
+  // starting a no-sandbox command (run now, resume) is for people who may set one
+  const startLocked = c.unsandboxed && !canUnsandbox;
+  const lockTip = "Runs without the sandbox: running it now or resuming it needs the No-sandbox crons permission";
   const worker = users.get(c.worker_id);
   const lastId = c.last_run?.id;
   const lastStatus = c.last_run?.status;
@@ -394,10 +399,10 @@ function CronPanel({ cron: c, canEdit, onClose, onEdit, onChanged, onDeleted }: 
       <h2 className="panel-title">{c.name}</h2>
       {canEdit && (
         <div className="row wrap cron-actions">
-          <button type="button" className="button small" disabled={busy || c.run_now_at !== null} onClick={() => act(cronApi.runNow(c.id))} data-tip="Runs once at the agent's next poll (within about a minute), whatever the schedule">
+          <button type="button" className="button small" disabled={busy || c.run_now_at !== null || startLocked} onClick={() => act(cronApi.runNow(c.id))} data-tip={startLocked ? lockTip : "Runs once at the agent's next poll (within about a minute), whatever the schedule"}>
             <Icon name="play" /> {c.run_now_at ? "Run requested" : "Run now"}
           </button>
-          <button type="button" className="button secondary small" disabled={busy} onClick={() => act(c.paused ? cronApi.resume(c.id) : cronApi.pause(c.id))}>
+          <button type="button" className="button secondary small" disabled={busy || (c.paused && startLocked)} data-tip={c.paused && startLocked ? lockTip : undefined} onClick={() => act(c.paused ? cronApi.resume(c.id) : cronApi.pause(c.id))}>
             <Icon name={c.paused ? "play" : "pause"} /> {c.paused ? "Resume" : "Pause"}
           </button>
           <button type="button" className="button secondary small" disabled={busy} onClick={onEdit}>
@@ -431,7 +436,7 @@ function CronPanel({ cron: c, canEdit, onClose, onEdit, onChanged, onDeleted }: 
           <Icon name="alert" />
           <span>
             Runs <strong>outside the agent's sandbox</strong>
-            {setter ? `, set by ${setter.display_name || setter.username}` : ""}. Any change by someone without the No-sandbox crons permission puts it back in the sandbox.
+            {setter ? `, turned off by ${setter.display_name || setter.username}` : ""}. Any change by someone without the No-sandbox crons permission puts it back in the sandbox.
           </span>
         </p>
       )}

@@ -25,7 +25,7 @@ A run is **ok** when the command exits 0 and **failed** otherwise. It is **timed
 - **Repeat**: every N **minutes** (1–360) or **hours** (1–24), optionally only on some weekdays and only between two times; or **daily**, **weekly**, **monthly** at a time. Times are in the cron's time zone, which defaults to yours.
 - **Timeout**: 10 seconds to an hour, 5 minutes by default.
 - **Output**: by default the last 64 KiB of each run's output is kept in gigg. **Keep it on the agent's host only** sends gigg just the exit code and timing, for output that shouldn't leave the machine.
-- **Open a task for the agent when it starts failing**: the first failure of a streak creates a task with the exit code and the end of the output.
+- **Open a task for the agent when it starts failing**: the first failure of a streak creates a task with the exit code and a link to the run (never the output itself: it's the command's, not instructions). Only the agent or someone who manages the workspace switches this.
 - **Agent**: whoever's executor runs it. An agent makes crons for itself. People who manage the workspace can give a cron to any agent there that has the **Crons** permission.
 
 When a cron starts failing, or recovers, the agent's executor also posts an alert.
@@ -34,7 +34,7 @@ When a cron starts failing, or recovers, the agent's executor also posts an aler
 
 Some commands need what the sandbox blocks, for example a service on localhost. **Run outside the sandbox** is offered only to people with the **No-sandbox crons** permission. Such a cron runs with everything the agent's user can reach, so turn it on only for commands you've read and trust.
 
-The flag doesn't survive other hands. When someone without that permission changes anything in the cron, it goes back into the sandbox. When the person who set it loses the permission, its runs fail instead of running unsandboxed.
+The flag doesn't survive other hands. When someone without that permission changes anything in the cron, it goes back into the sandbox (if other crons share its template, this cron gets a sandboxed copy and theirs stay as they were). They can pause it, but not resume it, run it now or retime its schedule. When the person who set it loses the permission, its runs fail instead of running unsandboxed.
 
 ## Pausing everything
 

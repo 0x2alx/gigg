@@ -274,6 +274,8 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 					return fmt.Errorf("workspace %s: %w", args[1], err)
 				}
 				ws = &w.ID
+			} else if _, err := store.GetWorkspaceBySlug(ctx, tx, "all"); err == nil {
+				return errors.New(`a workspace is named "all": ambiguous, use the UI`)
 			}
 			rules, err := store.RulesOfUser(ctx, tx, u.ID)
 			if err != nil {
@@ -293,6 +295,9 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 				ov[k] = v
 			}
 			for _, perm := range args[2:] {
+				if v, ok := ov[perm]; ok && !v {
+					fmt.Fprintf(os.Stderr, "%s: was denied for %s, now allowed\n", perm, u.Username)
+				}
 				ov[perm] = true
 			}
 			if err := store.SetRule(ctx, tx, a, "user", u.ID, ws, rule.Preset, ov); err != nil {
