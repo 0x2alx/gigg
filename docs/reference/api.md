@@ -365,7 +365,7 @@ in [access.md](access.md).
 | GET | `/projects/{p}` | A project. |
 | PATCH | `/projects/{p}` | Change a project (managers). |
 | DELETE | `/projects/{p}` | Delete an empty project (managers). |
-| GET | `/projects/{p}/board` | The board: statuses with their tasks, and the workspace's labels. |
+| GET | `/projects/{p}/board` | The board: statuses with their tasks, and the workspace's labels. Up to 5000 unarchived tasks; past that, `truncated: true` (the rest are in task lists). |
 | GET | `/projects/{p}/statuses` | Statuses in board order. |
 | POST | `/projects/{p}/statuses` | Add a status (managers). |
 | POST | `/projects/{p}/statuses/reorder` | Set the order of statuses (managers). |
@@ -451,7 +451,7 @@ Markdown cut to 280 characters).
 | GET | `/workspaces/{ws}/recurrences` | Recurring tasks (each pairs a template with a schedule). |
 | POST | `/projects/{p}/recurrences` | Create a recurring task. |
 | GET | `/recurrences/{id}` | A recurring task with its next five occurrences. |
-| PUT | `/recurrences/{id}` | Replace a recurring task; the next occurrence is recomputed from now. |
+| PUT | `/recurrences/{id}` | Replace a recurring task; the next occurrence is recomputed from now (an occurrence already made is never made again). The editor becomes its owner, so this needs `create_tasks` too; new timing changes the shared schedule and needs what `PUT /schedules/{id}` needs. |
 | DELETE | `/recurrences/{id}` | Stop a recurring task. Its tasks stay; `?template=true` / `?schedule=true` also delete its template / schedule (409 and nothing deleted while another recurring task uses it). |
 | GET | `/workspaces/{ws}/schedules` | Schedules (named timing). |
 | POST | `/workspaces/{ws}/schedules` | Make a schedule. |

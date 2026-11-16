@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -276,13 +277,11 @@ func (a *API) login(ctx context.Context, in *loginIn) (*loginOut, error) {
 	if !a.limiter.allow("login:"+req.IP+":"+name, 5) || !a.limiter.allow("login-user:"+name, 20) || !a.limiter.allow("login:"+req.IP, 30) {
 		return nil, fail(429, "rate_limited", "Too many login attempts; wait a minute.")
 	}
-	// argon2id takes 64 MiB per check: at most two at a time.
-	select {
-	case a.hashSlots <- struct{}{}:
-		defer func() { <-a.hashSlots }()
-	case <-time.After(3 * time.Second):
-		return nil, fail(429, "rate_limited", "Busy; try again in a moment.")
+	release, err := a.hashSlot()
+	if err != nil {
+		return nil, err
 	}
+	defer release()
 	u, err := store.GetUserByName(ctx, a.st.R, name)
 	if err != nil || u.PasswordHash == "" || u.Disabled || u.Kind != "human" {
 		auth.DummyVerify(in.Body.Password)
@@ -359,6 +358,15 @@ func (a *API) changePassword(ctx context.Context, in *passwordIn) (*struct{}, er
 	if p.Key != nil {
 		return nil, errForbidden("Change passwords from a browser session.")
 	}
+	// guessing the current password from a stolen session is limited like a login
+	if !a.limiter.allow(fmt.Sprintf("password:%d", p.User.ID), 5) {
+		return nil, fail(429, "rate_limited", "Too many attempts; wait a minute.")
+	}
+	release, err := a.hashSlot()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	if !auth.VerifyPassword(p.User.PasswordHash, in.Body.Current) {
 		return nil, fail(403, "bad_credentials", "The current password is wrong.")
 	}
@@ -615,4 +623,14 @@ func within(caller, target *store.APIKey) error {
 		return errForbidden("That key outlives this key.")
 	}
 	return nil
+}
+
+// hashSlot takes one of the argon2id slots (64 MiB per hash: at most two at a time), waiting up to 3 s.
+func (a *API) hashSlot() (release func(), err error) {
+	select {
+	case a.hashSlots <- struct{}{}:
+		return func() { <-a.hashSlots }, nil
+	case <-time.After(3 * time.Second):
+		return nil, fail(429, "rate_limited", "Busy; try again in a moment.")
+	}
 }

@@ -201,7 +201,7 @@ type TaskCreate struct {
 	ParentID      *int64                  `json:"parent_id,omitempty"`
 	BlocksParent  bool                    `json:"blocks_parent,omitempty" doc:"A subtask that holds its parent back while it is open (needs parent_id)"`
 	Labels        []string                `json:"labels,omitempty" maxItems:"20" doc:"Label names; missing ones are created"`
-	Assignees     []int64                 `json:"assignees,omitempty"`
+	Assignees     []int64                 `json:"assignees,omitempty" maxItems:"50"`
 	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p, e.g. opus, sonnet, claude-opus-5-5 (default: the agent's)"`
 	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level for claude -p (default: the agent's)"`
 	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Work it whatever the usage budget, day or night (needs the always_run permission)"`

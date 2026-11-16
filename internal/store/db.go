@@ -44,8 +44,10 @@ func (s *Store) Tx(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	if err != nil {
 		return err
 	}
+	// also on a panic in fn: a transaction left open would hold the only write connection (a long-lived
+	// context, such as housekeeping's, never cancels it); after Commit this is a no-op
+	defer func() { _ = tx.Rollback() }()
 	if err := fn(tx); err != nil {
-		_ = tx.Rollback()
 		return err
 	}
 	return tx.Commit()
@@ -148,3 +150,19 @@ func Activity(ctx context.Context, q Q, a Actor, workspaceID, projectID *int64, 
 func i64(v int64) *int64 { return &v }
 
 func timeFromMS(ms int64) time.Time { return time.UnixMilli(ms).UTC() }
+
+// checkVersion compares an If-Match version with the row's version read in this transaction (the
+// caller's copy may come from the read pool, so it can be stale). 0 = no check.
+func checkVersion(ctx context.Context, q Q, table string, id, expect int64) error {
+	if expect == 0 {
+		return nil
+	}
+	var v int64
+	if err := q.QueryRowContext(ctx, "SELECT version FROM "+table+" WHERE id = ?", id).Scan(&v); err != nil {
+		return err
+	}
+	if v != expect {
+		return ErrVersion
+	}
+	return nil
+}

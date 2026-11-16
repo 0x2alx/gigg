@@ -73,6 +73,19 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const [run, setRun] = useState<RunSettings>({ model: src?.model ?? "", effort: src?.effort ?? "", always_run: !!src?.always_run, allowed_tools: src?.allowed_tools ?? [] });
   const [repeat, setRepeat] = useState<RepeatState>(() => (schedule ? repeatFromRule(schedule) : { ...defaultRepeat(), freq: initialRepeat ?? "" }));
   const [err, setErr] = useState("");
+  // the typed content when the form opened: closing by ×, Esc or the backdrop with more than that asks
+  // once ("close again to discard") instead of losing the text; Cancel closes at once
+  const typed = JSON.stringify([title, description, checklist, subtasks, deps]);
+  const typed0 = useRef(typed);
+  const [discardAsked, setDiscardAsked] = useState(false);
+  const guardedClose = () => {
+    if (typed !== typed0.current && !discardAsked && !busy) {
+      setDiscardAsked(true);
+      setErr("You have unsaved changes. Close again to discard them, or press Cancel.");
+      return;
+    }
+    onClose();
+  };
   const [busy, setBusy] = useState(false);
 
   // the project's statuses: the ones given for the start project, else fetched (not for a template or a
@@ -242,6 +255,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     return b;
   };
 
+  const savingTpl = useRef(false);
   const saveAsTemplate = () => {
     const name = (saveAs ?? "").trim();
     if (run.tools_error) {
@@ -252,6 +266,8 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
       setErr(title.trim() ? "Give the template a name." : "A template needs a title.");
       return;
     }
+    if (savingTpl.current) return; // a double click saves one template
+    savingTpl.current = true;
     setErr("");
     api
       .createTemplate(ws.id, templateBody(name))
@@ -260,7 +276,10 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
         setNote(`Saved template “${t.name}”.`);
         setTemplates((xs) => [...xs, t]);
       })
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't save the template."));
+      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't save the template."))
+      .finally(() => {
+        savingTpl.current = false;
+      });
   };
 
   const createFromTemplate = () => {
@@ -296,13 +315,14 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     setBusy(true);
     setErr("");
     const fail = (e: unknown) => {
-      if (e instanceof ApiError && e.status === 412) setErr("Someone changed this recurring task meanwhile. Close and reopen it to see their version.");
+      if (e instanceof ApiError && e.status === 412)
+        setErr(`Someone changed this ${tplMode ? "template" : "recurring task"} meanwhile. Close and reopen it to see their version.`);
       else setErr(e instanceof ApiError ? e.message : repeating ? "Couldn't save the recurring task." : "Couldn't create the task.");
     };
     let done: Promise<string | undefined>;
     if (tplMode) {
       const body = templateBody(tplName.trim());
-      done = (tpl ? api.putTemplate(tpl.id, body) : api.createTemplate(ws.id, body)).then((t) => `Template “${t.name}” saved`);
+      done = (tpl ? api.putTemplate(tpl.id, body, tpl.version) : api.createTemplate(ws.id, body)).then((t) => `Template “${t.name}” saved`);
     } else if (repeating) {
       const content: Partial<RecurrenceBody> = usesPicked
         ? { template_id: picked!.id }
@@ -369,7 +389,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const alwaysOk = hasCap(me, "always_run", ws.id);
   const mode: EditorMode = tplMode ? "template" : repeating || editing ? "recurring" : "new";
   return (
-    <Modal title={heading} onClose={onClose} wide expandable help={<HelpButton topic={repeating || editing ? "recurring" : "tasks"} label={repeating || editing ? "Help: recurring tasks" : "Help: tasks"} />}>
+    <Modal title={heading} onClose={guardedClose} wide expandable help={<HelpButton topic={repeating || editing ? "recurring" : "tasks"} label={repeating || editing ? "Help: recurring tasks" : "Help: tasks"} />}>
       <form className="tm-form" onSubmit={submit} aria-label={heading}>
         {tpl && (tpl.recurring ?? 0) > 0 && (
           <p className="small muted sched-tpl" role="note">

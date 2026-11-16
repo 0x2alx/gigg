@@ -282,9 +282,19 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   }, []);
   const refresh = useCallback(() => {
     reloadMe();
-    Promise.all(me.workspaces.map((w) => api.projects(w.slug).then((r) => ({ ...w, projects: r.items }))))
-      .then(setTree)
-      .catch(() => setTree([]));
+    // one failed list keeps that workspace as it was (a blip must not empty the board and close what is
+    // open on it); a workspace that is gone for this user (403/404) drops out
+    void Promise.allSettled(me.workspaces.map((w) => api.projects(w.slug).then((r) => ({ ...w, projects: r.items })))).then((res) =>
+      setTree((prev) =>
+        res.flatMap((r, i) => {
+          if (r.status === "fulfilled") return [r.value];
+          const e = r.reason;
+          if (e instanceof ApiError && (e.status === 403 || e.status === 404)) return [];
+          const old = prev?.find((w) => w.id === me.workspaces[i]!.id);
+          return old ? [old] : [];
+        }),
+      ),
+    );
     api
       .users()
       .then((r) => setUsers(new Map(r.items.map((u) => [u.id, u]))))
@@ -343,11 +353,18 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
     () => (tree ? { me, tree, users, members, refresh, prefs, setPref, themes, savedViews, reloadSavedViews, live } : null),
     [me, tree, users, members, refresh, prefs, setPref, themes, savedViews, reloadSavedViews, live],
   );
+  const [logoutFailed, setLogoutFailed] = useState(false);
   if (!ctx) return <div className="center muted">Loading…</div>;
 
   const first = ctx.tree.find((w) => w.projects.length > 0);
+  // only a logout the server took (or a session already over) shows the login page: after a network
+  // failure the session is still valid, so say so instead of looking logged out
   const logout = () => {
-    api.logout().finally(onLogout);
+    setLogoutFailed(false);
+    api.logout().then(onLogout, (e: unknown) => {
+      if (e instanceof ApiError && e.status === 401) onLogout();
+      else setLogoutFailed(true);
+    });
   };
 
   const inAdmin = loc === "/admin" || loc.startsWith("/admin/");
@@ -392,11 +409,13 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             )}
             <NavLink href="/themes" icon={<Icon name="theme" />} label="Themes" />
             <NavLink href="/profile" icon={<Avatar user={me.user} size="xs" />} label={me.user.display_name || me.user.username} />
-            <button type="button" className="nav-item" onClick={logout}>
+            <button type="button" className={"nav-item" + (logoutFailed ? " danger" : "")} onClick={logout}>
               <span className="nav-icon" aria-hidden="true">
                 <Icon name="logout" />
               </span>
-              <span className="nav-label">Log out</span>
+              <span className="nav-label" role={logoutFailed ? "alert" : undefined}>
+                {logoutFailed ? "Couldn't log out: try again" : "Log out"}
+              </span>
             </button>
           </SidePanel>
         </aside>

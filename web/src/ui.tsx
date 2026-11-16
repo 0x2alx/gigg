@@ -233,10 +233,11 @@ export function Modal({ title, onClose, children, wide, xl, help, expandable }: 
     const prev = document.activeElement as HTMLElement | null;
     (ref.current?.querySelector<HTMLElement>("[autofocus], [data-autofocus]") ??
       ref.current?.querySelector<HTMLElement>("input, textarea, select, button:not(.help-button)"))?.focus();
+    // only the top dialog (the last one opened) answers Esc and keeps the focus
+    const top = () => [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].pop() === ref.current;
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") animatedClose.current();
-      // only the top dialog (the last one opened) keeps the focus
-      else if (e.key === "Tab" && [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].pop() === ref.current) trapTab(e, ref.current);
+      if (e.key === "Escape" && top()) animatedClose.current();
+      else if (e.key === "Tab" && top()) trapTab(e, ref.current);
     };
     document.addEventListener("keydown", esc);
     return () => {

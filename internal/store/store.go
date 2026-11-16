@@ -145,7 +145,14 @@ func (s *Store) migrate(ctx context.Context, log *slog.Logger) error {
 		if !fresh {
 			snap := filepath.Join(s.dir, "backups", fmt.Sprintf("pre-%04d.db", m.version))
 			if _, err := os.Stat(snap); errors.Is(err, os.ErrNotExist) {
-				if _, err := s.W.ExecContext(ctx, "VACUUM INTO ?", snap); err != nil {
+				// written under a temporary name and renamed: a crash mid-way never leaves a partial
+				// file under the final name (which a restart would take as done)
+				tmp := snap + ".tmp"
+				_ = os.Remove(tmp)
+				if _, err := s.W.ExecContext(ctx, "VACUUM INTO ?", tmp); err != nil {
+					return fmt.Errorf("snapshot before migration %s: %w", m.name, err)
+				}
+				if err := os.Rename(tmp, snap); err != nil {
 					return fmt.Errorf("snapshot before migration %s: %w", m.name, err)
 				}
 				log.Info("snapshot before migration", "file", snap)

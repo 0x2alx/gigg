@@ -118,6 +118,10 @@ func load(get func(string) string, environ []string) (*Config, error) {
 	if (main.TLSCert == "") != (main.TLSKey == "") {
 		errs = append(errs, errors.New("set both GIGG_TLS_CERT and GIGG_TLS_KEY, or neither"))
 	}
+	if main.TLS() && c.PublicURL != nil && c.PublicURL.Scheme != "https" {
+		// the browser would see https while cookies and the origin check expect http
+		errs = append(errs, errors.New("with GIGG_TLS_CERT, GIGG_PUBLIC_URL must start with https://"))
+	}
 	c.Listeners = append(c.Listeners, main)
 
 	var extras []Listener

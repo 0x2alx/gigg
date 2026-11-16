@@ -117,13 +117,20 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     const seq = ++loadSeq.current;
     Promise.allSettled(ids.map((id) => api.board(id))).then((res) => {
       if (seq !== loadSeq.current) return; // a newer load (another filter) is on its way
-      const m = new Map<number, Board>();
       const bad: string[] = [];
-      res.forEach((r, i) => {
-        if (r.status === "fulfilled") m.set(ids[i]!, r.value);
-        else bad.push(projOf(ids[i]!)?.project.name ?? `project ${ids[i]}`);
+      // a board that failed to reload keeps its last answer (dropping it would close an open task panel
+      // and the text in it); one never loaded stays out
+      setBoards((prev) => {
+        const m = new Map<number, Board>();
+        res.forEach((r, i) => {
+          if (r.status === "fulfilled") m.set(ids[i]!, r.value);
+          else if (prev.has(ids[i]!)) m.set(ids[i]!, prev.get(ids[i]!)!);
+        });
+        return m;
       });
-      setBoards(m);
+      res.forEach((r, i) => {
+        if (r.status === "rejected") bad.push(projOf(ids[i]!)?.project.name ?? `project ${ids[i]}`);
+      });
       setFailed(bad);
       setLoaded(true);
     });
@@ -291,10 +298,10 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const allTasks = useMemo(() => [...boards.values()].flatMap((b) => b.statuses.flatMap((s) => s.tasks)), [boards]);
   const taskById = (id: number) => allTasks.find((t) => t.id === id);
 
-  // moves: optimistic, then the server places the task; a failure puts the boards back
+  // moves: optimistic, then the server places the task; a failure reloads the boards (putting back the
+  // snapshot from before this move would also undo later moves and reloads)
   const sendMove = useCallback(
     (taskId: number, body: MoveBody, next: Map<number, Board>) => {
-      const before = boards;
       const key = allTasks.find((t) => t.id === taskId)?.key ?? "the task";
       setBoards(next);
       setMoveErr("");
@@ -305,13 +312,12 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
         .finally(() => movesInFlight.current--)
         .then(() => changed())
         .catch((e: unknown) => {
-          setBoards(before);
           const conflict = e instanceof ApiError && (e.status === 409 || e.status === 412);
           setMoveErr(conflict ? `${key} changed meanwhile; the board is reloaded.` : e instanceof ApiError ? `Couldn't move ${key}: ${e.message}` : `Couldn't move ${key}.`);
-          if (conflict) load();
+          load();
         });
     },
-    [boards, allTasks, changed, load],
+    [allTasks, changed, load],
   );
   const moveInProject = (taskId: number, statusId: number, index: number) => {
     const t = taskById(taskId);
@@ -638,6 +644,11 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       {failed.length > 0 && (
         <p className="danger small" role="alert">
           Couldn't load {failed.join(", ")}.
+        </p>
+      )}
+      {[...boards.values()].some((b) => b.truncated) && (
+        <p className="muted small" role="status">
+          {[...boards.values()].filter((b) => b.truncated).map((b) => b.project.name).join(", ")}: more tasks than a board shows. Archive finished ones, or use Table to see them all.
         </p>
       )}
       {moveErr && (

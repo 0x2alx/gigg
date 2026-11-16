@@ -1,10 +1,11 @@
 // Markdown is stored as source and rendered here: markdown-it without HTML, then DOMPurify with a
-// small allowlist. Links are http(s)/mailto only and open in a new tab; images must be same-origin.
+// small allowlist. Links are http(s)/mailto only and open in a new tab; images only from this server (imgsrc.ts).
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import type { User } from "./api";
 import { splitMentions } from "./items";
 import { taskLists } from "./mdtasks";
+import { imageSrcOK } from "./imgsrc";
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 
@@ -18,8 +19,10 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
     node.setAttribute("rel", "noopener noreferrer");
   }
   if (node.tagName === "IMG") {
+    // only images this server serves: avatars and static image files. Any other same-origin URL would
+    // be fetched with the viewer's cookie (an API call, or an event stream held open per image).
     const src = node.getAttribute("src") ?? "";
-    if (!src.startsWith("/") || src.startsWith("//")) node.remove();
+    if (!imageSrcOK(src)) node.remove();
   }
 });
 

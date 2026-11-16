@@ -10,12 +10,12 @@ variables are read by `gigg serve`, `gigg healthcheck` and `gigg admin`. An inva
 |---|---|---|
 | `GIGG_DATA_DIR` | `/data` | Data directory (database, snapshots, uploaded files). Created with mode `0700` if missing. |
 | `GIGG_LISTEN` | `:8080` | Address of the **main** listener (`host:port` or `:port`). |
-| `GIGG_TLS_CERT` | (none) | PEM certificate file for the main listener. Set both `GIGG_TLS_CERT` and `GIGG_TLS_KEY` for HTTPS, or neither for plain HTTP. |
+| `GIGG_TLS_CERT` | (none) | PEM certificate file for the main listener. Set both `GIGG_TLS_CERT` and `GIGG_TLS_KEY` for HTTPS, or neither for plain HTTP. With TLS, `GIGG_PUBLIC_URL` (if set) must start with `https://`. |
 | `GIGG_TLS_KEY` | (none) | PEM private key file for the main listener. |
 | `GIGG_LISTEN_<NAME>` | (none) | An extra, named listener (plain HTTP, API and MCP only). `<NAME>` is `[A-Z][A-Z0-9]{0,15}`; the listener's name is `<NAME>` in lower case (`GIGG_LISTEN_INTERNAL` makes the listener `internal`). `MAIN` is reserved. Any number may be set. |
 | `GIGG_PUBLIC_URL` | (none) | The origin users reach the main listener at, `https://host[:port]` or `http://host[:port]`, no path. Its host name is added to the allowed hosts. It also picks the session cookie (see below) and is the `Origin` accepted for browser writes and for MCP requests that send an `Origin`, besides the exact host and port a request was sent to when that host is an allowed host (so the server can be reached by its IP and by a `.local` name in `GIGG_ALLOWED_HOSTS`). Without it, MCP requests that send an `Origin` are refused. Without it the server logs a warning and only `localhost`, `127.0.0.1`, `::1` and `GIGG_ALLOWED_HOSTS` are accepted. |
 | `GIGG_ALLOWED_HOSTS` | (none) | Extra host names (comma- or space-separated, no ports) the server answers for. `localhost`, `127.0.0.1` and `::1` are always allowed. |
-| `GIGG_TRUSTED_PROXIES` | (none) | Comma- or space-separated networks in CIDR notation (a single address is written `/32` or `/128`). When the TCP peer is in one of them, the client address is taken from `X-Forwarded-For` (see below). |
+| `GIGG_TRUSTED_PROXIES` | (none) | Comma- or space-separated networks in CIDR notation (a single address is written `/32` or `/128`). When the TCP peer is in one of them, the client address is taken from `X-Forwarded-For` (see below), and the scheme the browser used from `X-Forwarded-Proto` (for the origin check on names other than the public URL). |
 | `GIGG_BACKUP_AT` | `03:30` | Local time (`HH:MM`, 24 h) of the nightly database snapshot, or `off` to disable it. |
 | `GIGG_DEFAULT_TZ` | `UTC` | IANA time zone for schedules and recurring tasks that name none and whose creator has no time zone preference (Profile). Also the default of `GIGG_BACKUP_TZ`. The zone database is built into the binary. |
 | `GIGG_BACKUP_TZ` | `GIGG_DEFAULT_TZ` | IANA time zone `GIGG_BACKUP_AT` is read in. |
@@ -77,8 +77,9 @@ GIGG_TRUSTED_PROXIES=10.0.0.5/32
 - The proxy must forward a `Host` that gigg accepts (the public host name, or one listed in
   `GIGG_ALLOWED_HOSTS`) and must pass the browser's `Origin` header through.
 - With an `https://` public URL the session cookie is `__Host-gigg_session` with the `Secure` flag,
-  even though gigg itself speaks plain HTTP to the proxy. With an `http://` public URL (or none) it is
-  `gigg_session` without `Secure`.
+  even though gigg itself speaks plain HTTP to the proxy. With no public URL it is the same when gigg
+  terminates TLS itself. With an `http://` public URL, or none and no TLS, it is `gigg_session`
+  without `Secure`.
 - gigg sends HSTS only when it terminates TLS itself; configure HSTS on the proxy otherwise.
 - Event streams (`GET /api/v1/workspaces/{ws}/events`) send `X-Accel-Buffering: no`; make sure the
   proxy doesn't buffer `text/event-stream` responses.
@@ -114,7 +115,7 @@ and background work.
 `GET /healthz` on any listener, without authentication (the `Host` check still applies):
 
 ```json
-{"status": "ok", "version": "1.2.3", "listener": "main", "schema": 10}
+{"status": "ok", "version": "1.2.3", "listener": "main", "schema": 11}
 ```
 
 It answers 503 with `"status": "error"` when the database doesn't respond. `gigg healthcheck` calls it

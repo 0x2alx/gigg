@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -195,6 +196,9 @@ func (a *API) cookieName() string {
 	if a.cfg.PublicURL != nil && a.cfg.PublicURL.Scheme == "https" {
 		return cookieSecure
 	}
+	if a.cfg.PublicURL == nil && a.listener("main").TLS() {
+		return cookieSecure // no public URL, but the browser reaches us over HTTPS
+	}
 	return cookiePlain
 }
 
@@ -205,6 +209,29 @@ func (a *API) listener(name string) config.Listener {
 		}
 	}
 	return config.Listener{}
+}
+
+// requestScheme: how the browser reached us: https when gigg terminates TLS, else what a trusted proxy
+// says in X-Forwarded-Proto, else http.
+func (a *API) requestScheme(r *http.Request) string {
+	if r.TLS != nil {
+		return "https"
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	if peer, err := netip.ParseAddr(host); err == nil {
+		for _, p := range a.cfg.TrustedProxies {
+			if p.Contains(peer.Unmap()) {
+				if v := strings.ToLower(strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0])); v == "https" || v == "http" {
+					return v
+				}
+				break
+			}
+		}
+	}
+	return "http"
 }
 
 // clientIP: the peer, or the rightmost X-Forwarded-For hop that isn't a trusted proxy.
@@ -355,10 +382,9 @@ func unsafeMethod(m string) bool {
 	return m != http.MethodGet && m != http.MethodHead && m != http.MethodOptions
 }
 
-// originOK: a browser request's Origin is this server's. With GIGG_PUBLIC_URL that is the public URL, or
-// the very host:port the request was sent to when that name is an allowed host (so a server reached by
-// both its IP and its .local name works under either; the host check has already refused other
-// names). Without a public URL, any allowed host name.
+// originOK: a browser request's Origin is this server's: the public URL (GIGG_PUBLIC_URL), or the very
+// scheme, host and port the request was sent to when that name is an allowed host (so a server reached
+// by both its IP and its .local name works under either; the host check has already refused other names).
 func (a *API) originOK(r *http.Request, origin string) bool {
 	u, err := url.Parse(origin)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
@@ -367,10 +393,12 @@ func (a *API) originOK(r *http.Request, origin string) bool {
 	if !a.cfg.AllowedHosts[strings.ToLower(u.Hostname())] {
 		return false
 	}
-	if a.cfg.PublicURL == nil {
+	if a.cfg.PublicURL != nil && strings.EqualFold(origin, a.cfg.PublicURL.Scheme+"://"+a.cfg.PublicURL.Host) {
 		return true
 	}
-	return strings.EqualFold(origin, a.cfg.PublicURL.Scheme+"://"+a.cfg.PublicURL.Host) || strings.EqualFold(u.Host, r.Host)
+	// otherwise the very scheme, host and port this request came in on (behind a trusted proxy, the
+	// scheme it reports)
+	return u.Scheme == a.requestScheme(r) && strings.EqualFold(u.Host, r.Host)
 }
 
 // csrfCheck: cookie-authenticated writes must come from our own origin, as JSON (or with the
@@ -623,7 +651,13 @@ func adminWith(p *access.Principal, scope string) error {
 
 // tx runs fn in a write transaction, mapping store errors.
 func (a *API) tx(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	return storeErr(a.st.Tx(ctx, fn))
+	err := a.st.Tx(ctx, fn)
+	if err == nil {
+		if c, ok := ctx.Value(committedKey{}).(*atomic.Bool); ok {
+			c.Store(true) // the idempotency layer: this request changed something
+		}
+	}
+	return storeErr(err)
 }
 
 // version parses an If-Match header ("N" or W/"N"); 0 = none.

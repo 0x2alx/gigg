@@ -1,7 +1,7 @@
 // How an agent runs a task: model and effort for claude -p, always-run (worked whatever the usage
 // budget, day or night) and a tool allowlist (the runner passes exactly those tools). Empty
 // model/effort = the agent's default; no tools = the runner's usual mode.
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 // Aliases always mean the latest of that family; full ids pin one version. Anything else can be typed.
 export const MODEL_SUGGESTIONS = ["opus", "sonnet", "haiku", "fable", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2"];
@@ -41,17 +41,33 @@ export function parseTools(text: string): { rules: string[]; bad: string | null 
 // ToolsInput: the allowlist as text, one rule per line; commits on blur when every rule is valid.
 export function ToolsInput({ value, onCommit, onError, disabled }: { value: string[]; onCommit: (v: string[]) => void; onError?: (bad: string | null) => void; disabled?: boolean }) {
   const [text, setText] = useState(value.join("\n"));
-  useEffect(() => setText(value.join("\n")), [value]);
+  // follow the saved value when it really changes (not on every new but equal array), and never while
+  // someone is typing in the box (a live reload would wipe the rules not yet committed)
+  const box = useRef<HTMLTextAreaElement>(null);
+  const saved = value.join("\n");
+  useEffect(() => {
+    if (document.activeElement !== box.current) setText(saved);
+  }, [saved]);
   const { rules, bad } = parseTools(text);
   useEffect(() => {
     onError?.(bad); // report only when it changes (a returned value would be taken for a cleanup)
   }, [bad]); // eslint-disable-line react-hooks/exhaustive-deps
+  // only text typed since the box got the focus is saved: leaving it untouched takes the saved value
+  // (someone may have changed the list meanwhile; putting the old text back would undo that)
+  const typed = useRef(false);
   const commit = () => {
-    if (!bad && JSON.stringify(rules) !== JSON.stringify(value)) onCommit(rules);
+    if (!typed.current) {
+      setText(saved);
+      return;
+    }
+    if (bad) return; // kept (and still "typed") until it's fixed
+    typed.current = false;
+    if (JSON.stringify(rules) !== JSON.stringify(value)) onCommit(rules);
   };
   return (
     <span className="tools-input">
       <textarea
+        ref={box}
         rows={Math.min(8, Math.max(3, rules.length + 1))}
         value={text}
         disabled={disabled}
@@ -60,7 +76,10 @@ export function ToolsInput({ value, onCommit, onError, disabled }: { value: stri
         aria-invalid={!!bad}
         spellCheck={false}
         autoCapitalize="off"
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          typed.current = true;
+          setText(e.target.value);
+        }}
         onBlur={commit}
       />
       {bad && <span className="danger small">not one permission rule: {bad}</span>}

@@ -226,3 +226,28 @@ func TestClaimRespectsWindow(t *testing.T) {
 		t.Fatalf("claim: %q", got)
 	}
 }
+
+// TestNextOccurrenceMidnightDST: in a zone whose clocks jump at midnight (Santiago, first Sunday of
+// September 2026: 00:00 -> 01:00) a daily rule still has that day's occurrence, once.
+func TestNextOccurrenceMidnightDST(t *testing.T) {
+	loc, err := time.LoadLocation("America/Santiago")
+	if err != nil {
+		t.Skip("no tzdata for America/Santiago")
+	}
+	at := func(s string) int64 {
+		v, err := time.ParseInLocation("2006-01-02 15:04", s, loc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v.UnixMilli()
+	}
+	r := &Recurrence{Title: "x", TZ: "America/Santiago", WindowStart: "09:00", WindowMinutes: 60, Freq: "daily", Interval: 1, StartsOn: at("2026-09-04 00:00")}
+	if err := r.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, ms := range r.Upcoming(at("2026-09-04 10:00"), 4) {
+		got = append(got, time.UnixMilli(ms).In(loc).Format("2006-01-02 15:04"))
+	}
+	eq(t, got, "2026-09-05 09:00", "2026-09-06 09:00", "2026-09-07 09:00", "2026-09-08 09:00")
+}

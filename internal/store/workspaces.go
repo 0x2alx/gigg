@@ -583,8 +583,8 @@ type StatusPatch struct {
 
 // PatchStatus applies a change.
 func PatchStatus(ctx context.Context, q Q, a Actor, s *Status, expect int64, p StatusPatch) (*Status, error) {
-	if expect != 0 && expect != s.Version {
-		return nil, ErrVersion
+	if err := checkVersion(ctx, q, "statuses", s.ID, expect); err != nil {
+		return nil, err
 	}
 	changed := map[string]any{}
 	if p.Name != nil {
@@ -797,8 +797,8 @@ type LabelPatch struct {
 
 // PatchLabel applies a change.
 func PatchLabel(ctx context.Context, q Q, a Actor, l *Label, expect int64, p LabelPatch) (*Label, error) {
-	if expect != 0 && expect != l.Version {
-		return nil, ErrVersion
+	if err := checkVersion(ctx, q, "labels", l.ID, expect); err != nil {
+		return nil, err
 	}
 	changed := map[string]any{}
 	if p.Name != nil {

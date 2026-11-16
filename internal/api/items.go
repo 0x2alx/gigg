@@ -55,7 +55,7 @@ type templateBody struct {
 	Priority      int64                   `json:"priority,omitempty" minimum:"0" maximum:"4"`
 	Color         *string                 `json:"color,omitempty"`
 	Labels        []string                `json:"labels,omitempty" maxItems:"20"`
-	Assignees     []int64                 `json:"assignees,omitempty"`
+	Assignees     []int64                 `json:"assignees,omitempty" maxItems:"50"`
 	Checklist     []string                `json:"checklist,omitempty" maxItems:"200"`
 	Subtasks      []store.TemplateSubtask `json:"subtasks,omitempty" maxItems:"50" doc:"Subtasks each task made from it gets (title; blocks_parent = the task waits for it)"`
 	Custom        map[string]any          `json:"custom,omitempty"`

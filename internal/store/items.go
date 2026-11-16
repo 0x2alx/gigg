@@ -300,7 +300,7 @@ func ArchiveDone(ctx context.Context, q Q, a Actor, p *Project, before int64, ca
 	rows.Close()
 	now := Now()
 	for _, id := range ids {
-		if _, err := q.ExecContext(ctx, `UPDATE tasks SET archived_at = ?, version = version + 1 WHERE id = ?`, now, id); err != nil {
+		if _, err := q.ExecContext(ctx, `UPDATE tasks SET archived_at = ?, updated_at = ?, version = version + 1 WHERE id = ?`, now, now, id); err != nil {
 			return 0, err
 		}
 	}

@@ -66,18 +66,25 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     });
 
   const shownId = useRef<number | null>(null); // the task on screen, so a new one never shows the last one's runs
-  const load = useCallback(() => {
+  // the task asked for now: a slow answer for the previous one (after a quick switch) is dropped
+  const keyRef = useRef(taskKey);
+  keyRef.current = taskKey;
+  // keepErr: a reload after a failed save keeps that save's message on screen
+  const load = useCallback((keepErr?: boolean) => {
+    const asked = taskKey;
     api
       .task(taskKey)
       .then((t) => {
+        if (keyRef.current !== asked) return;
         if (shownId.current !== t.id) {
           shownId.current = t.id;
           setComments([]);
           setRuns([]);
         }
         setTask(t);
-        setErr("");
+        if (keepErr !== true) setErr("");
         return Promise.all([api.comments(t.id), api.runs(t.id)]).then(([c, r]) => {
+          if (keyRef.current !== asked) return;
           setComments(c.items);
           setRuns(r.items);
         });
@@ -110,7 +117,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       if (!hit) return;
       if (timer) clearTimeout(timer);
       // a progress note changes the runs only; anything else reloads the task, its comments and runs
-      timer = setTimeout(() => (it.action === "run.progress" ? api.runs(taskId).then((r) => setRuns(r.items), () => undefined) : loadRef.current()), 400);
+      timer = setTimeout(() => (it.action === "run.progress" ? api.runs(taskId).then((r) => setRuns(r.items), () => undefined) : loadRef.current(true)), 400);
     };
     window.addEventListener("gigg:activity", on);
     return () => {
@@ -162,8 +169,6 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   // (the closing state names the task being closed, so a newly opened task never renders as closing)
   const [closingKey, setClosingKey] = useState<string | null>(null);
   const closing = closingKey === taskKey;
-  const keyRef = useRef(taskKey);
-  keyRef.current = taskKey;
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const close = useCallback(() => {
     if (reducedMotion()) return closeRef.current();
@@ -240,9 +245,14 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   }, [taskKey]);
 
   // act: saves a change; resolves to whether it worked (the error shows at the top)
-  const act = (p: Promise<Task>, after?: (t: Task) => void): Promise<boolean> =>
-    p
+  const act = (p: Promise<Task>, after?: (t: Task) => void): Promise<boolean> => {
+    const asked = taskKey;
+    return p
       .then((t) => {
+        if (keyRef.current !== asked) {
+          onChanged(); // saved, but another task is on screen now: only the board refreshes
+          return true;
+        }
         setTask(t);
         setErr("");
         onChanged();
@@ -251,9 +261,21 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
         return true;
       })
       .catch((e: unknown) => {
-        setErr(e instanceof ApiError ? e.message : "That didn't work.");
+        lastErr.current = e;
+        if (keyRef.current !== asked) return false; // not this task's error
+        setErr(
+          e instanceof ApiError && e.status === 412
+            ? "This task changed while you were editing. Save again to replace it with your text, or Cancel to see the new version."
+            : e instanceof ApiError
+              ? e.message
+              : "That didn't work.",
+        );
         return false;
       });
+  };
+
+  const [cloning, setCloning] = useState(false);
+  const lastErr = useRef<unknown>(null); // the last failed save's error (saveText tells a conflict apart)
 
   // labels and assignees save on each click: show the change at once and send the saves one at a
   // time, each with the latest list (two quick clicks never undo each other)
@@ -369,7 +391,18 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           else act(api.patchTask(task.id, c));
         }}
         setRun={(c) => act(api.patchTask(task.id, c))}
-        saveText={(title, description_md) => act(api.patchTask(task.id, { title, description_md }))}
+        textVersion={task.version}
+        saveText={(changes, version) => {
+          // only what the editor changed, onto the version it opened on: a title fix never puts back a
+          // description someone (or an agent) rewrote meanwhile, and a rewrite of the same text is refused
+          if (Object.keys(changes).length === 0) return Promise.resolve(true);
+          lastErr.current = null;
+          return act(api.patchTask(task.id, changes, version)).then((ok) => {
+            if (ok) return true;
+            load(true);
+            return lastErr.current instanceof ApiError && lastErr.current.status === 412 ? "conflict" : false;
+          });
+        }}
         canWrite={canWrite}
         ws={ws}
         statuses={statuses}
@@ -559,7 +592,16 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           <>
           {canWrite && (
             <div className="tp-actions">
-              <button type="button" className="button secondary" onClick={() => act(api.cloneTask(task.id), (t) => onMoved(t))}>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={cloning}
+                onClick={() => {
+                  if (cloning) return;
+                  setCloning(true); // a double click makes one copy
+                  void act(api.cloneTask(task.id), (t) => onMoved(t)).finally(() => setCloning(false));
+                }}
+              >
                 <Icon name="copy" /> Clone
               </button>
               {can("archive_tasks") &&
@@ -595,22 +637,31 @@ function Resume({ task, onDone }: { task: Task; onDone: (t: Task) => void }) {
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
   const queued = task.resume_requested_at !== null && task.status_category === "todo";
+  const [busy, setBusy] = useState(false);
+  const sending = useRef(false); // a double click (before the re-render disables the button) sends once
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (sending.current) return;
+    sending.current = true;
+    setBusy(true);
     api
       .resumeTask(task.id, text)
       .then((t) => {
         setText("");
         onDone(t);
       })
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't queue the resume."));
+      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't queue the resume."))
+      .finally(() => {
+        sending.current = false;
+        setBusy(false);
+      });
   };
   return (
     <form className="resume" onSubmit={submit} aria-label="Resume">
       {queued && <Pill color={CATEGORY_COLOR.todo!}>resume queued for the runner's next pass</Pill>}
       <textarea placeholder="Answer or instructions for the next run (Markdown)" data-dirty={text.trim() ? "" : undefined} value={text} onChange={(e) => setText(e.target.value)} rows={3} />
       {err && <p className="danger">{err}</p>}
-      <button type="submit" className="button">
+      <button type="submit" className="button" disabled={busy}>
         ▶ Resume
       </button>
       <p className="muted small">gigg records the request and moves the task back to To-Do; the runner continues the same session.</p>
@@ -621,15 +672,24 @@ function Resume({ task, onDone }: { task: Task; onDone: (t: Task) => void }) {
 function AddComment({ taskId, users, onDone }: { taskId: number; users: User[]; onDone: () => void }) {
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const sending = useRef(false); // Ctrl+Enter twice or a double click posts once
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (sending.current) return;
+    sending.current = true;
+    setBusy(true);
     api
       .addComment(taskId, text)
       .then(() => {
         setText("");
         onDone();
       })
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't post the comment."));
+      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't post the comment."))
+      .finally(() => {
+        sending.current = false;
+        setBusy(false);
+      });
   };
   return (
     <form className="add-comment" onSubmit={submit} aria-label="Add comment">
@@ -650,7 +710,7 @@ function AddComment({ taskId, users, onDone }: { taskId: number; users: User[]; 
         }}
       />
       {err && <p className="danger">{err}</p>}
-      <button type="submit" className="button">
+      <button type="submit" className="button" disabled={busy}>
         Comment
       </button>
     </form>

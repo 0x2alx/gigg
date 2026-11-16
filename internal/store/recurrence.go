@@ -211,9 +211,9 @@ func (r *Recurrence) NextOccurrence(after int64) (int64, bool) {
 	}
 	hm, _ := time.Parse("15:04", r.WindowStart)
 	start := time.UnixMilli(r.StartsOn).In(loc)
-	startDay := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
+	startDay := time.Date(start.Year(), start.Month(), start.Day(), 12, 0, 0, 0, loc) // noon: midnight doesn't exist on some DST days
 	from := time.UnixMilli(after).In(loc)
-	day := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, loc)
+	day := time.Date(from.Year(), from.Month(), from.Day(), 12, 0, 0, 0, loc)
 	if day.Before(startDay) {
 		day = startDay
 	}
@@ -259,6 +259,9 @@ func (r *Recurrence) matches(d, startDay time.Time) bool {
 		if months < 0 || months%r.Interval != 0 {
 			return false
 		}
+		if r.MonthDay == nil { // the API never stores one without a day; a bad row matches nothing
+			return false
+		}
 		last := time.Date(d.Year(), d.Month()+1, 0, 0, 0, 0, 0, d.Location()).Day()
 		want := int(*r.MonthDay)
 		if want == -1 || want > last {
@@ -286,6 +289,9 @@ func mondayOf(d time.Time) time.Time {
 
 // Upcoming lists the next n occurrence starts after `after`.
 func (r *Recurrence) Upcoming(after int64, n int) []int64 {
+	if r.MaxCount != nil && int64(n) > *r.MaxCount-r.CreatedCount { // no more than it will still make
+		n = int(max(*r.MaxCount-r.CreatedCount, 0))
+	}
 	var out []int64
 	t := after
 	for len(out) < n {
@@ -372,8 +378,10 @@ func CreateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence) (*Recurr
 // pairFree: a template and a schedule are paired at most once per project.
 func pairFree(ctx context.Context, q Q, project, tpl, sched, except int64) error {
 	var n int
-	_ = q.QueryRowContext(ctx, `SELECT count(*) FROM recurrences WHERE project_id = ? AND template_id = ? AND schedule_id = ? AND deleted_at IS NULL
-		AND id != ?`, project, tpl, sched, except).Scan(&n)
+	if err := q.QueryRowContext(ctx, `SELECT count(*) FROM recurrences WHERE project_id = ? AND template_id = ? AND schedule_id = ? AND deleted_at IS NULL
+		AND id != ?`, project, tpl, sched, except).Scan(&n); err != nil {
+		return err
+	}
 	if n > 0 {
 		return Conflict("this template already runs on this schedule in this project")
 	}
@@ -454,12 +462,12 @@ type RecurrenceChange struct {
 // UpdateRecurrence replaces a recurring task's own settings (the caller merged the patch), applies
 // the template and schedule change, and recomputes the next occurrence from now.
 func UpdateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence, expect int64, ch RecurrenceChange) (*Recurrence, error) {
-	if expect != 0 && expect != r.Version {
-		return nil, ErrVersion
-	}
 	cur, err := GetRecurrence(ctx, q, r.ID)
 	if err != nil {
 		return nil, err
+	}
+	if expect != 0 && expect != cur.Version { // read in this transaction: r may be a stale copy
+		return nil, ErrVersion
 	}
 	if ch.Template != 0 {
 		tpl, err := RecurrenceTemplate(ctx, q, r.WorkspaceID, r.ProjectID, ch.Template)
@@ -713,6 +721,12 @@ func materialize(ctx context.Context, tx *sql.Tx, r *Recurrence, now int64) (cre
 			r.NextAt = nil
 			break
 		}
+		// an occurrence already made (an edit inside the lead time recomputes next_at from now, which can
+		// land on it again) is never made twice, even if its task was since deleted
+		var made int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM tasks WHERE recurrence_id = ? AND occurrence_at = ?`, r.ID, at).Scan(&made); err != nil {
+			return created, skipped, err
+		}
 		open := 0
 		if r.Overlap == "skip" {
 			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.recurrence_id = ?
@@ -721,6 +735,7 @@ func materialize(ctx context.Context, tx *sql.Tx, r *Recurrence, now int64) (cre
 			}
 		}
 		switch {
+		case made > 0:
 		case end <= now:
 			skipped++ // its whole window already passed (e.g. the server was down): don't create a stale task
 			r.SkippedCount++
@@ -764,6 +779,9 @@ func validAssignees(ctx context.Context, q Q, r *Recurrence) []int64 {
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	if len(out) > MaxAssignees { // an older row with a longer list must not stop its occurrences
+		out = out[:MaxAssignees]
+	}
 	return out
 }
 
@@ -772,7 +790,7 @@ func validAssignees(ctx context.Context, q Q, r *Recurrence) []int64 {
 func markMissed(ctx context.Context, tx *sql.Tx, now int64, res *JanitorResult) int {
 	rows, err := tx.QueryContext(ctx, `SELECT t.id FROM tasks t JOIN statuses s ON s.id = t.status_id JOIN projects p ON p.id = t.project_id
 		WHERE t.not_after IS NOT NULL AND t.not_after <= ? AND t.missed_at IS NULL AND t.deleted_at IS NULL AND t.archived_at IS NULL
-		AND s.category IN ('backlog','todo') LIMIT 200`, now)
+		AND p.deleted_at IS NULL AND s.category IN ('backlog','todo') LIMIT 200`, now)
 	if err != nil {
 		res.Errors = append(res.Errors, "missed: "+err.Error())
 		return 0

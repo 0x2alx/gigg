@@ -400,15 +400,16 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 		args = append(args, int64Args(f.Projects)...)
 	}
 	switch {
-	case f.OnlyDeleted:
-		where = append(where, "t.deleted_at IS NOT NULL")
+	case f.OnlyDeleted: // the trash: not tasks of a deleted project (they can't come back)
+		where = append(where, "t.deleted_at IS NOT NULL", "p.deleted_at IS NULL")
 	case !f.IncludeDeleted:
 		where = append(where, "t.deleted_at IS NULL", "p.deleted_at IS NULL")
 	}
-	switch f.Archived {
-	case "only":
+	switch {
+	case f.OnlyDeleted: // the trash shows a trashed task whether or not it was archived first
+	case f.Archived == "only":
 		where = append(where, "t.archived_at IS NOT NULL")
-	case "include":
+	case f.Archived == "include":
 	default:
 		where = append(where, "t.archived_at IS NULL")
 	}
@@ -480,6 +481,10 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 			return nil, false, err
 		}
 		out = append(out, t)
+	}
+	if err := rows.Err(); err != nil { // a read cut short must not look like a shorter list
+		rows.Close()
+		return nil, false, err
 	}
 	rows.Close()
 	more := len(out) > limit
@@ -708,14 +713,29 @@ func setLabels(ctx context.Context, q Q, a Actor, ws, task int64, names []string
 	return nil
 }
 
+// MaxAssignees bounds a task's assignee list.
+const MaxAssignees = 50
+
 func setAssignees(ctx context.Context, q Q, ws, task int64, users []int64) error {
 	if users == nil {
 		return nil
 	}
+	// each id once, and a bounded list: every id costs a grants lookup inside the write transaction
+	seen := map[int64]bool{}
+	uniq := users[:0:0]
+	for _, u := range users {
+		if !seen[u] {
+			seen[u] = true
+			uniq = append(uniq, u)
+		}
+	}
+	if len(uniq) > MaxAssignees {
+		return Invalid("at most %d assignees", MaxAssignees)
+	}
 	if _, err := q.ExecContext(ctx, `DELETE FROM task_assignees WHERE task_id = ?`, task); err != nil {
 		return err
 	}
-	for _, u := range users {
+	for _, u := range uniq {
 		if _, g, err := UserGrants(ctx, q, u); err != nil || !g.Has(ws, "view") {
 			return Invalid("user %d can't see this workspace", u)
 		}
@@ -823,6 +843,11 @@ func PatchTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, p TaskP
 			changed["missed_at"] = nil // a reopened window clears "missed"
 		}
 	}
+	// a change that sets both ends of the window must close it after it opens (as on create); one end
+	// alone is taken as given (the UI saves each date on its own, so moving a window is two changes)
+	if p.StartAt != nil && p.NotAfter != nil && *p.StartAt != nil && *p.NotAfter != nil && **p.NotAfter <= **p.StartAt {
+		return nil, Invalid("the window must close after it opens")
+	}
 	if p.ParentID != nil {
 		if *p.ParentID != nil {
 			if **p.ParentID == t.ID {
@@ -830,6 +855,16 @@ func PatchTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, p TaskP
 			}
 			if par, err := GetTask(ctx, q, **p.ParentID); err != nil || par.WorkspaceID != t.WorkspaceID {
 				return nil, Invalid("parent task must be in the same workspace")
+			}
+			// no cycles: the new parent can't be this task's own subtask, at any depth
+			var loop int
+			if err := q.QueryRowContext(ctx, `WITH RECURSIVE up(id) AS (SELECT parent_id FROM tasks WHERE id = ?
+				UNION SELECT t.parent_id FROM tasks t JOIN up ON t.id = up.id WHERE t.parent_id IS NOT NULL)
+				SELECT count(*) FROM up WHERE id = ?`, **p.ParentID, t.ID).Scan(&loop); err != nil {
+				return nil, err
+			}
+			if loop > 0 {
+				return nil, Invalid("that task is a subtask of this one; a task can't be under its own subtask")
 			}
 		}
 		changed["parent_id"], data["parent_id"] = nullInt(*p.ParentID), nullInt(*p.ParentID)
@@ -1124,6 +1159,14 @@ func TrashTask(ctx context.Context, q Q, a Actor, t *Task, restore bool) (*Task,
 	if restore {
 		if !t.Deleted {
 			return t, nil
+		}
+		// a task of a deleted project would come back into no list
+		var gone int
+		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM projects WHERE id = ? AND deleted_at IS NOT NULL`, t.ProjectID).Scan(&gone); err != nil {
+			return nil, err
+		}
+		if gone > 0 {
+			return nil, Conflict("its project was deleted, so the task has nowhere to come back to")
 		}
 		if _, err := q.ExecContext(ctx, `UPDATE tasks SET deleted_at = NULL, deleted_by = NULL, updated_at = ?, version = version + 1 WHERE id = ?`, Now(), t.ID); err != nil {
 			return nil, err

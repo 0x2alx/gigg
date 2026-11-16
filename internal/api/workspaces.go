@@ -219,7 +219,12 @@ type Board struct {
 	Project  *store.Project `json:"project"`
 	Statuses []*BoardColumn `json:"statuses"`
 	Labels   []*store.Label `json:"labels"`
+	// Truncated: the project has more unarchived tasks than a board shows (boardMax); the rest are in lists
+	Truncated bool `json:"truncated,omitempty"`
 }
+
+// boardMax bounds one board answer; past it the board says so (Truncated) instead of dropping cards silently.
+const boardMax = 5000
 
 // BoardColumn is a status with its tasks.
 type BoardColumn struct {
@@ -599,14 +604,30 @@ func (a *API) registerWorkspaces() {
 		if err != nil {
 			return nil, err
 		}
-		ts, _, err := store.ListTasks(ctx, a.st.R, store.TaskFilter{WorkspaceID: pr.WorkspaceID, Projects: []int64{pr.ID}, Limit: 500})
+		var ts []*store.Task
+		seen := map[int64]bool{} // pages are separate reads: a task that moved between them comes once
+		more, offset := true, 0
+		for more && len(ts) < boardMax {
+			var page []*store.Task
+			page, more, err = store.ListTasks(ctx, a.st.R, store.TaskFilter{WorkspaceID: pr.WorkspaceID, Projects: []int64{pr.ID}, Limit: 500, Offset: offset})
+			if err != nil {
+				return nil, err
+			}
+			offset += len(page)
+			for _, t := range page {
+				if !seen[t.ID] {
+					seen[t.ID] = true
+					ts = append(ts, t)
+				}
+			}
+		}
 		if err == nil && p.HasScope("comments:read") {
 			err = store.AttachQuestions(ctx, a.st.R, ts) // a waiting card shows the agent's question
 		}
 		if err != nil {
 			return nil, err
 		}
-		b := &Board{Project: pr}
+		b := &Board{Project: pr, Truncated: more}
 		by := map[int64]*BoardColumn{}
 		for _, s := range sts {
 			c := &BoardColumn{Status: s, Tasks: []*store.Task{}}

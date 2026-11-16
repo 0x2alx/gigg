@@ -133,8 +133,8 @@ func Comments(ctx context.Context, q Q, task, sinceID int64, limit int) ([]*Comm
 
 // EditComment replaces a comment's text; the old text goes to the activity log.
 func EditComment(ctx context.Context, q Q, a Actor, c *Comment, expect int64, body string) (*Comment, error) {
-	if expect != 0 && expect != c.Version {
-		return nil, ErrVersion
+	if err := checkVersion(ctx, q, "comments", c.ID, expect); err != nil {
+		return nil, err
 	}
 	if c.Deleted {
 		return nil, Conflict("the comment was deleted")

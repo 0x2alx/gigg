@@ -43,8 +43,10 @@ export function TaskEditor(p: {
   set: (c: EditorChange) => void;
   setRun: (c: Partial<RunSettings>) => void;
   onToolsError?: (bad: string | null | undefined) => void;
-  // saving the title and description: the panel saves both at once (returns whether it worked)
-  saveText?: (title: string, description: string) => Promise<boolean>;
+  // saving the title and description (the panel): only what the editor changed, onto `version` (the
+  // task version the editor opened on; none = overwrite on purpose). "conflict": the task changed meanwhile.
+  saveText?: (changes: TextChanges, version?: number) => Promise<boolean | "conflict">;
+  textVersion?: number; // the task's version now (the editor keeps the one it opened on)
   canWrite: boolean;
   ws: WorkspaceTree;
   places?: WorkspaceTree[]; // a new task may move to these workspaces
@@ -93,6 +95,7 @@ export function TaskEditor(p: {
             aliases={p.aliases}
             onDraft={(title, description_md) => set({ title, description_md })}
             onSave={p.saveText}
+            version={p.textVersion}
           />
           {p.people}
         </section>
@@ -241,7 +244,8 @@ export function TaskEditor(p: {
 // TaskText: the title and the description, shown as the task reads (the description folded when
 // long, "show more" opens it) with a pencil to edit. The panel saves the edit with Save; a form
 // keeps it as typed (an empty one, a new task, starts in the editor).
-function TaskText({ title, description, live, canWrite, users, titleLabel, titlePlaceholder, aliases, onDraft, onSave }: {
+function TaskText({ title, description, version, live, canWrite, users, titleLabel, titlePlaceholder, aliases, onDraft, onSave }: {
+  version?: number;
   title: string;
   description: string;
   live: boolean;
@@ -251,7 +255,7 @@ function TaskText({ title, description, live, canWrite, users, titleLabel, title
   titlePlaceholder: string;
   aliases?: string[];
   onDraft: (title: string, description: string) => void;
-  onSave?: (title: string, description: string) => Promise<boolean>;
+  onSave?: (changes: TextChanges, version?: number) => Promise<boolean | "conflict">;
 }) {
   const [editing, setEditing] = useState(!live && !title.trim());
   // focus follows the switch the user made: into the title when they open the editor, back to the
@@ -271,7 +275,10 @@ function TaskText({ title, description, live, canWrite, users, titleLabel, title
   };
   if (editing && canWrite) {
     return live ? (
-      <TextForm title={title} description={description} users={users} onCancel={shut} onSave={(t, d) => void onSave?.(t, d).then((ok) => ok && shut())} />
+      <TextForm title={title} description={description} version={version} users={users} onCancel={shut} onSave={(ch, v) => onSave?.(ch, v).then((r) => {
+        if (r === true) shut();
+        return r;
+      }) ?? Promise.resolve(false)} />
     ) : (
       <div className="edit tp-edit">
         <input className="tp-title-input" value={title} onChange={(e) => onDraft(e.target.value, description)} required maxLength={250} placeholder={titlePlaceholder} aria-label={titleLabel} data-autofocus="" autoFocus={touched.current} />
@@ -312,17 +319,39 @@ function TaskText({ title, description, live, canWrite, users, titleLabel, title
   );
 }
 
-// TextForm: the panel's title and description editor (its own form: Save sends both).
-function TextForm({ title: t0, description: d0, users, onCancel, onSave }: { title: string; description: string; users: User[]; onCancel: () => void; onSave: (t: string, d: string) => void }) {
+// TextChanges: what the text editor changed, compared with the text it opened with (only those go out,
+// so saving a title never puts back a description someone else rewrote meanwhile).
+export type TextChanges = { title?: string; description_md?: string };
+
+// TextForm: the panel's title and description editor (its own form). The text and version it opened
+// with stay its base while it is open, even when the task reloads underneath: a save goes onto that
+// version, so a change someone made meanwhile is refused (412) rather than overwritten; after that
+// refusal the next Save overwrites on purpose.
+function TextForm({ title: t0, description: d0, version, users, onCancel, onSave }: {
+  title: string;
+  description: string;
+  version?: number;
+  users: User[];
+  onCancel: () => void;
+  onSave: (ch: TextChanges, version?: number) => Promise<boolean | "conflict">;
+}) {
+  const base = useRef({ title: t0, description: d0, version });
+  const [force, setForce] = useState(false);
   const [title, setTitle] = useState(t0);
   const [description, setDescription] = useState(d0);
-  const dirty = title !== t0 || description !== d0;
+  const dirty = title !== base.current.title || description !== base.current.description;
   return (
     <form
       className="edit tp-edit"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave(title, description);
+        void onSave(
+          {
+            ...(title !== base.current.title ? { title } : {}),
+            ...(description !== base.current.description ? { description_md: description } : {}),
+          },
+          force ? undefined : base.current.version,
+        ).then((r) => r === "conflict" && setForce(true));
       }}
       aria-label="Edit task"
       data-dirty={dirty ? "" : undefined}

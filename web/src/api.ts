@@ -420,6 +420,7 @@ export interface Board {
   project: Project;
   statuses: (Status & { tasks: Task[] })[];
   labels: Tag[];
+  truncated?: boolean; // more unarchived tasks than a board shows: the rest are only in Table and search
 }
 
 export interface InboxItem {
@@ -469,7 +470,9 @@ export const api = {
   task: (id: string | number) => call<Task>("GET", `/tasks/${id}`),
   createTask: (p: number, body: TaskCreateBody) =>
     call<Task>("POST", `/projects/${p}/tasks`, body),
-  patchTask: (id: number, body: Record<string, unknown>) => call<Task>("PATCH", `/tasks/${id}`, body),
+  // version: refuse (412) when the task changed since it was read (text edits, so nobody's words are overwritten)
+  patchTask: (id: number, body: Record<string, unknown>, version?: number) =>
+    call<Task>("PATCH", `/tasks/${id}`, body, version ? { "If-Match": `"${version}"` } : undefined),
   moveTask: (id: number, body: { status?: number; category?: Category; project?: number; position?: string; task?: number }) =>
     call<Task>("POST", `/tasks/${id}/move`, body),
   cloneTask: (id: number, project?: number) => call<Task>("POST", `/tasks/${id}/clone`, project ? { project } : {}),
@@ -538,7 +541,8 @@ export const api = {
   setCustom: (id: number, values: Record<string, unknown>) => call<Task>("PATCH", `/tasks/${id}/custom`, { values }),
   templates: (ws: string | number, project?: number) => call<{ items: Template[] }>("GET", `/workspaces/${ws}/templates${project ? `?project=${project}` : ""}`),
   createTemplate: (ws: string | number, body: TemplateBody) => call<Template>("POST", `/workspaces/${ws}/templates`, body),
-  putTemplate: (id: number, body: TemplateBody) => call<Template>("PUT", `/templates/${id}`, body),
+  putTemplate: (id: number, body: TemplateBody, version?: number) =>
+    call<Template>("PUT", `/templates/${id}`, body, version ? { "If-Match": `"${version}"` } : undefined),
   deleteTemplate: (id: number) => call<void>("DELETE", `/templates/${id}`),
   useTemplate: (id: number, project: number, title?: string) => call<Task>("POST", `/templates/${id}/use`, title ? { project, title } : { project }),
 };

@@ -49,7 +49,7 @@ These two decide what an unattended agent does, so they also protect existing ta
   or restoring it; requesting a resume.
 - Setting, changing or clearing `allowed_tools` needs `allowed_tools`. The same rules apply to a task
   that has a non-empty list.
-- Changing a schedule that a recurring task with either setting uses needs the matching permission,
+- Changing a schedule that a recurring task with either setting uses (directly, or by giving another recurring task on it new timing) needs the matching permission,
   as editing that recurring task would.
 - Creating a task from a template that carries either setting, and creating or changing a recurring
   task whose content (or template) carries it, needs the matching permission.

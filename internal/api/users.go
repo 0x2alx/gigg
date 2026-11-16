@@ -117,7 +117,13 @@ func (a *API) registerUsers() {
 			if in.Body.Kind != "human" {
 				return nil, fail(422, "invalid", "Agents have no password.")
 			}
-			if n.PasswordHash, err = auth.HashPassword(in.Body.Password); err != nil {
+			release, err := a.hashSlot()
+			if err != nil {
+				return nil, err
+			}
+			n.PasswordHash, err = auth.HashPassword(in.Body.Password)
+			release()
+			if err != nil {
 				return nil, fail(422, "invalid", err.Error())
 			}
 		}
@@ -182,7 +188,12 @@ func (a *API) registerUsers() {
 		if p.Key != nil {
 			return nil, errForbidden("Passwords are set from an admin's browser session, not with a key.")
 		}
+		release, err := a.hashSlot()
+		if err != nil {
+			return nil, err
+		}
 		h, err := auth.HashPassword(in.Body.Password)
+		release()
 		if err != nil {
 			return nil, fail(422, "invalid", err.Error())
 		}

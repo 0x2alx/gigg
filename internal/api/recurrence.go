@@ -30,7 +30,7 @@ type RecurrenceBody struct {
 	Priority      int64                   `json:"priority,omitempty" minimum:"0" maximum:"4"`
 	Color         *string                 `json:"color,omitempty"`
 	Labels        []string                `json:"labels,omitempty" maxItems:"20"`
-	Assignees     []int64                 `json:"assignees,omitempty"`
+	Assignees     []int64                 `json:"assignees,omitempty" maxItems:"50"`
 	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p (default: the agent's)"`
 	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort for claude -p (default: the agent's)"`
 	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Its tasks run whatever the usage budget (needs the always_run permission)"`
@@ -233,6 +233,10 @@ func (a *API) registerRecurrence() {
 		if err := allowed(p, r.WorkspaceID, "schedules"); err != nil {
 			return nil, err
 		}
+		// an edit makes the editor its owner, whose permissions the scheduler then creates tasks with
+		if err := allowed(p, r.WorkspaceID, "create_tasks"); err != nil {
+			return nil, err
+		}
 		v, err := ifMatch(in.IfMatch)
 		if err != nil {
 			return nil, err
@@ -285,9 +289,21 @@ func (a *API) registerRecurrence() {
 			if in.Body.Freq == "" {
 				return nil, fail(422, "invalid", "A recurring task needs freq (or a schedule_id).")
 			}
-			if p.Narrowed() && a.scheduleUsedOutside(ctx, p, old.ScheduleID) {
-				if rule := r.Rule(); rule.Validate() == nil && !rule.Same(old.Rule()) {
+			if rule := r.Rule(); rule.Validate() == nil && !rule.Same(old.Rule()) {
+				if p.Narrowed() && a.scheduleUsedOutside(ctx, p, old.ScheduleID) {
 					return nil, errForbidden("This schedule is used outside the projects this key reaches; pick or make another one.")
+				}
+				// new timing retimes the shared schedule, so every recurring task on it: the same guards as
+				// PUT /schedules/{id} (an always-run or tool-allowlist one on it needs those permissions)
+				always, tools, err := store.ScheduleGuards(ctx, a.st.R, old.ScheduleID)
+				if err != nil {
+					return nil, err
+				}
+				if err := alwaysRunGuard(p, r.WorkspaceID, always); err != nil {
+					return nil, err
+				}
+				if err := toolsGuard(p, r.WorkspaceID, tools); err != nil {
+					return nil, err
 				}
 			}
 		}

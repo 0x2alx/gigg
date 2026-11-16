@@ -302,7 +302,9 @@ func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) 
 	action := "schedule.updated"
 	if s.ID == 0 {
 		var n int
-		_ = q.QueryRowContext(ctx, `SELECT count(*) FROM schedules WHERE workspace_id = ? AND deleted_at IS NULL`, s.WorkspaceID).Scan(&n)
+		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM schedules WHERE workspace_id = ? AND deleted_at IS NULL`, s.WorkspaceID).Scan(&n); err != nil {
+			return nil, err
+		}
 		if n >= 200 {
 			return nil, Invalid("a workspace has at most 200 schedules")
 		}
@@ -385,6 +387,10 @@ func DeleteSchedule(ctx context.Context, q Q, a Actor, s *Schedule) error {
 		if rows.Scan(&t) == nil {
 			names = append(names, fmt.Sprintf("%q", t))
 		}
+	}
+	if err := rows.Err(); err != nil { // fail closed: an unread list must not allow the delete
+		rows.Close()
+		return err
 	}
 	rows.Close()
 	if len(names) > 0 {

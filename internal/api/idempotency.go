@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/0x2alx/gigg/internal/access"
 	"github.com/0x2alx/gigg/internal/store"
@@ -137,11 +138,17 @@ func (a *API) idempotent(next http.Handler) http.Handler {
 		}
 
 		rec := &idemRecorder{ResponseWriter: w}
-		next.ServeHTTP(rec, r)
+		committed := new(atomic.Bool) // set by a.tx when a write of this request committed
+		next.ServeHTTP(rec, r.WithContext(context.WithValue(r.Context(), committedKey{}, committed)))
 		if rec.status == 0 {
 			rec.status = http.StatusOK
 		}
-		if rec.status >= 500 {
+		// not stored when it may succeed on a retry: server errors, rate limits, and a request cancelled
+		// before any write committed. One cancelled after its write committed (post-commit reads failed)
+		// already ran: a retry must not run it again, so it is remembered as such.
+		if rec.status == statusClientClosed && committed.Load() {
+			rec.over = true // stored below as "already ran" (409 idempotency_unreplayable)
+		} else if rec.status >= 500 || rec.status == statusClientClosed || rec.status == http.StatusTooManyRequests {
 			return
 		}
 		// the request already ran: store even if the client has gone (the retry is what this is for)
@@ -155,7 +162,7 @@ func (a *API) idempotent(next http.Handler) http.Handler {
 		status, stored := rec.status, idemStored{ContentType: hd.Get("Content-Type"), ETag: hd.Get("ETag"), Location: hd.Get("Location"), Body: rec.buf.Bytes()}
 		if rec.over {
 			// too big to keep: remember that it ran, so a repeat doesn't run it again
-			pb, _ := json.Marshal(fail(409, "idempotency_unreplayable", "This request already ran, but its answer was too large to keep; reload to see the result."))
+			pb, _ := json.Marshal(fail(409, "idempotency_unreplayable", "This request already ran, but its answer couldn't be kept; reload to see the result."))
 			status, stored = http.StatusConflict, idemStored{ContentType: "application/problem+json", Body: append(pb, '\n')}
 		}
 		b, _ := json.Marshal(stored)
@@ -197,3 +204,6 @@ func (r *idemRecorder) Write(b []byte) (int, error) {
 }
 
 func (r *idemRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
+// committedKey: the request context value (*atomic.Bool) that a.tx sets once a write committed.
+type committedKey struct{}
