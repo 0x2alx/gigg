@@ -525,12 +525,14 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
             </>
           }
         />
-        {(err || (statusErr && !repeating && !noStatus)) && (
-          <p className="danger" role="alert">
-            {err || statusErr}
-          </p>
-        )}
         <div className="tm-foot">
+          {/* in the sticky footer, next to the buttons: the form is long, and a message at its end
+              would be out of view (Esc on a typed form, a refused save) */}
+          {(err || (statusErr && !repeating && !noStatus)) && (
+            <p className="danger tm-foot-msg" role="alert">
+              {err || statusErr}
+            </p>
+          )}
           {single && canTemplates && (
             <div className="save-tpl">
               {saveAs === null ? (

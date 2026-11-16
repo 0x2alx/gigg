@@ -1641,7 +1641,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
   background: var(--surface); border-top: 1px solid var(--line); border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 .tm-foot .grow { flex: 1; }
-.tm-form > .danger { margin: var(--sp-4) 0 0; }
+.tm-foot-msg { flex-basis: 100%; margin: 0; }
 /* full page */
 .modal-backdrop:has(> .modal-full) { padding: 1rem; place-items: stretch center; }
 /* the whole page: the dialog scrolls inside itself, so its sticky footer stays within its border */
