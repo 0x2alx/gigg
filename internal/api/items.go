@@ -48,25 +48,26 @@ type checklistItemPath struct {
 }
 
 type templateBody struct {
-	Project       *int64         `json:"project_id,omitempty" doc:"Limit to one project (default: any project of the workspace)"`
-	Name          string         `json:"name" minLength:"1" maxLength:"80"`
-	Title         string         `json:"title" minLength:"1" maxLength:"250"`
-	DescriptionMD string         `json:"description_md,omitempty" maxLength:"65536"`
-	Priority      int64          `json:"priority,omitempty" minimum:"0" maximum:"4"`
-	Color         *string        `json:"color,omitempty"`
-	Labels        []string       `json:"labels,omitempty" maxItems:"20"`
-	Assignees     []int64        `json:"assignees,omitempty"`
-	Checklist     []string       `json:"checklist,omitempty" maxItems:"200"`
-	Custom        map[string]any `json:"custom,omitempty"`
-	Model         string         `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p (default: the agent's)"`
-	Effort        string         `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort for claude -p (default: the agent's)"`
-	AlwaysRun     bool           `json:"always_run,omitempty" doc:"Tasks made from it run whatever the usage budget (needs the always_run permission)"`
-	AllowedTools  []string       `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its tasks get for the runner (permission rules); on update, omit to keep, [] clears. Needs the allowed_tools permission"`
+	Project       *int64                  `json:"project_id,omitempty" doc:"Limit to one project (default: any project of the workspace)"`
+	Name          string                  `json:"name" minLength:"1" maxLength:"80"`
+	Title         string                  `json:"title" minLength:"1" maxLength:"250"`
+	DescriptionMD string                  `json:"description_md,omitempty" maxLength:"65536"`
+	Priority      int64                   `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	Color         *string                 `json:"color,omitempty"`
+	Labels        []string                `json:"labels,omitempty" maxItems:"20"`
+	Assignees     []int64                 `json:"assignees,omitempty"`
+	Checklist     []string                `json:"checklist,omitempty" maxItems:"200"`
+	Subtasks      []store.TemplateSubtask `json:"subtasks,omitempty" maxItems:"50" doc:"Subtasks each task made from it gets (title; blocks_parent = the task waits for it)"`
+	Custom        map[string]any          `json:"custom,omitempty"`
+	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p (default: the agent's)"`
+	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort for claude -p (default: the agent's)"`
+	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Tasks made from it run whatever the usage budget (needs the always_run permission)"`
+	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its tasks get for the runner (permission rules); on update, omit to keep, [] clears. Needs the allowed_tools permission"`
 }
 
 func (b templateBody) apply(t *store.Template) {
 	t.ProjectID, t.Name, t.Title, t.DescriptionMD, t.Priority, t.Color = b.Project, b.Name, b.Title, b.DescriptionMD, b.Priority, b.Color
-	t.Labels, t.Assignees, t.Checklist, t.Custom = b.Labels, b.Assignees, b.Checklist, b.Custom
+	t.Labels, t.Assignees, t.Checklist, t.Custom, t.Subtasks = b.Labels, b.Assignees, b.Checklist, b.Custom, b.Subtasks
 	t.Model, t.Effort, t.AlwaysRun = b.Model, b.Effort, b.AlwaysRun
 	if b.AllowedTools != nil || t.ID == 0 {
 		t.AllowedTools = b.AllowedTools
@@ -587,6 +588,11 @@ func (a *API) registerItems() {
 		}
 		if len(tpl.Checklist) > 0 {
 			if err := allowed(p, pr.WorkspaceID, "checklists"); err != nil {
+				return nil, err
+			}
+		}
+		if anyGate(tpl.Subtasks) {
+			if err := allowed(p, pr.WorkspaceID, "relations"); err != nil {
 				return nil, err
 			}
 		}

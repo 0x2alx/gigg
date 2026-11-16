@@ -52,6 +52,7 @@ type (
 		Labels        []string       `json:"labels,omitempty"`
 		Assignees     []int64        `json:"assignees,omitempty"`
 		Checklist     []string       `json:"checklist,omitempty"`
+		Subtasks      []subtaskArg   `json:"subtasks,omitempty" jsonschema:"Subtasks each task made from it gets: title, and blocks_parent when the task should wait for it"`
 		Custom        map[string]any `json:"custom,omitempty"`
 		Model         string         `json:"model,omitempty" jsonschema:"Model for the agent's claude -p (default: the agent's)"`
 		Effort        string         `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh or max (default: the agent's)"`
@@ -186,6 +187,9 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 				}
 				if in.Priority != 0 {
 					b["priority"] = in.Priority
+				}
+				if in.Subtasks != nil {
+					b["subtasks"] = in.Subtasks
 				}
 				for k, v := range map[string]any{"labels": in.Labels, "assignees": in.Assignees, "checklist": in.Checklist} {
 					switch x := v.(type) {

@@ -20,33 +20,34 @@ type RecurrenceOut struct {
 // RecurrenceBody creates or replaces a recurring task: a template (template_id, or the task content
 // here) paired with a schedule (schedule_id, or the timing here), plus its own settings.
 type RecurrenceBody struct {
-	TemplateID    *int64         `json:"template_id,omitempty" doc:"Make each task from this template (same workspace; for this project or any); the content fields are then ignored. On update, another id switches to that template; without it, content changes are written to the current template (every recurring task using it follows)."`
-	ScheduleID    *int64         `json:"schedule_id,omitempty" doc:"Use this schedule (same workspace); the timing fields are then ignored. On update, another id switches to it; without it, timing changes are written to the current schedule (every recurring task on it moves). On create without it, a schedule with exactly this timing is reused or made."`
-	Title         string         `json:"title,omitempty" maxLength:"250" doc:"Task title (required unless template_id is given)"`
-	Checklist     []string       `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items each task gets; omit to keep the template's, [] clears"`
-	Custom        map[string]any `json:"custom,omitempty" doc:"Custom field values (field id -> value) each task gets; omit to keep the template's, {} clears"`
-	DescriptionMD string         `json:"description_md,omitempty" maxLength:"65536"`
-	Priority      int64          `json:"priority,omitempty" minimum:"0" maximum:"4"`
-	Color         *string        `json:"color,omitempty"`
-	Labels        []string       `json:"labels,omitempty" maxItems:"20"`
-	Assignees     []int64        `json:"assignees,omitempty"`
-	Model         string         `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p (default: the agent's)"`
-	Effort        string         `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort for claude -p (default: the agent's)"`
-	AlwaysRun     bool           `json:"always_run,omitempty" doc:"Its tasks run whatever the usage budget (needs the always_run permission)"`
-	AllowedTools  []string       `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its tasks get for the runner (permission rules); omit to keep the template's, [] clears. Needs the allowed_tools permission"`
-	Freq          string         `json:"freq,omitempty" enum:"daily,weekly,monthly," doc:"Required unless schedule_id is given"`
-	Interval      int64          `json:"interval,omitempty" minimum:"0" maximum:"365" doc:"Every N days/weeks/months (default 1)"`
-	Weekdays      []int          `json:"weekdays,omitempty" doc:"Weekly: 1=Mon .. 7=Sun"`
-	MonthDay      *int64         `json:"month_day,omitempty" doc:"Monthly: 1-31, -1 = last day (short months use their last day)"`
-	TZ            string         `json:"tz,omitempty" doc:"IANA time zone (default: the user's time zone preference, else the instance default GIGG_DEFAULT_TZ)"`
-	WindowStart   string         `json:"window_start,omitempty" pattern:"^[0-2][0-9]:[0-5][0-9]$" doc:"When the window opens, local HH:MM (default 00:00)"`
-	WindowMinutes int64          `json:"window_minutes,omitempty" minimum:"0" maximum:"44640" doc:"How long the window stays open (default 1440)"`
-	LeadMinutes   int64          `json:"lead_minutes,omitempty" minimum:"0" maximum:"10080" doc:"Create the task this long before the window opens"`
-	StartsOn      int64          `json:"starts_on,omitempty" doc:"Unix ms (default now)"`
-	EndsOn        *int64         `json:"ends_on,omitempty" doc:"Unix ms"`
-	MaxCount      *int64         `json:"max_count,omitempty" minimum:"1"`
-	Overlap       string         `json:"overlap,omitempty" enum:"skip,create," doc:"When the previous occurrence is still open: skip (default) or create anyway"`
-	Paused        bool           `json:"paused,omitempty"`
+	TemplateID    *int64                  `json:"template_id,omitempty" doc:"Make each task from this template (same workspace; for this project or any); the content fields are then ignored. On update, another id switches to that template; without it, content changes are written to the current template (every recurring task using it follows)."`
+	ScheduleID    *int64                  `json:"schedule_id,omitempty" doc:"Use this schedule (same workspace); the timing fields are then ignored. On update, another id switches to it; without it, timing changes are written to the current schedule (every recurring task on it moves). On create without it, a schedule with exactly this timing is reused or made."`
+	Title         string                  `json:"title,omitempty" maxLength:"250" doc:"Task title (required unless template_id is given)"`
+	Checklist     []string                `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items each task gets; omit to keep the template's, [] clears"`
+	Subtasks      []store.TemplateSubtask `json:"subtasks,omitempty" maxItems:"50" doc:"Subtasks each task gets (title; blocks_parent = the task waits for it); omit to keep the template's, [] clears"`
+	Custom        map[string]any          `json:"custom,omitempty" doc:"Custom field values (field id -> value) each task gets; omit to keep the template's, {} clears"`
+	DescriptionMD string                  `json:"description_md,omitempty" maxLength:"65536"`
+	Priority      int64                   `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	Color         *string                 `json:"color,omitempty"`
+	Labels        []string                `json:"labels,omitempty" maxItems:"20"`
+	Assignees     []int64                 `json:"assignees,omitempty"`
+	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p (default: the agent's)"`
+	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort for claude -p (default: the agent's)"`
+	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Its tasks run whatever the usage budget (needs the always_run permission)"`
+	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its tasks get for the runner (permission rules); omit to keep the template's, [] clears. Needs the allowed_tools permission"`
+	Freq          string                  `json:"freq,omitempty" enum:"daily,weekly,monthly," doc:"Required unless schedule_id is given"`
+	Interval      int64                   `json:"interval,omitempty" minimum:"0" maximum:"365" doc:"Every N days/weeks/months (default 1)"`
+	Weekdays      []int                   `json:"weekdays,omitempty" doc:"Weekly: 1=Mon .. 7=Sun"`
+	MonthDay      *int64                  `json:"month_day,omitempty" doc:"Monthly: 1-31, -1 = last day (short months use their last day)"`
+	TZ            string                  `json:"tz,omitempty" doc:"IANA time zone (default: the user's time zone preference, else the instance default GIGG_DEFAULT_TZ)"`
+	WindowStart   string                  `json:"window_start,omitempty" pattern:"^[0-2][0-9]:[0-5][0-9]$" doc:"When the window opens, local HH:MM (default 00:00)"`
+	WindowMinutes int64                   `json:"window_minutes,omitempty" minimum:"0" maximum:"44640" doc:"How long the window stays open (default 1440)"`
+	LeadMinutes   int64                   `json:"lead_minutes,omitempty" minimum:"0" maximum:"10080" doc:"Create the task this long before the window opens"`
+	StartsOn      int64                   `json:"starts_on,omitempty" doc:"Unix ms (default now)"`
+	EndsOn        *int64                  `json:"ends_on,omitempty" doc:"Unix ms"`
+	MaxCount      *int64                  `json:"max_count,omitempty" minimum:"1"`
+	Overlap       string                  `json:"overlap,omitempty" enum:"skip,create," doc:"When the previous occurrence is still open: skip (default) or create anyway"`
+	Paused        bool                    `json:"paused,omitempty"`
 }
 
 // apply copies the body: content unless a template is named, timing unless a schedule is named, and
@@ -55,7 +56,7 @@ func (b RecurrenceBody) apply(r *store.Recurrence) {
 	if b.TemplateID == nil {
 		r.Title, r.DescriptionMD, r.Priority, r.Color = b.Title, b.DescriptionMD, b.Priority, b.Color
 		r.Labels, r.Assignees, r.Model, r.Effort, r.AlwaysRun = b.Labels, b.Assignees, b.Model, b.Effort, b.AlwaysRun
-		r.Checklist, r.Custom = b.Checklist, b.Custom
+		r.Checklist, r.Custom, r.Subtasks = b.Checklist, b.Custom, b.Subtasks
 		if b.AllowedTools != nil {
 			r.AllowedTools = b.AllowedTools
 		}

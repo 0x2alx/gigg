@@ -145,6 +145,7 @@ type (
 		DueAt         int64          `json:"due_at,omitempty" jsonschema:"Unix ms"`
 		NotAfter      int64          `json:"not_after,omitempty" jsonschema:"Unix ms: the window closes; not claimable after it, and marked missed if untouched"`
 		Parent        int64          `json:"parent_id,omitempty" jsonschema:"Make it a subtask of this task id"`
+		BlocksParent  bool           `json:"blocks_parent,omitempty" jsonschema:"With parent_id: the parent waits (isn't handed out) until this subtask is done"`
 		Checklist     []string       `json:"checklist,omitempty" jsonschema:"Checklist items"`
 		Custom        map[string]any `json:"custom,omitempty" jsonschema:"Custom field values by field id"`
 		Model         string         `json:"model,omitempty" jsonschema:"Model for the agent's claude -p: opus, sonnet, haiku, fable or a full id (default: the agent's)"`
@@ -166,6 +167,7 @@ type (
 		Effort        *string  `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh, max; empty = the agent's default"`
 		AlwaysRun     *bool    `json:"always_run,omitempty" jsonschema:"Run it whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  []string `json:"allowed_tools,omitempty" jsonschema:"Replaces the runner tool allowlist ([] clears; needs the allowed_tools permission)"`
+		BlocksParent  *bool    `json:"blocks_parent,omitempty" jsonschema:"For a subtask: true = its parent waits until it is done"`
 		Clear         []string `json:"clear,omitempty" jsonschema:"Fields to clear: color, start_at, due_at, not_after, labels"`
 	}
 	moveTaskArgs struct {
@@ -198,32 +200,37 @@ type (
 		ID int64 `json:"id" jsonschema:"Recurring task id"`
 	}
 	recArgs struct {
-		ID            int64    `json:"id,omitempty" jsonschema:"update_recurring: the recurring task id"`
-		Project       int64    `json:"project,omitempty" jsonschema:"create_recurring: project id"`
-		Title         string   `json:"title,omitempty"`
-		DescriptionMD *string  `json:"description_md,omitempty" jsonschema:"Markdown, copied into each task"`
-		Priority      *int64   `json:"priority,omitempty" jsonschema:"0-4"`
-		Labels        []string `json:"labels,omitempty"`
-		Assignees     []int64  `json:"assignees,omitempty" jsonschema:"User ids"`
-		Freq          string   `json:"freq,omitempty" jsonschema:"daily, weekly or monthly"`
-		Interval      int64    `json:"interval,omitempty" jsonschema:"Every N days/weeks/months (default 1)"`
-		Weekdays      []int    `json:"weekdays,omitempty" jsonschema:"Weekly: 1=Mon .. 7=Sun"`
-		MonthDay      *int64   `json:"month_day,omitempty" jsonschema:"Monthly: 1-31, -1 = last day"`
-		TZ            string   `json:"tz,omitempty" jsonschema:"IANA zone; default: your time zone preference, else the instance default"`
-		WindowStart   string   `json:"window_start,omitempty" jsonschema:"Local HH:MM when the window opens (default 00:00)"`
-		WindowMinutes int64    `json:"window_minutes,omitempty" jsonschema:"How long the window stays open, minutes (default 1440)"`
-		LeadMinutes   *int64   `json:"lead_minutes,omitempty" jsonschema:"Create the task this many minutes before the window opens"`
-		EndsOn        *int64   `json:"ends_on,omitempty" jsonschema:"Unix ms; 0 clears"`
-		MaxCount      *int64   `json:"max_count,omitempty" jsonschema:"Stop after this many tasks; 0 clears"`
-		Overlap       string   `json:"overlap,omitempty" jsonschema:"skip (default: no new task while the last is still open) or create"`
-		Paused        *bool    `json:"paused,omitempty"`
-		Model         *string  `json:"model,omitempty" jsonschema:"Model for claude -p; empty = the agent's default"`
-		Effort        *string  `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh, max; empty = the agent's default"`
-		AlwaysRun     *bool    `json:"always_run,omitempty" jsonschema:"Its tasks run whatever the usage budget (needs the always_run permission)"`
-		AllowedTools  []string `json:"allowed_tools,omitempty" jsonschema:"Tool allowlist its tasks get for the runner (permission rules; [] clears; needs the allowed_tools permission)"`
-		TemplateID    *int64   `json:"template_id,omitempty" jsonschema:"Make each task from this template (see list_templates); content fields are then ignored. update_recurring: switches to it"`
-		Checklist     []string `json:"checklist,omitempty" jsonschema:"Checklist items each task gets (stored in the template)"`
-		ScheduleID    *int64   `json:"schedule_id,omitempty" jsonschema:"Use this schedule (see list_schedules); timing fields are then ignored. update_recurring: switches to it"`
+		ID            int64        `json:"id,omitempty" jsonschema:"update_recurring: the recurring task id"`
+		Project       int64        `json:"project,omitempty" jsonschema:"create_recurring: project id"`
+		Title         string       `json:"title,omitempty"`
+		DescriptionMD *string      `json:"description_md,omitempty" jsonschema:"Markdown, copied into each task"`
+		Priority      *int64       `json:"priority,omitempty" jsonschema:"0-4"`
+		Labels        []string     `json:"labels,omitempty"`
+		Assignees     []int64      `json:"assignees,omitempty" jsonschema:"User ids"`
+		Freq          string       `json:"freq,omitempty" jsonschema:"daily, weekly or monthly"`
+		Interval      int64        `json:"interval,omitempty" jsonschema:"Every N days/weeks/months (default 1)"`
+		Weekdays      []int        `json:"weekdays,omitempty" jsonschema:"Weekly: 1=Mon .. 7=Sun"`
+		MonthDay      *int64       `json:"month_day,omitempty" jsonschema:"Monthly: 1-31, -1 = last day"`
+		TZ            string       `json:"tz,omitempty" jsonschema:"IANA zone; default: your time zone preference, else the instance default"`
+		WindowStart   string       `json:"window_start,omitempty" jsonschema:"Local HH:MM when the window opens (default 00:00)"`
+		WindowMinutes int64        `json:"window_minutes,omitempty" jsonschema:"How long the window stays open, minutes (default 1440)"`
+		LeadMinutes   *int64       `json:"lead_minutes,omitempty" jsonschema:"Create the task this many minutes before the window opens"`
+		EndsOn        *int64       `json:"ends_on,omitempty" jsonschema:"Unix ms; 0 clears"`
+		MaxCount      *int64       `json:"max_count,omitempty" jsonschema:"Stop after this many tasks; 0 clears"`
+		Overlap       string       `json:"overlap,omitempty" jsonschema:"skip (default: no new task while the last is still open) or create"`
+		Paused        *bool        `json:"paused,omitempty"`
+		Model         *string      `json:"model,omitempty" jsonschema:"Model for claude -p; empty = the agent's default"`
+		Effort        *string      `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh, max; empty = the agent's default"`
+		AlwaysRun     *bool        `json:"always_run,omitempty" jsonschema:"Its tasks run whatever the usage budget (needs the always_run permission)"`
+		AllowedTools  []string     `json:"allowed_tools,omitempty" jsonschema:"Tool allowlist its tasks get for the runner (permission rules; [] clears; needs the allowed_tools permission)"`
+		TemplateID    *int64       `json:"template_id,omitempty" jsonschema:"Make each task from this template (see list_templates); content fields are then ignored. update_recurring: switches to it"`
+		Checklist     []string     `json:"checklist,omitempty" jsonschema:"Checklist items each task gets (stored in the template)"`
+		Subtasks      []subtaskArg `json:"subtasks,omitempty" jsonschema:"Subtasks each task gets (stored in the template): title, and blocks_parent when the task should wait for it; [] clears"`
+		ScheduleID    *int64       `json:"schedule_id,omitempty" jsonschema:"Use this schedule (see list_schedules); timing fields are then ignored. update_recurring: switches to it"`
+	}
+	subtaskArg struct {
+		Title        string `json:"title"`
+		BlocksParent bool   `json:"blocks_parent,omitempty" jsonschema:"The parent task waits until this subtask is done"`
 	}
 	progressArgs struct {
 		Task string `json:"task" jsonschema:"Task id or key (its running run gets the update)"`
@@ -337,6 +344,9 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				if in.Parent != 0 {
 					b["parent_id"] = in.Parent
 				}
+				if in.BlocksParent {
+					b["blocks_parent"] = true
+				}
 				if len(in.Checklist) > 0 {
 					b["checklist"] = in.Checklist
 				}
@@ -386,6 +396,9 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				if in.AllowedTools != nil {
 					b["allowed_tools"] = in.AllowedTools
+				}
+				if in.BlocksParent != nil {
+					b["blocks_parent"] = *in.BlocksParent
 				}
 				for _, f := range in.Clear {
 					switch f {
@@ -590,6 +603,9 @@ func (in recArgs) merge(b map[string]any) map[string]any {
 	if in.Checklist != nil {
 		b["checklist"] = in.Checklist
 	}
+	if in.Subtasks != nil {
+		b["subtasks"] = in.Subtasks
+	}
 	if in.ScheduleID != nil {
 		b["schedule_id"] = *in.ScheduleID
 	}
@@ -599,7 +615,7 @@ func (in recArgs) merge(b map[string]any) map[string]any {
 // content: the call changes the task content.
 func (in recArgs) content() bool {
 	return in.Title != "" || in.DescriptionMD != nil || in.Priority != nil || in.Labels != nil || in.Assignees != nil || in.Model != nil ||
-		in.Effort != nil || in.AlwaysRun != nil || in.AllowedTools != nil || in.Checklist != nil
+		in.Effort != nil || in.AlwaysRun != nil || in.AllowedTools != nil || in.Checklist != nil || in.Subtasks != nil
 }
 
 // timing: the call changes the timing.

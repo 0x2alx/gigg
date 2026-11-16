@@ -52,7 +52,9 @@ type Task struct {
 	SubtaskDone       int64          `json:"subtask_done"`
 	ChecklistTotal    int64          `json:"checklist_total"`
 	ChecklistDone     int64          `json:"checklist_done"`
-	BlockedBy         int64          `json:"blocked_by" doc:"Open tasks blocking this one"`
+	BlockedBy         int64          `json:"blocked_by" doc:"Open tasks blocking this one: its blockers (dependencies) and its open subtasks marked blocks_parent"`
+	BlockedBySubtasks int64          `json:"blocked_by_subtasks" doc:"How many of blocked_by are its own subtasks (blocks_parent)"`
+	BlocksParent      bool           `json:"blocks_parent" doc:"A subtask that holds its parent back while it is open"`
 	Custom            map[string]any `json:"custom" doc:"Custom field values by field id"`
 	Deleted           bool           `json:"deleted"`
 	Labels            []TaskTag      `json:"labels"`
@@ -110,7 +112,21 @@ const taskCols = `t.id, p.key || '-' || t.number, t.workspace_id, t.project_id, 
 	(SELECT count(*) FROM checklist_items ci WHERE ci.task_id = t.id AND ci.done_at IS NOT NULL),
 	(SELECT count(*) FROM task_relations r JOIN tasks b ON b.id = r.from_task_id JOIN statuses bs ON bs.id = b.status_id
 		WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND bs.category NOT IN ('done','cancelled')),
-	t.model, t.effort, t.always_run, t.allowed_tools`
+	` + blockingSubtasks + `,
+	t.model, t.effort, t.always_run, t.allowed_tools, t.blocks_parent`
+
+// blockingSubtasks counts t's open subtasks that hold it back (blocks_parent; not archived ones,
+// which agents never get either), except those that
+// also have a "blocks" link to it (already counted with the dependencies).
+const blockingSubtasks = `(SELECT count(*) FROM tasks c JOIN statuses cs ON cs.id = c.status_id
+		WHERE c.parent_id = t.id AND c.blocks_parent = 1 AND c.deleted_at IS NULL AND c.archived_at IS NULL AND cs.category NOT IN ('done','cancelled')
+		AND NOT EXISTS (SELECT 1 FROM task_relations r WHERE r.from_task_id = c.id AND r.to_task_id = t.id AND r.kind = 'blocks'))`
+
+// blockedCond: t has an open blocker, a "blocks" dependency or a subtask that blocks its parent.
+const blockedCond = `(EXISTS (SELECT 1 FROM task_relations r JOIN tasks b ON b.id = r.from_task_id JOIN statuses bs ON bs.id = b.status_id
+		WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND bs.category NOT IN ('done','cancelled'))
+	OR EXISTS (SELECT 1 FROM tasks c JOIN statuses cs ON cs.id = c.status_id
+		WHERE c.parent_id = t.id AND c.blocks_parent = 1 AND c.deleted_at IS NULL AND c.archived_at IS NULL AND cs.category NOT IN ('done','cancelled')))`
 
 const taskFrom = ` FROM tasks t JOIN projects p ON p.id = t.project_id JOIN statuses s ON s.id = t.status_id JOIN users u ON u.id = t.created_by`
 
@@ -123,7 +139,7 @@ func scanTask(row interface{ Scan(...any) error }) (*Task, error) {
 		&t.StatusName, &t.StatusCategory, &t.Position, &t.Priority, &color, &start, &due, &done, &parent, &cloned,
 		&t.CreatedBy, &t.CreatedByUsername, &t.CreatedByAdmin, &viaKey, &t.CreatedAt, &t.UpdatedAt, &sess, &lastRun,
 		&resume, &t.CostUSDTotal, &t.CommentCount, &t.Deleted, &t.Version, &rec, &occ, &notAfter, &missed, &archived,
-		&t.SubtaskCount, &t.SubtaskDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.Model, &t.Effort, &t.AlwaysRun, &tools); err != nil {
+		&t.SubtaskCount, &t.SubtaskDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubtasks, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -137,6 +153,7 @@ func scanTask(row interface{ Scan(...any) error }) (*Task, error) {
 	t.Labels, t.Assignees, t.Aliases, t.Custom = []TaskTag{}, []int64{}, []string{}, map[string]any{}
 	t.AllowedTools = []string{}
 	_ = json.Unmarshal([]byte(tools), &t.AllowedTools)
+	t.BlockedBy += t.BlockedBySubtasks
 	return &t, nil
 }
 
@@ -399,8 +416,7 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 		where, args = append(where, "t.parent_id = ?"), append(args, *f.ParentID)
 	}
 	if f.BlockedOnly {
-		where = append(where, `EXISTS (SELECT 1 FROM task_relations r JOIN tasks b ON b.id = r.from_task_id JOIN statuses bs ON bs.id = b.status_id
-			WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND bs.category NOT IN ('done','cancelled'))`)
+		where = append(where, blockedCond)
 	}
 	if f.StatusID != nil {
 		where, args = append(where, "t.status_id = ?"), append(args, *f.StatusID)
@@ -527,6 +543,8 @@ type NewTask struct {
 	Effort        string
 	AlwaysRun     bool
 	AllowedTools  []string
+	BlocksParent  bool // a subtask that holds its parent back while open (needs ParentID)
+	Quiet         bool // no "assigned" notification (subtasks made together with their parent)
 }
 
 // Efforts are the claude -p effort levels (” = the agent's default).
@@ -602,6 +620,8 @@ func CreateTask(ctx context.Context, q Q, a Actor, n NewTask) (*Task, error) {
 		if par, err := GetTask(ctx, q, *n.ParentID); err != nil || par.WorkspaceID != p.WorkspaceID {
 			return nil, Invalid("parent task must be in the same workspace")
 		}
+	} else if n.BlocksParent {
+		return nil, Invalid("blocks_parent needs a parent task")
 	}
 	pos, err := placePosition(ctx, q, st.ID, Place{Where: "bottom"})
 	if err != nil {
@@ -621,11 +641,11 @@ func CreateTask(ctx context.Context, q Q, a Actor, n NewTask) (*Task, error) {
 	}
 	res, err := q.ExecContext(ctx, `INSERT INTO tasks (workspace_id, project_id, number, title, description_md, status_id, position,
 		priority, color, start_at, due_at, done_at, parent_id, cloned_from_id, created_by, created_via_key_id, created_at, updated_at,
-		not_after, recurrence_id, occurrence_at, model, effort, always_run, allowed_tools)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, p.WorkspaceID, p.ID, num, n.Title, n.DescriptionMD, st.ID, pos, n.Priority,
+		not_after, recurrence_id, occurrence_at, model, effort, always_run, allowed_tools, blocks_parent)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, p.WorkspaceID, p.ID, num, n.Title, n.DescriptionMD, st.ID, pos, n.Priority,
 		nullStr(n.Color), nullInt(n.StartAt), nullInt(n.DueAt), doneAt, nullInt(n.ParentID), nullInt(n.ClonedFromID),
 		a.UserID, nullInt(n.CreatedViaKey), now, now, nullInt(n.NotAfter), nullInt(n.RecurrenceID), nullInt(n.OccurrenceAt),
-		n.Model, n.Effort, n.AlwaysRun, mustJSON(tools))
+		n.Model, n.Effort, n.AlwaysRun, mustJSON(tools), n.BlocksParent)
 	if err != nil {
 		return nil, err
 	}
@@ -647,8 +667,10 @@ func CreateTask(ctx context.Context, q Q, a Actor, n NewTask) (*Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := Notify(ctx, q, a, t, nil, "assigned", t.Assignees); err != nil {
-		return nil, err
+	if !n.Quiet {
+		if err := Notify(ctx, q, a, t, nil, "assigned", t.Assignees); err != nil {
+			return nil, err
+		}
 	}
 	if err := Notify(ctx, q, a, t, nil, "mention", MentionedUsers(ctx, q, n.DescriptionMD)); err != nil {
 		return nil, err
@@ -720,6 +742,7 @@ type TaskPatch struct {
 	Effort        *string
 	AlwaysRun     *bool
 	AllowedTools  []string // nil = unchanged, empty = cleared
+	BlocksParent  *bool
 }
 
 // PatchTask applies a change and records old and new values (old text in full).
@@ -810,6 +833,26 @@ func PatchTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, p TaskP
 			}
 		}
 		changed["parent_id"], data["parent_id"] = nullInt(*p.ParentID), nullInt(*p.ParentID)
+	}
+	parent := t.ParentID
+	if p.ParentID != nil {
+		parent = *p.ParentID
+	}
+	switch {
+	case p.BlocksParent != nil && *p.BlocksParent && parent == nil:
+		return nil, Invalid("blocks_parent needs a parent task")
+	case p.BlocksParent != nil && *p.BlocksParent != t.BlocksParent:
+		changed["blocks_parent"], data["blocks_parent"] = *p.BlocksParent, map[string]any{"old": t.BlocksParent, "new": *p.BlocksParent}
+	case parent == nil && t.BlocksParent:
+		changed["blocks_parent"] = false // no parent left to hold back
+	}
+	if parent != nil && (changed["blocks_parent"] == true || p.ParentID != nil && t.BlocksParent && changed["blocks_parent"] == nil) {
+		// the parent mustn't (transitively) hold this task back, or neither could ever start
+		if cyc, err := Blocks(ctx, q, *parent, t.ID); err != nil {
+			return nil, err
+		} else if cyc {
+			return nil, Conflict("the parent already depends on %s: blocking it would be a cycle", t.Key)
+		}
 	}
 	if p.Labels != nil {
 		if err := setLabels(ctx, q, a, t.WorkspaceID, t.ID, p.Labels); err != nil {

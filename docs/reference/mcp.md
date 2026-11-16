@@ -84,8 +84,8 @@ There are no MCP tools for claiming tasks or recording runs; runners use the RES
 
 | Tool | Needs | Arguments | Does |
 |---|---|---|---|
-| `create_task` | `tasks:write` | `project`, `title`, `description_md?`, `category?`, `priority?` (0 none .. 4 urgent), `labels?` (created if missing), `color?`, `start_at?`, `due_at?`, `not_after?`, `parent_id?`, `checklist?`, `custom?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` | `POST /projects/{project}/tasks`. |
-| `update_task` | `tasks:write` | `task`, `title?`, `description_md?`, `priority?`, `labels?` (replaces), `color?`, `start_at?`, `due_at?`, `not_after?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` (`[]` clears), `clear?` (any of `color`, `start_at`, `due_at`, `not_after`, `labels`) | `PATCH /tasks/{task}`. An empty `model`/`effort` resets to the agent's default. |
+| `create_task` | `tasks:write` | `project`, `title`, `description_md?`, `category?`, `priority?` (0 none .. 4 urgent), `labels?` (created if missing), `color?`, `start_at?`, `due_at?`, `not_after?`, `parent_id?`, `blocks_parent?` (with `parent_id`: the parent waits for this subtask), `checklist?`, `custom?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` | `POST /projects/{project}/tasks`. |
+| `update_task` | `tasks:write` | `task`, `title?`, `description_md?`, `priority?`, `labels?` (replaces), `color?`, `start_at?`, `due_at?`, `not_after?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` (`[]` clears), `blocks_parent?` (a subtask), `clear?` (any of `color`, `start_at`, `due_at`, `not_after`, `labels`) | `PATCH /tasks/{task}`. An empty `model`/`effort` resets to the agent's default. |
 | `move_task` | `tasks:write` | `task`, `category?` or `status?`, `project?`, `position?` (`top`, `bottom`, `before`, `after`), `relative_to?` | `POST /tasks/{task}/move`. |
 | `clone_task` | `tasks:write` | `task`, `project?`, `title?` | Copies a task. |
 | `resume_task` | `tasks:write` | `task`, `comment_md?` | Asks for the task's agent session to be resumed (records the request, moves the task to todo; runs nothing). |
@@ -95,7 +95,7 @@ There are no MCP tools for claiming tasks or recording runs; runners use the RES
 | `update_checklist` | `tasks:write`, `checklists` anywhere | `task`, `add?`, `check?`, `uncheck?`, `remove?` (item ids) | Applies the changes in that order and returns the checklist. Stops at the first failing step. |
 | `archive_task` | `tasks:write`, `archive_tasks` anywhere | `task`, `restore?` | Archives a task, or unarchives it with `restore: true`. |
 | `create_from_template` | `tasks:write`, `create_tasks` anywhere | `template`, `project`, `title?` | Creates a task from a template. |
-| `save_template` | `tasks:write`, `templates` anywhere | `workspace?`, `id?` (replace), `project_id?`, `name`, `title`, `description_md?`, `priority?`, `labels?`, `assignees?`, `checklist?`, `custom?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` | Creates a template, or replaces template `id`. |
+| `save_template` | `tasks:write`, `templates` anywhere | `workspace?`, `id?` (replace), `project_id?`, `name`, `title`, `description_md?`, `priority?`, `labels?`, `assignees?`, `checklist?`, `subtasks?` (`{title, blocks_parent?}` each), `custom?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` | Creates a template, or replaces template `id`. Tasks made from it get its subtasks. |
 | `delete_task` | `tasks:delete` | `task` | Moves a task to the trash. |
 | `restore_task` | `tasks:delete` | `task` | Restores a task from the trash. |
 | `add_comment` | `comments:write` | `task`, `body_md`, `kind?` (`comment`, `report`, `question`) | Comments on a task. |
@@ -105,7 +105,7 @@ There are no MCP tools for claiming tasks or recording runs; runners use the RES
 
 | Tool | Needs | Arguments | Does |
 |---|---|---|---|
-| `create_recurring` | `tasks:write`, `schedules` anywhere | `project`, content (`title`, `description_md`, `priority`, `labels`, `assignees`, `checklist`, `model`, `effort`, `always_run`, `allowed_tools`) or `template_id`; timing (`freq` `daily`/`weekly`/`monthly`, `interval`, `weekdays` 1=Mon..7=Sun, `month_day` 1-31 or -1, `tz`, `window_start` HH:MM, `window_minutes`, `lead_minutes`) or `schedule_id`; `ends_on?`, `max_count?`, `overlap?` (`skip`/`create`), `paused?` | Creates a recurring task. Content given here is saved as a new template; timing reuses an identical schedule or makes one. |
+| `create_recurring` | `tasks:write`, `schedules` anywhere | `project`, content (`title`, `description_md`, `priority`, `labels`, `assignees`, `checklist`, `subtasks`, `model`, `effort`, `always_run`, `allowed_tools`) or `template_id`; timing (`freq` `daily`/`weekly`/`monthly`, `interval`, `weekdays` 1=Mon..7=Sun, `month_day` 1-31 or -1, `tz`, `window_start` HH:MM, `window_minutes`, `lead_minutes`) or `schedule_id`; `ends_on?`, `max_count?`, `overlap?` (`skip`/`create`), `paused?` | Creates a recurring task. Content given here is saved as a new template; timing reuses an identical schedule or makes one. |
 | `update_recurring` | same | `id` plus any of the above | Changes a recurring task; omitted fields stay. `template_id`/`schedule_id` switch; content and timing fields edit the shared template/schedule in place. `ends_on`/`max_count` of 0 clear them. |
 | `delete_recurring` | same | `id` | Stops a recurring task (its tasks, template and schedule stay). |
 | `save_schedule` | `tasks:write`, `schedules` anywhere | `id?`, `workspace?`, `name?`, `freq`, `interval?`, `weekdays?`, `month_day?`, `tz?`, `window_start?`, `window_minutes?`, `lead_minutes?` | Makes a schedule, or changes schedule `id` (omitted fields stay); every recurring task on it follows. |

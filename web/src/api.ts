@@ -129,7 +129,9 @@ export interface Task {
   subtask_done?: number;
   checklist_total?: number;
   checklist_done?: number;
-  blocked_by?: number; // open tasks blocking this one
+  blocked_by?: number; // open tasks blocking this one (dependencies and subtasks that block it)
+  blocked_by_subtasks?: number; // how many of blocked_by are its own subtasks
+  blocks_parent?: boolean; // a subtask its parent waits for
   custom?: Record<string, unknown> | null; // custom field values by field id
   last_run?: RunBrief; // the latest run, in brief
   question?: QuestionBrief; // waiting tasks on the board and in lists: the latest question
@@ -188,6 +190,12 @@ export interface CustomField {
   position: number;
 }
 
+// A subtask a template (or a new task) creates; blocks_parent: the parent waits for it.
+export interface TemplateSubtask {
+  title: string;
+  blocks_parent?: boolean;
+}
+
 export interface TemplateBody {
   model?: string;
   effort?: string;
@@ -202,6 +210,7 @@ export interface TemplateBody {
   labels?: string[];
   assignees?: number[];
   checklist?: string[];
+  subtasks?: TemplateSubtask[];
   custom?: Record<string, unknown>;
 }
 
@@ -221,6 +230,7 @@ export interface Template {
   labels: string[] | null;
   assignees: number[] | null;
   checklist: string[] | null;
+  subtasks?: TemplateSubtask[] | null;
   custom: Record<string, unknown> | null;
   version: number;
   recurring?: number; // live recurring tasks that create their tasks from it
@@ -241,8 +251,12 @@ export interface TaskCreateBody {
   color?: string;
   start_at?: number;
   due_at?: number;
+  not_after?: number;
   parent_id?: number;
+  blocks_parent?: boolean;
   checklist?: string[];
+  subtasks?: TemplateSubtask[]; // created with it, made like it
+  relations?: { task: string; direction: RelationDirection }[]; // links it starts with
   custom?: Record<string, unknown>;
 }
 
@@ -251,6 +265,7 @@ export interface RecurrenceBody {
   template_id?: number; // make each task from this template (content fields ignored); on update, switch to it
   schedule_id?: number; // use this schedule (timing fields ignored); on update, switch to it
   checklist?: string[]; // omit = keep the template's
+  subtasks?: TemplateSubtask[]; // omit = keep the template's
   custom?: Record<string, unknown>; // omit = keep the template's
   model?: string;
   effort?: string;
@@ -318,6 +333,7 @@ export interface Recurrence {
   template_created_by: number;
   template_uses: number; // live recurring tasks using it, this one included
   checklist: string[] | null;
+  subtasks?: TemplateSubtask[] | null;
   custom: Record<string, unknown> | null;
   schedule_id: number;
   schedule_name: string;

@@ -595,10 +595,9 @@ func ClaimTask(ctx context.Context, q Q, a Actor, ws int64, c Claim) (*Task, err
 	// didn't ask for StartDue), never after it closes, and never once missed (that waits for a human).
 	now := Now()
 	where = append(where, "(t.not_after IS NULL OR ((t.start_at IS NULL OR t.start_at <= ?) AND t.not_after > ?))", "t.missed_at IS NULL")
-	// archived tasks and tasks with an open blocker are never handed out
-	where = append(where, "t.archived_at IS NULL", `NOT EXISTS (SELECT 1 FROM task_relations r JOIN tasks b ON b.id = r.from_task_id
-		JOIN statuses bs ON bs.id = b.status_id WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL
-		AND bs.category NOT IN ('done','cancelled'))`)
+	// archived tasks and tasks with an open blocker (a dependency, or a subtask that blocks its parent)
+	// are never handed out
+	where = append(where, "t.archived_at IS NULL", "NOT "+blockedCond)
 	args = append(args, now, now)
 	// the workspace's runner limits: the pause, the task caps, always-run only
 	lw, la, err := claimLimits(ctx, q, ws, c.AlwaysOnly)

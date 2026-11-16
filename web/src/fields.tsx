@@ -12,7 +12,15 @@ export function assignable(users: Map<number, User>, memberIds: number[]): User[
   return out.sort((a, b) => Number(a.kind === "agent") - Number(b.kind === "agent") || a.username.localeCompare(b.username));
 }
 
-export function LabelInput({ value, onChange, known }: { value: string[]; onChange: (v: string[]) => void; known: Tag[] }) {
+// withCurrent: the candidates plus anyone already assigned who isn't one any more (a former member),
+// so they stay visible and can be unassigned.
+export function withCurrent(candidates: User[], ids: number[], users: Map<number, User>): User[] {
+  const extra = ids.filter((id) => !candidates.some((u) => u.id === id)).map((id) => users.get(id)).filter((u): u is User => !!u);
+  return extra.length ? [...candidates, ...extra] : candidates;
+}
+
+// autosave: each change saves at once (the task panel), so Backspace in the empty box doesn't remove the last label.
+export function LabelInput({ value, onChange, known, autosave }: { value: string[]; onChange: (v: string[]) => void; known: Tag[]; autosave?: boolean }) {
   const [text, setText] = useState("");
   const add = (name: string) => {
     const n = name.trim();
@@ -36,7 +44,7 @@ export function LabelInput({ value, onChange, known }: { value: string[]; onChan
             if (e.key === "Enter" || e.key === ",") {
               e.preventDefault();
               add(text);
-            } else if (e.key === "Backspace" && !text && value.length) {
+            } else if (e.key === "Backspace" && !text && value.length && !autosave) {
               onChange(value.slice(0, -1));
             }
           }}

@@ -918,7 +918,6 @@ label.check input { width: auto; accent-color: var(--accent); }
 .mention-list button.on, .mention-list button:hover { background: color-mix(in srgb, var(--text) 10%, var(--high)); }
 .mention-list .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mention { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--text); display: inline-block; padding: 0 0.35rem; border-radius: 999px; font-size: 0.9em; font-weight: var(--weight-strong); line-height: 1.4; }
-.tpl-pick { background: var(--low); border: 1px dashed var(--line-strong); border-radius: var(--radius-m); padding: var(--sp-4) var(--sp-5); }
 .save-tpl { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .save-tpl .link { padding: 0; }
 .sched-tpl { margin: 0; padding: 0.4rem 0.6rem; border-radius: var(--radius-m); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
@@ -1217,7 +1216,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   .narrow .admin-table td:first-child { flex: 1 1 100%; }
   .narrow .admin-table td.admin-actions { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: flex-start; }
   .narrow .admin-table td.admin-actions > * { margin-left: 0; }
-  /* task panel folding boxes: the phone padding of the other boxes (with .tm-section, further down) */
+  /* task panel folding boxes: the phone padding of the other boxes (further down) */
   .tsec-head { padding: var(--sp-3) var(--sp-5); }
   .tsec-body { padding: var(--sp-2) var(--sp-5) var(--sp-5); }
   .narrow .admin-table td[data-label]::before, .narrow .vw-table td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: 0.8rem; }
@@ -1304,13 +1303,9 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .pause-ws, .pause-len { border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
 
 /* ---- agent run settings ---- */
-.run-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 0.75rem; border: 1px solid var(--line); border-radius: var(--radius-m); padding: 0.5rem 0.75rem; }
-.run-settings legend { padding: 0 0.25rem; }
-.run-settings .run-always { grid-column: 1 / -1; }
 .model-input { display: inline-flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 .model-input input { width: 100%; }
 .run-always { display: inline-flex; align-items: center; gap: 0.4rem; }
-.run-settings .span2 { grid-column: 1 / -1; }
 .tools-input { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; width: 100%; }
 .tools-input textarea { width: 100%; font-family: var(--mono, ui-monospace, monospace); font-size: 0.85rem; resize: vertical; }
 .tools-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
@@ -1333,7 +1328,6 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .narrow .acc { grid-template-columns: 1fr; }
 .narrow .acc-levels { flex-direction: row; overflow-x: auto; }
 .narrow .acc-level { min-width: 9rem; }
-.narrow .run-settings { grid-template-columns: 1fr; }
 .button.danger { background: var(--danger); color: var(--on-danger, #fff); border-color: var(--danger); }
 .acc-editor .perm-row { flex-wrap: wrap; row-gap: 0.3rem; }
 .acc-editor .perm-name { flex-basis: 100%; }
@@ -1607,33 +1601,37 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .modal-head > h2 { flex: 1; min-width: 0; }
 .modal-head > .modal-expand { width: 1.94rem; height: 1.94rem; padding: 0; display: inline-grid; place-items: center; font-size: 0.95rem; flex: none; color: var(--muted); }
 .modal-head > .modal-expand:hover { color: var(--text); }
-.tm-form { display: flex; flex-direction: column; }
-.tm-body { display: flex; flex-direction: column; gap: var(--sp-5); }
-.tm-main, .tm-side { display: contents; }
-.tpl-pick, .tm-body .sched-tpl { order: 0; margin: 0; }
-/* one column: the sections in source order (the tab order): Task, Checklist, Where, When, Details,
-   Agent run, Fields; the full page puts the first two on the left, like the task panel */
-/* the New task form's sections and the task panel's boxes share one look */
-.tm-section, .tp-box {
+/* the task form is laid out like the task panel (its boxes, rows and two columns when wide): the
+   form is a tpanel container too */
+.tm-form { display: flex; flex-direction: column; container: tpanel / inline-size; }
+.tm-form > .tp-body { margin-top: 0; }
+.tm-form > .sched-tpl { margin: 0 0 var(--sp-5); }
+.tp-box {
   background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-l);
   padding: var(--sp-5) var(--sp-6) var(--sp-6); min-width: 0;
 }
-.tm-h {
-  display: flex; align-items: center; gap: 0.45rem; margin: 0 0 var(--sp-5);
-  font-size: var(--fs-xs); font-weight: var(--weight-strong); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+/* the form's task box: the template rows, then the title and description as the panel edits them */
+.tp-task > .te-head { margin-bottom: var(--sp-4); }
+.tp-task > .te-text { margin: 0; }
+.tp-task .tpl-pick select { width: auto; flex: 0 1 auto; max-width: 100%; }
+.tsec-note { margin: 0; }
+/* Repeat inside a When group: its rows join the group's label | value columns */
+.tp-grid > .repeat, .tp-grid > .repeat > .rf { display: contents; }
+.tp-grid .rf-l { grid-column: 1; min-height: 2rem; font-weight: inherit; }
+.tp-grid .rf-c { grid-column: 2 / -1; min-height: 2rem; }
+.tp-grid .rf-c > select, .tp-grid .rf-pair > select { width: auto; max-width: 100%; }
+.tp-grid .rf-c .num { width: 4.2rem; }
+.tp-grid .rf-c .time, .tp-grid .rf-c .date { width: auto; max-width: 100%; }
+@container tpsec (max-width: 24rem) {
+  .tp-grid .rf-l, .tp-grid .rf-c { grid-column: 1; }
+  .tp-grid .rf-l { min-height: 0; margin-top: 0.4rem; }
 }
-.tm-h > .ico { color: var(--accent); font-size: 0.95rem; }
-.tm-h .help-button { margin-left: auto; text-transform: none; letter-spacing: 0; }
-.tm-stack { display: flex; flex-direction: column; gap: var(--sp-5); }
-.tm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: var(--sp-5) var(--sp-6); align-items: start; }
-.tm-s-people .tm-grid { grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
-.tm-grid > .tm-wide { grid-column: 1 / -1; }
-.tm-h .tm-h-count { margin-left: auto; text-transform: none; letter-spacing: 0; }
-.tm-stack > .tm-grid { margin-bottom: 0; }
-.tm-section select { width: 100%; }
-/* the repeat block and the run settings sit flat inside their section */
-.tm-section .repeat { background: none; border: 0; padding: 0; }
-.run-settings.bare { border: 0; padding: 0; margin: 0; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--sp-5) var(--sp-6); }
+/* a subtask's "blocks parent" switch */
+.sub-gate { flex: none; display: inline-flex; font-size: var(--fs-sm); white-space: nowrap; cursor: pointer; }
+.sub-gate .ico { font-size: 0.8rem; }
+.sub-gate:has(input:checked) { color: var(--danger); }
+.rel-static { cursor: default; }
+.rel-static:hover { background: none; border-color: transparent; }
 /* the actions stay in view at the bottom while the form scrolls */
 .tm-foot {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); position: sticky; bottom: 0; z-index: 2;
@@ -1647,16 +1645,10 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 /* the whole page: the dialog scrolls inside itself, so its sticky footer stays within its border */
 .modal.modal-full { width: min(100%, 110rem); max-width: none; height: calc(100dvh - 2rem); overflow-y: auto; display: flex; flex-direction: column; }
 .modal-full .tm-form { flex: 1; }
+.modal-full .te-text .mde textarea { min-height: 18rem; }
 @media (min-width: 721px) { .modal-full .tm-foot { bottom: calc(-1 * var(--sp-7)); } } /* the dialog scrolls itself: stick over its bottom padding */
-.modal-full .tm-body { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(20rem, 1fr); gap: var(--sp-6) var(--sp-7); align-items: start; flex: 1; }
-.modal-full .tm-main, .modal-full .tm-side { display: flex; flex-direction: column; gap: var(--sp-5); min-width: 0; }
-.modal-full .tm-s-task .mde textarea { min-height: 18rem; }
-@media (max-width: 900px) {
-  .modal-full .tm-body { display: flex; flex-direction: column; }
-  .modal-full .tm-main, .modal-full .tm-side { display: contents; }
-}
 @media (max-width: 720px) {
-  .tm-section, .tp-box { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
+  .tp-box { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
   /* the phone sheet's padding: 0.9rem, 1rem + the safe area at the bottom */
   .tm-foot { margin: var(--sp-5) -0.9rem calc(-1rem - env(safe-area-inset-bottom)); padding: var(--sp-4) 0.9rem calc(var(--sp-4) + env(safe-area-inset-bottom)); bottom: calc(-1rem - env(safe-area-inset-bottom)); }
   .modal-backdrop:has(> .modal-full) { padding: 0; }
@@ -1675,7 +1667,6 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 }
 .place-filter select:focus-visible { outline-offset: -2px; }
 .place-filter:has(select.active) { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
-.modal-full .tm-side .tm-grid { grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); }
 .tm-foot .save-tpl .link { font-size: var(--fs-sm); }
 
 /* the task panel starts under the top bar on wide screens, so the inbox and the bell stay in reach */
@@ -1685,3 +1676,5 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 @media (max-width: 720px) {
   :root { --topbar-h: calc(2.4rem + 0.9rem + 1px); }
 }
+/* subtask titles wrap next to their "blocks parent" switch instead of being cut off */
+.sub-list .rel-title { white-space: normal; overflow-wrap: anywhere; }

@@ -378,7 +378,7 @@ in [access.md](access.md).
 |---|---|---|
 | GET | `/workspaces/{ws}/tasks` | Tasks across a workspace (filters combine). |
 | GET | `/projects/{p}/tasks` | A project's tasks (filters combine). |
-| POST | `/projects/{p}/tasks` | Create a task. |
+| POST | `/projects/{p}/tasks` | Create a task; `subtasks` (`{title, blocks_parent}`) and `relations` (`{task, direction}`) are created with it, in one transaction. |
 | GET | `/tasks/{id}` | A task, by id or key. |
 | PATCH | `/tasks/{id}` | Change a task's fields (`null` clears). |
 | POST | `/tasks/{id}/move` | Move a task: status, position, or another project of the workspace. |

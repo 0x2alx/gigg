@@ -1,5 +1,5 @@
 // Pure helpers for the task-level features: @mentions, checklist ordering, custom field values.
-import type { CustomField, Task, Template } from "./api";
+import type { CustomField, Task, Template, TemplateSubtask } from "./api";
 import type { RunSettings } from "./runsettings";
 import { fromDateInput, toDateInput } from "./fields";
 
@@ -165,10 +165,15 @@ export function cleanCustom(v: Record<string, unknown>): Record<string, unknown>
   return Object.keys(out).length ? out : undefined;
 }
 
+// normSubs: subtasks as the server stores them (blocks_parent always present), for comparing.
+export function normSubs(xs: TemplateSubtask[]): TemplateSubtask[] {
+  return xs.map((s) => ({ title: s.title.trim(), blocks_parent: !!s.blocks_parent }));
+}
+
 // sameAsTemplate: the form still holds exactly the template's content.
 export function sameAsTemplate(
   t: Template,
-  f: { title: string; description: string; priority: number; taskLabels: string[]; assignees: number[]; color: string | null; run: RunSettings; checklist: string; custom: Record<string, unknown> },
+  f: { title: string; description: string; priority: number; taskLabels: string[]; assignees: number[]; color: string | null; run: RunSettings; checklist: string[]; subtasks: TemplateSubtask[]; custom: Record<string, unknown> },
 ): boolean {
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const sorted = (xs: number[]) => [...xs].sort((a, b) => a - b);
@@ -183,7 +188,8 @@ export function sameAsTemplate(
     (t.effort ?? "") === f.run.effort &&
     !!t.always_run === f.run.always_run &&
     same(t.allowed_tools ?? [], f.run.allowed_tools) &&
-    same(t.checklist ?? [], splitLines(f.checklist)) &&
+    same(t.checklist ?? [], f.checklist) &&
+    same(normSubs(t.subtasks ?? []), normSubs(f.subtasks)) &&
     same(cleanCustom(t.custom ?? {}) ?? {}, cleanCustom(f.custom) ?? {})
   );
 }

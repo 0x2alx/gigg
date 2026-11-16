@@ -38,7 +38,7 @@ When a runner claims work, gigg hands out the next task from **To-Do** in the ag
 
 - tasks that haven't reached their start time (when the runner asks for that);
 - tasks whose window has closed, and missed tasks;
-- blocked tasks;
+- blocked tasks: an open "blocks" dependency, or an open subtask marked **blocks parent** (see [Subtasks and dependencies](tasks.md#subtasks-and-dependencies));
 - archived tasks.
 
 The claim moves the task to Doing, so two runners never get the same task.

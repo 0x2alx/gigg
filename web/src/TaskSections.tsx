@@ -1,13 +1,42 @@
-// Task panel sections: checklist, subtasks, dependencies and custom fields. Each saves straight to
-// the server and hands the updated task back through onTask.
+// The task editor's building blocks, shared by the task panel (each change saves straight to the
+// server and hands the updated task back through onTask) and the task form (New task, templates,
+// recurring tasks: the "draft" versions hold the values until Create or Save). Both lay a task out
+// the same way: the property groups (PropGroup of Rows) and the folding boxes (Section).
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, type ChecklistItem, type CustomField, type Relation, type RelationDirection, type Task } from "./api";
+import { api, ApiError, type ChecklistItem, type CustomField, type Relation, type RelationDirection, type Task, type TemplateSubtask } from "./api";
 import { formatCustom, fromInput, moveAfter, progress, reorder, splitLines, toInput } from "./items";
 import { CATEGORY_COLOR } from "./theme";
+import { EffortSelect, ModelInput, ToolsInput, type RunSettings } from "./runsettings";
 import { Pill, StatusBadge } from "./ui";
+import { HelpButton } from "./help";
 import { Icon, type IconName } from "./icons";
 
 export const errText = (e: unknown, fallback = "That didn't work.") => (e instanceof ApiError ? e.message : fallback);
+
+// PropGroup: a titled box of label/value rows (Where, When, Details, Agent run).
+export function PropGroup({ icon, title, children, help }: { icon: IconName; title: string; children: ReactNode; help?: ReactNode }) {
+  return (
+    <section className="tp-box tp-group" aria-label={title}>
+      <h4 className="tp-gh">
+        <Icon name={icon} /> {title}
+        {help}
+      </h4>
+      <div className="tp-grid">{children}</div>
+    </section>
+  );
+}
+
+// Row: one label + value in a property group. wide rows take the whole width (chips, swatches).
+export function Row({ label, wide, className, children, tip }: { label: ReactNode; wide?: boolean; className?: string; children: ReactNode; tip?: string }) {
+  return (
+    <div className={"tp-row" + (wide ? " wide" : "")}>
+      <span className="tp-label" data-tip={tip}>
+        {label}
+      </span>
+      <div className={"tp-value" + (className ? " " + className : "")}>{children}</div>
+    </div>
+  );
+}
 
 // Section: a compact collapsible block with a title row of badges (the badges show while it is folded).
 // openOn: a value that opens the section each time it changes to a new non-zero value. keepMounted:
@@ -57,102 +86,96 @@ export function ProgressBar({ done, total, label }: { done: number; total: numbe
   );
 }
 
+function Problem({ text }: { text: string }) {
+  return text ? (
+    <p className="danger small" role="alert">
+      {text}
+    </p>
+  ) : null;
+}
+
+// ---- agent run
+
+// AgentRunGroup: model, effort, always run and the tool allowlist. onChange gets the one setting
+// changed. alwaysLocked: the Always run box can't be changed (no permission).
+export function AgentRunGroup({ value, canWrite, alwaysLocked, canTools, onChange, onToolsError }: {
+  value: RunSettings; canWrite: boolean; alwaysLocked: boolean; canTools: boolean; onChange: (p: Partial<RunSettings>) => void; onToolsError?: (bad: string | null) => void;
+}) {
+  return (
+    <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run tasks" />}>
+      <Row tip="Model for the agent’s run (an alias like opus or sonnet, or a full model id). Empty: the agent’s default" label="Model">
+        <ModelInput value={value.model} disabled={!canWrite} onCommit={(model) => onChange({ model })} />
+      </Row>
+      <Row tip="Reasoning effort for the agent’s run (low to max). Empty: the agent’s default" label="Effort">
+        <EffortSelect value={value.effort} disabled={!canWrite} onChange={(effort) => onChange({ effort })} />
+      </Row>
+      <Row tip="Run it whatever the usage budget, day or night, like a cron job. The daily cap and pauses still apply" label="Always run" wide>
+        <label className="admin-check run-always" title={alwaysLocked ? "Changing it needs the Always-run tasks permission" : "Runs whatever the usage budget, day or night"}>
+          <input type="checkbox" checked={value.always_run} disabled={!canWrite || alwaysLocked} onChange={(e) => onChange({ always_run: e.target.checked })} />
+          <span className="muted small">whatever the usage budget, day or night</span>
+        </label>
+      </Row>
+      {(canTools || value.allowed_tools.length > 0) && (
+        <Row tip="The agent gets exactly these tools for this task (Claude Code permission rules), nothing else. Empty: its usual setup" label="Allowed tools" wide>
+          {canTools && canWrite ? (
+            <ToolsInput value={value.allowed_tools} onCommit={(allowed_tools) => onChange({ allowed_tools })} onError={onToolsError} />
+          ) : (
+            <span className="tools-list" title="Changing it needs the Task tool allowlists permission">
+              {value.allowed_tools.map((r) => (
+                <code key={r}>{r}</code>
+              ))}
+            </span>
+          )}
+        </Row>
+      )}
+    </PropGroup>
+  );
+}
+
 // ---- checklist
 
-export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdit: boolean; onTask: (t: Task) => void }) {
-  const [items, setItems] = useState<ChecklistItem[] | null>(null);
-  const [text, setText] = useState("");
-  const [editing, setEditing] = useState<{ id: number; text: string } | null>(null);
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let live = true;
-    api
-      .checklist(task.id)
-      .then((r) => live && setItems(r.items))
-      .catch((e: unknown) => live && setErr(errText(e, "Couldn't load the checklist.")));
-    return () => {
-      live = false;
-    };
-  }, [task.id, task.version]);
+interface CheckRow {
+  key: string;
+  text: string;
+  done: boolean;
+}
 
-  const run = (p: Promise<Task>) => {
-    setBusy(true);
-    setErr("");
-    return p
-      .then(onTask)
-      .catch((e: unknown) => {
-        setErr(errText(e));
-        api.checklist(task.id).then((r) => setItems(r.items), () => undefined);
-      })
-      .finally(() => setBusy(false));
-  };
+// ChecklistBox: the checklist list and its add box. Draft items (checkable false) show their box
+// unticked and disabled: they can be ticked once the task exists.
+function ChecklistBox({ rows, canEdit, checkable, busy, err, onToggle, onEdit, onMove, onDelete, onAdd }: {
+  rows: CheckRow[] | null; canEdit: boolean; checkable: boolean; busy: boolean; err: string;
+  onToggle: (i: number) => void; onEdit: (i: number, text: string) => void; onMove: (i: number, dir: -1 | 1) => void; onDelete: (i: number) => void; onAdd: (lines: string[]) => void;
+}) {
+  const [text, setText] = useState("");
+  const [editing, setEditing] = useState<{ key: string; text: string } | null>(null);
   const add = (lines: string[]) => {
     if (!lines.length) return;
     setText("");
-    void run(api.addChecklist(task.id, lines));
-  };
-  const toggle = (it: ChecklistItem) => {
-    setItems((xs) => xs?.map((x) => (x.id === it.id ? { ...x, done_at: x.done_at ? null : Date.now() } : x)) ?? null);
-    void run(api.patchChecklist(task.id, it.id, { done: !it.done_at }));
-  };
-  const move = (i: number, dir: -1 | 1) => {
-    if (!items) return;
-    const after = moveAfter(items.map((x) => x.id), i, dir);
-    if (after === null) return;
-    const id = items[i]!.id;
-    setItems(reorder(items, i, dir));
-    void run(api.patchChecklist(task.id, id, { after })).then(() =>
-      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-check="${id}"] .ck-${dir < 0 ? "up" : "down"}`)?.focus()),
-    );
+    onAdd(lines);
   };
   const saveEdit = () => {
     if (!editing) return;
+    const i = rows?.findIndex((r) => r.key === editing.key) ?? -1;
     const t = editing.text.trim();
-    const it = items?.find((x) => x.id === editing.id);
     setEditing(null);
-    if (!t || !it || t === it.text) return;
-    setItems((xs) => xs?.map((x) => (x.id === it.id ? { ...x, text: t } : x)) ?? null);
-    void run(api.patchChecklist(task.id, it.id, { text: t }));
+    if (i < 0 || !t || t === rows![i]!.text) return;
+    onEdit(i, t);
   };
-
-  const total = items?.length ?? task.checklist_total ?? 0;
-  const done = items ? items.filter((x) => x.done_at).length : (task.checklist_done ?? 0);
-  if (!canEdit && total === 0) return null;
   return (
-    <Section
-      defaultOpen={false}
-      label="Checklist"
-      title="Checklist"
-      icon="checklist"
-      badges={
-        total > 0 && (
-          <>
-            <ProgressBar done={done} total={total} label="Checklist progress" />
-            <span className={"tsec-count" + (done === total ? " done" : "")}>
-              {done}/{total}
-            </span>
-          </>
-        )
-      }
-    >
-      {err && (
-        <p className="danger small" role="alert">
-          {err}
-        </p>
-      )}
+    <>
+      <Problem text={err} />
       <ul className="checklist">
-        {items?.map((it, i) => (
-          <li key={it.id} data-check={it.id} className={it.done_at ? "done" : undefined}>
-            <input type="checkbox" checked={!!it.done_at} disabled={!canEdit} onChange={() => toggle(it)} aria-label={`Done: ${it.text}`} />
-            {editing?.id === it.id ? (
+        {rows?.map((it, i) => (
+          <li key={it.key} data-check={it.key} className={it.done ? "done" : undefined}>
+            <input type="checkbox" checked={it.done} disabled={!canEdit || !checkable} onChange={() => onToggle(i)} aria-label={`Done: ${it.text}`} />
+            {editing?.key === it.key ? (
               <input
                 className="ck-edit"
                 value={editing.text}
                 autoFocus
                 maxLength={500}
                 aria-label="Edit item"
-                onChange={(e) => setEditing({ id: it.id, text: e.target.value })}
+                onChange={(e) => setEditing({ key: it.key, text: e.target.value })}
                 onBlur={saveEdit}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -166,7 +189,7 @@ export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdi
                 }}
               />
             ) : canEdit ? (
-              <button type="button" className="ck-text" onClick={() => setEditing({ id: it.id, text: it.text })} aria-label={`Edit item: ${it.text}`}>
+              <button type="button" className="ck-text" onClick={() => setEditing({ key: it.key, text: it.text })} aria-label={`Edit item: ${it.text}`}>
                 {it.text}
               </button>
             ) : (
@@ -174,21 +197,13 @@ export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdi
             )}
             {canEdit && (
               <span className="ck-actions">
-                <button type="button" className="icon-button ck-up" disabled={i === 0 || busy} onClick={() => move(i, -1)} aria-label={`Move up: ${it.text}`}>
+                <button type="button" className="icon-button ck-up" disabled={i === 0 || busy} onClick={() => onMove(i, -1)} aria-label={`Move up: ${it.text}`}>
                   ↑
                 </button>
-                <button type="button" className="icon-button ck-down" disabled={i === items.length - 1 || busy} onClick={() => move(i, 1)} aria-label={`Move down: ${it.text}`}>
+                <button type="button" className="icon-button ck-down" disabled={i === rows.length - 1 || busy} onClick={() => onMove(i, 1)} aria-label={`Move down: ${it.text}`}>
                   ↓
                 </button>
-                <button
-                  type="button"
-                  className="icon-button"
-                  onClick={() => {
-                    setItems((xs) => xs?.filter((x) => x.id !== it.id) ?? null);
-                    void run(api.deleteChecklist(task.id, it.id));
-                  }}
-                  aria-label={`Delete item: ${it.text}`}
-                >
+                <button type="button" className="icon-button" onClick={() => onDelete(i)} aria-label={`Delete item: ${it.text}`}>
                   <Icon name="x" />
                 </button>
               </span>
@@ -220,16 +235,192 @@ export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdi
           }}
         />
       )}
+    </>
+  );
+}
+
+const focusMoved = (key: string, dir: -1 | 1) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-check="${key}"] .ck-${dir < 0 ? "up" : "down"}`)?.focus());
+
+export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdit: boolean; onTask: (t: Task) => void }) {
+  const [items, setItems] = useState<ChecklistItem[] | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    api
+      .checklist(task.id)
+      .then((r) => live && setItems(r.items))
+      .catch((e: unknown) => live && setErr(errText(e, "Couldn't load the checklist.")));
+    return () => {
+      live = false;
+    };
+  }, [task.id, task.version]);
+
+  const run = (p: Promise<Task>) => {
+    setBusy(true);
+    setErr("");
+    return p
+      .then(onTask)
+      .catch((e: unknown) => {
+        setErr(errText(e));
+        api.checklist(task.id).then((r) => setItems(r.items), () => undefined);
+      })
+      .finally(() => setBusy(false));
+  };
+  const at = (i: number) => items![i]!;
+
+  const total = items?.length ?? task.checklist_total ?? 0;
+  const done = items ? items.filter((x) => x.done_at).length : (task.checklist_done ?? 0);
+  if (!canEdit && total === 0) return null;
+  return (
+    <Section
+      defaultOpen={false}
+      label="Checklist"
+      title="Checklist"
+      icon="checklist"
+      badges={
+        total > 0 && (
+          <>
+            <ProgressBar done={done} total={total} label="Checklist progress" />
+            <span className={"tsec-count" + (done === total ? " done" : "")}>
+              {done}/{total}
+            </span>
+          </>
+        )
+      }
+    >
+      <ChecklistBox
+        rows={items?.map((x) => ({ key: String(x.id), text: x.text, done: !!x.done_at })) ?? null}
+        canEdit={canEdit}
+        checkable
+        busy={busy}
+        err={err}
+        onToggle={(i) => {
+          const it = at(i);
+          setItems((xs) => xs?.map((x) => (x.id === it.id ? { ...x, done_at: x.done_at ? null : Date.now() } : x)) ?? null);
+          void run(api.patchChecklist(task.id, it.id, { done: !it.done_at }));
+        }}
+        onEdit={(i, t) => {
+          const it = at(i);
+          setItems((xs) => xs?.map((x) => (x.id === it.id ? { ...x, text: t } : x)) ?? null);
+          void run(api.patchChecklist(task.id, it.id, { text: t }));
+        }}
+        onMove={(i, dir) => {
+          if (!items) return;
+          const after = moveAfter(items.map((x) => x.id), i, dir);
+          if (after === null) return;
+          const id = at(i).id;
+          setItems(reorder(items, i, dir));
+          void run(api.patchChecklist(task.id, id, { after })).then(() => focusMoved(String(id), dir));
+        }}
+        onDelete={(i) => {
+          const it = at(i);
+          setItems((xs) => xs?.filter((x) => x.id !== it.id) ?? null);
+          void run(api.deleteChecklist(task.id, it.id));
+        }}
+        onAdd={(lines) => void run(api.addChecklist(task.id, lines))}
+      />
+    </Section>
+  );
+}
+
+// ChecklistDraft: the checklist of a task (or template) not saved yet.
+export function ChecklistDraft({ items, onChange, note }: { items: string[]; onChange: (v: string[]) => void; note?: string }) {
+  // stable keys for the rows, so an item being edited keeps its box while others move
+  const ids = useRef<string[]>([]);
+  const seq = useRef(0);
+  while (ids.current.length < items.length) ids.current.push("d" + seq.current++);
+  ids.current.length = items.length;
+  const swap = (i: number, j: number) => {
+    const xs = [...items];
+    [xs[i], xs[j]] = [xs[j]!, xs[i]!];
+    [ids.current[i], ids.current[j]] = [ids.current[j]!, ids.current[i]!];
+    onChange(xs);
+  };
+  return (
+    <Section defaultOpen={false} label="Checklist" title="Checklist" icon="checklist" badges={items.length > 0 && <span className="tsec-count">{items.length}</span>}>
+      {note && <p className="muted small tsec-note">{note}</p>}
+      <ChecklistBox
+        rows={items.map((text, i) => ({ key: ids.current[i]!, text, done: false }))}
+        canEdit
+        checkable={false}
+        busy={false}
+        err=""
+        onToggle={() => undefined}
+        onEdit={(i, t) => onChange(items.map((x, j) => (j === i ? t : x)))}
+        onMove={(i, dir) => {
+          const j = i + dir;
+          if (j < 0 || j >= items.length) return;
+          const key = ids.current[i]!;
+          swap(i, j);
+          focusMoved(key, dir);
+        }}
+        onDelete={(i) => {
+          ids.current.splice(i, 1);
+          onChange(items.filter((_, j) => j !== i));
+        }}
+        onAdd={(lines) => onChange([...items, ...lines].slice(0, 200))}
+      />
+      {items.length >= 200 && <p className="muted small tsec-note">That's the most a checklist can hold (200).</p>}
     </Section>
   );
 }
 
 // ---- subtasks
 
-export function SubtasksSection({ task, wsId, canCreate, onOpen, onChanged }: { task: Task; wsId: number; canCreate: boolean; onOpen: (t: Task) => void; onChanged: () => void }) {
+const GATE_TIP = "While this subtask is open, its parent waits: agents don’t pick the parent up until it is done or cancelled";
+
+// GateBox: the "blocks parent" switch of one subtask.
+function GateBox({ on, disabled, onChange, title }: { on: boolean; disabled?: boolean; onChange: (v: boolean) => void; title: string }) {
+  return (
+    <label className="check sub-gate" title={GATE_TIP}>
+      <input type="checkbox" checked={on} disabled={disabled} onChange={(e) => onChange(e.target.checked)} aria-label={`Blocks the parent: ${title}`} />
+      <Icon name="lock" /> blocks parent
+    </label>
+  );
+}
+
+function SubtaskAdd({ onAdd }: { onAdd: (title: string) => Promise<unknown> | void }) {
+  const [title, setTitle] = useState("");
+  const add = () => {
+    const t = title.trim();
+    if (!t) return;
+    const p = onAdd(t);
+    if (p) void p.then(() => setTitle(""), () => undefined);
+    else setTitle("");
+  };
+  return (
+    <div className="quick-add">
+      <input
+        value={title}
+        data-dirty={title.trim() ? "" : undefined}
+        placeholder="Subtask title"
+        maxLength={250}
+        aria-label="New subtask title"
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            add();
+          }
+        }}
+      />
+      <button type="button" className="button secondary small" onClick={add} disabled={!title.trim()}>
+        + Subtask
+      </button>
+    </div>
+  );
+}
+
+const SUB_NOTE = "Each subtask is a task of its own, made like this one (priority, assignees, dates, agent run). Tick “blocks parent” to make this task wait for it.";
+
+// canEdit: may switch "blocks parent" (the relations permission). assignable: who can be assigned in
+// the workspace (a new subtask gets the parent's assignees, but not former members).
+export function SubtasksSection({ task, wsId, canCreate, canEdit, assignable, onOpen, onTask, onChanged }: {
+  task: Task; wsId: number; canCreate: boolean; canEdit: boolean; assignable: number[]; onOpen: (t: Task) => void; onTask: (t: Task) => void; onChanged: () => void;
+}) {
   const [subs, setSubs] = useState<Task[] | null>(null);
   const [parent, setParent] = useState<Task | null>(null);
-  const [title, setTitle] = useState("");
   const [err, setErr] = useState("");
   const load = () =>
     api
@@ -244,23 +435,45 @@ export function SubtasksSection({ task, wsId, canCreate, onOpen, onChanged }: { 
     setParent(null);
     if (task.parent_id) api.task(task.parent_id).then(setParent, () => undefined);
   }, [task.parent_id]);
+  // the parent's blocked count changes with its subtasks: reload it after each change
+  const refresh = () => {
+    void load();
+    onChanged();
+    api.task(task.id).then(onTask, () => undefined);
+  };
 
-  const add = () => {
-    const t = title.trim();
-    if (!t) return;
+  const add = (title: string) => {
     setErr("");
-    api
-      .createTask(task.project_id, { title: t, parent_id: task.id })
-      .then(() => {
-        setTitle("");
-        void load();
-        onChanged();
+    return api
+      .createTask(task.project_id, {
+        title,
+        parent_id: task.id,
+        priority: task.priority,
+        assignees: task.assignees.filter((id) => assignable.includes(id)),
+        ...(task.start_at ? { start_at: task.start_at } : {}),
+        ...(task.due_at ? { due_at: task.due_at } : {}),
+        ...(task.not_after ? { not_after: task.not_after } : {}),
+        ...(task.model ? { model: task.model } : {}),
+        ...(task.effort ? { effort: task.effort } : {}),
       })
-      .catch((e: unknown) => setErr(errText(e, "Couldn't add the subtask.")));
+      .then(refresh)
+      .catch((e: unknown) => {
+        setErr(errText(e, "Couldn't add the subtask."));
+        throw e;
+      });
+  };
+  const gate = (s: Task, on: boolean) => {
+    setErr("");
+    setSubs((xs) => xs?.map((x) => (x.id === s.id ? { ...x, blocks_parent: on } : x)) ?? null);
+    api.patchTask(s.id, { blocks_parent: on }).then(refresh, (e: unknown) => {
+      setErr(errText(e));
+      void load();
+    });
   };
 
   const total = subs?.length ?? task.subtask_count ?? 0;
   const done = subs ? subs.filter((s) => s.status_category === "done" || s.status_category === "cancelled").length : (task.subtask_done ?? 0);
+  const gates = (subs ?? []).filter((s) => s.blocks_parent && !s.archived_at && s.status_category !== "done" && s.status_category !== "cancelled").length;
   if (!canCreate && total === 0 && !task.parent_id) return null;
   return (
     <Section
@@ -269,14 +482,21 @@ export function SubtasksSection({ task, wsId, canCreate, onOpen, onChanged }: { 
       title="Subtasks"
       icon="subtasks"
       badges={
-        total > 0 && (
-          <>
-            <ProgressBar done={done} total={total} label="Subtask progress" />
-            <span className={"tsec-count" + (done === total ? " done" : "")}>
-              {done}/{total} done
+        <>
+          {total > 0 && (
+            <>
+              <ProgressBar done={done} total={total} label="Subtask progress" />
+              <span className={"tsec-count" + (done === total ? " done" : "")}>
+                {done}/{total} done
+              </span>
+            </>
+          )}
+          {gates > 0 && (
+            <span className="pill pill-danger" title="Open subtasks this task waits for">
+              <Icon name="lock" /> {gates}
             </span>
-          </>
-        )
+          )}
+        </>
       }
     >
       {task.parent_id && (
@@ -289,15 +509,12 @@ export function SubtasksSection({ task, wsId, canCreate, onOpen, onChanged }: { 
           ) : (
             <span className="muted">…</span>
           )}
+          <GateBox on={!!task.blocks_parent} disabled={!canEdit} title={task.title} onChange={(on) => api.patchTask(task.id, { blocks_parent: on }).then(onTask, (e: unknown) => setErr(errText(e)))} />
         </p>
       )}
-      {err && (
-        <p className="danger small" role="alert">
-          {err}
-        </p>
-      )}
+      <Problem text={err} />
       {subs && subs.length > 0 && (
-        <ul className="rel-list">
+        <ul className="rel-list sub-list">
           {subs.map((s) => (
             <li key={s.id} className={s.archived_at ? "archived" : undefined}>
               <button type="button" className="rel-open" onClick={() => onOpen(s)}>
@@ -306,31 +523,54 @@ export function SubtasksSection({ task, wsId, canCreate, onOpen, onChanged }: { 
                 <span className="rel-title">{s.title}</span>
                 {!!s.archived_at && <span className="pill pill-muted">archived</span>}
               </button>
+              <GateBox on={!!s.blocks_parent} disabled={!canEdit} title={s.title} onChange={(on) => gate(s, on)} />
             </li>
           ))}
         </ul>
       )}
-      {canCreate && (
-        <div className="quick-add">
-          <input
-            value={title}
-            data-dirty={title.trim() ? "" : undefined}
-            placeholder="Subtask title"
-            maxLength={250}
-            aria-label="New subtask title"
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                add();
-              }
-            }}
-          />
-          <button type="button" className="button secondary small" onClick={add} disabled={!title.trim()}>
-            + Subtask
-          </button>
-        </div>
+      {canCreate && <SubtaskAdd onAdd={add} />}
+    </Section>
+  );
+}
+
+// SubtasksDraft: subtasks for a task (or template) not saved yet; created with it.
+// canGate: may tick "blocks parent" (the relations permission).
+export function SubtasksDraft({ items, onChange, canGate, note = SUB_NOTE }: { items: TemplateSubtask[]; onChange: (v: TemplateSubtask[]) => void; canGate: boolean; note?: string }) {
+  const gates = items.filter((s) => s.blocks_parent).length;
+  return (
+    <Section
+      defaultOpen={false}
+      label="Subtasks"
+      title="Subtasks"
+      icon="subtasks"
+      badges={
+        <>
+          {items.length > 0 && <span className="tsec-count">{items.length}</span>}
+          {gates > 0 && (
+            <span className="pill pill-danger" title="Subtasks this task will wait for">
+              <Icon name="lock" /> {gates}
+            </span>
+          )}
+        </>
+      }
+    >
+      <p className="muted small tsec-note">{note}</p>
+      {items.length > 0 && (
+        <ul className="rel-list sub-list">
+          {items.map((s, i) => (
+            <li key={i}>
+              <span className="rel-open rel-static">
+                <span className="rel-title">{s.title}</span>
+              </span>
+              <GateBox on={!!s.blocks_parent} disabled={!canGate && !s.blocks_parent} title={s.title} onChange={(on) => onChange(items.map((x, j) => (j === i ? { ...x, blocks_parent: on } : x)))} />
+              <button type="button" className="icon-button" onClick={() => onChange(items.filter((_, j) => j !== i))} aria-label={`Remove subtask: ${s.title}`}>
+                <Icon name="x" />
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
+      {items.length < 50 ? <SubtaskAdd onAdd={(title) => onChange([...items, { title, blocks_parent: false }])} /> : <p className="muted small tsec-note">That's the most it can have (50).</p>}
     </Section>
   );
 }
@@ -343,6 +583,7 @@ interface Dep {
   title: string;
   open: boolean;
   dir: RelationDirection; // seen from this task
+  subtask?: boolean; // an open subtask that blocks its parent (not a link: untick it in Subtasks)
 }
 
 export function splitRelations(taskId: number, rels: Relation[]): Record<RelationDirection, Dep[]> {
@@ -359,14 +600,140 @@ export function splitRelations(taskId: number, rels: Relation[]): Record<Relatio
 
 const DIR_LABEL: Record<RelationDirection, string> = { blocked_by: "🔒 Blocked by", blocks: "⛔ Blocks", relates: "↔ Related" };
 
-export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { task: Task; wsId: number; canEdit: boolean; onTask: (t: Task) => void; onOpen: (t: Task) => void }) {
-  const [rels, setRels] = useState<Relation[] | null>(null);
-  const [err, setErr] = useState("");
+// DepList: the dependencies grouped by direction.
+function DepList({ groups, canEdit, onOpen, onRemove }: { groups: Record<RelationDirection, Dep[]>; canEdit: boolean; onOpen?: (d: Dep) => void; onRemove: (d: Dep) => void }) {
+  return (
+    <>
+      {(["blocked_by", "blocks", "relates"] as const).map(
+        (d) =>
+          groups[d].length > 0 && (
+            <div key={d} className="dep-group">
+              <div className="dep-head small">{DIR_LABEL[d]}</div>
+              <ul className="rel-list">
+                {groups[d].map((x) => {
+                  const body = (
+                    <>
+                      <span className="pill pill-key">{x.key}</span>
+                      {x.other < 0 ? null : x.open ? <Pill color={d === "blocked_by" ? "#E5484D" : CATEGORY_COLOR.todo!}>open</Pill> : <Pill color={CATEGORY_COLOR.done!}>done</Pill>}
+                      <span className="rel-title">{x.title}</span>
+                      {x.subtask && <span className="pill pill-muted">subtask</span>}
+                    </>
+                  );
+                  return (
+                    <li key={(x.subtask ? "s" : "r") + x.other + x.key}>
+                      {onOpen ? (
+                        <button type="button" className="rel-open" onClick={() => onOpen(x)}>
+                          {body}
+                        </button>
+                      ) : (
+                        <span className="rel-open rel-static">{body}</span>
+                      )}
+                      {canEdit && !x.subtask && (
+                        <button type="button" className="icon-button" onClick={() => onRemove(x)} aria-label={`Remove ${DIR_LABEL[d].replace(/^\S+\s/, "").toLowerCase()} ${x.key}`}>
+                          <Icon name="x" />
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ),
+      )}
+    </>
+  );
+}
+
+// DepPicker: "+ Dependency", then a direction and a task search. onPick resolves when it was added.
+function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; onPick: (ref: string, dir: RelationDirection, t?: Task) => Promise<unknown> }) {
   const [adding, setAdding] = useState(false);
   const [dir, setDir] = useState<RelationDirection>("blocked_by");
   const [q, setQ] = useState("");
   const [found, setFound] = useState<Task[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    const s = q.trim();
+    if (!s) {
+      setFound([]);
+      return;
+    }
+    timer.current = setTimeout(() => {
+      api
+        .wsTasks(wsId, { q: s, limit: 10 })
+        .then((r) => setFound(r.items.filter((t) => t.id !== exclude)))
+        .catch(() => setFound([]));
+    }, 250);
+  }, [q, wsId, exclude]);
+  const pick = (ref: string, t?: Task) =>
+    onPick(ref, dir, t).then(
+      () => {
+        setQ("");
+        setFound([]);
+        setAdding(false);
+      },
+      () => undefined,
+    );
+  if (!adding) {
+    return (
+      <button type="button" className="button secondary small" onClick={() => setAdding(true)}>
+        + Dependency
+      </button>
+    );
+  }
+  return (
+    <div className="dep-add">
+      <div className="quick-add">
+        <select value={dir} onChange={(e) => setDir(e.target.value as RelationDirection)} aria-label="Direction">
+          <option value="blocked_by">is blocked by</option>
+          <option value="blocks">blocks</option>
+          <option value="relates">relates to</option>
+        </select>
+        <input
+          value={q}
+          autoFocus
+          data-dirty={q.trim() ? "" : undefined}
+          placeholder="Search tasks or type a key"
+          aria-label="Find a task"
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault(); // never submits the form around it
+              if (q.trim()) void pick(found[0]?.key ?? q.trim(), found[0]);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              setAdding(false);
+            }
+          }}
+        />
+      </div>
+      {found.length > 0 && (
+        <ul className="rel-list search-results" aria-label="Matching tasks">
+          {found.map((t) => (
+            <li key={t.id}>
+              <button type="button" className="rel-open" onClick={() => void pick(t.key, t)}>
+                <span className="pill pill-key">{t.key}</span>
+                <StatusBadge name={t.status_name} category={t.status_category} />
+                <span className="rel-title">{t.title}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button type="button" className="link small" onClick={() => setAdding(false)}>
+        cancel
+      </button>
+    </div>
+  );
+}
+
+const cycleText = (e: unknown) => (e instanceof ApiError && e.status === 409 ? `That would make a cycle: ${e.message}` : errText(e));
+
+export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { task: Task; wsId: number; canEdit: boolean; onTask: (t: Task) => void; onOpen: (t: Task) => void }) {
+  const [rels, setRels] = useState<Relation[] | null>(null);
+  const [gates, setGates] = useState<Task[]>([]); // open subtasks that block this task
+  const [err, setErr] = useState("");
   // a link added or removed doesn't change the task's version: reload the list after each one
   const [reload, setReload] = useState(0);
   useEffect(() => {
@@ -379,35 +746,23 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
       live = false;
     };
   }, [task.id, task.version, reload]);
+  const nGates = task.blocked_by_subtasks ?? 0;
   useEffect(() => {
-    if (timer.current) clearTimeout(timer.current);
-    const s = q.trim();
-    if (!s) {
-      setFound([]);
+    if (!nGates) {
+      setGates([]);
       return;
     }
-    timer.current = setTimeout(() => {
-      api
-        .wsTasks(wsId, { q: s, limit: 10 })
-        .then((r) => setFound(r.items.filter((t) => t.id !== task.id)))
-        .catch(() => setFound([]));
-    }, 250);
-  }, [q, wsId, task.id]);
+    let live = true;
+    api.wsTasks(wsId, { parent: task.id, archived: "include", limit: 200, sort: "number" }).then(
+      (r) => live && setGates(r.items.filter((s) => s.blocks_parent && !s.archived_at && s.status_category !== "done" && s.status_category !== "cancelled")),
+      () => live && setGates([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [task.id, task.version, wsId, nGates]);
 
-  const fail = (e: unknown) => setErr(e instanceof ApiError && e.status === 409 ? `That would make a cycle: ${e.message}` : errText(e));
-  const add = (other: string) => {
-    setErr("");
-    api
-      .addRelation(task.id, other, dir)
-      .then((t) => {
-        setQ("");
-        setFound([]);
-        setAdding(false);
-        setReload((n) => n + 1);
-        onTask(t);
-      })
-      .catch(fail);
-  };
+  const fail = (e: unknown) => setErr(cycleText(e));
   const remove = (d: Dep) => {
     setErr("");
     api
@@ -418,10 +773,11 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
       })
       .catch(fail);
   };
-  const open = (id: number) => api.task(id).then(onOpen, fail);
+  const open = (d: Dep) => void api.task(d.other).then(onOpen, fail);
 
   const groups = splitRelations(task.id, rels ?? []);
-  const count = (rels ?? []).length;
+  groups.blocked_by.push(...gates.map((s) => ({ other: s.id, key: s.key, title: s.title, open: true, dir: "blocked_by" as const, subtask: true })));
+  const count = (rels ?? []).length + gates.length;
   if (!canEdit && count === 0) return null;
   return (
     <Section
@@ -440,89 +796,100 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
         </>
       }
     >
-      {err && (
-        <p className="danger small" role="alert">
-          {err}
-        </p>
+      <Problem text={err} />
+      <DepList groups={groups} canEdit={canEdit} onOpen={open} onRemove={remove} />
+      {canEdit && (
+        <DepPicker
+          wsId={wsId}
+          exclude={task.id}
+          onPick={(ref, dir) => {
+            setErr("");
+            return api.addRelation(task.id, ref, dir).then(
+              (t) => {
+                setReload((n) => n + 1);
+                onTask(t);
+              },
+              (e: unknown) => {
+                fail(e);
+                throw e;
+              },
+            );
+          }}
+        />
       )}
-      {(["blocked_by", "blocks", "relates"] as const).map(
-        (d) =>
-          groups[d].length > 0 && (
-            <div key={d} className="dep-group">
-              <div className="dep-head small">{DIR_LABEL[d]}</div>
-              <ul className="rel-list">
-                {groups[d].map((x) => (
-                  <li key={x.other}>
-                    <button type="button" className="rel-open" onClick={() => void open(x.other)}>
-                      <span className="pill pill-key">{x.key}</span>
-                      {x.open ? <Pill color={d === "blocked_by" ? "#E5484D" : CATEGORY_COLOR.todo!}>open</Pill> : <Pill color={CATEGORY_COLOR.done!}>done</Pill>}
-                      <span className="rel-title">{x.title}</span>
-                    </button>
-                    {canEdit && (
-                      <button type="button" className="icon-button" onClick={() => remove(x)} aria-label={`Remove ${DIR_LABEL[d].slice(2).toLowerCase()} ${x.key}`}>
-                        <Icon name="x" />
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ),
-      )}
-      {canEdit &&
-        (adding ? (
-          <div className="dep-add">
-            <div className="quick-add">
-              <select value={dir} onChange={(e) => setDir(e.target.value as RelationDirection)} aria-label="Direction">
-                <option value="blocked_by">is blocked by</option>
-                <option value="blocks">blocks</option>
-                <option value="relates">relates to</option>
-              </select>
-              <input
-                value={q}
-                autoFocus
-                placeholder="Search tasks or type a key"
-                aria-label="Find a task"
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && q.trim()) {
-                    e.preventDefault();
-                    add(found[0]?.key ?? q.trim());
-                  } else if (e.key === "Escape") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setAdding(false);
-                  }
-                }}
-              />
-            </div>
-            {found.length > 0 && (
-              <ul className="rel-list search-results" aria-label="Matching tasks">
-                {found.map((t) => (
-                  <li key={t.id}>
-                    <button type="button" className="rel-open" onClick={() => add(t.key)}>
-                      <span className="pill pill-key">{t.key}</span>
-                      <StatusBadge name={t.status_name} category={t.status_category} />
-                      <span className="rel-title">{t.title}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <button type="button" className="link small" onClick={() => setAdding(false)}>
-              cancel
-            </button>
-          </div>
-        ) : (
-          <button type="button" className="button secondary small" onClick={() => setAdding(true)}>
-            + Dependency
-          </button>
-        ))}
+    </Section>
+  );
+}
+
+export interface DraftDep {
+  id: number;
+  key: string;
+  title: string;
+  open: boolean;
+  dir: RelationDirection;
+}
+
+// DependenciesDraft: links a new task starts with (made when it is created).
+export function DependenciesDraft({ wsId, items, onChange }: { wsId: number; items: DraftDep[]; onChange: (v: DraftDep[]) => void }) {
+  const [err, setErr] = useState("");
+  const groups: Record<RelationDirection, Dep[]> = { blocked_by: [], blocks: [], relates: [] };
+  for (const d of items) groups[d.dir].push({ other: d.id, key: d.key, title: d.title, open: d.open, dir: d.dir });
+  const blockers = items.filter((d) => d.dir === "blocked_by" && d.open).length;
+  return (
+    <Section
+      defaultOpen={false}
+      label="Dependencies"
+      title="Dependencies"
+      icon="link"
+      badges={
+        <>
+          {blockers > 0 && (
+            <span className="pill pill-danger">
+              <Icon name="lock" /> {blockers} open
+            </span>
+          )}
+          {items.length > 0 && <span className="tsec-count">{items.length}</span>}
+        </>
+      }
+    >
+      <Problem text={err} />
+      <DepList groups={groups} canEdit onRemove={(d) => onChange(items.filter((x) => !(x.id === d.other && x.dir === d.dir)))} />
+      <DepPicker
+        wsId={wsId}
+        onPick={(ref, dir, found) => {
+          setErr("");
+          return (found ? Promise.resolve(found) : api.task(ref)).then(
+            (t) => {
+              if (t.workspace_id !== wsId) throw new ApiError(422, "invalid", `${t.key} is in another workspace.`);
+              if (items.some((x) => x.id === t.id && x.dir === dir)) return;
+              const open = t.status_category !== "done" && t.status_category !== "cancelled";
+              onChange([...items, { id: t.id, key: t.key, title: t.title, open, dir }]);
+            },
+          ).catch((e: unknown) => {
+            setErr(e instanceof ApiError && e.status === 404 ? `No task ${ref}.` : errText(e));
+            throw e;
+          });
+        }}
+      />
     </Section>
   );
 }
 
 // ---- custom fields
+
+function FieldsBox({ fields, values, canEdit, err, onSave }: { fields: CustomField[]; values: Record<string, unknown>; canEdit: boolean; err: string; onSave: (f: CustomField, v: unknown) => void }) {
+  const set = fields.filter((f) => formatCustom(f, values[String(f.id)]) !== "").length;
+  return (
+    <Section defaultOpen={false} label="Custom fields" title="Fields" icon="fields" badges={<span className="tsec-count">{set}/{fields.length} set</span>}>
+      <Problem text={err} />
+      <dl className="props custom-props">
+        {fields.map((f) => (
+          <CustomRow key={f.id} field={f} value={values[String(f.id)] ?? null} canEdit={canEdit} onSave={(v) => onSave(f, v)} />
+        ))}
+      </dl>
+    </Section>
+  );
+}
 
 export function CustomFieldsSection({ task, fields, canEdit, onTask }: { task: Task; fields: CustomField[]; canEdit: boolean; onTask: (t: Task) => void }) {
   const [err, setErr] = useState("");
@@ -540,21 +907,22 @@ export function CustomFieldsSection({ task, fields, canEdit, onTask }: { task: T
       .then(onTask)
       .catch((e: unknown) => setErr(errText(e)));
   };
-  const set = fields.filter((f) => formatCustom(f, task.custom?.[String(f.id)]) !== "").length;
-  return (
-    <Section defaultOpen={false} label="Custom fields" title="Fields" icon="fields" badges={<span className="tsec-count">{set}/{fields.length} set</span>}>
-      {err && (
-        <p className="danger small" role="alert">
-          {err}
-        </p>
-      )}
-      <dl className="props custom-props">
-        {fields.map((f) => (
-          <CustomRow key={f.id} field={f} value={task.custom?.[String(f.id)] ?? null} canEdit={canEdit} onSave={(v) => save(f, v)} />
-        ))}
-      </dl>
-    </Section>
-  );
+  return <FieldsBox fields={fields} values={task.custom ?? {}} canEdit={canEdit} err={err} onSave={save} />;
+}
+
+// FieldsDraft: custom field values for a task (or template) not saved yet.
+export function FieldsDraft({ fields, values, onChange }: { fields: CustomField[]; values: Record<string, unknown>; onChange: (v: Record<string, unknown>) => void }) {
+  const [err, setErr] = useState("");
+  if (fields.length === 0) return null;
+  const save = (f: CustomField, v: unknown) => {
+    if (v === undefined) {
+      setErr(`${f.name}: not a valid ${f.kind}.`);
+      return;
+    }
+    setErr("");
+    onChange({ ...values, [String(f.id)]: v });
+  };
+  return <FieldsBox fields={fields} values={values} canEdit err={err} onSave={save} />;
 }
 
 export function CustomInput({ field: f, value, onSave, autoFocus, onDone }: { field: CustomField; value: unknown; onSave: (v: unknown) => void; autoFocus?: boolean; onDone?: () => void }) {

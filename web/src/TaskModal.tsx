@@ -1,24 +1,25 @@
-// New task / new schedule / edit schedule / new or edited template. With "Repeat" set, submitting
-// creates a schedule (the server then creates one task per occurrence) instead of a single task. A
-// schedule's task content is a template: its own one (made from this form), or a picked template
-// left unchanged, which the schedule then uses as is.
-// The form is in sections (the task, where it goes, when, people, checklist and fields, the agent run),
-// each a grid; the dialog can grow to the whole page, where the sections sit in two columns.
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { RunSettingsFields, runBody, type RunSettings } from "./runsettings";
-import { api, ApiError, hasCap, priorityNames, type Category, type CustomField, type Recurrence, type RecurrenceBody, type Schedule, type Status, type Tag, type Template, type TemplateBody } from "./api";
+// The task form: New task, New/Edit recurring task, New/Edit template. It is laid out exactly like
+// the task panel (the same boxes in the same order, the same rows and controls): the task, Checklist
+// and Subtasks on the left; Where, When, Details, Agent run, Dependencies and Fields on the right.
+// The panel saves each change at once; the form keeps them until Create/Save.
+// With "Repeat" set, submitting creates a recurring task (the server then creates one task per
+// occurrence) instead of a single task. Its task content is a template: its own one (made from this
+// form), or a picked template left unchanged, which it then uses as is.
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { runBody, type RunSettings } from "./runsettings";
+import { api, ApiError, hasCap, priorityNames, type Category, type CustomField, type Recurrence, type RecurrenceBody, type Schedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubtask } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, assignable } from "./fields";
 import { DEFAULT_DUE_TIME, DEFAULT_START_TIME } from "./dates";
-import { cleanCustom, sameAsTemplate, splitLines } from "./items";
+import { cleanCustom, normSubs, sameAsTemplate } from "./items";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { RepeatFields, RfRow } from "./RepeatFields";
 import { repeatOfSchedule, sameTiming } from "./scheduleTiming";
-import { CustomInput } from "./TaskSections";
+import { AgentRunGroup, ChecklistDraft, DependenciesDraft, FieldsDraft, PropGroup, Row, SubtasksDraft, type DraftDep } from "./TaskSections";
 import { defaultRepeat, fmtInstant, localTZ, repeatFromRule, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
 import { Modal } from "./ui";
 import { HelpButton } from "./help";
-import { Icon, type IconName } from "./icons";
+import { Icon } from "./icons";
 
 export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, schedule, template, repeat: initialRepeat, initialStatus, initialCategory, onClose, onCreated }: {
   ws: WorkspaceTree; // where the form starts (with projectId)
@@ -46,7 +47,9 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const [known, setKnown] = useState<Tag[]>(labels);
   const [tplName, setTplName] = useState(tpl?.name ?? "");
   const [tplAnyProject, setTplAnyProject] = useState(tpl ? tpl.project_id === null : false);
-  const [checklist, setChecklist] = useState((schedule?.checklist ?? tpl?.checklist ?? []).join("\n"));
+  const [checklist, setChecklist] = useState<string[]>(schedule?.checklist ?? tpl?.checklist ?? []);
+  const [subtasks, setSubtasks] = useState<TemplateSubtask[]>(normSubs(schedule?.subtasks ?? tpl?.subtasks ?? []));
+  const [deps, setDeps] = useState<DraftDep[]>([]);
   const [custom, setCustom] = useState<Record<string, unknown>>(schedule?.custom ?? tpl?.custom ?? {});
   const [fields, setFields] = useState<CustomField[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -66,6 +69,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const [assignees, setAssignees] = useState<number[]>(schedule?.assignees ?? tpl?.assignees ?? []);
   const [due, setDue] = useState<number | null>(null);
   const [start, setStart] = useState<number | null>(null);
+  const [notAfter, setNotAfter] = useState<number | null>(null);
   const [color, setColor] = useState<string | null>(schedule?.color ?? tpl?.color ?? null);
   const src = schedule ?? tpl;
   const [run, setRun] = useState<RunSettings>({ model: src?.model ?? "", effort: src?.effort ?? "", always_run: !!src?.always_run, allowed_tools: src?.allowed_tools ?? [] });
@@ -144,6 +148,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     if (lastWs.current === ws.id) return;
     lastWs.current = ws.id;
     setCustom({});
+    setDeps([]);
     setPicked(null);
     setPickedSchedule(null);
     const ok = new Set(assignable(users, members.get(ws.id) ?? []).map((u) => u.id));
@@ -200,7 +205,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const problem = run.tools_error ? `Allowed tools: “${run.tools_error}” isn't one permission rule.` : tplMode ? null : repeatProblem(repeat);
   const canTemplates = hasCap(me, "templates", ws.id);
   // a picked template (editing: the current one), unchanged: the recurring task uses it as is
-  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, taskLabels, assignees, color, run, checklist, custom });
+  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, taskLabels, assignees, color, run, checklist, subtasks, custom });
   // likewise a picked schedule whose timing wasn't changed
   const usesSchedule = repeating && !!pickedSchedule && sameTiming(repeat, pickedSchedule);
   const pickSchedule = (id: number) => {
@@ -222,7 +227,8 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     setAssignees(t.assignees ?? []);
     setColor(t.color);
     setRun({ model: t.model ?? "", effort: t.effort ?? "", always_run: !!t.always_run, allowed_tools: t.allowed_tools ?? [] });
-    setChecklist((t.checklist ?? []).join("\n"));
+    setChecklist(t.checklist ?? []);
+    setSubtasks(normSubs(t.subtasks ?? []));
     setCustom(t.custom ?? {});
   };
 
@@ -231,8 +237,8 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     if (tpl) b.allowed_tools = run.allowed_tools; // an edit sends the list, so clearing it clears it
     if (!(tplMode && tplAnyProject)) b.project_id = project;
     if (color) b.color = color;
-    const items = splitLines(checklist);
-    if (items.length) b.checklist = items;
+    if (checklist.length) b.checklist = checklist;
+    if (subtasks.length) b.subtasks = normSubs(subtasks);
     const c = cleanCustom(custom);
     if (c) b.custom = c;
     return b;
@@ -275,6 +281,16 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    // a checklist item or subtask typed but not added yet would be lost: point at it instead
+    const pending = (e.currentTarget as HTMLFormElement).querySelector<HTMLInputElement>(".ck-add[data-dirty], .quick-add input[data-dirty], .dep-add input[data-dirty]");
+    if (pending) {
+      setErr(`“${pending.value.trim()}” isn't added yet: press Enter to add it, or clear the box.`);
+      pending.focus();
+      pending.classList.remove("dirty-flash");
+      void pending.offsetWidth; // restart the animation
+      pending.classList.add("dirty-flash");
+      return;
+    }
     if (problem) {
       setErr(problem);
       return;
@@ -302,7 +318,8 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
             ...runBody(run),
             ...(editing ? { model: run.model, effort: run.effort, always_run: run.always_run, allowed_tools: run.allowed_tools } : {}),
             // on an edit, unchanged lists are left out (kept as the template has them)
-            ...(!schedule || JSON.stringify(splitLines(checklist)) !== JSON.stringify(schedule.checklist ?? []) ? { checklist: splitLines(checklist) } : {}),
+            ...(!schedule || JSON.stringify(checklist) !== JSON.stringify(schedule.checklist ?? []) ? { checklist } : {}),
+            ...(!schedule || JSON.stringify(normSubs(subtasks)) !== JSON.stringify(normSubs(schedule.subtasks ?? [])) ? { subtasks: normSubs(subtasks) } : {}),
             ...(!schedule || JSON.stringify(cleanCustom(custom) ?? {}) !== JSON.stringify(cleanCustom(schedule.custom ?? {}) ?? {}) ? { custom: cleanCustom(custom) ?? {} } : {}),
           };
       // the timing fields go along; with a schedule_id the server ignores them
@@ -322,7 +339,10 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
           ...(color ? { color } : {}),
           ...(due !== null ? { due_at: due } : {}),
           ...(start !== null ? { start_at: start } : {}),
-          ...(splitLines(checklist).length ? { checklist: splitLines(checklist) } : {}),
+          ...(notAfter !== null ? { not_after: notAfter } : {}),
+          ...(checklist.length ? { checklist } : {}),
+          ...(subtasks.length ? { subtasks: normSubs(subtasks) } : {}),
+          ...(deps.length ? { relations: deps.map((d) => ({ task: String(d.id), direction: d.dir })) } : {}),
           ...(cleanCustom(custom) ? { custom: cleanCustom(custom) } : {}),
           ...runBody(run),
         })
@@ -339,7 +359,6 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   };
 
   const heading = tplMode ? (tpl ? "Edit template" : "New template") : editing ? "Edit recurring task" : repeating ? "New recurring task" : "New task";
-  const setCount = Object.values(custom).filter((v) => v !== null && v !== undefined && v !== "" && v !== false).length;
   const moveWs = (id: number) => {
     const w = places.find((x) => x.id === id);
     if (w?.projects[0]) {
@@ -347,203 +366,209 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
       setProject(w.projects[0].id);
     }
   };
+  const canRelations = hasCap(me, "relations", ws.id);
+  const single = !tplMode && !editing && !repeating; // one task, made now
+  const alwaysOk = hasCap(me, "always_run", ws.id);
   return (
     <Modal title={heading} onClose={onClose} wide expandable help={<HelpButton topic={repeating || editing ? "recurring" : "tasks"} label={repeating || editing ? "Help: recurring tasks" : "Help: tasks"} />}>
       <form className="tm-form" onSubmit={submit} aria-label={heading}>
-        <div className="tm-body">
-          <div className="tm-main">
-            {!tplMode && templates.length > 0 && (
-              <div className="field tpl-pick">
-                <span className="field-label">{editing ? "Template" : "From template"}</span>
-                <div className="quick-add">
-                  <select value={picked?.id ?? ""} onChange={(e) => pick(templates.find((t) => t.id === Number(e.target.value)) ?? null)} aria-label="From template">
-                    {!editing && <option value="">— blank task —</option>}
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                        {t.project_id === null ? " (any project)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {picked && canCreate && !repeating && (
-                    <button type="button" className="button secondary small" onClick={createFromTemplate} disabled={busy}>
-                      ⚡ Create from template
-                    </button>
+        {tpl && (tpl.recurring ?? 0) > 0 && (
+          <p className="small muted sched-tpl" role="note">
+            ⟳ {tpl.recurring} recurring task{tpl.recurring === 1 ? " creates its" : "s create their"} tasks from this template: changes apply to the tasks they create from now on.
+          </p>
+        )}
+        {editing && schedule && <ScheduleTemplateNote schedule={schedule} />}
+        <div className="tp-body">
+          <div className="tp-main">
+            <section className="tp-box tp-task" aria-label={tplMode ? "Template" : "Task"}>
+              {(tplMode || templates.length > 0) && (
+                <div className="tp-grid te-head">
+                  {tplMode && (
+                    <Row label="Template name" wide>
+                      <input value={tplName} onChange={(e) => setTplName(e.target.value)} required maxLength={80} placeholder="e.g. Bug report" aria-label="Template name" />
+                    </Row>
                   )}
-                </div>
-                {picked && !repeating && <span className="muted small">The form is filled from “{picked.name}”; change anything before creating, or create it as is.</span>}
-                {picked && repeating && !editing && (
-                  <span className="muted small">
-                    {usesPicked
-                      ? `Uses template “${picked.name}” itself: later edits to that template change the tasks it creates. Change anything here to save it as a new template instead.`
-                      : `Changed from “${picked.name}”: saved as a new template with what's here.`}
-                  </span>
-                )}
-                {picked && editing && schedule && picked.id !== schedule.template_id && (
-                  <span className="muted small">
-                    {usesPicked ? `Switches to template “${picked.name}”.` : `Changed from “${picked.name}”: the changes are saved to the current template “${schedule.template_name}” instead.`}
-                  </span>
-                )}
-              </div>
-            )}
-            {tpl && (tpl.recurring ?? 0) > 0 && (
-              <p className="small muted sched-tpl" role="note">
-                ⟳ {tpl.recurring} recurring task{tpl.recurring === 1 ? " creates its" : "s create their"} tasks from this template: changes apply to the tasks they create from now on.
-              </p>
-            )}
-            {editing && schedule && <ScheduleTemplateNote schedule={schedule} />}
-            <Section icon="pencil" title={tplMode ? "Template" : "Task"} id="task">
-              {tplMode && (
-                <label>
-                  Template name
-                  <input value={tplName} onChange={(e) => setTplName(e.target.value)} required maxLength={80} placeholder="e.g. Bug report" />
-                </label>
-              )}
-              <label>
-                {tplMode ? "Task title" : "Title"}
-                <input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={250} placeholder="What needs doing?" data-autofocus="" />
-              </label>
-              <div className="field">
-                <span className="field-label">
-                  Description <span className="muted small">Markdown · @ to mention</span>
-                </span>
-                <MarkdownEditor value={description} onChange={setDescription} users={candidates} minRows={editing ? 3 : 5} aria-label="Description" />
-              </div>
-            </Section>
-            <Section icon="checklist" title="Checklist" id="check">
-              <label>
-                <span className="muted small">One item per line{repeating ? ", on every task" : ""}</span>
-                <textarea value={checklist} onChange={(e) => setChecklist(e.target.value)} rows={Math.min(6, Math.max(2, checklist.split("\n").length))} placeholder={"First step\nSecond step"} />
-              </label>
-            </Section>
-          </div>
-          <div className="tm-side">
-            <Section icon="layers" title="Where" grid id="where">
-              <label>
-                Workspace
-                {places.length > 1 && !editing && !tpl ? (
-                  <select value={ws.id} onChange={(e) => moveWs(Number(e.target.value))}>
-                    {places.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input value={ws.name} disabled />
-                )}
-              </label>
-              <label>
-                Project
-                <select
-                  value={tplMode && tplAnyProject ? "any" : project}
-                  onChange={(e) => {
-                    if (e.target.value === "any") setTplAnyProject(true);
-                    else {
-                      setTplAnyProject(false);
-                      setProject(Number(e.target.value));
-                    }
-                  }}
-                  disabled={editing}
-                >
-                  {tplMode && <option value="any">Any project</option>}
-                  {ws.projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.key} · {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {!repeating && !tplMode && (
-                <label>
-                  Status
-                  <select value={status} onChange={(e) => setStatus(Number(e.target.value))} disabled={!statusReady} aria-busy={!statusReady && !statusErr}>
-                    {projectStatuses.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </Section>
-            {!tplMode && (
-              <Section icon="calendar" title="When" id="when">
-                {!repeating && (
-                  <div className="tm-grid">
-                    <div className="field">
-                      <span className="field-label">Start</span>
-                      <DateTimeInput value={start} onChange={setStart} defaultTime={DEFAULT_START_TIME} label="Start" live />
-                    </div>
-                    <div className="field">
-                      <span className="field-label">Due</span>
-                      <DateTimeInput value={due} onChange={setDue} defaultTime={DEFAULT_DUE_TIME} label="Due" live />
-                    </div>
-                  </div>
-                )}
-                {canRepeat && <RepeatFields value={repeat} onChange={setRepeat} allowNever={!editing} showPaused={editing}>
-                  {schedules.length > 0 && (
-                    <RfRow label="Schedule">
-                      <select value={pickedSchedule?.id ?? ""} onChange={(e) => (e.target.value ? pickSchedule(Number(e.target.value)) : setPickedSchedule(null))} aria-label="Schedule">
-                        {!editing && <option value="">custom timing</option>}
-                        {schedules.map((x) => (
-                          <option key={x.id} value={x.id}>
-                            {x.name}
+                  {!tplMode && templates.length > 0 && (
+                    <Row label={editing ? "Template" : "From template"} wide className="tpl-pick">
+                      <select value={picked?.id ?? ""} onChange={(e) => pick(templates.find((t) => t.id === Number(e.target.value)) ?? null)} aria-label="From template">
+                        {!editing && <option value="">— blank task —</option>}
+                        {templates.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                            {t.project_id === null ? " (any project)" : ""}
                           </option>
                         ))}
                       </select>
-                      {(() => {
-                        // the select already says which schedule it runs on; say only what saving will do
-                        const hint = usesSchedule
-                          ? editing && schedule && pickedSchedule!.id !== schedule.schedule_id
-                            ? `Switches to “${pickedSchedule!.name}”.`
-                            : ""
-                          : editing && schedule
-                            ? `Timing changes are saved to “${schedule.schedule_name}”.`
-                            : "Saved as a new schedule (or the existing one with exactly this timing).";
-                        return hint && <span className="muted small rf-note">{hint}</span>;
-                      })()}
-                    </RfRow>
+                      {picked && canCreate && !repeating && (
+                        <button type="button" className="button secondary small" onClick={createFromTemplate} disabled={busy}>
+                          ⚡ Create from template
+                        </button>
+                      )}
+                      {picked && !repeating && <span className="muted small rf-note">The form is filled from “{picked.name}”; change anything before creating, or create it as is.</span>}
+                      {picked && repeating && !editing && (
+                        <span className="muted small rf-note">
+                          {usesPicked
+                            ? `Uses template “${picked.name}” itself: later edits to that template change the tasks it creates. Change anything here to save it as a new template instead.`
+                            : `Changed from “${picked.name}”: saved as a new template with what's here.`}
+                        </span>
+                      )}
+                      {picked && editing && schedule && picked.id !== schedule.template_id && (
+                        <span className="muted small rf-note">
+                          {usesPicked ? `Switches to template “${picked.name}”.` : `Changed from “${picked.name}”: the changes are saved to the current template “${schedule.template_name}” instead.`}
+                        </span>
+                      )}
+                    </Row>
                   )}
-                </RepeatFields>}
-              </Section>
-            )}
-            <Section icon="users" title="Details" grid id="people">
-              <label>
-                Priority
-                <select value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
-                  {priorityNames.map((n, i) => (
-                    <option key={n} value={i}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="field tm-wide">
-                <span className="field-label">Labels</span>
-                <LabelInput value={taskLabels} onChange={setTaskLabels} known={known} />
+                </div>
+              )}
+              <div className="edit tp-edit te-text">
+                <input className="tp-title-input" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={250} placeholder={tplMode ? "Task title: what needs doing?" : "Title: what needs doing?"} aria-label={tplMode ? "Task title" : "Title"} data-autofocus="" />
+                <MarkdownEditor value={description} onChange={setDescription} users={candidates} minRows={6} aria-label="Description" placeholder="Description (Markdown) · @ to mention" />
               </div>
-              <div className="field tm-wide">
-                <span className="field-label">Assignees</span>
-                <AssigneePicker value={assignees} onChange={setAssignees} candidates={candidates} />
-              </div>
-              <div className="field tm-wide">
-                <span className="field-label">Colour</span>
-                <ColorPicker value={color} onChange={setColor} />
-              </div>
-            </Section>
-            <Section icon="bot" title="Agent run" id="agent" aside={<HelpButton topic="agents" label="Help: how agents run tasks" />}>
-              <RunSettingsFields value={run} onChange={setRun} canAlways={hasCap(me, "always_run", ws.id)} canTools={hasCap(me, "allowed_tools", ws.id)} bare />
-            </Section>
-            {fields.length > 0 && (
-              <Section icon="fields" title="Fields" id="fields" aside={<span className="pill pill-muted tm-h-count">{setCount}/{fields.length} set</span>}>
-                <dl className="props custom-props">
-                  {fields.map((f) => (
-                    <FieldRow key={f.id} field={f} value={custom[String(f.id)] ?? null} onSave={(v) => v !== undefined && setCustom((c) => ({ ...c, [String(f.id)]: v }))} />
-                  ))}
-                </dl>
-              </Section>
-            )}
+            </section>
+            <div className="tsecs">
+              <ChecklistDraft items={checklist} onChange={setChecklist} note={repeating ? "Every task it creates gets this checklist." : tplMode ? "Every task made from the template gets this checklist." : undefined} />
+              <SubtasksDraft
+                items={subtasks}
+                onChange={setSubtasks}
+                canGate={canRelations}
+                note={
+                  repeating || tplMode
+                    ? `Every task ${repeating ? "it creates" : "made from the template"} gets these subtasks, each made like it (priority, assignees, window, agent run). Tick “blocks parent” to make the task wait for one.`
+                    : undefined
+                }
+              />
+            </div>
+          </div>
+          <div className="tp-side">
+            <div className="tp-props">
+              <PropGroup icon="layers" title="Where">
+                <Row label="Workspace">
+                  {places.length > 1 && !editing && !tpl ? (
+                    <select value={ws.id} onChange={(e) => moveWs(Number(e.target.value))} aria-label="Workspace">
+                      {places.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="pill pill-ws">{ws.name}</span>
+                  )}
+                </Row>
+                <Row label="Project">
+                  <select
+                    value={tplMode && tplAnyProject ? "any" : project}
+                    onChange={(e) => {
+                      if (e.target.value === "any") setTplAnyProject(true);
+                      else {
+                        setTplAnyProject(false);
+                        setProject(Number(e.target.value));
+                      }
+                    }}
+                    disabled={editing}
+                    aria-label="Project"
+                  >
+                    {tplMode && <option value="any">Any project</option>}
+                    {ws.projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.key} · {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </Row>
+                {!repeating && !tplMode && (
+                  <Row label="Status">
+                    <select value={status} onChange={(e) => setStatus(Number(e.target.value))} disabled={!statusReady} aria-busy={!statusReady && !statusErr} aria-label="Status">
+                      {projectStatuses.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Row>
+                )}
+              </PropGroup>
+
+              {!tplMode && (
+                <PropGroup icon="calendar" title="When">
+                  {!repeating && (
+                    <>
+                      <Row wide label={notAfter ? "Window opens" : "Start"}>
+                        <DateTimeInput value={start} onChange={setStart} defaultTime={DEFAULT_START_TIME} label={notAfter ? "Window opens" : "Start"} live />
+                      </Row>
+                      <Row wide label="Due">
+                        <DateTimeInput value={due} onChange={setDue} defaultTime={DEFAULT_DUE_TIME} label="Due" live />
+                      </Row>
+                      <Row tip="After this moment the task can’t be started any more; untouched, it is marked missed" wide label="Window closes">
+                        <DateTimeInput value={notAfter} onChange={setNotAfter} defaultTime={DEFAULT_DUE_TIME} label="Window closes" live />
+                      </Row>
+                    </>
+                  )}
+                  {canRepeat && (
+                    <RepeatFields value={repeat} onChange={setRepeat} allowNever={!editing} showPaused={editing}>
+                      {schedules.length > 0 && (
+                        <RfRow label="Schedule">
+                          <select value={pickedSchedule?.id ?? ""} onChange={(e) => (e.target.value ? pickSchedule(Number(e.target.value)) : setPickedSchedule(null))} aria-label="Schedule">
+                            {!editing && <option value="">custom timing</option>}
+                            {schedules.map((x) => (
+                              <option key={x.id} value={x.id}>
+                                {x.name}
+                              </option>
+                            ))}
+                          </select>
+                          {(() => {
+                            // the select already says which schedule it runs on; say only what saving will do
+                            const hint = usesSchedule
+                              ? editing && schedule && pickedSchedule!.id !== schedule.schedule_id
+                                ? `Switches to “${pickedSchedule!.name}”.`
+                                : ""
+                              : editing && schedule
+                                ? `Timing changes are saved to “${schedule.schedule_name}”.`
+                                : "Saved as a new schedule (or the existing one with exactly this timing).";
+                            return hint && <span className="muted small rf-note">{hint}</span>;
+                          })()}
+                        </RfRow>
+                      )}
+                    </RepeatFields>
+                  )}
+                </PropGroup>
+              )}
+
+              <PropGroup icon="users" title="Details">
+                <Row label="Priority">
+                  <select value={priority} onChange={(e) => setPriority(Number(e.target.value))} aria-label="Priority">
+                    {priorityNames.map((n, i) => (
+                      <option key={n} value={i}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </Row>
+                <Row label="Labels" wide>
+                  <LabelInput value={taskLabels} onChange={setTaskLabels} known={known} />
+                </Row>
+                <Row label="Assignees" wide>
+                  <AssigneePicker value={assignees} onChange={setAssignees} candidates={candidates} />
+                </Row>
+                <Row label="Colour" wide>
+                  <ColorPicker value={color} onChange={setColor} />
+                </Row>
+              </PropGroup>
+
+              <AgentRunGroup
+                value={run}
+                canWrite
+                alwaysLocked={!alwaysOk && !run.always_run}
+                canTools={hasCap(me, "allowed_tools", ws.id)}
+                onChange={(p) => setRun((r) => ({ ...r, ...p, ...(p.allowed_tools ? { tools_error: null } : {}) }))}
+                onToolsError={(bad) => setRun((r) => ((bad ?? null) === (r.tools_error ?? null) ? r : { ...r, tools_error: bad }))}
+              />
+            </div>
+            <div className="tsecs">
+              {single && canRelations && <DependenciesDraft wsId={ws.id} items={deps} onChange={setDeps} />}
+              <FieldsDraft fields={fields} values={custom} onChange={setCustom} />
+            </div>
           </div>
         </div>
         {(err || (statusErr && !repeating && !noStatus)) && (
@@ -552,7 +577,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
           </p>
         )}
         <div className="tm-foot">
-          {!tplMode && !editing && !repeating && canTemplates && (
+          {single && canTemplates && (
             <div className="save-tpl">
               {saveAs === null ? (
                 <button type="button" className="link small" onClick={() => setSaveAs(title)}>
@@ -576,7 +601,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
           <button type="button" className="button secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="button" disabled={busy || (repeating && !!problem) || (!tplMode && !editing && !repeating && !statusReady)}>
+          <button type="submit" className="button" disabled={busy || (repeating && !!problem) || (single && !statusReady)}>
             {tplMode ? "Save template" : editing ? "Save recurring task" : repeating ? "⟳ Create recurring task" : "Create task"}
           </button>
         </div>
@@ -604,20 +629,6 @@ function rememberProject(id: number) {
   }
 }
 
-// Section: one titled block of the form (a heading with an icon, then its fields; `grid` lays the
-// fields out side by side as the width allows).
-function Section({ icon, title, grid, aside, id, children }: { icon: IconName; title: string; grid?: boolean; aside?: ReactNode; id: string; children: ReactNode }) {
-  return (
-    <section className={"tm-section tm-s-" + id} aria-label={title}>
-      <h3 className="tm-h">
-        <Icon name={icon} /> {title}
-        {aside}
-      </h3>
-      <div className={grid ? "tm-grid" : "tm-stack"}>{children}</div>
-    </section>
-  );
-}
-
 // ScheduleTemplateNote: where an edited recurring task's content and timing live, and who shares them.
 function ScheduleTemplateNote({ schedule: s }: { schedule: Recurrence }) {
   const { me } = useApp();
@@ -632,16 +643,5 @@ function ScheduleTemplateNote({ schedule: s }: { schedule: Recurrence }) {
       <br /><Icon name="clock" /> Timing: schedule <strong>“{s.schedule_name}”</strong>
       {sOthers > 0 && <> (also used by {others(sOthers)}: timing changes move them too)</>}
     </p>
-  );
-}
-
-function FieldRow({ field, value, onSave }: { field: CustomField; value: unknown; onSave: (v: unknown) => void }) {
-  return (
-    <>
-      <dt>{field.name}</dt>
-      <dd>
-        <CustomInput field={field} value={value} onSave={onSave} />
-      </dd>
-    </>
   );
 }

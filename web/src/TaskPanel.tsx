@@ -1,20 +1,18 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { api, ApiError, fmtTime, hasCap, priorityNames, resumeCommand, type Comment, type CustomField, type Recurrence, type Run, type Status, type Tag, type Task, type User } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
-import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, assignable } from "./fields";
+import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, assignable, withCurrent } from "./fields";
 import { DEFAULT_DUE_TIME, DEFAULT_START_TIME } from "./dates";
 import { Markdown, setMentionUsers } from "./markdown";
 import { MarkdownEditor } from "./MarkdownEditor";
-import { ChecklistSection, CustomFieldsSection, DependenciesSection, Section, SubtasksSection } from "./TaskSections";
+import { AgentRunGroup, ChecklistSection, CustomFieldsSection, DependenciesSection, PropGroup, Row, Section, SubtasksSection } from "./TaskSections";
 import { Clamp } from "./Clamp";
 import { HistorySection } from "./TaskHistory";
 import { describeRule } from "./recurrence";
 import { CATEGORY_COLOR } from "./theme";
-import { EffortSelect, ModelInput, ToolsInput } from "./runsettings";
 import { Avatar, EXIT_MS, LabelChip, Pill, PriorityBadge, StatusBadge, TaskBadges, UserBadge, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
-import { HelpButton } from "./help";
-import { Icon, type IconName } from "./icons";
+import { Icon } from "./icons";
 
 const kindBadge: Record<Comment["kind"], [string, string] | null> = {
   comment: null,
@@ -48,7 +46,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   const [comments, setComments] = useState<Comment[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [err, setErr] = useState("");
-  const [editing, setEditing] = useState<"" | "text" | "labels" | "assignees" | "color">("");
+  const [editing, setEditing] = useState<"" | "text">("");
   const [schedule, setSchedule] = useState<Recurrence | "gone" | null>(null);
   // full: the panel covers the whole view next to the sidebar (remembered per browser)
   const [full, setFull] = useState(() => {
@@ -253,6 +251,11 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       })
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "That didn't work."));
 
+  // labels and assignees save on each click: show the change at once and send the saves one at a
+  // time, each with the latest list (two quick clicks never undo each other)
+  const [liveLabels, setLiveLabels] = useLiveList(task?.id ?? 0, task ? task.labels.map((l) => l.name) : [], (v) => act(api.patchTask(task!.id, { labels: v })));
+  const [liveAssignees, setLiveAssignees] = useLiveList(task?.id ?? 0, task?.assignees ?? [], (v) => act(api.patchTask(task!.id, { assignees: v })));
+
   if (!task) {
     return (
       <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "") + (closing ? " closing" : "")} inert={closing || undefined} aria-label="Task">
@@ -334,7 +337,8 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       )}
       {!!task.blocked_by && (
         <div className="banner banner-danger" role="status">
-          <Icon name="lock" /> Blocked by {task.blocked_by} open task{task.blocked_by === 1 ? "" : "s"}: agents won't pick it up until {task.blocked_by === 1 ? "it is" : "they are"} done.
+          <Icon name="lock" /> Blocked by {task.blocked_by} open task{task.blocked_by === 1 ? "" : "s"}
+          {task.blocked_by_subtasks ? ` (${task.blocked_by_subtasks === task.blocked_by ? (task.blocked_by === 1 ? "its subtask" : "its subtasks") : `${task.blocked_by_subtasks} of them its subtask${task.blocked_by_subtasks === 1 ? "" : "s"}`})` : ""}: agents won't pick it up until {task.blocked_by === 1 ? "it is" : "they are"} done.
         </div>
       )}
 
@@ -387,7 +391,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           {/* folded by default; keyed by task so a newly opened task starts folded again */}
           <div className="tsecs" key={"secs-" + task.id}>
             <ChecklistSection task={task} canEdit={can("checklists")} onTask={onTask} />
-            <SubtasksSection task={task} wsId={ws.id} canCreate={can("create_tasks") && !task.deleted} onOpen={onMoved} onChanged={onChanged} />
+            <SubtasksSection task={task} wsId={ws.id} canCreate={can("create_tasks") && !task.deleted} canEdit={can("relations") && !task.deleted} assignable={candidates.map((u) => u.id)} onOpen={onMoved} onTask={onTask} onChanged={onChanged} />
           </div>
           <section className="tp-box comments" aria-label="Comments">
             <h3>
@@ -514,37 +518,28 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                   <PriorityBadge priority={task.priority} showNone />
                 )}
               </Row>
+              {/* the same pickers as the task form; each change saves */}
               <Row label="Labels" wide>
-                {editing === "labels" ? (
-                  <InlineLabels task={task} known={labels} onSave={(v) => act(api.patchTask(task.id, { labels: v }))} onCancel={() => setEditing("")} />
+                {canWrite ? (
+                  <LabelInput value={liveLabels} onChange={setLiveLabels} known={labels} autosave />
                 ) : (
-                  <div className="chips editable">
+                  <div className="chips">
                     {task.labels.map((l) => (
                       <LabelChip key={l.id} label={labelFor(l)} />
                     ))}
                     {task.labels.length === 0 && <span className="muted">none</span>}
-                    {canWrite && (
-                      <button type="button" className="icon-button" aria-label="Edit labels" onClick={() => setEditing("labels")}>
-                        <Icon name="pencil" />
-                      </button>
-                    )}
                   </div>
                 )}
               </Row>
               <Row label="Assignees" wide>
-                {editing === "assignees" ? (
-                  <InlineAssignees task={task} candidates={candidates} onSave={(v) => act(api.patchTask(task.id, { assignees: v }))} onCancel={() => setEditing("")} />
+                {canWrite ? (
+                  <AssigneePicker value={liveAssignees} onChange={setLiveAssignees} candidates={withCurrent(candidates, liveAssignees, users)} />
                 ) : (
-                  <div className="chips editable">
+                  <div className="chips">
                     {task.assignees.map((id) => (
                       <UserBadge key={id} user={users.get(id)} />
                     ))}
                     {task.assignees.length === 0 && <span className="muted">nobody</span>}
-                    {canWrite && (
-                      <button type="button" className="icon-button" aria-label="Edit assignees" onClick={() => setEditing("assignees")}>
-                        <Icon name="pencil" />
-                      </button>
-                    )}
                   </div>
                 )}
               </Row>
@@ -565,33 +560,13 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
               </Row>
             </PropGroup>
 
-            <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run tasks" />}>
-              <Row tip="Model for the agent’s run (an alias like opus or sonnet, or a full model id). Empty: the agent’s default" label="Model">
-                <ModelInput value={task.model ?? ""} disabled={!canWrite} onCommit={(v) => act(api.patchTask(task.id, { model: v }))} />
-              </Row>
-              <Row tip="Reasoning effort for the agent’s run (low to max). Empty: the agent’s default" label="Effort">
-                <EffortSelect value={task.effort ?? ""} disabled={!canWrite} onChange={(v) => act(api.patchTask(task.id, { effort: v }))} />
-              </Row>
-              <Row tip="Run it whatever the usage budget, day or night, like a cron job. The daily cap and pauses still apply" label="Always run" wide>
-                <label className="admin-check run-always" title={can("always_run") ? "Runs whatever the usage budget, day or night" : "Changing it needs the Always-run tasks permission"}>
-                  <input type="checkbox" checked={!!task.always_run} disabled={!can("always_run")} onChange={(e) => act(api.patchTask(task.id, { always_run: e.target.checked }))} />
-                  <span className="muted small">whatever the usage budget, day or night</span>
-                </label>
-              </Row>
-              {(can("allowed_tools") || (task.allowed_tools ?? []).length > 0) && (
-                <Row tip="The agent gets exactly these tools for this task (Claude Code permission rules), nothing else. Empty: its usual setup" label="Allowed tools" wide>
-                  {can("allowed_tools") ? (
-                    <ToolsInput value={task.allowed_tools ?? []} onCommit={(v) => act(api.patchTask(task.id, { allowed_tools: v }))} />
-                  ) : (
-                    <span className="tools-list" title="Changing this task needs the Task tool allowlists permission">
-                      {(task.allowed_tools ?? []).map((r) => (
-                        <code key={r}>{r}</code>
-                      ))}
-                    </span>
-                  )}
-                </Row>
-              )}
-            </PropGroup>
+            <AgentRunGroup
+              value={{ model: task.model ?? "", effort: task.effort ?? "", always_run: !!task.always_run, allowed_tools: task.allowed_tools ?? [] }}
+              canWrite={canWrite}
+              alwaysLocked={!can("always_run")}
+              canTools={can("allowed_tools")}
+              onChange={(p) => act(api.patchTask(task.id, p))}
+            />
           </div>
           {(cmd || runs.length > 0) && (
             <div className="tsecs" key={"agent-" + task.id}>
@@ -729,44 +704,6 @@ function TextForm({ task, users, onCancel, onSave }: { task: Task; users: User[]
   );
 }
 
-function InlineLabels({ task, known, onSave, onCancel }: { task: Task; known: Tag[]; onSave: (v: string[]) => void; onCancel: () => void }) {
-  const [v, setV] = useState(task.labels.map((l) => l.name));
-  const dirty = v.join("\n") !== task.labels.map((l) => l.name).join("\n");
-  return (
-    <div className="inline-edit" data-dirty={dirty ? "" : undefined}>
-      <LabelInput value={v} onChange={setV} known={known} />
-      <div className="row end">
-        <button type="button" className="button secondary small" onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="button" className="button small" onClick={() => onSave(v)}>
-          Save
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function InlineAssignees({ task, candidates, onSave, onCancel }: {
-  task: Task; candidates: ReturnType<typeof assignable>; onSave: (v: number[]) => void; onCancel: () => void;
-}) {
-  const [v, setV] = useState(task.assignees);
-  const dirty = v.join() !== task.assignees.join();
-  return (
-    <div className="inline-edit" data-dirty={dirty ? "" : undefined}>
-      <AssigneePicker value={v} onChange={setV} candidates={candidates} />
-      <div className="row end">
-        <button type="button" className="button secondary small" onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="button" className="button small" onClick={() => onSave(v)}>
-          Save
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function Resume({ task, onDone }: { task: Task; onDone: (t: Task) => void }) {
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
@@ -833,26 +770,34 @@ function AddComment({ taskId, users, onDone }: { taskId: number; users: User[]; 
   );
 }
 
-function PropGroup({ icon, title, children, help }: { icon: IconName; title: string; children: ReactNode; help?: ReactNode }) {
-  return (
-    <section className="tp-box tp-group" aria-label={title}>
-      <h4 className="tp-gh">
-        <Icon name={icon} /> {title}
-        {help}
-      </h4>
-      <div className="tp-grid">{children}</div>
-    </section>
-  );
-}
-
-// Row: one label + value in a property group. wide rows take the whole width (chips, swatches).
-function Row({ label, wide, className, children, tip }: { label: ReactNode; wide?: boolean; className?: string; children: ReactNode; tip?: string }) {
-  return (
-    <div className={"tp-row" + (wide ? " wide" : "")}>
-      <span className="tp-label" data-tip={tip}>
-        {label}
-      </span>
-      <div className={"tp-value" + (className ? " " + className : "")}>{children}</div>
-    </div>
-  );
+// useLiveList: a list that saves on each change. The new value shows at once; saves go one at a time,
+// each sending the latest value, and the server's value shows again once they're done. key: the
+// task (another task starts clean).
+function useLiveList<T>(key: number, server: T[], save: (v: T[]) => Promise<unknown>): [T[], (v: T[]) => void] {
+  const [local, setLocal] = useState<T[] | null>(null);
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  const busy = useRef(false);
+  const next = useRef<T[] | null>(null);
+  useEffect(() => {
+    setLocal(null);
+    next.current = null;
+  }, [key]);
+  const flush = () => {
+    const v = next.current;
+    if (!v) {
+      busy.current = false;
+      setLocal(null);
+      return;
+    }
+    next.current = null;
+    busy.current = true;
+    void saveRef.current(v).finally(flush);
+  };
+  const set = (v: T[]) => {
+    setLocal(v);
+    next.current = v;
+    if (!busy.current) flush();
+  };
+  return [local ?? server, set];
 }

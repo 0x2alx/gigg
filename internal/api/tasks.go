@@ -177,26 +177,35 @@ func (in *projectTasksIn) list() *taskListIn {
 	return &taskListIn{Status: in.Status, Category: in.Category, Label: in.Label, PriorityMin: in.PriorityMin, Assignee: in.Assignee, CreatedBy: in.CreatedBy, Q: in.Q, DueBefore: in.DueBefore, UpdatedSince: in.UpdatedSince, IncludeDeleted: in.IncludeDeleted, Deleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Cursor: in.Cursor, Archived: in.Archived, Parent: in.Parent, Blocked: in.Blocked}
 }
 
+// RelationIn is a dependency a new task starts with.
+type RelationIn struct {
+	Task      string `json:"task" doc:"The other task, id or key"`
+	Direction string `json:"direction" enum:"blocks,blocked_by,relates" doc:"blocks: the new task blocks the other; blocked_by: the other blocks the new task"`
+}
+
 // TaskCreate is the body for a new task.
 type TaskCreate struct {
-	Checklist     []string       `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items to start with"`
-	Custom        map[string]any `json:"custom,omitempty" doc:"Custom field values by field id"`
-	Title         string         `json:"title" minLength:"1" maxLength:"250"`
-	DescriptionMD string         `json:"description_md,omitempty" maxLength:"65536"`
-	Status        int64          `json:"status,omitempty" doc:"Status id (default: the project's default status)"`
-	Category      string         `json:"category,omitempty" enum:"backlog,todo,doing,waiting,done,cancelled," doc:"Alternative to status"`
-	Priority      int64          `json:"priority,omitempty" minimum:"0" maximum:"4"`
-	Color         *string        `json:"color,omitempty"`
-	StartAt       *int64         `json:"start_at,omitempty"`
-	DueAt         *int64         `json:"due_at,omitempty"`
-	NotAfter      *int64         `json:"not_after,omitempty" doc:"The window closes (unix ms): not claimable after this; untouched it becomes missed"`
-	ParentID      *int64         `json:"parent_id,omitempty"`
-	Labels        []string       `json:"labels,omitempty" maxItems:"20" doc:"Label names; missing ones are created"`
-	Assignees     []int64        `json:"assignees,omitempty"`
-	Model         string         `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p, e.g. opus, sonnet, claude-opus-5-5 (default: the agent's)"`
-	Effort        string         `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level for claude -p (default: the agent's)"`
-	AlwaysRun     bool           `json:"always_run,omitempty" doc:"Work it whatever the usage budget, day or night (needs the always_run permission)"`
-	AllowedTools  []string       `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tools the runner's claude -p may use for it (Claude Code permission rules, one per entry, e.g. Read, Bash(git status *)); it then runs with --permission-mode dontAsk. Needs the allowed_tools permission"`
+	Checklist     []string                `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items to start with"`
+	Subtasks      []store.TemplateSubtask `json:"subtasks,omitempty" maxItems:"50" doc:"Subtasks to create with it, made like it (project, priority, assignees, window, run settings); blocks_parent = it waits for that subtask"`
+	Relations     []RelationIn            `json:"relations,omitempty" maxItems:"50" doc:"Dependencies to start with (needs the relations permission)"`
+	Custom        map[string]any          `json:"custom,omitempty" doc:"Custom field values by field id"`
+	Title         string                  `json:"title" minLength:"1" maxLength:"250"`
+	DescriptionMD string                  `json:"description_md,omitempty" maxLength:"65536"`
+	Status        int64                   `json:"status,omitempty" doc:"Status id (default: the project's default status)"`
+	Category      string                  `json:"category,omitempty" enum:"backlog,todo,doing,waiting,done,cancelled," doc:"Alternative to status"`
+	Priority      int64                   `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	Color         *string                 `json:"color,omitempty"`
+	StartAt       *int64                  `json:"start_at,omitempty"`
+	DueAt         *int64                  `json:"due_at,omitempty"`
+	NotAfter      *int64                  `json:"not_after,omitempty" doc:"The window closes (unix ms): not claimable after this; untouched it becomes missed"`
+	ParentID      *int64                  `json:"parent_id,omitempty"`
+	BlocksParent  bool                    `json:"blocks_parent,omitempty" doc:"A subtask that holds its parent back while it is open (needs parent_id)"`
+	Labels        []string                `json:"labels,omitempty" maxItems:"20" doc:"Label names; missing ones are created"`
+	Assignees     []int64                 `json:"assignees,omitempty"`
+	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model for the agent's claude -p, e.g. opus, sonnet, claude-opus-5-5 (default: the agent's)"`
+	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level for claude -p (default: the agent's)"`
+	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Work it whatever the usage budget, day or night (needs the always_run permission)"`
+	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tools the runner's claude -p may use for it (Claude Code permission rules, one per entry, e.g. Read, Bash(git status *)); it then runs with --permission-mode dontAsk. Needs the allowed_tools permission"`
 }
 
 type taskCreateIn struct {
@@ -216,6 +225,7 @@ type taskPatchIn struct {
 		DueAt         Opt[int64]    `json:"due_at,omitempty"`
 		NotAfter      Opt[int64]    `json:"not_after,omitempty"`
 		ParentID      Opt[int64]    `json:"parent_id,omitempty"`
+		BlocksParent  Opt[bool]     `json:"blocks_parent,omitempty" doc:"A subtask that holds its parent back while it is open"`
 		Labels        Opt[[]string] `json:"labels,omitempty" doc:"Replaces the task's labels (names)"`
 		Assignees     Opt[[]int64]  `json:"assignees,omitempty" doc:"Replaces the task's assignees (user ids)"`
 		Model         Opt[string]   `json:"model,omitempty" maxLength:"64" doc:"Model for claude -p; null or empty = the agent's default"`
@@ -393,6 +403,12 @@ func (a *API) registerTasks() {
 				return nil, err
 			}
 		}
+		// a subtask that blocks its parent holds another task back, like a dependency
+		if len(in.Body.Relations) > 0 || in.Body.BlocksParent || anyGate(in.Body.Subtasks) {
+			if err := allowed(p, pr.WorkspaceID, "relations"); err != nil {
+				return nil, err
+			}
+		}
 		b := in.Body
 		if err := alwaysRunChange(p, pr.WorkspaceID, false, b.AlwaysRun); err != nil {
 			return nil, err
@@ -402,7 +418,7 @@ func (a *API) registerTasks() {
 		}
 		n := store.NewTask{ProjectID: pr.ID, Title: b.Title, DescriptionMD: b.DescriptionMD, Priority: b.Priority, Color: b.Color,
 			StartAt: b.StartAt, DueAt: b.DueAt, NotAfter: b.NotAfter, ParentID: b.ParentID, Labels: b.Labels, Assignees: b.Assignees,
-			Model: strings.TrimSpace(b.Model), Effort: b.Effort, AlwaysRun: b.AlwaysRun, AllowedTools: b.AllowedTools}
+			Model: strings.TrimSpace(b.Model), Effort: b.Effort, AlwaysRun: b.AlwaysRun, AllowedTools: b.AllowedTools, BlocksParent: b.BlocksParent}
 		if p.Key != nil {
 			n.CreatedViaKey = &p.Key.ID
 		}
@@ -436,7 +452,29 @@ func (a *API) registerTasks() {
 					return err
 				}
 			}
-			if len(b.Checklist)+len(b.Custom) > 0 {
+			if err := store.AddSubtasks(ctx, tx, p.Actor(), t, b.Subtasks); err != nil {
+				return err
+			}
+			for _, r := range b.Relations {
+				o, err := a.task(ctx, p, r.Task)
+				if err != nil {
+					return store.Invalid("no such task %q", r.Task)
+				}
+				from, to, kind := t, o, "blocks"
+				switch r.Direction {
+				case "blocked_by":
+					from, to = o, t
+				case "relates":
+					kind = "relates"
+					if o.ID < t.ID {
+						from, to = o, t
+					}
+				}
+				if err := store.AddRelation(ctx, tx, p.Actor(), from, to, kind); err != nil {
+					return err
+				}
+			}
+			if len(b.Checklist)+len(b.Custom)+len(b.Subtasks)+len(b.Relations) > 0 {
 				t, err = store.GetTask(ctx, tx, t.ID)
 			}
 			return err
@@ -478,6 +516,20 @@ func (a *API) registerTasks() {
 			}
 			patch := store.TaskPatch{Title: b.Title.Val(), DescriptionMD: b.DescriptionMD.Val(), Priority: b.Priority.Val(), Color: b.Color.Ptr(),
 				StartAt: b.StartAt.Ptr(), DueAt: b.DueAt.Ptr(), NotAfter: b.NotAfter.Ptr(), ParentID: b.ParentID.Ptr()}
+			if b.BlocksParent.Set {
+				on := false
+				if v := b.BlocksParent.Val(); v != nil {
+					on = *v
+				}
+				patch.BlocksParent = &on
+			}
+			// switching a subtask's hold on its parent, or moving a holding subtask under another
+			// parent, is a dependency change
+			if (patch.BlocksParent != nil && *patch.BlocksParent != t.BlocksParent) || (b.ParentID.Set && t.BlocksParent) {
+				if err := allowed(p, t.WorkspaceID, "relations"); err != nil {
+					return nil, err
+				}
+			}
 			if b.Model.Set {
 				m := ""
 				if v := b.Model.Val(); v != nil {
@@ -823,4 +875,14 @@ func (a *API) withTaskOp(ctx context.Context, ref, ifm string, min, scope string
 		return nil, err
 	}
 	return &taskOut{ETag: etag(out.Version), Body: out}, nil
+}
+
+// anyGate: some of these subtasks would hold their parent back (that needs the relations permission).
+func anyGate(subs []store.TemplateSubtask) bool {
+	for _, s := range subs {
+		if s.BlocksParent {
+			return true
+		}
+	}
+	return false
 }

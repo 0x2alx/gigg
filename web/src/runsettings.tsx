@@ -2,7 +2,6 @@
 // budget, day or night) and a tool allowlist (the runner passes exactly those tools). Empty
 // model/effort = the agent's default; no tools = the runner's usual mode.
 import { useEffect, useId, useState } from "react";
-import { HelpButton } from "./help";
 
 // Aliases always mean the latest of that family; full ids pin one version. Anything else can be typed.
 export const MODEL_SUGGESTIONS = ["opus", "sonnet", "haiku", "fable", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2"];
@@ -120,46 +119,6 @@ export function EffortSelect({ value, onChange, disabled, label = "Effort" }: { 
         </option>
       ))}
     </select>
-  );
-}
-
-// RunSettingsFields: the run fields for a form (new task, template, recurring task).
-// bare: no frame or legend (the caller's own section heading names it)
-export function RunSettingsFields({ value, onChange, canAlways, canTools, bare }: { value: RunSettings; onChange: (v: RunSettings) => void; canAlways: boolean; canTools: boolean; bare?: boolean }) {
-  return (
-    <fieldset className={"span2 run-settings" + (bare ? " bare" : "")}>
-      <legend className={bare ? "sr-only" : "field-label"}>
-        Agent run {!bare && <HelpButton topic="agents" label="Help: how agents run tasks" />}
-      </legend>
-      <label>
-        Model
-        <ModelInput value={value.model} onCommit={(model) => onChange({ ...value, model })} />
-      </label>
-      <label>
-        Effort
-        <EffortSelect value={value.effort} onChange={(effort) => onChange({ ...value, effort })} />
-      </label>
-      <label className="admin-check run-always" title={canAlways ? "" : "Needs the Always-run tasks permission"}>
-        <input type="checkbox" checked={value.always_run} disabled={!canAlways && !value.always_run} onChange={(e) => onChange({ ...value, always_run: e.target.checked })} />
-        <span>
-          Always run <span className="muted small">whatever the usage budget, day or night (cron-like tasks)</span>
-        </span>
-      </label>
-      {(canTools || value.allowed_tools.length > 0) && (
-        <label className="span2" title={canTools ? "" : "Needs the Task tool allowlists permission"}>
-          Allowed tools{" "}
-          <span className="muted small">one permission rule per line; the agent gets exactly these (claude -p --allowedTools), nothing else</span>
-          <ToolsInput
-            value={value.allowed_tools}
-            disabled={!canTools}
-            onCommit={(allowed_tools) => onChange({ ...value, allowed_tools, tools_error: null })}
-            onError={(bad) => {
-              if ((bad ?? null) !== (value.tools_error ?? null)) onChange({ ...value, tools_error: bad });
-            }}
-          />
-        </label>
-      )}
-    </fieldset>
   );
 }
 

@@ -55,6 +55,19 @@ func TaskRelations(ctx context.Context, q Q, task int64) ([]Relation, error) {
 	return out, rows.Err()
 }
 
+// Blocks reports whether task `from` holds task `to` back, directly or through a chain: "blocks"
+// dependencies and subtasks marked blocks_parent (child -> parent) both count, whatever the tasks'
+// state (a trashed or archived one may come back).
+func Blocks(ctx context.Context, q Q, from, to int64) (bool, error) {
+	var n int
+	err := q.QueryRowContext(ctx, `WITH RECURSIVE
+		e(f, t) AS (SELECT from_task_id, to_task_id FROM task_relations WHERE kind = 'blocks'
+			UNION ALL SELECT id, parent_id FROM tasks WHERE blocks_parent = 1 AND parent_id IS NOT NULL),
+		down(id) AS (SELECT ? UNION SELECT e.t FROM e JOIN down ON e.f = down.id)
+		SELECT count(*) FROM down WHERE id = ?`, from, to).Scan(&n)
+	return n > 0, err
+}
+
 // AddRelation links from -> to. Both tasks must be in one workspace; blocking cycles are refused.
 func AddRelation(ctx context.Context, q Q, a Actor, from, to *Task, kind string) error {
 	if kind != "blocks" && kind != "relates" {
@@ -68,12 +81,9 @@ func AddRelation(ctx context.Context, q Q, a Actor, from, to *Task, kind string)
 	}
 	if kind == "blocks" {
 		// would `to` (transitively) block `from`? then this closes a cycle
-		var n int
-		if err := q.QueryRowContext(ctx, `WITH RECURSIVE down(id) AS (SELECT ? UNION SELECT r.to_task_id FROM task_relations r JOIN down ON r.from_task_id = down.id WHERE r.kind = 'blocks')
-			SELECT count(*) FROM down WHERE id = ?`, to.ID, from.ID).Scan(&n); err != nil {
+		if cyc, err := Blocks(ctx, q, to.ID, from.ID); err != nil {
 			return err
-		}
-		if n > 0 {
+		} else if cyc {
 			return Conflict("%s already depends on %s: that would be a cycle", from.Key, to.Key)
 		}
 	}
@@ -543,40 +553,47 @@ func SetCustomValues(ctx context.Context, q Q, a Actor, t *Task, vals map[string
 
 // ---------------------------------------------------------------- templates
 
-// Template is a reusable task blueprint.
-type Template struct {
-	ID            int64          `json:"id"`
-	WorkspaceID   int64          `json:"workspace_id"`
-	ProjectID     *int64         `json:"project_id" doc:"null = usable in any project of the workspace"`
-	Name          string         `json:"name"`
-	Title         string         `json:"title"`
-	DescriptionMD string         `json:"description_md"`
-	Priority      int64          `json:"priority"`
-	Color         *string        `json:"color"`
-	Labels        []string       `json:"labels"`
-	Assignees     []int64        `json:"assignees"`
-	Checklist     []string       `json:"checklist"`
-	Custom        map[string]any `json:"custom"`
-	Model         string         `json:"model"`
-	Effort        string         `json:"effort"`
-	AlwaysRun     bool           `json:"always_run"`
-	AllowedTools  []string       `json:"allowed_tools" doc:"Tool allowlist for the runner (permission rules); empty = the runner's usual mode"`
-	CreatedBy     int64          `json:"created_by"`
-	CreatedAt     int64          `json:"created_at"`
-	Version       int64          `json:"version"`
-	Recurring     int64          `json:"recurring" doc:"Live recurring tasks that create their tasks from this template"`
+// TemplateSubtask is a subtask every task made from a template gets.
+type TemplateSubtask struct {
+	Title        string `json:"title" doc:"The subtask's title"`
+	BlocksParent bool   `json:"blocks_parent,omitempty" doc:"The parent task waits (isn't handed out) until this subtask is done"`
 }
 
-const tplCols = `id, workspace_id, project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools,
+// Template is a reusable task blueprint.
+type Template struct {
+	ID            int64             `json:"id"`
+	WorkspaceID   int64             `json:"workspace_id"`
+	ProjectID     *int64            `json:"project_id" doc:"null = usable in any project of the workspace"`
+	Name          string            `json:"name"`
+	Title         string            `json:"title"`
+	DescriptionMD string            `json:"description_md"`
+	Priority      int64             `json:"priority"`
+	Color         *string           `json:"color"`
+	Labels        []string          `json:"labels"`
+	Assignees     []int64           `json:"assignees"`
+	Checklist     []string          `json:"checklist"`
+	Subtasks      []TemplateSubtask `json:"subtasks" doc:"Subtasks each task made from it gets"`
+	Custom        map[string]any    `json:"custom"`
+	Model         string            `json:"model"`
+	Effort        string            `json:"effort"`
+	AlwaysRun     bool              `json:"always_run"`
+	AllowedTools  []string          `json:"allowed_tools" doc:"Tool allowlist for the runner (permission rules); empty = the runner's usual mode"`
+	CreatedBy     int64             `json:"created_by"`
+	CreatedAt     int64             `json:"created_at"`
+	Version       int64             `json:"version"`
+	Recurring     int64             `json:"recurring" doc:"Live recurring tasks that create their tasks from this template"`
+}
+
+const tplCols = `id, workspace_id, project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools, subtasks,
 	(SELECT count(*) FROM recurrences r WHERE r.template_id = task_templates.id AND r.deleted_at IS NULL)`
 
 func scanTemplate(row interface{ Scan(...any) error }) (*Template, error) {
 	t := &Template{}
 	var proj sql.NullInt64
 	var color sql.NullString
-	var labels, assignees, checklist, custom, tools string
+	var labels, assignees, checklist, custom, tools, subs string
 	if err := row.Scan(&t.ID, &t.WorkspaceID, &proj, &t.Name, &t.Title, &t.DescriptionMD, &t.Priority, &color, &labels, &assignees, &checklist, &custom,
-		&t.CreatedBy, &t.CreatedAt, &t.Version, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.Recurring); err != nil {
+		&t.CreatedBy, &t.CreatedAt, &t.Version, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &subs, &t.Recurring); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -589,7 +606,25 @@ func scanTemplate(row interface{ Scan(...any) error }) (*Template, error) {
 	_ = json.Unmarshal([]byte(custom), &t.Custom)
 	t.AllowedTools = []string{}
 	_ = json.Unmarshal([]byte(tools), &t.AllowedTools)
+	t.Subtasks = []TemplateSubtask{}
+	_ = json.Unmarshal([]byte(subs), &t.Subtasks)
 	return t, nil
+}
+
+// normSubtasks trims and checks a template's subtasks (nil becomes empty).
+func normSubtasks(subs []TemplateSubtask) ([]TemplateSubtask, error) {
+	if len(subs) > 50 {
+		return nil, Invalid("at most 50 subtasks")
+	}
+	out := make([]TemplateSubtask, 0, len(subs))
+	for _, s := range subs {
+		s.Title = strings.TrimSpace(s.Title)
+		if err := validTaskText(s.Title, ""); err != nil {
+			return nil, Invalid("subtask title: 1-250 characters")
+		}
+		out = append(out, s)
+	}
+	return out, nil
 }
 
 func (t *Template) validate() error {
@@ -622,6 +657,11 @@ func (t *Template) validate() error {
 	if len(t.Checklist) > 200 {
 		return Invalid("at most 200 checklist items")
 	}
+	subs, err := normSubtasks(t.Subtasks)
+	if err != nil {
+		return err
+	}
+	t.Subtasks = subs
 	for _, c := range t.Checklist {
 		if _, err := validItemText(c); err != nil {
 			return err
@@ -719,8 +759,8 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 	action := "template.updated"
 	if t.ID == 0 {
 		res, err := q.ExecContext(ctx, `INSERT INTO task_templates (workspace_id, project_id, name, title, description_md, priority, color, labels, assignees,
-			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, t.WorkspaceID, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
-			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools))
+			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subtasks) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, t.WorkspaceID, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
+			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subtasks))
 		if err != nil {
 			return nil, err
 		}
@@ -735,8 +775,8 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			return nil, ErrVersion
 		}
 		if _, err := q.ExecContext(ctx, `UPDATE task_templates SET project_id = ?, name = ?, title = ?, description_md = ?, priority = ?, color = ?, labels = ?,
-			assignees = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
-			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), t.ID); err != nil {
+			assignees = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, subtasks = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
+			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subtasks), t.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -777,9 +817,32 @@ func templateSchedules(ctx context.Context, q Q, id int64) []string {
 	return out
 }
 
-// templateExtras adds a template's checklist and custom values to a task made from it (custom
-// fields deleted since the template was saved are dropped).
-func templateExtras(ctx context.Context, q Q, a Actor, t *Task, checklist []string, custom map[string]any) error {
+// AddSubtasks creates subtasks of t, each made like t: same project, priority, assignees, window
+// and run settings. The assignees aren't notified again for each one (they were for t).
+func AddSubtasks(ctx context.Context, q Q, a Actor, t *Task, subs []TemplateSubtask) error {
+	subs, err := normSubtasks(subs)
+	if err != nil {
+		return err
+	}
+	for _, s := range subs {
+		parent := t.ID
+		if _, err := CreateTask(ctx, q, a, NewTask{ProjectID: t.ProjectID, Title: s.Title, Priority: t.Priority, ParentID: &parent,
+			BlocksParent: s.BlocksParent, StartAt: t.StartAt, DueAt: t.DueAt, NotAfter: t.NotAfter, Assignees: t.Assignees,
+			CreatedViaKey: t.CreatedViaKeyID, Model: t.Model, Effort: t.Effort, AlwaysRun: t.AlwaysRun, AllowedTools: t.AllowedTools,
+			Quiet: true}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// templateExtras adds a template's checklist, custom values and subtasks to a task made from it
+// (custom fields deleted since the template was saved are dropped). Each subtask is made like the
+// task: same project, priority, assignees, window and run settings.
+func templateExtras(ctx context.Context, q Q, a Actor, t *Task, checklist []string, custom map[string]any, subs []TemplateSubtask) error {
+	if err := AddSubtasks(ctx, q, a, t, subs); err != nil {
+		return err
+	}
 	if len(checklist) > 0 {
 		if err := AddChecklistItems(ctx, q, a, t, checklist); err != nil {
 			return err
@@ -814,7 +877,7 @@ func TaskFromTemplate(ctx context.Context, q Q, a Actor, tpl *Template, p *Proje
 	if err != nil {
 		return nil, err
 	}
-	if err := templateExtras(ctx, q, a, t, tpl.Checklist, tpl.Custom); err != nil {
+	if err := templateExtras(ctx, q, a, t, tpl.Checklist, tpl.Custom, tpl.Subtasks); err != nil {
 		return nil, err
 	}
 	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "task.from_template", "task", t.ID, map[string]any{"template": tpl.ID, "name": tpl.Name}); err != nil {

@@ -2,7 +2,7 @@
 
 Three separate objects work together:
 
-- A **template** is the content of a task: title, description, priority, labels, assignees, checklist, custom fields and agent run settings. You can also start an ordinary task from a template.
+- A **template** is the content of a task: title, description, priority, labels, assignees, checklist, subtasks, custom fields and agent run settings. Every task made from it gets its subtasks, each made like the task (same window, assignees and run settings) and, when marked **blocks parent**, holding the task back until it's done. You can also start an ordinary task from a template.
 - A **schedule** is a timing: "every day 09:00–11:00", "every Friday", "the last day of every month". Several recurring tasks can share one.
 - A **recurring task** links one template to one schedule in a project. It has its own start date, end date or maximum count, an overlap rule and a pause switch. The same template can be linked to several schedules, but each template–schedule pair appears only once per project.
 
