@@ -196,7 +196,7 @@ func TestGuardsEverywhere(t *testing.T) {
 	code, out, _ = e.reqH("DELETE", gig, "", ada, csrf)
 	e.ok(code, out, 200)
 	// a key that may delete and restore, for an agent that may delete gigs: still not this one
-	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"del","user_id":%d,"workspace":"scout","scopes":["workspace:read","gigs:read","gigs:write","gigs:delete"],"allowed_listeners":["internal"]}`, e.ids["scout.user"]), ada)
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"del","user_id":%d,"reach":["scout"],"scopes":["workspace:read","gigs:read","gigs:write","gigs:delete"],"allowed_listeners":["internal"]}`, e.ids["scout.user"]), ada)
 	e.ok(code, out, 201)
 	var kc KeyCreated
 	_ = json.Unmarshal(out, &kc)

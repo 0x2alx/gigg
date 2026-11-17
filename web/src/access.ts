@@ -1,5 +1,5 @@
-// Access rules: a user or a group gets a preset and/or allow/deny overrides, in one workspace or
-// in all of them. The API types, the admin calls and the pure helpers the admin screens use.
+// Access rules: a user or a group gets a preset and/or allow/deny overrides, in all workspaces, in
+// one workspace, or in one project of a workspace (the gig permissions only). The API types, the admin calls and the pure helpers the admin screens use.
 import { call } from "./http";
 
 export interface Permission {
@@ -7,6 +7,7 @@ export interface Permission {
   label: string;
   description: string;
   section: string;
+  project?: boolean; // can be given for one project (a gig permission)
 }
 
 export interface PermissionsInfo {
@@ -21,11 +22,12 @@ export interface AccessRule {
   group_id?: number;
   group_name?: string;
   workspace_id: number | null; // null = all workspaces (future ones too)
+  project_id?: number | null; // set: one project of workspace_id only
   preset: string; // "" = none
   overrides: Record<string, boolean>;
 }
 
-export type Source = "admin" | "user" | "user_all" | "group" | "group_all" | "needs_view" | "default";
+export type Source = "admin" | "user_project" | "user" | "user_all" | "group_project" | "group" | "group_all" | "needs_view" | "default";
 
 export interface Decision {
   name: string;
@@ -36,6 +38,7 @@ export interface Decision {
 
 export interface AccessRow {
   workspace_id: number; // 0 = all workspaces
+  project_id?: number; // a project with a rule of its own
   role: string;
   permissions: Decision[];
 }
@@ -58,6 +61,7 @@ export interface Group {
 
 export interface RuleBody {
   workspace_id: number | null;
+  project_id?: number | null;
   preset?: string;
   overrides?: Record<string, boolean>;
 }
@@ -76,25 +80,30 @@ export const accessApi = {
   deleteGroup: (id: number) => call<void>("DELETE", `/groups/${id}`),
 };
 
+// The presets a rule for one project can hold (the others give workspace-level permissions).
+export const PROJECT_PRESETS = ["viewer", "consumer", "member"];
+
 // The order rules are read in, for the help text.
 export const RULE_ORDER =
-  "Most specific first: the user's rule for the workspace, then their rule for all workspaces, then their groups' rules for the workspace, then for all workspaces; otherwise off. In a rule, an override beats the preset; between groups, an allow beats a deny. Everything needs “See the workspace”.";
+  "Most specific first: the user's rule for the project, for the workspace, for all workspaces; then their groups' rules in the same order; otherwise off. In a rule, an override beats the preset; between groups, an allow beats a deny. Everything needs “See the workspace” (or, for one project, “See” there).";
 
-// ruleAt: the rule for one level (ws null = all workspaces).
-export function ruleAt(rules: AccessRule[], ws: number | null): AccessRule | undefined {
-  return rules.find((r) => (r.workspace_id ?? null) === ws);
+// ruleAt: the rule for one level (ws null = all workspaces; project set = that project only).
+export function ruleAt(rules: AccessRule[], ws: number | null, project: number | null = null): AccessRule | undefined {
+  return rules.find((r) => (r.workspace_id ?? null) === ws && (r.project_id ?? null) === project);
 }
 
+const level = (ws: number | null, project: number | null) => (project ? { workspace_id: ws, project_id: project } : { workspace_id: ws });
+
 // body: the request that sets one override (or clears it) in a rule, keeping the rest.
-export function withOverride(rule: AccessRule | undefined, ws: number | null, perm: string, v: Tri): RuleBody {
+export function withOverride(rule: AccessRule | undefined, ws: number | null, perm: string, v: Tri, project: number | null = null): RuleBody {
   const overrides = { ...(rule?.overrides ?? {}) };
   if (v === null) delete overrides[perm];
   else overrides[perm] = v;
-  return { workspace_id: ws, preset: rule?.preset ?? "", overrides };
+  return { ...level(ws, project), preset: rule?.preset ?? "", overrides };
 }
 
-export function withPreset(rule: AccessRule | undefined, ws: number | null, preset: string): RuleBody {
-  return { workspace_id: ws, preset, overrides: { ...(rule?.overrides ?? {}) } };
+export function withPreset(rule: AccessRule | undefined, ws: number | null, preset: string, project: number | null = null): RuleBody {
+  return { ...level(ws, project), preset, overrides: { ...(rule?.overrides ?? {}) } };
 }
 
 // ruleSummary: a rule in a few words ("Member, +Recurring gigs, -Delete gigs").
@@ -116,10 +125,14 @@ export function sourceText(d: Pick<Decision, "source" | "group">): string {
   switch (d.source) {
     case "admin":
       return "admin: everything";
+    case "user_project":
+      return "own rule, this project";
     case "user":
       return "own rule, this workspace";
     case "user_all":
       return "own rule, all workspaces";
+    case "group_project":
+      return d.group ? `group ${d.group}, this project` : "a group";
     case "group":
       return d.group ? `group ${d.group}, this workspace` : "a group";
     case "group_all":

@@ -40,7 +40,7 @@ type scheduleOut struct {
 
 func (a *API) schedule(ctx context.Context, p *access.Principal, id int64) (*store.Schedule, error) {
 	s, err := store.GetSchedule(ctx, a.st.R, id)
-	if err != nil || (s.Shared && !seesShared(p)) || (!s.Shared && !p.SeesWorkspace(s.WorkspaceID)) {
+	if err != nil || (s.Shared && !seesShared(p)) || (!s.Shared && !p.Allowed(s.WorkspaceID, access.Viewer)) {
 		return nil, errNotFound()
 	}
 	return s, nil
@@ -57,9 +57,9 @@ func sharedScheduleWrite(p *access.Principal, s *store.Schedule) error {
 	return nil
 }
 
-// scheduleUsedOutside: a live recurring gig outside the projects a narrowed key reaches uses it.
-func (a *API) scheduleUsedOutside(ctx context.Context, p *access.Principal, id int64) bool {
-	if !p.Narrowed() {
+// scheduleUsedOutside: a live recurring gig outside the projects of ws the caller reaches uses it.
+func (a *API) scheduleUsedOutside(ctx context.Context, p *access.Principal, ws, id int64) bool {
+	if !p.Narrowed(ws) {
 		return false
 	}
 	rows, err := a.st.R.QueryContext(ctx, `SELECT DISTINCT project_id FROM recurrences WHERE schedule_id = ? AND deleted_at IS NULL`, id)
@@ -73,7 +73,7 @@ func (a *API) scheduleUsedOutside(ctx context.Context, p *access.Principal, id i
 			return true
 		}
 		reach := false
-		for _, k := range p.ProjectFilter() {
+		for _, k := range p.ProjectFilter(ws) {
 			reach = reach || k == pid
 		}
 		if !reach {
@@ -246,7 +246,7 @@ func (a *API) registerSchedules() {
 		if err := require(p, s.WorkspaceID, "recurring_gigs", "gigs:write"); err != nil {
 			return nil, err
 		}
-		if a.scheduleUsedOutside(ctx, p, s.ID) {
+		if a.scheduleUsedOutside(ctx, p, s.WorkspaceID, s.ID) {
 			return nil, errForbidden("This schedule is used outside the projects this key reaches.")
 		}
 		// retiming a schedule retimes every recurring gig on it: an always-run one (or one with a tool

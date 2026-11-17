@@ -25,8 +25,8 @@ UPDATE api_keys
 --     edit_gigs (a merged permission is allowed only where all its parts were);
 --   - the scopes no endpoint ever checked (artifacts:write, admin:transfer, admin:export,
 --     admin:settings) are dropped from keys.
--- The table is rebuilt for the preset CHECK (migrations run with foreign keys off; nothing refers
--- to access_rules).
+-- The table is rebuilt for the preset CHECK. Nothing refers to access_rules, so this migration
+-- keeps foreign keys on (no foreign-keys-off header).
 CREATE TABLE access_rules_new (
   id            INTEGER PRIMARY KEY,
   user_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,

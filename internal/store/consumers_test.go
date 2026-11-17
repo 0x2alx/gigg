@@ -23,6 +23,10 @@ func TestConsumersMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// today's code reads access_rules.project_id (0017): add it for the setup, drop it before 0016 runs
+	if _, err := s.W.ExecContext(ctx, `ALTER TABLE access_rules ADD COLUMN project_id INTEGER`); err != nil {
+		t.Fatal(err)
+	}
 	var ws, ws2, pid, own, deny, open, done, tplNone, tplAda, tplShared, rec int64
 	var ada *User
 	must(t, s.Tx(ctx, func(tx *sql.Tx) error {
@@ -109,6 +113,7 @@ func TestConsumersMigration(t *testing.T) {
 		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('a', 'gk_a', x'00', ?3, ?2, '["artifacts:write","gigs:read"]', 9000000000000, 1)`,
 		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('adm', 'gk_adm', x'00', 1, NULL, '["admin:export","admin:keys","admin:settings","admin:transfer"]', 9000000000000, 1)`,
 		`INSERT INTO groups (id, name, created_at) VALUES (90, 'g', 1)`,
+		`ALTER TABLE access_rules DROP COLUMN project_id`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?4, 'commenter', '{}', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?2, 'member', '{"schedules":true,"checklists":false,"relations":true}', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, NULL, 'manager', '{"schedules":false}', 1)`,

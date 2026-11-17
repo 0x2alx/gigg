@@ -97,7 +97,7 @@ func (c errandFix) claim(at string) []*ClaimedErrand {
 	var out []*ClaimedErrand
 	must(c.t, c.s.Tx(c.ctx, func(tx *sql.Tx) error {
 		var err error
-		out, err = ClaimErrands(c.ctx, tx, c.agent.ID, c.ws.ID, 0)
+		out, err = ClaimErrands(c.ctx, tx, c.agent.ID, c.ws.ID, nil, 0)
 		return err
 	}))
 	return out
@@ -215,7 +215,7 @@ func TestErrandClaimAndFinish(t *testing.T) {
 	// the workspace's errands paused: nothing claimed
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error { return PauseErrands(f.ctx, tx, f.a, f.ws.ID) }))
 	Now = func() int64 { return ny(t, "2026-11-20 03:31") }
-	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error { _, err := ClaimErrands(f.ctx, tx, f.agent.ID, f.ws.ID, 0); return err })
+	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error { _, err := ClaimErrands(f.ctx, tx, f.agent.ID, f.ws.ID, nil, 0); return err })
 	if !errors.Is(err, ErrErrandsPaused) {
 		t.Fatalf("paused: %v", err)
 	}
@@ -401,7 +401,7 @@ func TestErrandClaimLimit(t *testing.T) {
 	var got []*ClaimedErrand
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
 		var err error
-		got, err = ClaimErrands(f.ctx, tx, f.agent.ID, f.ws.ID, 1)
+		got, err = ClaimErrands(f.ctx, tx, f.agent.ID, f.ws.ID, nil, 1)
 		return err
 	}))
 	if len(got) != 1 || got[0].ErrandID != ids[0] {

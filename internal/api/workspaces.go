@@ -11,16 +11,17 @@ import (
 	"github.com/0x2alx/gigg/internal/store"
 )
 
-// workspace resolves an id, a slug or "current" (a workspace key's own workspace) within reach.
+// workspace resolves an id, a slug or "current" (a limited key's first workspace) within reach.
 func (a *API) workspace(ctx context.Context, p *access.Principal, ref string) (*store.Workspace, error) {
 	var w *store.Workspace
 	var err error
 	switch {
 	case ref == "current":
-		if p.Key == nil || p.Key.WorkspaceID == nil {
-			return nil, fail(422, "invalid", `"current" needs a workspace key.`)
+		cur, cerr := a.current(ctx, p)
+		if cerr != nil {
+			return nil, cerr
 		}
-		w, err = store.GetWorkspace(ctx, a.st.R, *p.Key.WorkspaceID)
+		w, err = store.GetWorkspace(ctx, a.st.R, cur)
 	default:
 		if id, e := strconv.ParseInt(ref, 10, 64); e == nil {
 			w, err = store.GetWorkspace(ctx, a.st.R, id)
@@ -32,6 +33,20 @@ func (a *API) workspace(ctx context.Context, p *access.Principal, ref string) (*
 		return nil, errNotFound()
 	}
 	return w, nil
+}
+
+// current: what "current" names. A key limited to some places: the first one's workspace. Otherwise
+// (a session, or a key that follows its user): the one workspace the user owns.
+func (a *API) current(ctx context.Context, p *access.Principal) (int64, error) {
+	if cur := p.Current(); cur != nil {
+		return *cur, nil
+	}
+	if p.User != nil {
+		if id, err := store.OwnedWorkspace(ctx, a.st.R, p.User.ID); err == nil {
+			return id, nil
+		}
+	}
+	return 0, fail(422, "invalid", `"current" is a limited key's first place, or the one workspace you own; name a workspace instead.`)
 }
 
 // project resolves a project id within reach (including the key's project narrowing).
@@ -52,6 +67,26 @@ func require(p *access.Principal, ws int64, perm, scope string) error {
 		return errForbidden("This key lacks the " + scope + " scope.")
 	}
 	return errNoPermission(perm)
+}
+
+// requireIn: like require, for a permission in one project (gig-level permissions are decided per
+// project; others fall back to the workspace).
+func requireIn(p *access.Principal, ws, project int64, perm, scope string) error {
+	if p.CanIn(ws, project, perm, scope) {
+		return nil
+	}
+	if !p.HasScope(scope) {
+		return errForbidden("This key lacks the " + scope + " scope.")
+	}
+	return errNoPermission(perm)
+}
+
+// requireScope: the scope alone (403 when missing), where visibility already decided the rest.
+func requireScope(p *access.Principal, scope string) error {
+	if p.HasScope(scope) {
+		return nil
+	}
+	return errForbidden("This key lacks the " + scope + " scope.")
 }
 
 type wsPath struct {
@@ -102,6 +137,19 @@ type memberPutIn struct {
 	Body struct {
 		Role string `json:"role" enum:"viewer,consumer,member,manager"`
 	}
+}
+
+type projectMemberPutIn struct {
+	P    int64 `path:"p"`
+	User int64 `path:"user"`
+	Body struct {
+		Role string `json:"role" enum:"viewer,consumer,member"`
+	}
+}
+
+type projectMemberDelIn struct {
+	P    int64 `path:"p"`
+	User int64 `path:"user"`
 }
 
 type memberDelIn struct {
@@ -276,7 +324,7 @@ func (a *API) registerWorkspaces() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "workspace:read"); err != nil {
+		if err := requireScope(p, "workspace:read"); err != nil {
 			return nil, err
 		}
 		return &workspaceOut{ETag: etag(w.Version), Body: w}, nil
@@ -299,7 +347,7 @@ func (a *API) registerWorkspaces() {
 				return nil, err
 			}
 		}
-		if p.Narrowed() {
+		if p.Narrowed(w.ID) {
 			return nil, errForbidden("A key narrowed to projects can't change the workspace.")
 		}
 		v, err := ifMatch(in.IfMatch)
@@ -331,7 +379,7 @@ func (a *API) registerWorkspaces() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "workspace:read"); err != nil {
+		if err := requireScope(p, "workspace:read"); err != nil {
 			return nil, err
 		}
 		out := &membersOut{}
@@ -342,6 +390,9 @@ func (a *API) registerWorkspaces() {
 		if !p.AdminWith("admin:members") { // how others got their access is admin business
 			for i := range out.Body.Items {
 				out.Body.Items[i].Preset, out.Body.Items[i].Source = "", ""
+				for j := range out.Body.Items[i].Projects {
+					out.Body.Items[i].Projects[j].Preset, out.Body.Items[i].Projects[j].Source = "", ""
+				}
 			}
 		}
 		return out, storeErr(err)
@@ -386,6 +437,52 @@ func (a *API) registerWorkspaces() {
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.SetMembership(ctx, tx, p.Actor(), w.ID, in.User, "") })
 	})
 
+	huma.Register(a.h, huma.Operation{OperationID: "set-project-member", Method: "PUT", Path: "/projects/{p}/members/{user}", Tags: []string{"projects"},
+		Summary:       "Give a user a role in one project (admin): they see the workspace with that project, or get more (or less) there than in the rest of it",
+		DefaultStatus: 204}, func(ctx context.Context, in *projectMemberPutIn) (*struct{}, error) {
+		p, err := me(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := adminWith(p, "admin:members"); err != nil {
+			return nil, err
+		}
+		if err := sessionOnly(p, "Project members"); err != nil {
+			return nil, err
+		}
+		pr, err := a.project(ctx, p, in.P)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := store.GetUser(ctx, a.st.R, in.User); err != nil {
+			return nil, errNotFound()
+		}
+		return nil, a.tx(ctx, func(tx *sql.Tx) error {
+			return store.SetProjectMembership(ctx, tx, p.Actor(), pr.WorkspaceID, pr.ID, in.User, in.Body.Role)
+		})
+	})
+	huma.Register(a.h, huma.Operation{OperationID: "remove-project-member", Method: "DELETE", Path: "/projects/{p}/members/{user}", Tags: []string{"projects"},
+		Summary: "Remove a user's own rule for one project (admin; what the workspace's rules give remains)", DefaultStatus: 204},
+		func(ctx context.Context, in *projectMemberDelIn) (*struct{}, error) {
+			p, err := me(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if err := adminWith(p, "admin:members"); err != nil {
+				return nil, err
+			}
+			if err := sessionOnly(p, "Project members"); err != nil {
+				return nil, err
+			}
+			pr, err := a.project(ctx, p, in.P)
+			if err != nil {
+				return nil, err
+			}
+			return nil, a.tx(ctx, func(tx *sql.Tx) error {
+				return store.SetProjectMembership(ctx, tx, p.Actor(), pr.WorkspaceID, pr.ID, in.User, "")
+			})
+		})
+
 	huma.Register(a.h, huma.Operation{OperationID: "list-labels", Method: "GET", Path: "/workspaces/{ws}/labels", Tags: []string{"labels"},
 		Summary: "A workspace's labels"}, func(ctx context.Context, in *wsPath) (*labelsOut, error) {
 		p, err := me(ctx)
@@ -396,7 +493,7 @@ func (a *API) registerWorkspaces() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "workspace:read"); err != nil {
+		if err := requireScope(p, "workspace:read"); err != nil {
 			return nil, err
 		}
 		out := &labelsOut{}
@@ -419,7 +516,7 @@ func (a *API) registerWorkspaces() {
 		if err := require(p, w.ID, access.Manager, "projects:write"); err != nil {
 			return nil, err
 		}
-		if p.Narrowed() {
+		if p.Narrowed(w.ID) {
 			return nil, errForbidden("A key narrowed to projects can't change workspace labels.")
 		}
 		var l *store.Label
@@ -446,7 +543,7 @@ func (a *API) registerWorkspaces() {
 		if err := require(p, l.WorkspaceID, access.Manager, "projects:write"); err != nil {
 			return nil, err
 		}
-		if p.Narrowed() {
+		if p.Narrowed(l.WorkspaceID) {
 			return nil, errForbidden("A key narrowed to projects can't change workspace labels.")
 		}
 		v, err := ifMatch(in.IfMatch)
@@ -476,7 +573,7 @@ func (a *API) registerWorkspaces() {
 		if err := require(p, l.WorkspaceID, access.Manager, "projects:write"); err != nil {
 			return nil, err
 		}
-		if p.Narrowed() {
+		if p.Narrowed(l.WorkspaceID) {
 			return nil, errForbidden("A key narrowed to projects can't change workspace labels.")
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteLabel(ctx, tx, p.Actor(), l) })
@@ -492,11 +589,11 @@ func (a *API) registerWorkspaces() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "workspace:read"); err != nil {
+		if err := requireScope(p, "workspace:read"); err != nil {
 			return nil, err
 		}
 		out := &projectsOut{}
-		out.Body.Items, err = store.ListProjects(ctx, a.st.R, w.ID, p.ProjectFilter())
+		out.Body.Items, err = store.ListProjects(ctx, a.st.R, w.ID, p.ProjectFilter(w.ID))
 		if out.Body.Items == nil {
 			out.Body.Items = []*store.Project{}
 		}
@@ -515,7 +612,7 @@ func (a *API) registerWorkspaces() {
 		if err := require(p, w.ID, access.Manager, "projects:write"); err != nil {
 			return nil, err
 		}
-		if p.Narrowed() {
+		if p.Narrowed(w.ID) {
 			return nil, errForbidden("A key narrowed to projects can't create projects.")
 		}
 		var pr *store.Project
@@ -539,7 +636,7 @@ func (a *API) registerWorkspaces() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Viewer, "workspace:read"); err != nil {
+		if err := requireIn(p, pr.WorkspaceID, pr.ID, access.Viewer, "workspace:read"); err != nil {
 			return nil, err
 		}
 		return &projectOut{ETag: etag(pr.Version), Body: pr}, nil
@@ -597,7 +694,7 @@ func (a *API) registerWorkspaces() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireIn(p, pr.WorkspaceID, pr.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		sts, err := store.Statuses(ctx, a.st.R, pr.ID)
@@ -658,7 +755,7 @@ func (a *API) registerWorkspaces() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Viewer, "workspace:read"); err != nil {
+		if err := requireIn(p, pr.WorkspaceID, pr.ID, access.Viewer, "workspace:read"); err != nil {
 			return nil, err
 		}
 		out := &statusesOut{}

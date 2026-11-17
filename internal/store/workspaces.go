@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
+	"strconv"
+	"strings"
 )
 
 // Workspace is the isolation and membership unit.
@@ -146,6 +148,30 @@ func GetWorkspace(ctx context.Context, q Q, id int64) (*Workspace, error) {
 }
 
 // GetWorkspaceBySlug loads a workspace by slug.
+// OwnedWorkspace is the one live workspace a user owns, or ErrNotFound when they own none or several.
+func OwnedWorkspace(ctx context.Context, q Q, user int64) (int64, error) {
+	rows, err := q.QueryContext(ctx, `SELECT id FROM workspaces WHERE owner_id = ? AND archived_at IS NULL LIMIT 2`, user)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return 0, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	if len(ids) != 1 {
+		return 0, ErrNotFound
+	}
+	return ids[0], nil
+}
+
 func GetWorkspaceBySlug(ctx context.Context, q Q, slug string) (*Workspace, error) {
 	return scanWorkspace(q.QueryRowContext(ctx, "SELECT "+wsCols+" FROM workspaces WHERE slug = ?", slug))
 }
@@ -363,6 +389,38 @@ func firstOf(t []StatusTemplate, cat string) int {
 // GetProject loads a project.
 func GetProject(ctx context.Context, q Q, id int64) (*Project, error) {
 	return scanProject(q.QueryRowContext(ctx, "SELECT "+projCols+" FROM projects WHERE id = ?", id))
+}
+
+// ProjectBySlug loads a live project of a workspace by slug or id.
+func ProjectBySlug(ctx context.Context, q Q, ws int64, ref string) (*Project, error) {
+	p, err := scanProject(q.QueryRowContext(ctx, "SELECT "+projCols+" FROM projects WHERE workspace_id = ? AND (slug = ? OR CAST(id AS TEXT) = ?) AND deleted_at IS NULL",
+		ws, ref, ref))
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// ResolvePlace reads "workspace" or "workspace/project" (slugs or ids) into ids.
+func ResolvePlace(ctx context.Context, q Q, ref string) (ws int64, project *int64, err error) {
+	wref, pref, hasProject := strings.Cut(ref, "/")
+	var w *Workspace
+	if id, e := strconv.ParseInt(wref, 10, 64); e == nil {
+		w, err = GetWorkspace(ctx, q, id)
+	} else {
+		w, err = GetWorkspaceBySlug(ctx, q, wref)
+	}
+	if err != nil {
+		return 0, nil, Invalid("no workspace %q", wref)
+	}
+	if !hasProject {
+		return w.ID, nil, nil
+	}
+	p, err := ProjectBySlug(ctx, q, w.ID, pref)
+	if err != nil {
+		return 0, nil, Invalid("no project %q in %s", pref, w.Slug)
+	}
+	return w.ID, &p.ID, nil
 }
 
 // ListProjects returns a workspace's projects (not deleted); only = optional narrowing.

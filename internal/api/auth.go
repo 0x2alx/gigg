@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,22 +42,34 @@ type WorkspaceAccess struct {
 	Color *string `json:"color"`
 	// OwnerID: the user the workspace belongs to (display only), or null.
 	OwnerID *int64 `json:"owner_id"`
-	Role    string `json:"role" enum:"viewer,consumer,member,manager,admin" doc:"The closest preset to what the caller may do here (display only)"`
-	// Permissions held here (see GET /permissions), after the key's limits.
+	Role    string `json:"role" enum:",viewer,consumer,member,manager,admin" doc:"The closest preset to what the caller may do in the whole workspace (display only; empty: only some of its projects)"`
+	// Permissions held for the whole workspace (see GET /permissions), after the key's limits.
+	Permissions []string `json:"permissions"`
+	// Whole: the caller sees the whole workspace (else only Projects, and none of its
+	// workspace-level things).
+	Whole bool `json:"whole"`
+	// Projects: the projects in reach, in sidebar order, with what the caller may do in each.
+	Projects []ProjectAccess `json:"projects"`
+}
+
+// ProjectAccess is a project in reach and the caller's gig-level permissions there.
+type ProjectAccess struct {
+	ID          int64    `json:"id"`
+	Role        string   `json:"role" doc:"The closest preset (display only)"`
 	Permissions []string `json:"permissions"`
 }
 
 // KeyInfo is the key in use (never the secret).
 type KeyInfo struct {
-	ID               int64    `json:"id"`
-	Name             string   `json:"name"`
-	Prefix           string   `json:"prefix"`
-	WorkspaceID      *int64   `json:"workspace_id"`
-	ProjectIDs       []int64  `json:"project_ids"`
-	Scopes           []string `json:"scopes"`
-	AllowedListeners []string `json:"allowed_listeners"`
-	AllowedCIDRs     []string `json:"allowed_cidrs"`
-	ExpiresAt        int64    `json:"expires_at"`
+	ID               int64            `json:"id"`
+	Name             string           `json:"name"`
+	Prefix           string           `json:"prefix"`
+	Bound            bool             `json:"bound" doc:"Limited to Reach (else it follows the user's rules wherever they reach)"`
+	Reach            []store.KeyPlace `json:"reach"`
+	Scopes           []string         `json:"scopes"`
+	AllowedListeners []string         `json:"allowed_listeners"`
+	AllowedCIDRs     []string         `json:"allowed_cidrs"`
+	ExpiresAt        int64            `json:"expires_at"`
 }
 
 func (a *API) meBody(ctx context.Context, p *access.Principal) (*MeBody, error) {
@@ -76,7 +89,21 @@ func (a *API) meBody(ctx context.Context, p *access.Principal) (*MeBody, error) 
 				perms = append(perms, c.Name)
 			}
 		}
-		b.Workspaces = append(b.Workspaces, WorkspaceAccess{ID: w.ID, Slug: w.Slug, Name: w.Name, Color: w.Color, OwnerID: w.OwnerID, Role: store.RoleLabel(p.User.IsAdmin, perms), Permissions: perms})
+		wa := WorkspaceAccess{ID: w.ID, Slug: w.Slug, Name: w.Name, Color: w.Color, OwnerID: w.OwnerID, Permissions: perms,
+			Whole: p.Allowed(w.ID, access.Viewer), Projects: []ProjectAccess{}}
+		if wa.Whole {
+			wa.Role = store.RoleLabel(p.User.IsAdmin, perms)
+		}
+		for _, pid := range p.ProjectsWith(w.ID, access.Viewer) {
+			pp := []string{}
+			for _, name := range store.ProjectPermissions {
+				if p.AllowedIn(w.ID, pid, name) {
+					pp = append(pp, name)
+				}
+			}
+			wa.Projects = append(wa.Projects, ProjectAccess{ID: pid, Role: store.RoleLabel(p.User.IsAdmin && wa.Whole, pp), Permissions: pp})
+		}
+		b.Workspaces = append(b.Workspaces, wa)
 	}
 	if p.Key != nil {
 		b.Key = keyInfo(p.Key)
@@ -91,7 +118,7 @@ func (a *API) meBody(ctx context.Context, p *access.Principal) (*MeBody, error) 
 }
 
 func keyInfo(k *store.APIKey) *KeyInfo {
-	return &KeyInfo{ID: k.ID, Name: k.Name, Prefix: k.Prefix, WorkspaceID: k.WorkspaceID, ProjectIDs: k.ProjectIDs, Scopes: k.Scopes,
+	return &KeyInfo{ID: k.ID, Name: k.Name, Prefix: k.Prefix, Bound: k.Bound, Reach: k.Reach, Scopes: k.Scopes,
 		AllowedListeners: k.AllowedListeners, AllowedCIDRs: k.AllowedCIDRs, ExpiresAt: k.ExpiresAt}
 }
 
@@ -151,8 +178,7 @@ type userOut struct {
 type KeyCreate struct {
 	Name             string   `json:"name" minLength:"1" maxLength:"64"`
 	UserID           int64    `json:"user_id,omitempty" doc:"Acting user (admin /keys only; default: the caller)"`
-	Workspace        string   `json:"workspace,omitempty" doc:"Workspace id or slug; empty = admin key (admins only)"`
-	ProjectIDs       []int64  `json:"project_ids,omitempty" doc:"Narrow the key to these projects of its workspace"`
+	Reach            []string `json:"reach,omitempty" maxItems:"50" doc:"Limit the key to these places, in order: \"workspace\" or \"workspace/project\" (ids or slugs; the first one's workspace is its \"current\"). Empty: the key follows its user's rules wherever they reach (an admin's is an admin key)."`
 	Scopes           []string `json:"scopes" minItems:"1"`
 	AllowedListeners []string `json:"allowed_listeners,omitempty" doc:"Usable only on these listeners (null = any)"`
 	AllowedCIDRs     []string `json:"allowed_cidrs,omitempty" doc:"Usable only from these networks (null = any)"`
@@ -411,7 +437,7 @@ func (a *API) patchMe(ctx context.Context, in *mePatchIn) (*userOut, error) {
 
 // createKey enforces the no-escalation rule: a key can't create a key wider than itself.
 func (a *API) createKey(ctx context.Context, p *access.Principal, in KeyCreate) (*keyCreatedOut, error) {
-	n := store.NewKey{Name: in.Name, UserID: in.UserID, ProjectIDs: in.ProjectIDs, Scopes: in.Scopes,
+	n := store.NewKey{Name: in.Name, UserID: in.UserID, Scopes: in.Scopes,
 		AllowedListeners: in.AllowedListeners, AllowedCIDRs: in.AllowedCIDRs, ExpiresAt: in.ExpiresAt, CreatedByUser: &p.User.ID}
 	if n.ExpiresAt == 0 {
 		n.ExpiresAt = store.Now() + int64(365*24*time.Hour/time.Millisecond)
@@ -423,18 +449,26 @@ func (a *API) createKey(ctx context.Context, p *access.Principal, in KeyCreate) 
 	if err != nil {
 		return nil, fail(422, "invalid", "No such user.")
 	}
-	if in.Workspace != "" {
-		w, err := a.workspace(ctx, p, in.Workspace)
+	for _, ref := range in.Reach {
+		if ref == "current" || strings.HasPrefix(ref, "current/") {
+			cur, err := a.current(ctx, p)
+			if err != nil {
+				return nil, err
+			}
+			ref = strconv.FormatInt(cur, 10) + strings.TrimPrefix(ref, "current")
+		}
+		ws, project, err := store.ResolvePlace(ctx, a.st.R, ref)
 		if err != nil {
-			return nil, err
+			return nil, errNotFound()
 		}
-		n.WorkspaceID = &w.ID
-		if !store.UserHas(ctx, a.st.R, target.ID, w.ID, "view") {
-			return nil, fail(422, "invalid", "The key's user can't see that workspace.")
+		if (project == nil && !p.SeesWorkspace(ws)) || (project != nil && !p.SeesProject(ws, *project)) {
+			return nil, errNotFound() // the caller's reach first: no probing
 		}
-	}
-	if len(n.ProjectIDs) > 0 && n.WorkspaceID == nil {
-		return nil, fail(422, "invalid", "Project narrowing needs a workspace.")
+		if !store.UserSees(ctx, a.st.R, target.ID, ws, project) {
+			return nil, fail(422, "invalid", "The key's user can't see "+ref+".")
+		}
+		n.Bound = true
+		n.Reach = append(n.Reach, store.KeyPlace{WorkspaceID: ws, ProjectID: project})
 	}
 	if k := p.Key; k != nil {
 		n.CreatedByKey = &k.ID
@@ -443,16 +477,13 @@ func (a *API) createKey(ctx context.Context, p *access.Principal, in KeyCreate) 
 				return nil, errForbidden("A key can't grant the " + s + " scope it doesn't have.")
 			}
 		}
-		if k.WorkspaceID != nil && (n.WorkspaceID == nil || *n.WorkspaceID != *k.WorkspaceID) {
-			return nil, errForbidden("A workspace key can only create keys for its own workspace.")
-		}
-		if len(k.ProjectIDs) > 0 {
-			if len(n.ProjectIDs) == 0 {
-				return nil, errForbidden("A narrowed key can only create keys narrowed to its projects.")
+		if k.Bound {
+			if !n.Bound {
+				return nil, errForbidden("A key limited to some places can only create keys limited to them.")
 			}
-			for _, pid := range n.ProjectIDs {
-				if !slices.Contains(k.ProjectIDs, pid) {
-					return nil, errForbidden("A narrowed key can only create keys narrowed to its projects.")
+			for _, pl := range n.Reach {
+				if (pl.ProjectID == nil && !k.WholeWorkspace(pl.WorkspaceID)) || (pl.ProjectID != nil && !k.ReachesProject(pl.WorkspaceID, *pl.ProjectID)) {
+					return nil, errForbidden("A key limited to some places can only create keys limited to them.")
 				}
 			}
 		}
@@ -590,16 +621,13 @@ func within(caller, target *store.APIKey) error {
 			return errForbidden("That key has the " + sc + " scope, which this key lacks.")
 		}
 	}
-	if caller.WorkspaceID != nil && (target.WorkspaceID == nil || *target.WorkspaceID != *caller.WorkspaceID) {
-		return errForbidden("That key reaches beyond this key's workspace.")
-	}
-	if len(caller.ProjectIDs) > 0 {
-		if len(target.ProjectIDs) == 0 {
-			return errForbidden("That key reaches beyond this key's projects.")
+	if caller.Bound {
+		if !target.Bound {
+			return errForbidden("That key reaches beyond this key's places.")
 		}
-		for _, pid := range target.ProjectIDs {
-			if !slices.Contains(caller.ProjectIDs, pid) {
-				return errForbidden("That key reaches beyond this key's projects.")
+		for _, pl := range target.Reach {
+			if (pl.ProjectID == nil && !caller.WholeWorkspace(pl.WorkspaceID)) || (pl.ProjectID != nil && !caller.ReachesProject(pl.WorkspaceID, *pl.ProjectID)) {
+				return errForbidden("That key reaches beyond this key's places.")
 			}
 		}
 	}

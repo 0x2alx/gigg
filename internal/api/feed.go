@@ -109,7 +109,7 @@ func (a *API) feedScope(ctx context.Context, p *access.Principal, ref string) (s
 	if err != nil {
 		return "", nil, err
 	}
-	if err := require(p, w.ID, access.Viewer, "workspace:read"); err != nil {
+	if err := requireScope(p, "workspace:read"); err != nil {
 		return "", nil, err
 	}
 	if err := need(p, "gigs:read"); err != nil {
@@ -122,7 +122,7 @@ func (a *API) feedScope(ctx context.Context, p *access.Principal, ref string) (s
 	if !p.IsInstanceAdmin() {
 		where += " AND action NOT LIKE 'key.%' AND action NOT LIKE 'member.%' AND action NOT LIKE '%.access'"
 	}
-	if pf := p.ProjectFilter(); pf != nil {
+	if pf := p.ProjectFilter(w.ID); pf != nil {
 		where += " AND project_id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(pf)), ",") + ")"
 		for _, x := range pf {
 			args = append(args, x)

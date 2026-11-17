@@ -27,6 +27,7 @@ A run is **ok** when the command exits 0 and **failed** otherwise. It is **timed
 - **Timeout**: 5 minutes by default. Another value (10 seconds to 12 hours) needs the *Run timeouts* permission; the agent's host may cap it lower.
 - **Output**: by default the last 64 KiB of each run's output is kept in gigg. **Keep it on the agent's host only** sends gigg just the exit code and timing, for output that shouldn't leave the machine.
 - **Open a gig for the agent when it starts failing**: the first failure of a streak creates a gig with the exit code and a link to the run (never the output itself: it's the command's, not instructions). Only the agent or someone who manages the workspace switches this.
+- **Project** (when the workspace has several): the project whose work the errand does. Whoever sees that project sees the errand and its runs, and its failure gigs land there. The Errands page follows the sidebar's project filter.
 - **Agent**: whoever's executor runs it. An agent makes errands for itself. People who manage the workspace can give an errand to any agent there that has the **Errands** permission.
 
 When an errand starts failing, or recovers, the agent's executor also posts an alert.
@@ -45,6 +46,6 @@ The flag doesn't survive other hands. When someone without that permission chang
 
 ## Permissions
 
-- Seeing errands and their runs: anyone who can see the workspace. Reading run output with an API key needs the `errands:output` scope.
+- Seeing errands and their runs: anyone who can see the errand's project (an errand whose project was deleted: anyone who sees the whole workspace). Reading run output with an API key needs the `errands:output` scope.
 - Making, changing, pausing and running errands: the **Errands** permission (`errands:write` for keys).
 - The agent's executor claims and reports its own runs with a key holding `errands:run`.

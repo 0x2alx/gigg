@@ -334,14 +334,14 @@ func (a *API) registerGigs() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireScope(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		f, err := in.list().filter(w.ID)
 		if err != nil {
 			return nil, err
 		}
-		f.Projects = p.ProjectFilter()
+		f.Projects = p.ProjectFilter(w.ID)
 		f.SearchComments = p.HasScope("comments:read")
 		if in.Project != 0 {
 			if !p.SeesProject(w.ID, in.Project) {
@@ -368,7 +368,7 @@ func (a *API) registerGigs() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireIn(p, pr.WorkspaceID, pr.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		f, err := in.list().filter(pr.WorkspaceID)
@@ -396,10 +396,10 @@ func (a *API) registerGigs() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Editor, "gigs:write"); err != nil {
+		if err := requireIn(p, pr.WorkspaceID, pr.ID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
-		if err := allowed(p, pr.WorkspaceID, "create_gigs"); err != nil {
+		if err := allowedIn(p, pr.WorkspaceID, pr.ID, "create_gigs"); err != nil {
 			return nil, err
 		}
 		b := in.Body
@@ -491,7 +491,7 @@ func (a *API) registerGigs() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		return &gigOut{ETag: etag(t.Version), Body: t}, nil
@@ -588,11 +588,14 @@ func (a *API) registerGigs() {
 			}
 			if b.Project != 0 && b.Project != t.ProjectID {
 				// another project is a producer's edit (a new key, the target's statuses)
-				if err := require(p, t.WorkspaceID, access.Editor, "gigs:write"); err != nil {
+				if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Editor, "gigs:write"); err != nil {
 					return nil, err
 				}
 				if !p.SeesProject(t.WorkspaceID, b.Project) {
 					return nil, store.Invalid("no such project in this workspace")
+				}
+				if err := allowedIn(p, t.WorkspaceID, b.Project, access.Editor); err != nil {
+					return nil, err
 				}
 				m.ProjectID = &b.Project
 			}
@@ -616,15 +619,19 @@ func (a *API) registerGigs() {
 	huma.Register(a.h, huma.Operation{OperationID: "clone-gig", Method: "POST", Path: "/gigs/{id}/clone", Tags: []string{"gigs"},
 		Summary: "Copy a gig (optionally into another project of the workspace)", DefaultStatus: 201}, func(ctx context.Context, in *gigCloneIn) (*gigOut, error) {
 		return a.withGig(ctx, in.ID, "", access.Editor, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
-			if err := allowed(p, t.WorkspaceID, "create_gigs"); err != nil {
-				return nil, err
-			}
+			target := t.ProjectID
 			var proj *int64
 			if in.Body.Project != 0 {
 				if !p.SeesProject(t.WorkspaceID, in.Body.Project) {
 					return nil, store.Invalid("no such project in this workspace")
 				}
-				proj = &in.Body.Project
+				proj, target = &in.Body.Project, in.Body.Project
+			}
+			if err := allowedIn(p, t.WorkspaceID, target, "create_gigs"); err != nil {
+				return nil, err
+			}
+			if err := allowedIn(p, t.WorkspaceID, target, access.Editor); err != nil {
+				return nil, err
 			}
 			var via *int64
 			if p.Key != nil {
@@ -636,7 +643,7 @@ func (a *API) registerGigs() {
 	huma.Register(a.h, huma.Operation{OperationID: "delete-gig", Method: "DELETE", Path: "/gigs/{id}", Tags: []string{"gigs"},
 		Summary: "Move a gig to the trash (restore with /restore)"}, func(ctx context.Context, in *gigPath) (*gigOut, error) {
 		return a.withGigOp(ctx, in.ID, "", access.Editor, "gigs:delete", opTrashed, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
-			if err := allowed(p, t.WorkspaceID, "delete_gigs"); err != nil {
+			if err := allowedIn(p, t.WorkspaceID, t.ProjectID, "delete_gigs"); err != nil {
 				return nil, err
 			}
 			return store.TrashGig(ctx, tx, p.Actor(), t, false)
@@ -645,7 +652,7 @@ func (a *API) registerGigs() {
 	huma.Register(a.h, huma.Operation{OperationID: "restore-gig", Method: "POST", Path: "/gigs/{id}/restore", Tags: []string{"gigs"},
 		Summary: "Restore a gig from the trash"}, func(ctx context.Context, in *gigPath) (*gigOut, error) {
 		return a.withGigOp(ctx, in.ID, "", access.Editor, "gigs:delete", opTrashed|opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
-			if err := allowed(p, t.WorkspaceID, "delete_gigs"); err != nil {
+			if err := allowedIn(p, t.WorkspaceID, t.ProjectID, "delete_gigs"); err != nil {
 				return nil, err
 			}
 			return store.TrashGig(ctx, tx, p.Actor(), t, true)
@@ -677,7 +684,7 @@ func (a *API) registerGigs() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		if err := need(p, "comments:read"); err != nil {
@@ -702,7 +709,7 @@ func (a *API) registerGigs() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "comments:read"); err != nil {
+		if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Viewer, "comments:read"); err != nil {
 			return nil, err
 		}
 		out := &commentsOut{}
@@ -725,7 +732,7 @@ func (a *API) registerGigs() {
 		if t.Deleted {
 			return nil, trashErr(t)
 		}
-		if err := require(p, t.WorkspaceID, access.Commenter, "comments:write"); err != nil {
+		if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Commenter, "comments:write"); err != nil {
 			return nil, err
 		}
 		if !store.IsClientCommentKind(in.Body.Kind) {
@@ -749,14 +756,14 @@ func (a *API) registerGigs() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "edit-comment", Method: "PATCH", Path: "/comments/{id}", Tags: []string{"comments"},
 		Summary: "Edit your comment (the old text stays in the history)"}, func(ctx context.Context, in *commentPatchIn) (*commentOut, error) {
-		p, c, err := a.comment(ctx, in.ID)
+		p, c, project, err := a.comment(ctx, in.ID)
 		if err != nil {
 			return nil, err
 		}
 		if c.AuthorID != p.User.ID {
 			return nil, errForbidden("Only the author can edit a comment.")
 		}
-		if err := require(p, c.WorkspaceID, access.Commenter, "comments:write"); err != nil {
+		if err := requireIn(p, c.WorkspaceID, project, access.Commenter, "comments:write"); err != nil {
 			return nil, err
 		}
 		v, err := ifMatch(in.IfMatch)
@@ -775,7 +782,7 @@ func (a *API) registerGigs() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-comment", Method: "DELETE", Path: "/comments/{id}", Tags: []string{"comments"},
 		Summary: "Delete a comment (yours, or any as a manager)", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
-		p, c, err := a.comment(ctx, in.ID)
+		p, c, project, err := a.comment(ctx, in.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -783,27 +790,28 @@ func (a *API) registerGigs() {
 		if c.AuthorID != p.User.ID {
 			min = access.Manager
 		}
-		if err := require(p, c.WorkspaceID, min, "comments:write"); err != nil {
+		if err := requireIn(p, c.WorkspaceID, project, min, "comments:write"); err != nil {
 			return nil, err
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteComment(ctx, tx, p.Actor(), c) })
 	})
 }
 
-func (a *API) comment(ctx context.Context, id int64) (*access.Principal, *store.Comment, error) {
+// comment resolves a comment within reach, with its gig's project.
+func (a *API) comment(ctx context.Context, id int64) (*access.Principal, *store.Comment, int64, error) {
 	p, err := me(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	c, err := store.GetComment(ctx, a.st.R, id)
 	if err != nil {
-		return nil, nil, errNotFound()
+		return nil, nil, 0, errNotFound()
 	}
 	t, err := store.GetGig(ctx, a.st.R, c.GigID)
 	if err != nil || !p.SeesProject(t.WorkspaceID, t.ProjectID) {
-		return nil, nil, errNotFound()
+		return nil, nil, 0, errNotFound()
 	}
-	return p, c, nil
+	return p, c, t.ProjectID, nil
 }
 
 // withGig resolves the gig, checks role and scope, and runs fn in a transaction with the
@@ -846,7 +854,7 @@ func (a *API) withGigOp(ctx context.Context, ref, ifm string, min, scope string,
 	if err != nil {
 		return nil, err
 	}
-	if err := require(p, t.WorkspaceID, min, scope); err != nil {
+	if err := requireIn(p, t.WorkspaceID, t.ProjectID, min, scope); err != nil {
 		return nil, err
 	}
 	v, err := ifMatch(ifm)

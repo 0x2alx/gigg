@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent as ReactFocusEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { setMentionUsers } from "./markdown";
 import { Link, Redirect, Route, Switch, useLocation, useSearch } from "wouter";
-import { api, ApiError, SIGNED_OUT, type Me, type Project, type ThemeState, type User } from "./api";
+import { api, ApiError, SIGNED_OUT, type Me, type Project, type ProjectAccess, type ThemeState, type User } from "./api";
 import { NotificationsPage, TopBell } from "./Bell";
 import { badgeCount } from "./notifications";
 import { BoardPage } from "./Board";
@@ -33,6 +33,8 @@ export interface WorkspaceTree {
   color?: string | null;
   owner_id?: number | null; // the user it belongs to (display only)
   projects: Project[];
+  whole?: boolean; // you see the whole workspace (false: only its projects listed here)
+  access?: ProjectAccess[]; // what you may do in each of those projects (from /auth/me)
 }
 
 export interface AppCtx {
@@ -285,7 +287,7 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
     reloadMe();
     // one failed list keeps that workspace as it was (a blip must not empty the board and close what is
     // open on it); a workspace that is gone for this user (403/404) drops out
-    void Promise.allSettled(me.workspaces.map((w) => api.projects(w.slug).then((r) => ({ ...w, projects: r.items })))).then((res) =>
+    void Promise.allSettled(me.workspaces.map((w) => api.projects(w.slug).then((r) => ({ ...w, access: w.projects, projects: r.items })))).then((res) =>
       setTree((prev) =>
         res.flatMap((r, i) => {
           if (r.status === "fulfilled") return [r.value];

@@ -305,7 +305,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
   const candidates = assignable(users, members.get(ws.id) ?? []);
   const status = statuses.find((s) => s.id === gig.status_id);
   const overdue = gig.due_at !== null && gig.due_at < Date.now() && gig.status_category !== "done";
-  const can = (cap: string) => canWrite && hasCap(me, cap, gig.workspace_id);
+  const can = (cap: string) => canWrite && hasCap(me, cap, gig.workspace_id, gig.project_id);
   const onGig = (t: Gig) => {
     setGig(t);
     setErr("");

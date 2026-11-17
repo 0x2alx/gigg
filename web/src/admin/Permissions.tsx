@@ -1,9 +1,9 @@
-// Access rules for a user or a group: one level at a time (all workspaces, or one workspace), a
-// preset and per-permission overrides (Allow / Deny / no override). For users, the effective result
+// Access rules for a user or a group: one level at a time (all workspaces, one workspace, or one
+// project of a workspace: the gig permissions only), a preset and per-permission overrides (Allow / Deny / no override). For users, the effective result
 // per permission and where it comes from. Browser sessions only (keys get 403), which this page is.
 import { useEffect, useState } from "react";
 import { useApp } from "../App";
-import { accessApi, RULE_ORDER, ruleAt, ruleSummary, sections, sourceText, withOverride, withPreset, type AccessRule, type Decision, type Group, type PermissionsInfo, type RuleBody, type Tri, type UserAccess } from "../access";
+import { accessApi, PROJECT_PRESETS, RULE_ORDER, ruleAt, ruleSummary, sections, sourceText, withOverride, withPreset, type AccessRule, type Decision, type Group, type PermissionsInfo, type RuleBody, type Tri, type UserAccess } from "../access";
 import { CATEGORY_COLOR, readableOn } from "../theme";
 import { Avatar, Modal, Pill } from "../ui";
 import { errMsg, type AdminUser } from "./adminApi";
@@ -58,18 +58,32 @@ export function Effective({ allowed, blocked }: { allowed: boolean; blocked?: st
   );
 }
 
-// LevelPicker: "All workspaces" and each workspace, with the rule summary of each.
-function LevelPicker({ rules, info, level, onPick }: { rules: AccessRule[]; info: PermissionsInfo; level: number | null; onPick: (ws: number | null) => void }) {
+// Level: where a rule applies: all workspaces (ws null), one workspace, or one project of it.
+export interface Level {
+  ws: number | null;
+  project: number | null;
+}
+const ALL: Level = { ws: null, project: null };
+
+// LevelPicker: "All workspaces", each workspace, and under a workspace its projects (shown for the
+// workspace being looked at, and wherever a project has a rule), with the rule summary of each.
+function LevelPicker({ rules, info, level, onPick }: { rules: AccessRule[]; info: PermissionsInfo; level: Level; onPick: (l: Level) => void }) {
   const { tree } = useApp();
-  const levels: { ws: number | null; name: string }[] = [{ ws: null, name: "All workspaces" }, ...tree.map((w) => ({ ws: w.id, name: w.name }))];
+  const levels: (Level & { name: string })[] = [{ ...ALL, name: "All workspaces" }];
+  for (const w of tree) {
+    levels.push({ ws: w.id, project: null, name: w.name });
+    const open = level.ws === w.id;
+    for (const p of w.projects) if (open || ruleAt(rules, w.id, p.id)) levels.push({ ws: w.id, project: p.id, name: p.name });
+  }
   return (
     <ul className="acc-levels" role="tablist" aria-label="Where the rule applies">
       {levels.map((l) => {
-        const r = ruleAt(rules, l.ws);
+        const r = ruleAt(rules, l.ws, l.project);
+        const on = level.ws === l.ws && level.project === l.project;
         return (
-          <li key={l.ws ?? 0}>
-            <button type="button" role="tab" aria-selected={level === l.ws} className={"acc-level" + (level === l.ws ? " on" : "") + (r ? " has" : "")} onClick={() => onPick(l.ws)}>
-              <span className="acc-level-name">{l.ws === null ? "★ " : ""}{l.name}</span>
+          <li key={`${l.ws ?? 0}/${l.project ?? 0}`}>
+            <button type="button" role="tab" aria-selected={on} className={"acc-level" + (l.project ? " acc-level-project" : "") + (on ? " on" : "") + (r ? " has" : "")} onClick={() => onPick({ ws: l.ws, project: l.project })}>
+              <span className="acc-level-name">{l.ws === null ? "★ " : l.project ? "› " : ""}{l.name}</span>
               <span className="muted small acc-level-sum">{ruleSummary(r, info.permissions)}</span>
             </button>
           </li>
@@ -80,19 +94,24 @@ function LevelPicker({ rules, info, level, onPick }: { rules: AccessRule[]; info
 }
 
 // RuleEditor: one level's preset and overrides; with decisions (users), the effective answer too.
-function RuleEditor({ info, rule, ws, decisions, busy, onSet, who }: {
-  info: PermissionsInfo; rule: AccessRule | undefined; ws: number | null; decisions?: Decision[]; busy: boolean; onSet: (b: RuleBody) => void; who: string;
+function RuleEditor({ info, rule, level, decisions, busy, onSet, who }: {
+  info: PermissionsInfo; rule: AccessRule | undefined; level: Level; decisions?: Decision[]; busy: boolean; onSet: (b: RuleBody) => void; who: string;
 }) {
+  const { ws, project } = level;
   const preset = rule?.preset ?? "";
   const inPreset = new Set(info.presets[preset] ?? []);
   const dec = new Map((decisions ?? []).map((d) => [d.name, d]));
+  // a project's rule holds the gig permissions only (an older server marks none: show them all)
+  const marked = info.permissions.some((p) => p.project);
+  const perms = project && marked ? info.permissions.filter((p) => p.project) : info.permissions;
+  const roles = project ? info.roles.filter((r) => PROJECT_PRESETS.includes(r)) : info.roles;
   return (
     <div className="acc-editor">
       <label className="acc-preset">
         Preset
-        <select value={preset} disabled={busy} onChange={(e) => onSet(withPreset(rule, ws, e.target.value))}>
+        <select value={preset} disabled={busy} onChange={(e) => onSet(withPreset(rule, ws, e.target.value, project))}>
           <option value="">None (only the overrides below)</option>
-          {info.roles.map((r) => (
+          {roles.map((r) => (
             <option key={r} value={r}>
               {r[0]!.toUpperCase() + r.slice(1)}
             </option>
@@ -100,11 +119,11 @@ function RuleEditor({ info, rule, ws, decisions, busy, onSet, who }: {
         </select>
       </label>
       {rule && (
-        <button type="button" className="button secondary small" disabled={busy} onClick={() => onSet({ workspace_id: ws, preset: "", overrides: {} })}>
+        <button type="button" className="button secondary small" disabled={busy} onClick={() => onSet({ workspace_id: ws, ...(project ? { project_id: project } : {}), preset: "", overrides: {} })}>
           Remove this rule
         </button>
       )}
-      {sections(info.permissions).map((s) => (
+      {sections(perms).map((s) => (
         <section key={s.section} className="acc-section">
           <h3 className="acc-section-head">{s.section}</h3>
           <ul className="admin-list perm-list">
@@ -114,8 +133,8 @@ function RuleEditor({ info, rule, ws, decisions, busy, onSet, who }: {
               return (
                 <li key={p.name} className="admin-list-row perm-row">
                   <span className="perm-name" title={p.description}>
-                    {p.label}
-                    <span className="muted small perm-desc">{p.description}</span>
+                    {project && p.name === "view" ? "See the project" : p.label}
+                    <span className="muted small perm-desc">{project && p.name === "view" ? "See this project: its gigs, comments and runs (and its workspace's name). Every other permission here needs it." : p.description}</span>
                   </span>
                   {d && <Effective allowed={d.allowed} blocked={NEEDS_EDIT.has(p.name) && dec.get("edit_gigs")?.allowed === false ? "Edit gigs" : undefined} />}
                   {d && <span className={"pill perm-src perm-src-" + d.source}>{sourceText(d)}</span>}
@@ -125,7 +144,7 @@ function RuleEditor({ info, rule, ws, decisions, busy, onSet, who }: {
                     inheritWord={inPreset.has(p.name) ? "Preset ✓" : "Inherit"}
                     value={ov === undefined ? null : ov}
                     disabled={busy}
-                    onChange={(v) => onSet(withOverride(rule, ws, p.name, v))}
+                    onChange={(v) => onSet(withOverride(rule, ws, p.name, v, project))}
                   />
                 </li>
               );
@@ -153,7 +172,7 @@ export function PermissionsModal({ user, onClose }: { user: AdminUser; onClose: 
   const info = usePermissionsInfo(setError);
   const [acc, setAcc] = useState<UserAccess | null>(null);
   const [busy, setBusy] = useState(false);
-  const [level, setLevel] = useState<number | null>(null);
+  const [level, setLevel] = useState<Level>(ALL);
 
   useEffect(() => {
     accessApi
@@ -171,7 +190,7 @@ export function PermissionsModal({ user, onClose }: { user: AdminUser; onClose: 
       .catch((e: unknown) => setError(errMsg(e)))
       .finally(() => setBusy(false));
   };
-  const row = acc?.grid.find((r) => r.workspace_id === (level ?? 0));
+  const row = acc?.grid.find((r) => r.workspace_id === (level.ws ?? 0) && (r.project_id ?? null) === level.project);
 
   return (
     <Modal title={`Permissions · @${user.username}`} onClose={onClose} xl>
@@ -203,12 +222,14 @@ export function PermissionsModal({ user, onClose }: { user: AdminUser; onClose: 
             <LevelPicker rules={acc.rules} info={info} level={level} onPick={setLevel} />
             <div className="acc-main">
               <p className="small acc-level-note">
-                {level === null
+                {level.ws === null
                   ? "Applies in every workspace, including new ones, unless the user's rule for a workspace says otherwise."
-                  : "Applies in this workspace only; beats the all-workspaces rule and the groups."}
+                  : level.project
+                    ? "Applies in this project only (its gigs): beats every other rule. On its own it shows the user this project, and none of the rest of the workspace."
+                    : "Applies in this workspace only; beats the all-workspaces rule and the groups."}
                 {row && row.role && <> Effective here: <strong>{row.role}</strong>.</>}
               </p>
-              <RuleEditor info={info} rule={ruleAt(acc.rules, level)} ws={level} decisions={row?.permissions} busy={busy} onSet={set} who={user.username} />
+              <RuleEditor info={info} rule={ruleAt(acc.rules, level.ws, level.project)} level={level} decisions={row?.permissions} busy={busy} onSet={set} who={user.username} />
             </div>
           </div>
         )}
@@ -222,7 +243,7 @@ export function GroupAccessModal({ group, onClose, onChanged }: { group: Group; 
   const info = usePermissionsInfo(setError);
   const [g, setG] = useState(group);
   const [busy, setBusy] = useState(false);
-  const [level, setLevel] = useState<number | null>(null);
+  const [level, setLevel] = useState<Level>(ALL);
   const set = (b: RuleBody) => {
     setBusy(true);
     setError("");
@@ -245,7 +266,7 @@ export function GroupAccessModal({ group, onClose, onChanged }: { group: Group; 
           <div className="acc">
             <LevelPicker rules={g.rules} info={info} level={level} onPick={setLevel} />
             <div className="acc-main">
-              <RuleEditor info={info} rule={ruleAt(g.rules, level)} ws={level} busy={busy} onSet={set} who={`group ${g.name}`} />
+              <RuleEditor info={info} rule={ruleAt(g.rules, level.ws, level.project)} level={level} busy={busy} onSet={set} who={`group ${g.name}`} />
             </div>
           </div>
         )}

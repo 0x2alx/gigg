@@ -139,26 +139,29 @@ gigg admin color user sam none
 ### member
 
 ```
-gigg admin member <workspace> <username> <viewer|consumer|member|manager|none>
+gigg admin member <workspace>[/<project>] <username> <viewer|consumer|member|manager|none>
 ```
 
-Sets the user's preset in one workspace, keeping any per-permission overrides they already have
-there. `none` removes the user's own rule for that workspace; access that comes from an
-all-workspaces rule or from groups remains. See [access.md](access.md).
+Sets the user's preset in one workspace, or in one project of it (`viewer`, `consumer` or `member`),
+keeping any per-permission overrides they already have there. `none` removes the user's own rule
+there; access that comes from a wider rule or from groups remains. A project rule alone shows the user
+that project only. See [access.md](access.md#rules-for-one-project).
 
 ```sh
 gigg admin member acme sam manager
 gigg admin member acme scout member
+# another agent may work the gigs assigned to it in acme's website project, and nothing else of acme
+gigg admin member acme/web atlas consumer
 ```
 
 ### access
 
 ```
-gigg admin access <username> <workspace|all> <preset|none> [permission=allow|deny ...]
+gigg admin access <username> <workspace|workspace/project|all> <preset|none> [permission=allow|deny ...]
 ```
 
-Sets the user's access rule for one workspace, or for all workspaces (`all`, which also covers
-workspaces created later). The rule is replaced as a whole: preset and overrides. `none` with no
+Sets the user's access rule for one workspace, one project (gig permissions only), or all workspaces
+(`all`, which also covers workspaces created later). The rule is replaced as a whole: preset and overrides. `none` with no
 overrides removes the rule. Permission names are listed in [access.md](access.md#permissions).
 
 ```sh
@@ -173,14 +176,15 @@ gigg admin access sam acme none pause_runs=allow
 ### allow, deny
 
 ```
-gigg admin allow <username> <workspace|all|each> <permission> [...]
-gigg admin deny  <username> <workspace|all|each> <permission> [...]
+gigg admin allow <username> <workspace|workspace/project|all|each> <permission> [...]
+gigg admin deny  <username> <workspace|workspace/project|all|each> <permission> [...]
 ```
 
-Allows or denies permissions on the user's rule for one workspace, their `all` rule, or `each` rule
-they have, and keeps the rest of it (preset and other overrides); `access` replaces a rule as a
-whole. The user needs that rule first (`member` or `access`). The most specific rule wins, so a deny
-meant for the user everywhere goes on `each`.
+Allows or denies permissions on the user's rule for one workspace or project, their `all` rule, or
+`each` rule they have, and keeps the rest of it (preset and other overrides); `access` replaces a rule
+as a whole. The user needs that rule first (`member` or `access`). The most specific rule wins, so a
+deny meant for the user everywhere goes on `each`. On a project rule, the permissions a project can't
+hold are skipped.
 
 ```sh
 # let the agent scout manage its own errands in its workspace
@@ -195,19 +199,20 @@ API).
 ### project-add
 
 ```
-gigg admin project-add <workspace> <slug> <name> <KEY>
+gigg admin project-add <workspace> <slug> <name> <KEY> [description]
 ```
 
-Creates a project (board). `<KEY>` prefixes its gig keys (`WEB-1`, `WEB-2`, ...).
+Creates a project (board). `<KEY>` prefixes its gig keys (`WEB-1`, `WEB-2`, ...). The description
+(Markdown) says what the project is about; agents get it as context with its gigs.
 
 ```sh
-gigg admin project-add acme web "Website" WEB
+gigg admin project-add acme web "Website" WEB "The public website: content, design and its deploys."
 ```
 
 ### key-add
 
 ```
-gigg admin key-add -user U [-workspace W] -scopes a,b [-listeners x,y] [-cidrs c] [-name N] [-days 365] [-out F]
+gigg admin key-add -user U [-reach W[,W/P...]] -scopes a,b [-listeners x,y] [-cidrs c] [-name N] [-days 365] [-out F]
 ```
 
 Creates an API key acting as user `U`.
@@ -215,7 +220,7 @@ Creates an API key acting as user `U`.
 | Flag | Default | Meaning |
 |---|---|---|
 | `-user` | (required) | The user the key acts as. |
-| `-workspace` | none | Bind the key to this workspace (the user must be able to see it). Without it: an admin user's key is an admin key (may carry `admin:*` scopes); another user's key is unbound and reaches that user's workspaces. |
+| `-reach` | none | Limit the key to these places, in order: workspaces and `workspace/project`s (slugs or ids; the user must be able to see each). The first one's workspace is the key's `current`. Without it the key follows its user: an admin user's key is an admin key (may carry `admin:*` scopes); another user's key reaches wherever the user's access does, and follows changes to it. |
 | `-scopes` | (required) | Comma-separated scopes (see [api.md](api.md#scopes)). |
 | `-listeners` | any | Comma-separated listener names the key works on (`main`, `internal`, ...). |
 | `-cidrs` | any | Comma-separated networks (CIDR) the key works from. |
@@ -223,13 +228,11 @@ Creates an API key acting as user `U`.
 | `-days` | `365` | Lifetime in days (keys live at most 3 years). |
 | `-out` | stdout | Write the token to this file (mode `0600`, replaced atomically). |
 
-Project narrowing (`project_ids`) is not available here; use `POST /api/v1/keys` or `/me/keys`.
-
 The token is shown only once. Without `-out` it is printed on stdout, but `gigg admin` refuses to print
 it on a terminal: redirect stdout into the file that needs it.
 
 ```sh
-gigg admin key-add -user scout -workspace acme -name runner \
+gigg admin key-add -user scout -reach acme -name runner \
   -scopes workspace:read,gigs:read,gigs:write,comments:read,comments:write,runs:write \
   -listeners internal -out /run/secrets/scout.key
 ```
@@ -304,7 +307,7 @@ member acme sam member
 access scout acme member always_run=allow
 
 # the runner's key, usable only on the internal listener
-key-add -user scout -workspace acme -name runner -scopes workspace:read,gigs:read,gigs:write,comments:read,comments:write,runs:write -listeners internal -out /run/secrets/scout.key
+key-add -user scout -reach acme -name runner -scopes workspace:read,gigs:read,gigs:write,comments:read,comments:write,runs:write -listeners internal -out /run/secrets/scout.key
 ```
 
 ```sh

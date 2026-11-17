@@ -85,17 +85,26 @@ type fieldBody struct {
 func (a *API) template(ctx context.Context, p *access.Principal, id int64) (*store.Template, error) {
 	t, err := store.GetTemplate(ctx, a.st.R, id)
 	if err != nil || (t.Shared && !seesShared(p)) || (!t.Shared && !p.SeesWorkspace(t.WorkspaceID)) ||
-		(t.ProjectID != nil && !p.SeesProject(t.WorkspaceID, *t.ProjectID)) {
+		(t.ProjectID != nil && !p.SeesProject(t.WorkspaceID, *t.ProjectID)) || (!t.Shared && t.ProjectID == nil && p.Narrowed(t.WorkspaceID)) {
 		return nil, errNotFound()
 	}
 	return t, nil
 }
 
-// seesShared: the shared templates and schedules are there for anyone who sees a workspace (they can
-// use them in it), and for admins.
+// seesShared: the shared library (templates, schedules, errand templates) is there for anyone who
+// sees at least one workspace whole (they can use it there), and for admins. Access to only some
+// projects of a workspace doesn't show it: it is workspace-level.
 func seesShared(p *access.Principal) bool {
 	ws := p.Workspaces()
-	return ws == nil || len(ws) > 0
+	if ws == nil {
+		return true
+	}
+	for _, w := range ws {
+		if p.Allowed(w, access.Viewer) {
+			return true
+		}
+	}
+	return false
 }
 
 // readIn checks a read of an item that is a workspace's (ws) or shared (ws 0): the workspace's viewer
@@ -136,7 +145,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		rs, err := store.GigRelations(ctx, a.st.R, t.ID)
@@ -204,7 +213,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		cl, err := store.Checklist(ctx, a.st.R, t.ID)
@@ -246,7 +255,7 @@ func (a *API) registerItems() {
 		}
 		return a.withGigOp(ctx, in.ID, "", min, scope, op, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if in.Body.Done != nil {
-				if err := require(p, t.WorkspaceID, access.Worker, "gigs:work"); err != nil {
+				if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Worker, "gigs:work"); err != nil {
 					return nil, err
 				}
 			}
@@ -276,7 +285,7 @@ func (a *API) registerItems() {
 		huma.Register(a.h, huma.Operation{OperationID: op, Method: "POST", Path: path, Tags: []string{"gigs"}, Summary: sum},
 			func(ctx context.Context, in *gigPath) (*gigOut, error) {
 				return a.withGigOp(ctx, in.ID, "", access.Editor, "gigs:write", archiveOp(arch), func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
-					if err := allowed(p, t.WorkspaceID, "archive_gigs"); err != nil {
+					if err := allowedIn(p, t.WorkspaceID, t.ProjectID, "archive_gigs"); err != nil {
 						return nil, err
 					}
 					return store.ArchiveGig(ctx, tx, p.Actor(), t, arch)
@@ -303,10 +312,10 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Editor, "gigs:write"); err != nil {
+		if err := requireIn(p, pr.WorkspaceID, pr.ID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
-		if err := allowed(p, pr.WorkspaceID, "archive_gigs"); err != nil {
+		if err := allowedIn(p, pr.WorkspaceID, pr.ID, "archive_gigs"); err != nil {
 			return nil, err
 		}
 		out := &struct {
@@ -333,7 +342,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireScope(p, "gigs:read"); err != nil { // the definitions: anyone who sees some of the workspace
 			return nil, err
 		}
 		fs, err := store.CustomFields(ctx, a.st.R, w.ID)
@@ -452,10 +461,10 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireScope(p, "gigs:read"); err != nil {
 			return nil, err
 		}
-		projects := p.ProjectFilter()
+		projects := p.ProjectFilter(w.ID)
 		if in.Project != 0 {
 			if !p.SeesProject(w.ID, in.Project) {
 				return nil, errNotFound()
@@ -465,6 +474,15 @@ func (a *API) registerItems() {
 		ts, err := store.Templates(ctx, a.st.R, w.ID, projects)
 		if err != nil {
 			return nil, err
+		}
+		if p.Narrowed(w.ID) { // only some projects: only their templates (the workspace-wide ones are workspace-level)
+			keep := ts[:0]
+			for _, t := range ts {
+				if t.ProjectID != nil {
+					keep = append(keep, t)
+				}
+			}
+			ts = keep
 		}
 		return items(ts), nil
 	})
@@ -487,8 +505,8 @@ func (a *API) registerItems() {
 		if in.Body.Project != nil && !p.SeesProject(w.ID, *in.Body.Project) {
 			return nil, errNotFound()
 		}
-		if p.Narrowed() && in.Body.Project == nil {
-			return nil, errForbidden("A key limited to some projects makes templates for one of those projects.")
+		if p.Narrowed(w.ID) && in.Body.Project == nil {
+			return nil, errForbidden("Access to only some projects makes templates for one of those projects.")
 		}
 		if err := allowed(p, w.ID, "templates"); err != nil {
 			return nil, err
@@ -506,7 +524,11 @@ func (a *API) registerItems() {
 		in.Body.apply(t)
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			var err error
-			t.Assignees = store.OwnerDefault(ctx, tx, w.ID, t.Assignees)
+			var proj int64
+			if t.ProjectID != nil {
+				proj = *t.ProjectID
+			}
+			t.Assignees = store.OwnerDefault(ctx, tx, w.ID, proj, t.Assignees)
 			t, err = store.SaveTemplate(ctx, tx, p.Actor(), t, 0)
 			return err
 		})
@@ -590,7 +612,7 @@ func (a *API) registerItems() {
 			if in.Body.Project != nil && !p.SeesProject(t.WorkspaceID, *in.Body.Project) {
 				return nil, errNotFound()
 			}
-			if p.Narrowed() && (in.Body.Project == nil || t.ProjectID == nil) {
+			if p.Narrowed(t.WorkspaceID) && (in.Body.Project == nil || t.ProjectID == nil) {
 				return nil, errForbidden("A key limited to some projects only changes templates of those projects.")
 			}
 			if err := allowed(p, t.WorkspaceID, "templates"); err != nil {
@@ -639,7 +661,7 @@ func (a *API) registerItems() {
 		if err := require(p, t.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
-		if p.Narrowed() && t.ProjectID == nil {
+		if p.Narrowed(t.WorkspaceID) && t.ProjectID == nil {
 			return nil, errForbidden("A key limited to some projects only changes templates of those projects.")
 		}
 		if err := allowed(p, t.WorkspaceID, "templates"); err != nil {
@@ -667,10 +689,10 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Editor, "gigs:write"); err != nil {
+		if err := requireIn(p, pr.WorkspaceID, pr.ID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
-		if err := allowed(p, pr.WorkspaceID, "create_gigs"); err != nil {
+		if err := allowedIn(p, pr.WorkspaceID, pr.ID, "create_gigs"); err != nil {
 			return nil, err
 		}
 		if err := alwaysRunChange(p, pr.WorkspaceID, false, tpl.AlwaysRun); err != nil {
@@ -801,8 +823,8 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		// a project-narrowed key only sees entries about its projects
-		if p.Narrowed() {
+		// only entries about gigs in reach (project rules and limited keys narrow it)
+		{
 			vis := ns[:0]
 			for _, n := range ns {
 				if n.GigID != nil {
@@ -866,7 +888,7 @@ func (a *API) registerItems() {
 // workspace) a cross-workspace filter.
 func filterInReach(p *access.Principal, ws *int64) bool {
 	if ws == nil {
-		return p.Key == nil || p.Key.WorkspaceID == nil
+		return p.Key == nil || !p.Key.Bound
 	}
 	return p.SeesWorkspace(*ws)
 }

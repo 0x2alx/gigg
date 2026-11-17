@@ -6,11 +6,11 @@
   API keys. Any user can be disabled; a disabled user's sessions and keys stop working.
 - **Instance admins** are users with the admin flag.
 - **Workspaces** hold projects (boards), and projects hold gigs. Permissions are granted per
-  workspace. A workspace may name an **owner**, shown next to it in the sidebar; ownership grants
+  workspace, and the gig permissions also per project. A workspace may name an **owner**, shown next to it in the sidebar; ownership grants
   nothing.
 - **Groups** are named sets of users that share access rules.
 - **Access rules** give a user or a group a **preset** and/or per-permission **overrides** in one
-  workspace, or in all workspaces (which also covers workspaces created later).
+  project, in one workspace, or in all workspaces (which also covers workspaces created later).
 
 ## Permissions
 
@@ -114,8 +114,8 @@ preset to what they actually hold there: `admin`, else `manager` if they have `m
 
 ## Access rules
 
-A rule belongs to one user or one group, and to one workspace or to all workspaces. A user or group has
-at most one rule per level. A rule has:
+A rule belongs to one user or one group, and to one project, one workspace or all workspaces. A user
+or group has at most one rule per level. A rule has:
 
 - `preset`: `viewer`, `consumer`, `member`, `manager`, or none;
 - `overrides`: a map of permission to `true` (allow) or `false` (deny).
@@ -123,20 +123,42 @@ at most one rule per level. A rule has:
 Inside one rule, an override beats the preset. A permission that the rule's preset doesn't include and
 that has no override is "no opinion" (inherit), not a deny.
 
+### Rules for one project
+
+A project rule decides the gig permissions in that project only: `view`, `comment`, `work_gigs`,
+`edit_gigs`, `create_gigs`, `delete_gigs`, `archive_gigs`. Its preset is `viewer`, `consumer` or `member`
+(the others give workspace-level permissions). Everything else (templates, recurring gigs, schedules,
+custom fields, errands, runner settings, managing the workspace) is decided for the whole workspace and
+needs `view` of the whole workspace.
+
+Uses:
+
+- **Give someone one project of a workspace**: a project rule alone. They see the workspace (its name,
+  and its labels and members, which gigs show) and only the projects they have, with their gigs,
+  comments, runs and activity; nothing workspace-level. Their gigs' assignees, notifications and
+  claims follow the same reach.
+- **Lower or raise a member in one project**: a project rule with overrides (`edit_gigs=deny` in a
+  project where they should only move gigs). A preset only adds permissions; an override can remove one.
+
+A workspace's member list shows people with only some projects as such, with their projects.
+
 ### Resolution
 
-For one user, one workspace and one permission, the first level with an opinion decides, most specific
+For one user, one place and one permission, the first level with an opinion decides, most specific
 first:
 
 1. instance admin: allowed;
-2. the user's rule for this workspace;
-3. the user's rule for all workspaces;
-4. the rules of the user's groups for this workspace;
-5. the rules of the user's groups for all workspaces;
-6. otherwise: not allowed.
+2. the user's rule for this project (gig permissions in a project);
+3. the user's rule for this workspace;
+4. the user's rule for all workspaces;
+5. the rules of the user's groups for this project;
+6. the rules of the user's groups for this workspace;
+7. the rules of the user's groups for all workspaces;
+8. otherwise: not allowed.
 
 Between several groups on the same level, any allow beats a deny. Finally, a permission other than
-`view` is not held unless `view` resolves to allowed in the same workspace.
+`view` is not held unless `view` resolves to allowed in the same place (the project, for a gig
+permission there; the whole workspace otherwise).
 
 So the user's own rules beat group rules, and a workspace rule beats an all-workspaces rule. A user
 deny at any level wins over every group allow below it.
@@ -147,23 +169,24 @@ member permissions except `delete_gigs` (the user rule denies it), plus `always_
 workspaces `scout` is a plain member.
 
 `GET /api/v1/users/{id}/access` (admin) shows a user's rules, groups and the resolved grid for every
-workspace, with the level each answer came from (`admin`, `user`, `user_all`, `group`, `group_all`,
-`needs_view`, `default`). The row with `workspace_id` 0 is the all-workspaces level: what a new
-workspace starts with.
+workspace, and for each project with a rule of its own, with the level each answer came from (`admin`,
+`user_project`, `user`, `user_all`, `group_project`, `group`, `group_all`, `needs_view`, `default`).
+The row with `workspace_id` 0 is the all-workspaces level: what a new workspace starts with.
 
 ### Setting rules
 
 | How | What |
 |---|---|
-| `gigg admin member <ws> <user> <preset\|none>` | Set a user's preset in one workspace, keeping their overrides there; `none` removes the rule. |
-| `gigg admin access <user> <ws\|all> <preset\|none> [perm=allow\|deny ...]` | Replace a user's rule at one level. |
-| `PUT /api/v1/users/{id}/access` | `{"workspace_id": 3 or null, "preset": "member", "overrides": {"always_run": true}}`; no preset and no overrides removes the rule. |
+| `gigg admin member <ws>[/<project>] <user> <preset\|none>` | Set a user's preset in one workspace or project, keeping their overrides there; `none` removes the rule. |
+| `gigg admin access <user> <ws\|ws/project\|all> <preset\|none> [perm=allow\|deny ...]` | Replace a user's rule at one level. |
+| `PUT /api/v1/users/{id}/access` | `{"workspace_id": 3 or null, "project_id": 12 (optional), "preset": "member", "overrides": {"always_run": true}}`; no preset and no overrides removes the rule. |
 | `PUT /api/v1/groups/{id}/access` | The same for a group. |
 | `PUT` / `DELETE /api/v1/workspaces/{ws}/members/{user}` | Set a user's preset in a workspace (`{"role": "member"}`, keeping their overrides), or remove their own rule there. |
+| `PUT` / `DELETE /api/v1/projects/{p}/members/{user}` | The same for one project (`viewer`, `consumer` or `member`). |
 
 The API routes need an instance admin in a browser session (keys are refused). Group membership is
-changed with `PATCH /api/v1/groups/{id}`. When a change leaves a user unable to see a workspace, they
-are removed as assignee from its gigs.
+changed with `PATCH /api/v1/groups/{id}`. When a change leaves a user unable to see a project, they
+are removed as assignee from its gigs, at once.
 
 ## Instance admins
 
@@ -181,17 +204,19 @@ An admin is not listed among a workspace's members unless they have their own ru
 
 Admin keys (unbound keys of an admin user) are limited by their `admin:*` scopes for admin
 operations: `admin:workspaces`, `admin:members`, `admin:users`, `admin:keys`, `admin:audit` (see
-[api.md](api.md#scopes)). A workspace-bound key of an admin user holds every permission in its own
-workspace but is not an instance admin.
+[api.md](api.md#scopes)). A limited key of an admin user holds every permission in its places but is
+not an instance admin.
 
 ## API keys, scopes and permissions
 
 An API request succeeds only if all of these hold:
 
 1. **Key restrictions**: not revoked or expired; the listener and client network are allowed.
-2. **Reach**: the object's workspace is the key's workspace (for a bound key), and its project is
-   among the key's projects (for a narrowed key). Otherwise the answer is 404.
-3. **Permission**: the key's user holds the permission in that workspace (by the rules above).
+2. **Reach**: for a limited key, the object is in one of its places (a whole workspace, or that
+   project); a workspace-level object needs a whole workspace among them. For any credential, the
+   user sees the object's project (or, for a workspace-level object, the whole workspace). Otherwise
+   the answer is 404.
+3. **Permission**: the key's user holds the permission there (by the rules above).
 4. **Scope**: the key carries the scope the operation needs.
 
 Missing 3 or 4 gives 403 naming the permission or scope. Browser sessions carry every scope, so only 1-3

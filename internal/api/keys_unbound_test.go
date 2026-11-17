@@ -23,7 +23,7 @@ func TestUnboundKeyForMember(t *testing.T) {
 	e.ok(code, out, 201)
 	var kc KeyCreated
 	_ = json.Unmarshal(out, &kc)
-	if kc.Key.WorkspaceID != nil {
+	if kc.Key.Bound {
 		t.Fatalf("expected an unbound key: %s", out)
 	}
 	key := cred{token: kc.Token, listener: "internal"}
@@ -60,7 +60,7 @@ func TestUnboundKeyForMember(t *testing.T) {
 	code, out, _ = e.req("POST", "/workspaces/scout/fields", field, key)
 	e.ok(code, out, 201)
 	// a key without workspace:write can't, whatever the role
-	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"bob-ro","user_id":%d,"workspace":"scout","scopes":["workspace:read"]}`, bob), e.ada())
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"bob-ro","user_id":%d,"reach":["scout"],"scopes":["workspace:read"]}`, bob), e.ada())
 	e.ok(code, out, 201)
 	var ro KeyCreated
 	_ = json.Unmarshal(out, &ro)

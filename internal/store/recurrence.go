@@ -338,10 +338,10 @@ func CreateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence) (*Recurr
 		}
 		r.fromTemplate(tpl)
 		if tpl.Shared {
-			r.Assignees = OwnerDefault(ctx, q, r.WorkspaceID, r.OwnAssignees) // its own, or the workspace owner
+			r.Assignees = OwnerDefault(ctx, q, r.WorkspaceID, r.ProjectID, r.OwnAssignees) // its own, or the workspace owner
 		}
 	} else {
-		r.Assignees = OwnerDefault(ctx, q, r.WorkspaceID, r.Assignees) // its new template's
+		r.Assignees = OwnerDefault(ctx, q, r.WorkspaceID, r.ProjectID, r.Assignees) // its new template's
 	}
 	if r.ScheduleID != 0 {
 		s, err := WorkspaceSchedule(ctx, q, r.WorkspaceID, r.ScheduleID)
@@ -792,7 +792,7 @@ func schedulerMayRun(ctx context.Context, q Q, r *Recurrence) bool {
 	if err != nil || u.Disabled {
 		return false
 	}
-	return g.Has(r.WorkspaceID, "recurring_gigs") && g.Has(r.WorkspaceID, "create_gigs") && g.Has(r.WorkspaceID, "edit_gigs") &&
+	return g.Has(r.WorkspaceID, "recurring_gigs") && g.HasIn(r.WorkspaceID, r.ProjectID, "create_gigs") && g.HasIn(r.WorkspaceID, r.ProjectID, "edit_gigs") &&
 		(!r.AlwaysRun || g.Has(r.WorkspaceID, "always_run")) && (len(r.AllowedTools) == 0 || g.Has(r.WorkspaceID, "allowed_tools"))
 }
 
@@ -894,7 +894,7 @@ func autoArchive(ctx context.Context, tx *sql.Tx, now int64) (int, error) {
 func validAssignees(ctx context.Context, q Q, r *Recurrence) []int64 {
 	out := []int64{}
 	for _, u := range r.Assignees {
-		if _, g, err := UserGrants(ctx, q, u); err == nil && g.Has(r.WorkspaceID, "view") {
+		if _, g, err := UserGrants(ctx, q, u); err == nil && g.HasIn(r.WorkspaceID, r.ProjectID, "view") {
 			out = append(out, u)
 		}
 	}

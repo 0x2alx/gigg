@@ -107,7 +107,7 @@ export function ErrandsPage({ open }: { open?: number }) {
   }, [wsOf, me]);
   const writable = useMemo(() => tree.filter((w) => canEdit(w.id)), [tree, canEdit]);
 
-  const inPlace = useMemo(() => (items ?? []).filter((c) => placeMatch(place, tree, c.workspace_id, null)), [items, place, tree]);
+  const inPlace = useMemo(() => (items ?? []).filter((c) => placeMatch(place, tree, c.workspace_id, c.project_id)), [items, place, tree]);
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const order = (c: Errand) => (c.paused ? 2 : c.state === "failing" ? 0 : 1);
@@ -323,6 +323,7 @@ export function ErrandsPage({ open }: { open?: number }) {
           errand={editing === "new" ? null : editing}
           choices={writable}
           initialWs={editing === "new" ? (writable.find((w) => placeMatch(place, tree, w.id, null)) ?? writable[0]!) : wsOf(editing.workspace_id)!}
+          initialProject={place?.startsWith("p:") ? Number(place.slice(2)) : 0}
           onClose={() => setEditing(null)}
           onSaved={(c) => {
             onSaved(c);
@@ -465,6 +466,8 @@ function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChan
         <dd className="errand-worker">
           {worker && <Avatar user={worker} size="xs" />} {c.worker_username}
         </dd>
+        <dt>Project</dt>
+        <dd>{c.project_id ? (tree.flatMap((w) => w.projects).find((p) => p.id === c.project_id)?.name ?? `#${c.project_id}`) : <span className="muted">none (its project is gone)</span>}</dd>
         <dt>Timeout</dt>
         <dd>{durMS(c.timeout_s * 1000)}</dd>
         <dt>Output</dt>
@@ -673,15 +676,15 @@ function SharedTemplates({ ws, onClose }: { ws: WorkspaceTree; onClose: () => vo
 
 // ErrandEditor: a new errand, an errand, or (template) a shared errand template: then only its command half
 // (name, command, timeout, output, sandbox, notes), saved to the shared library.
-function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, onTemplateSaved }: {
-  errand: Errand | null; template?: ErrandTemplate | "new"; choices: WorkspaceTree[]; initialWs: WorkspaceTree; onClose: () => void; onSaved: (c: Errand) => void; onTemplateSaved?: () => void;
+function ErrandEditor({ errand, template, choices, initialWs, initialProject = 0, onClose, onSaved, onTemplateSaved }: {
+  errand: Errand | null; template?: ErrandTemplate | "new"; choices: WorkspaceTree[]; initialWs: WorkspaceTree; initialProject?: number; onClose: () => void; onSaved: (c: Errand) => void; onTemplateSaved?: () => void;
 }) {
   const { me, users, members } = useApp();
   const tplMode = !!template;
   const tpl = template && template !== "new" ? template : null;
   const [wsId, setWsId] = useState(initialWs.id);
   const ws = errand ? initialWs : (choices.find((w) => w.id === wsId) ?? initialWs);
-  const [f, setF] = useState<ErrandForm>(() => (errand ? formOfErrand(errand) : tpl ? { ...defaultErrandForm(), ...contentOf(tpl) } : defaultErrandForm()));
+  const [f, setF] = useState<ErrandForm>(() => (errand ? formOfErrand(errand) : tpl ? { ...defaultErrandForm(), ...contentOf(tpl) } : { ...defaultErrandForm(), project: initialProject }));
   const set = (p: Partial<ErrandForm>) => setF((x) => ({ ...x, ...p }));
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -735,7 +738,7 @@ function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, 
         .finally(() => setBusy(false));
       return;
     }
-    const body = errandBody({ ...f, worker }, errand, canUnsandbox, picked);
+    const body = errandBody({ ...f, worker, project: ws.projects.some((p) => p.id === f.project) ? f.project : 0 }, errand, canUnsandbox, picked);
     const leaving = detaching(errand, body);
     if (leaving.length && !confirmed) {
       setBusy(false);
@@ -760,13 +763,26 @@ function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, 
         {!errand && !tplMode && choices.length > 1 && (
           <label className="span2">
             Workspace
-            <select value={ws.id} onChange={(e) => (setWsId(Number(e.target.value)), set({ worker: "" }))}>
+            <select value={ws.id} onChange={(e) => (setWsId(Number(e.target.value)), set({ worker: "", project: 0 }))}>
               {choices.map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.name}
                 </option>
               ))}
             </select>
+          </label>
+        )}
+        {!tplMode && ws.projects.length > 1 && (
+          <label className="span2">
+            Project
+            <select value={ws.projects.some((p) => p.id === f.project) ? f.project : ws.projects[0]!.id} onChange={(e) => set({ project: Number(e.target.value) })}>
+              {ws.projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <span className="muted small">Who sees this project sees the errand (and its runs); its failure gigs land here.</span>
           </label>
         )}
         {errand && errand.template_uses > 1 && (

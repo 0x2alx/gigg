@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/netip"
+	"slices"
 	"sort"
 )
 
@@ -99,26 +101,71 @@ func ListSessions(ctx context.Context, q Q, userID int64) ([]*Session, error) {
 
 // APIKey is a bearer credential acting as one user.
 type APIKey struct {
-	ID               int64    `json:"id"`
-	Name             string   `json:"name"`
-	Prefix           string   `json:"prefix"`
-	UserID           int64    `json:"user_id"`
-	WorkspaceID      *int64   `json:"workspace_id"` // nil = admin key
-	ProjectIDs       []int64  `json:"project_ids"`  // empty = every project of the workspace
-	Scopes           []string `json:"scopes"`
-	AllowedListeners []string `json:"allowed_listeners"`
-	AllowedCIDRs     []string `json:"allowed_cidrs"`
-	ExpiresAt        int64    `json:"expires_at"`
-	CreatedAt        int64    `json:"created_at"`
-	CreatedByUser    *int64   `json:"created_by_user"`
-	CreatedByKey     *int64   `json:"created_by_key"`
-	LastUsedAt       *int64   `json:"last_used_at"`
-	LastUsedListener *string  `json:"last_used_listener"`
-	LastUsedIP       *string  `json:"last_used_ip"`
-	Revoked          bool     `json:"revoked"`
-	Version          int64    `json:"version"`
+	ID               int64      `json:"id"`
+	Name             string     `json:"name"`
+	Prefix           string     `json:"prefix"`
+	UserID           int64      `json:"user_id"`
+	Bound            bool       `json:"bound"` // false: wherever the user's rules reach; true: only Reach
+	Reach            []KeyPlace `json:"reach"` // a bound key's places, in order (the first one's workspace is "current")
+	Scopes           []string   `json:"scopes"`
+	AllowedListeners []string   `json:"allowed_listeners"`
+	AllowedCIDRs     []string   `json:"allowed_cidrs"`
+	ExpiresAt        int64      `json:"expires_at"`
+	CreatedAt        int64      `json:"created_at"`
+	CreatedByUser    *int64     `json:"created_by_user"`
+	CreatedByKey     *int64     `json:"created_by_key"`
+	LastUsedAt       *int64     `json:"last_used_at"`
+	LastUsedListener *string    `json:"last_used_listener"`
+	LastUsedIP       *string    `json:"last_used_ip"`
+	Revoked          bool       `json:"revoked"`
+	Version          int64      `json:"version"`
 
 	SecretHash []byte `json:"-"`
+}
+
+// KeyPlace is one place a bound key reaches: a whole workspace (no project) or one project of it.
+type KeyPlace struct {
+	WorkspaceID int64  `json:"workspace_id"`
+	ProjectID   *int64 `json:"project_id,omitempty"`
+}
+
+// Current is the workspace "current" means for this key: its first place (nil for an unbound key).
+func (k *APIKey) Current() *int64 {
+	if !k.Bound || len(k.Reach) == 0 {
+		return nil
+	}
+	return &k.Reach[0].WorkspaceID
+}
+
+// ReachesWorkspace reports whether the key reaches at least part of a workspace.
+func (k *APIKey) ReachesWorkspace(ws int64) bool {
+	return !k.Bound || slices.ContainsFunc(k.Reach, func(p KeyPlace) bool { return p.WorkspaceID == ws })
+}
+
+// WholeWorkspace reports whether the key reaches all of a workspace (its workspace-level things too).
+func (k *APIKey) WholeWorkspace(ws int64) bool {
+	return !k.Bound || slices.ContainsFunc(k.Reach, func(p KeyPlace) bool { return p.WorkspaceID == ws && p.ProjectID == nil })
+}
+
+// ProjectsIn lists the projects of ws the key is limited to: nil when it reaches the whole
+// workspace, empty when it reaches none of it.
+func (k *APIKey) ProjectsIn(ws int64) []int64 {
+	if k.WholeWorkspace(ws) {
+		return nil
+	}
+	out := []int64{}
+	for _, p := range k.Reach {
+		if p.WorkspaceID == ws && p.ProjectID != nil {
+			out = append(out, *p.ProjectID)
+		}
+	}
+	return out
+}
+
+// ReachesProject reports whether the key reaches a project of ws.
+func (k *APIKey) ReachesProject(ws, project int64) bool {
+	ps := k.ProjectsIn(ws)
+	return ps == nil || slices.Contains(ps, project)
 }
 
 // AllScopes is every scope a key can carry; admin:* scopes only on admin keys.
@@ -131,22 +178,22 @@ var AllScopes = []string{
 // IsAdminScope reports an admin:* scope.
 func IsAdminScope(s string) bool { return len(s) > 6 && s[:6] == "admin:" }
 
-const keyCols = `id, name, prefix, user_id, workspace_id, scopes, allowed_listeners, allowed_cidrs, expires_at, created_at,
+const keyCols = `id, name, prefix, user_id, bound, scopes, allowed_listeners, allowed_cidrs, expires_at, created_at,
 	created_by_user, created_by_key, last_used_at, last_used_listener, last_used_ip, revoked_at IS NOT NULL, version, secret_hash`
 
 func scanKey(row interface{ Scan(...any) error }) (*APIKey, error) {
 	var k APIKey
-	var ws, cbu, cbk, lu sql.NullInt64
+	var cbu, cbk, lu sql.NullInt64
 	var scopes string
 	var listeners, cidrs, lul, lip sql.NullString
-	if err := row.Scan(&k.ID, &k.Name, &k.Prefix, &k.UserID, &ws, &scopes, &listeners, &cidrs, &k.ExpiresAt, &k.CreatedAt,
+	if err := row.Scan(&k.ID, &k.Name, &k.Prefix, &k.UserID, &k.Bound, &scopes, &listeners, &cidrs, &k.ExpiresAt, &k.CreatedAt,
 		&cbu, &cbk, &lu, &lul, &lip, &k.Revoked, &k.Version, &k.SecretHash); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
-	k.WorkspaceID, k.CreatedByUser, k.CreatedByKey, k.LastUsedAt = ptrInt(ws), ptrInt(cbu), ptrInt(cbk), ptrInt(lu)
+	k.CreatedByUser, k.CreatedByKey, k.LastUsedAt = ptrInt(cbu), ptrInt(cbk), ptrInt(lu)
 	k.LastUsedListener, k.LastUsedIP = ptrStr(lul), ptrStr(lip)
 	_ = json.Unmarshal([]byte(scopes), &k.Scopes)
 	if listeners.Valid {
@@ -158,19 +205,24 @@ func scanKey(row interface{ Scan(...any) error }) (*APIKey, error) {
 	return &k, nil
 }
 
-func (k *APIKey) loadProjects(ctx context.Context, q Q) error {
-	rows, err := q.QueryContext(ctx, `SELECT project_id FROM api_key_projects WHERE key_id = ? ORDER BY project_id`, k.ID)
+func (k *APIKey) loadReach(ctx context.Context, q Q) error {
+	k.Reach = []KeyPlace{}
+	if !k.Bound {
+		return nil
+	}
+	rows, err := q.QueryContext(ctx, `SELECT workspace_id, project_id FROM api_key_reach WHERE key_id = ? ORDER BY position, rowid`, k.ID)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-	k.ProjectIDs = []int64{}
 	for rows.Next() {
-		var p int64
-		if err := rows.Scan(&p); err != nil {
+		var pl KeyPlace
+		var pid sql.NullInt64
+		if err := rows.Scan(&pl.WorkspaceID, &pid); err != nil {
 			return err
 		}
-		k.ProjectIDs = append(k.ProjectIDs, p)
+		pl.ProjectID = ptrInt(pid)
+		k.Reach = append(k.Reach, pl)
 	}
 	return rows.Err()
 }
@@ -181,8 +233,8 @@ type NewKey struct {
 	Prefix           string
 	SecretHash       []byte
 	UserID           int64
-	WorkspaceID      *int64
-	ProjectIDs       []int64
+	Bound            bool       // false: the key follows its user's rules
+	Reach            []KeyPlace // a bound key's places (at least one)
 	Scopes           []string
 	AllowedListeners []string // nil = any
 	AllowedCIDRs     []string // nil = any
@@ -204,7 +256,7 @@ func NormalizeScopes(scopes []string, adminKey bool) ([]string, error) {
 			return nil, Invalid("unknown scope %q", s)
 		}
 		if IsAdminScope(s) && !adminKey {
-			return nil, Invalid("%s needs an admin key (an admin user, no workspace)", s)
+			return nil, Invalid("%s needs an admin key (an admin user's key that isn't limited to some places)", s)
 		}
 		if !seen[s] {
 			seen[s] = true
@@ -241,7 +293,7 @@ func CreateKey(ctx context.Context, q Q, a Actor, n NewKey) (*APIKey, error) {
 		return nil, Invalid("key name: 1-64 characters")
 	}
 	adminKey := false
-	if n.WorkspaceID == nil {
+	if !n.Bound {
 		u, err := GetUser(ctx, q, n.UserID)
 		if err != nil {
 			return nil, err
@@ -261,17 +313,21 @@ func CreateKey(ctx context.Context, q Q, a Actor, n NewKey) (*APIKey, error) {
 	if n.ExpiresAt > Now()+MaxKeyLifetime {
 		return nil, Invalid("keys live at most 3 years")
 	}
-	res, err := q.ExecContext(ctx, `INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, allowed_listeners,
+	reach, err := normalizeReach(ctx, q, n.Bound, n.Reach)
+	if err != nil {
+		return nil, err
+	}
+	res, err := q.ExecContext(ctx, `INSERT INTO api_keys (name, prefix, secret_hash, user_id, bound, scopes, allowed_listeners,
 		allowed_cidrs, expires_at, created_at, created_by_user, created_by_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-		n.Name, n.Prefix, n.SecretHash, n.UserID, nullInt(n.WorkspaceID), mustJSON(scopes), jsonOrNull(n.AllowedListeners),
+		n.Name, n.Prefix, n.SecretHash, n.UserID, n.Bound, mustJSON(scopes), jsonOrNull(n.AllowedListeners),
 		jsonOrNull(n.AllowedCIDRs), n.ExpiresAt, Now(), nullInt(n.CreatedByUser), nullInt(n.CreatedByKey))
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	for _, p := range n.ProjectIDs {
-		if _, err := q.ExecContext(ctx, `INSERT INTO api_key_projects (key_id, project_id)
-			SELECT ?, id FROM projects WHERE id = ? AND workspace_id = ?`, id, p, nullInt(n.WorkspaceID)); err != nil {
+	for i, pl := range reach {
+		if _, err := q.ExecContext(ctx, `INSERT INTO api_key_reach (key_id, position, workspace_id, project_id) VALUES (?, ?, ?, ?)`,
+			id, i, pl.WorkspaceID, nullInt(pl.ProjectID)); err != nil {
 			return nil, err
 		}
 	}
@@ -279,22 +335,74 @@ func CreateKey(ctx context.Context, q Q, a Actor, n NewKey) (*APIKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(k.ProjectIDs) != len(n.ProjectIDs) {
-		return nil, Invalid("projects must belong to the key's workspace")
-	}
-	_, err = Activity(ctx, q, a, n.WorkspaceID, nil, "key.created", "key", id, map[string]any{
-		"name": n.Name, "prefix": n.Prefix, "user_id": n.UserID, "scopes": scopes, "projects": n.ProjectIDs,
+	_, err = Activity(ctx, q, a, k.Current(), nil, "key.created", "key", id, map[string]any{
+		"name": n.Name, "prefix": n.Prefix, "user_id": n.UserID, "scopes": scopes, "bound": n.Bound, "reach": reach,
 		"allowed_listeners": n.AllowedListeners, "allowed_cidrs": n.AllowedCIDRs, "expires_at": n.ExpiresAt})
 	return k, err
 }
 
-// GetKey loads a key with its project narrowing.
+// normalizeReach checks a bound key's places: at least one, each project in its workspace, no
+// place twice, and no project listed beside its whole workspace (the workspace already covers it).
+func normalizeReach(ctx context.Context, q Q, bound bool, reach []KeyPlace) ([]KeyPlace, error) {
+	if !bound {
+		if len(reach) > 0 {
+			return nil, Invalid("a key that follows its user's rules lists no places")
+		}
+		return nil, nil
+	}
+	if len(reach) == 0 {
+		return nil, Invalid("a limited key needs at least one place (a workspace or a project)")
+	}
+	whole := map[int64]bool{}
+	for _, pl := range reach {
+		if pl.ProjectID == nil {
+			whole[pl.WorkspaceID] = true
+		}
+	}
+	out := []KeyPlace{}
+	seen := map[string]bool{}
+	for _, pl := range reach {
+		var n int
+		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM workspaces WHERE id = ?`, pl.WorkspaceID).Scan(&n); err != nil {
+			return nil, err
+		}
+		if n == 0 {
+			return nil, Invalid("no workspace %d", pl.WorkspaceID)
+		}
+		key := KeyPlace{WorkspaceID: pl.WorkspaceID}
+		if pl.ProjectID != nil {
+			if err := q.QueryRowContext(ctx, `SELECT count(*) FROM projects WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+				*pl.ProjectID, pl.WorkspaceID).Scan(&n); err != nil {
+				return nil, err
+			}
+			if n == 0 {
+				return nil, Invalid("project %d isn't in workspace %d", *pl.ProjectID, pl.WorkspaceID)
+			}
+			if whole[pl.WorkspaceID] {
+				continue
+			}
+			key.ProjectID = pl.ProjectID
+		}
+		id := fmt.Sprint(key.WorkspaceID)
+		if key.ProjectID != nil {
+			id += "/" + fmt.Sprint(*key.ProjectID)
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, key)
+	}
+	return out, nil
+}
+
+// GetKey loads a key with its places.
 func GetKey(ctx context.Context, q Q, id int64) (*APIKey, error) {
 	k, err := scanKey(q.QueryRowContext(ctx, "SELECT "+keyCols+" FROM api_keys WHERE id = ?", id))
 	if err != nil {
 		return nil, err
 	}
-	return k, k.loadProjects(ctx, q)
+	return k, k.loadReach(ctx, q)
 }
 
 // KeyByPrefix loads a key for authentication.
@@ -303,7 +411,7 @@ func KeyByPrefix(ctx context.Context, q Q, prefix string) (*APIKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return k, k.loadProjects(ctx, q)
+	return k, k.loadReach(ctx, q)
 }
 
 // ListKeys returns keys acting as userID, or all keys when userID is 0.
@@ -328,7 +436,7 @@ func ListKeys(ctx context.Context, q Q, userID int64) ([]*APIKey, error) {
 	}
 	rows.Close()
 	for _, k := range out {
-		if err := k.loadProjects(ctx, q); err != nil {
+		if err := k.loadReach(ctx, q); err != nil {
 			return nil, err
 		}
 	}
@@ -350,7 +458,7 @@ func RevokeKey(ctx context.Context, q Q, a Actor, k *APIKey) error {
 	if _, err := q.ExecContext(ctx, `UPDATE api_keys SET revoked_at = ?, version = version + 1 WHERE id = ? AND revoked_at IS NULL`, Now(), k.ID); err != nil {
 		return err
 	}
-	if _, err := Activity(ctx, q, a, k.WorkspaceID, nil, "key.revoked", "key", k.ID, map[string]any{"prefix": k.Prefix}); err != nil {
+	if _, err := Activity(ctx, q, a, k.Current(), nil, "key.revoked", "key", k.ID, map[string]any{"prefix": k.Prefix}); err != nil {
 		return err
 	}
 	return revokeChildren(ctx, q, a, k.ID)
@@ -395,7 +503,7 @@ func RotateKey(ctx context.Context, q Q, a Actor, k *APIKey, prefix string, secr
 		prefix, secretHash, k.ID); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, k.WorkspaceID, nil, "key.rotated", "key", k.ID, map[string]any{"old_prefix": k.Prefix, "prefix": prefix}); err != nil {
+	if _, err := Activity(ctx, q, a, k.Current(), nil, "key.rotated", "key", k.ID, map[string]any{"old_prefix": k.Prefix, "prefix": prefix}); err != nil {
 		return nil, err
 	}
 	// a rotation usually means the old secret leaked: whatever it created goes too

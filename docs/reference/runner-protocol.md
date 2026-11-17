@@ -79,7 +79,8 @@ progress and usage calls still work. Pausing again replaces the previous pause.
 ## Claiming
 
 ```
-POST /workspaces/{ws}/gigs/claim
+POST /workspaces/{ws}/gigs/claim     # one workspace
+POST /gigs/claim                     # every workspace and project the key reaches
 ```
 
 ```json
@@ -98,7 +99,7 @@ POST /workspaces/{ws}/gigs/claim
 |---|---|---|
 | `from_category` | `todo` | Status category to take a gig from. |
 | `to_category` | `doing` | Category to move it to (the first status of that category in its project). |
-| `projects` | all in reach | Only these project ids. A project outside the key's reach answers 404. A narrowed key is limited to its projects anyway. |
+| `projects` | all in reach | Only these project ids (not with `POST /gigs/claim`). A project outside the key's reach answers 404. Without it, the projects of the workspace where the caller may work gigs. |
 | `created_by` | anyone | Only gigs created by these users (ids or usernames). Unknown users are ignored; if none is known, the answer is 204. |
 | `start_due` | false | Skip gigs whose `start_at` is in the future. |
 | `always_only` | false | Only `always_run` gigs (for example when the runner's own usage budget says no). |
@@ -109,12 +110,18 @@ Answers:
 - **200** with the gig (and its `ETag`): it has been moved to `to_category` in the same transaction,
   so two runners can't claim the same gig.
 - **204**: nothing matches.
-- **423** `paused`: the workspace is paused.
+- **423** `paused`: the workspace is paused (`POST /gigs/claim`: every workspace in reach is; a paused
+  workspace's gigs are skipped while another one runs).
 - **404**: the workspace (or a listed project) is not in reach.
+
+`POST /gigs/claim` is for an agent that works in more than one place, for example its own workspace
+and a project of another workspace it was given. Each workspace's pause and limits apply to that
+workspace's gigs.
 
 A gig is eligible when all of these hold:
 
-- it is in the workspace, in a status of `from_category`, not in the trash, not archived;
+- it is in the workspace (or, for `POST /gigs/claim`, in a workspace and project in reach), in a status
+  of `from_category`, not in the trash, not archived;
 - its project is not deleted or archived;
 - it matches `projects`, `created_by` and `start_due`;
 - if it has a time window (`not_after`): the window is open (`start_at` passed, `not_after` not yet),
@@ -123,8 +130,12 @@ A gig is eligible when all of these hold:
 - the workspace limits above allow it.
 
 Eligible gigs are ordered by: `always_run` first, then higher `priority`, then earliest `due_at` (gigs
-without one last), then project position, status position, position in the column, and id. The first
-one is claimed.
+without one last), then the claimer's own workspace (the one it owns) before others, then project
+position (the sidebar's order), status position, position in the column, and id. The first one is
+claimed.
+
+Each gig belongs to a project whose description (`GET /projects/{id}`, `description_md`) says what it
+is about: worth giving the agent with the gig.
 
 A dry run applies the same rules (including the pause) but reserves nothing: a later real claim may
 return a different gig.
@@ -290,24 +301,25 @@ people who decide what unattended agents may do, not to the agents themselves un
 
 ```text
 key       = read token file
-ws        = "current"                      # workspace key
+places    = GET /auth/me .workspaces    # every workspace the key reaches
 on start:
-    for run in GET /workspaces/{ws}/runs?status=running:
-        if run.worker_username == me:
-            POST /runs/{run.id}/finish {status: "interrupted"}
+    for ws in places:
+        for run in GET /workspaces/{ws.id}/runs?status=running:
+            if run.worker_username == me:
+                POST /runs/{run.id}/finish {status: "interrupted"}
 
 loop every N minutes:
-    state = GET /workspaces/{ws}/runner
-    if state.settings.paused: continue
+    if every ws in places has (GET /workspaces/{ws.id}/runner).settings.paused: continue
 
     budget_ok = runner's own check (usage meter, time of day, ...)
-    resp = POST /workspaces/{ws}/gigs/claim
+    resp = POST /gigs/claim
                {start_due: true, always_only: not budget_ok}
     if resp.status in (204, 423): continue
     gig = resp.body
 
     resuming = gig.resume_requested_at != null and gig.session_id != null
-    prompt   = build from gig.title, gig.description_md,
+    project  = GET /projects/{gig.project_id}
+    prompt   = build from project.name, project.description_md, gig.title, gig.description_md,
                and GET /gigs/{gig.id}/comments (since the last run when resuming)
 
     run = POST /gigs/{gig.id}/runs

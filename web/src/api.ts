@@ -37,8 +37,17 @@ export interface WorkspaceAccess {
   name: string;
   color?: string | null; // #RRGGBB; null = the default colour from the slug (colorFor)
   owner_id?: number | null; // the user it belongs to (display only)
-  role: string; // the closest preset to what you may do here (display only)
-  permissions?: string[]; // what you may do here (see GET /permissions)
+  role: string; // the closest preset to what you may do in the whole workspace ("" = only some projects; display only)
+  permissions?: string[]; // what you may do in the whole workspace (see GET /permissions)
+  whole?: boolean; // you see the whole workspace (false: only `projects`, none of its workspace-level things)
+  projects?: ProjectAccess[]; // every project you see here, with what you may do in it
+}
+
+// ProjectAccess: what you may do in one project (the gig permissions: view, comment, work_gigs, ...).
+export interface ProjectAccess {
+  id: number;
+  role: string;
+  permissions: string[];
 }
 
 export interface Me {
@@ -51,21 +60,33 @@ export interface Me {
   source_url?: string; // this server's source code (AGPL-3.0 §13; GIGG_SOURCE_URL)
 }
 
-// hasCap: whether this account may use a feature, in workspace ws when given (permissions are per
-// workspace), else anywhere. An older server without the lists allows all.
-export function hasCap(me: Pick<Me, "capabilities" | "workspaces" | "admin"> | null | undefined, cap: string, ws?: number): boolean {
+// hasCap: whether this account may use a feature: in project `project` of workspace ws when both are
+// given (a project can have rules of its own), in workspace ws when given (the whole workspace), else
+// anywhere. An older server without the lists allows all.
+export function hasCap(me: Pick<Me, "capabilities" | "workspaces" | "admin"> | null | undefined, cap: string, ws?: number, project?: number): boolean {
   if (!me) return true;
   if (me.admin) return true;
   if (ws !== undefined) {
     const w = me.workspaces?.find((x) => x.id === ws);
+    const p = project !== undefined ? w?.projects?.find((x) => x.id === project) : undefined;
+    if (p && PROJECT_PERMISSIONS.has(cap)) return p.permissions.includes(cap);
     if (w?.permissions) return w.permissions.includes(cap);
   }
   return !me.capabilities || me.capabilities.includes(cap);
 }
 
-// canWriteIn: whether a workspace role reaches Edit gigs (member and up), which creating gigs,
-// templates and recurring gigs need besides their own permission. One place for every screen.
-export const canWriteIn = (ws: { role?: string }) => ws.role !== "viewer" && ws.role !== "consumer";
+// The permissions a project's rules can decide; the rest are the whole workspace's.
+export const PROJECT_PERMISSIONS = new Set(["view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs"]);
+
+// canWriteIn: whether you may edit gigs (Edit gigs: member and up), which creating gigs, templates
+// and recurring gigs need besides their own permission: in one project when given (its own rules
+// count), else in the whole workspace. One place for every screen.
+export const canWriteIn = (ws: { role?: string; whole?: boolean; access?: ProjectAccess[] }, project?: number) => {
+  const p = project !== undefined ? ws.access?.find((x) => x.id === project) : undefined;
+  if (p) return p.permissions.includes("edit_gigs");
+  if (ws.whole === false) return false;
+  return ws.role !== "viewer" && ws.role !== "consumer";
+};
 
 export interface Project {
   id: number;

@@ -239,3 +239,16 @@ a.admin-name:hover { text-decoration: underline; }
 .admin-picture-body { display: flex; flex-direction: column; gap: 0.35rem; flex: 1 1 14rem; min-width: 0; }
 .admin-picture-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .admin-picture .admin-error { margin: 0; }
+
+/* a member's own project rules, under their workspace row */
+.admin-member-projects { list-style: none; margin: 0; padding: 0 0 0 calc(var(--sp-4) * 2 + 1.5rem); }
+.admin-member-projects .admin-list-row { border-top: 1px dashed var(--line); min-height: 2.2rem; }
+
+/* the key form's places: workspace, project, remove */
+.key-places { display: flex; flex-direction: column; gap: var(--sp-2); }
+.key-place { flex-wrap: nowrap; gap: var(--sp-2); }
+.key-place select { flex: 1 1 0; min-width: 0; }
+.key-place-add { align-self: flex-start; }
+@media (max-width: 720px) {
+  .admin-member-projects { padding-left: var(--sp-4); }
+}

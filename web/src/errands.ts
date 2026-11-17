@@ -40,6 +40,7 @@ export interface ErrandRun {
 export interface Errand {
   id: number;
   workspace_id: number;
+  project_id: number | null; // the project whose work it does (its failure gigs land there); null: its project is gone
   worker_id: number;
   worker_username: string;
   created_by: number;
@@ -99,6 +100,7 @@ export interface ErrandBody {
   unsandboxed?: boolean;
   rule?: Partial<ErrandRule> & { freq: ErrandFreq };
   worker?: string;
+  project?: number; // the project it belongs to (new: default the workspace's first)
   on_failure_gig?: boolean;
   paused?: boolean;
 }
@@ -156,6 +158,7 @@ export interface ErrandForm {
   to: string;
   tz: string;
   worker: string; // username; "" = yourself
+  project: number; // 0 = the workspace's first project
   onFailureGig: boolean;
 }
 
@@ -177,6 +180,7 @@ export function defaultErrandForm(now: Date = new Date()): ErrandForm {
     to: "17:00",
     tz: localTZ(),
     worker: "",
+    project: 0,
     onFailureGig: false,
   };
 }
@@ -209,6 +213,7 @@ export function formOfErrand(c: Errand): ErrandForm {
     to: fr && !allDay ? toHM(toMin(r.window_start) + r.window_minutes) : "17:00",
     tz: r.tz || localTZ(),
     worker: c.worker_username,
+    project: c.project_id ?? 0,
     onFailureGig: c.on_failure_gig,
   };
 }
@@ -319,6 +324,7 @@ export function errandBody(f: ErrandForm, cur: Errand | null, canUnsandbox: bool
     b.template_id = picked.id;
     b.rule = errandRule(f);
     if (f.worker) b.worker = f.worker;
+    if (f.project) b.project = f.project;
     if (f.onFailureGig) b.on_failure_gig = true;
     return b;
   }
@@ -333,6 +339,7 @@ export function errandBody(f: ErrandForm, cur: Errand | null, canUnsandbox: bool
   if (canUnsandbox && (!cur ? f.unsandboxed : f.unsandboxed !== cur.unsandboxed)) b.unsandboxed = f.unsandboxed;
   if (!cur || !sameTiming(f, cur.rule)) b.rule = errandRule(f);
   if (f.worker && (!cur || f.worker !== cur.worker_username)) b.worker = f.worker;
+  if (f.project && (!cur || f.project !== cur.project_id)) b.project = f.project;
   if (!cur ? f.onFailureGig : f.onFailureGig !== cur.on_failure_gig) b.on_failure_gig = f.onFailureGig;
   return b;
 }

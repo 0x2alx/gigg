@@ -19,7 +19,7 @@ func TestConsumerKey(t *testing.T) {
 	code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member",
 		"overrides":{"edit_gigs":false,"delete_gigs":false,"archive_gigs":false,"create_gigs":false}}`, ws), ada)
 	e.ok(code, out, 200)
-	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"consumer","user_id":%d,"workspace":"scout",
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"consumer","user_id":%d,"reach":["scout"],
 		"scopes":["workspace:read","gigs:read","gigs:work","comments:read","comments:write","runs:write"],"allowed_listeners":["internal"]}`, e.ids["scout.user"]), ada)
 	e.ok(code, out, 201)
 	var kc KeyCreated
@@ -89,7 +89,7 @@ func TestConsumerKey(t *testing.T) {
 		t.Fatalf("gigs:write without Edit gigs: %d %s", code, out)
 	}
 	// and a producer key without gigs:work can't move
-	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"producer","user_id":%d,"workspace":"atlas","scopes":["gigs:read","gigs:write"]}`, e.ids["atlas.user"]), ada)
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"producer","user_id":%d,"reach":["atlas"],"scopes":["gigs:read","gigs:write"]}`, e.ids["atlas.user"]), ada)
 	e.ok(code, out, 201)
 	_ = json.Unmarshal(out, &kc)
 	if code, out, _ := e.req("POST", fmt.Sprintf("/gigs/%d/move", e.ids["atlas.gig"]), `{"category":"done"}`, cred{token: kc.Token, listener: "main"}); code != 403 {

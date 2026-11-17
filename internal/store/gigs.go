@@ -721,7 +721,7 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 	if err := setLabels(ctx, q, a, p.WorkspaceID, id, n.Labels); err != nil {
 		return nil, err
 	}
-	if err := setAssignees(ctx, q, p.WorkspaceID, id, OwnerDefault(ctx, q, p.WorkspaceID, n.Assignees)); err != nil {
+	if err := setAssignees(ctx, q, p.WorkspaceID, p.ID, id, OwnerDefault(ctx, q, p.WorkspaceID, p.ID, n.Assignees)); err != nil {
 		return nil, err
 	}
 	data := map[string]any{"key": fmt.Sprintf("%s-%d", p.Key, num), "title": n.Title, "status": st.Name}
@@ -777,9 +777,9 @@ func setLabels(ctx context.Context, q Q, a Actor, ws, gig int64, names []string)
 }
 
 // OwnerDefault: what a new gig, workspace template or recurring gig is assigned to when it's created
-// with nobody: the workspace's owner, if they can be assigned there (active, sees the workspace).
-// Creation only; later edits may leave it unassigned.
-func OwnerDefault(ctx context.Context, q Q, ws int64, users []int64) []int64 {
+// with nobody: the workspace's owner, if they can be assigned there (active, sees the project; project
+// 0: the whole workspace). Creation only; later edits may leave it unassigned.
+func OwnerDefault(ctx context.Context, q Q, ws, project int64, users []int64) []int64 {
 	if len(users) > 0 || ws == 0 {
 		return users
 	}
@@ -787,7 +787,7 @@ func OwnerDefault(ctx context.Context, q Q, ws int64, users []int64) []int64 {
 	if err := q.QueryRowContext(ctx, `SELECT owner_id FROM workspaces WHERE id = ?`, ws).Scan(&owner); err != nil || !owner.Valid {
 		return users
 	}
-	if _, g, err := UserGrants(ctx, q, owner.Int64); err != nil || !g.Has(ws, "view") {
+	if _, g, err := UserGrants(ctx, q, owner.Int64); err != nil || !g.HasIn(ws, project, "view") {
 		return users
 	}
 	return []int64{owner.Int64}
@@ -796,7 +796,7 @@ func OwnerDefault(ctx context.Context, q Q, ws int64, users []int64) []int64 {
 // MaxAssignees bounds a gig's assignee list.
 const MaxAssignees = 50
 
-func setAssignees(ctx context.Context, q Q, ws, gig int64, users []int64) error {
+func setAssignees(ctx context.Context, q Q, ws, project, gig int64, users []int64) error {
 	if users == nil {
 		return nil
 	}
@@ -816,8 +816,8 @@ func setAssignees(ctx context.Context, q Q, ws, gig int64, users []int64) error 
 		return err
 	}
 	for _, u := range uniq {
-		if _, g, err := UserGrants(ctx, q, u); err != nil || !g.Has(ws, "view") {
-			return Invalid("user %d can't see this workspace", u)
+		if _, g, err := UserGrants(ctx, q, u); err != nil || !g.HasIn(ws, project, "view") {
+			return Invalid("user %d can't see this project", u)
 		}
 		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_assignees (gig_id, user_id) VALUES (?,?)`, gig, u); err != nil {
 			return err
@@ -990,7 +990,7 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 		data["labels"] = p.Labels
 	}
 	if p.Assignees != nil {
-		if err := setAssignees(ctx, q, t.WorkspaceID, t.ID, p.Assignees); err != nil {
+		if err := setAssignees(ctx, q, t.WorkspaceID, t.ProjectID, t.ID, p.Assignees); err != nil {
 			return nil, err
 		}
 		data["assignees"] = p.Assignees

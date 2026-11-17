@@ -228,7 +228,7 @@ func TestBadInputAndIsolation(t *testing.T) {
 	}
 
 	// credential routes are never stored for replay
-	code, out, _ = e.reqH("POST", "/me/keys", `{"name":"idem","workspace":"scout","scopes":["gigs:read"]}`, scout, map[string]string{"Idempotency-Key": "k1"})
+	code, out, _ = e.reqH("POST", "/me/keys", `{"name":"idem","reach":["scout"],"scopes":["gigs:read"]}`, scout, map[string]string{"Idempotency-Key": "k1"})
 	e.ok(code, out, 201)
 	var n int
 	_ = e.st.R.QueryRow(`SELECT count(*) FROM idempotency_keys`).Scan(&n)

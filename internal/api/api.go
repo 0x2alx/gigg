@@ -593,6 +593,14 @@ func allowed(p *access.Principal, ws int64, perm string) error {
 	return errNoPermission(perm)
 }
 
+// allowedIn is allowed for one project.
+func allowedIn(p *access.Principal, ws, project int64, perm string) error {
+	if p.AllowedIn(ws, project, perm) {
+		return nil
+	}
+	return errNoPermission(perm)
+}
+
 // allowedAnywhere is allowed for account-level features (saved filters).
 func allowedAnywhere(p *access.Principal, perm string) error {
 	if p.AllowedAnywhere(perm) {

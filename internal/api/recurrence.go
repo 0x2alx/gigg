@@ -121,10 +121,10 @@ func (a *API) registerRecurrence() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireScope(p, "gigs:read"); err != nil {
 			return nil, err
 		}
-		projects := p.ProjectFilter()
+		projects := p.ProjectFilter(w.ID)
 		if in.Project != 0 {
 			if !p.SeesProject(w.ID, in.Project) {
 				return nil, errNotFound()
@@ -160,7 +160,7 @@ func (a *API) registerRecurrence() {
 			if err != nil {
 				return nil, err
 			}
-			if err := require(p, pr.WorkspaceID, access.Editor, "gigs:write"); err != nil {
+			if err := requireIn(p, pr.WorkspaceID, pr.ID, access.Editor, "gigs:write"); err != nil {
 				return nil, err
 			}
 			if err := allowed(p, pr.WorkspaceID, "recurring_gigs"); err != nil {
@@ -226,7 +226,7 @@ func (a *API) registerRecurrence() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireIn(p, r.WorkspaceID, r.ProjectID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		return a.recurrenceOut(r), nil
@@ -245,14 +245,14 @@ func (a *API) registerRecurrence() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Editor, "gigs:write"); err != nil {
+		if err := requireIn(p, r.WorkspaceID, r.ProjectID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if err := allowed(p, r.WorkspaceID, "recurring_gigs"); err != nil {
 			return nil, err
 		}
 		// an edit makes the editor its owner, whose permissions the scheduler then creates gigs with
-		if err := allowed(p, r.WorkspaceID, "create_gigs"); err != nil {
+		if err := allowedIn(p, r.WorkspaceID, r.ProjectID, "create_gigs"); err != nil {
 			return nil, err
 		}
 		v, err := ifMatch(in.IfMatch)
@@ -307,7 +307,7 @@ func (a *API) registerRecurrence() {
 						return nil, err
 					}
 				}
-				if p.Narrowed() {
+				if p.Narrowed(r.WorkspaceID) {
 					if t, err := store.GetTemplate(ctx, a.st.R, old.TemplateID); err != nil || t.ProjectID == nil {
 						return nil, errForbidden("A key limited to some projects only changes templates of those projects.")
 					}
@@ -319,7 +319,7 @@ func (a *API) registerRecurrence() {
 				return nil, fail(422, "invalid", "A recurring gig needs freq (or a schedule_id).")
 			}
 			if rule := r.Rule(); rule.Validate() == nil && !rule.Same(old.Rule()) && !old.ScheduleShared { // shared: it moves to its own
-				if p.Narrowed() && a.scheduleUsedOutside(ctx, p, old.ScheduleID) {
+				if p.Narrowed(r.WorkspaceID) && a.scheduleUsedOutside(ctx, p, r.WorkspaceID, old.ScheduleID) {
 					return nil, errForbidden("This schedule is used outside the projects this key reaches; pick or make another one.")
 				}
 				// new timing retimes the shared schedule, so every recurring gig on it: the same guards as
@@ -362,7 +362,7 @@ func (a *API) registerRecurrence() {
 			if err != nil {
 				return nil, err
 			}
-			if err := require(p, r.WorkspaceID, access.Editor, "gigs:write"); err != nil {
+			if err := requireIn(p, r.WorkspaceID, r.ProjectID, access.Editor, "gigs:write"); err != nil {
 				return nil, err
 			}
 			if err := allowed(p, r.WorkspaceID, "recurring_gigs"); err != nil {
@@ -384,7 +384,7 @@ func (a *API) registerRecurrence() {
 						return nil, err
 					}
 				}
-				if p.Narrowed() && t.ProjectID == nil {
+				if p.Narrowed(r.WorkspaceID) && t.ProjectID == nil {
 					return nil, errForbidden("A key limited to some projects only changes templates of those projects.")
 				}
 				tpl = t

@@ -33,8 +33,8 @@ A key acts as one user and has these properties:
 | Property | Meaning |
 |---|---|
 | `user_id` | The user the key acts as. A key never has more permissions than its user. |
-| `workspace_id` | The workspace the key is bound to, or `null` (unbound). A bound key reaches nothing outside its workspace. |
-| `project_ids` | Optional narrowing to some projects of its workspace (needs a workspace). Other projects' gigs, runs and activity are invisible. |
+| `bound` | `false`: the key follows its user's access wherever it reaches (and changes with it). `true`: it reaches only the places in `reach`. |
+| `reach` | A bound key's places, in order: whole workspaces (`{"workspace_id": 3}`) and single projects (`{"workspace_id": 3, "project_id": 12}`). The first one's workspace is the key's `current`. A bound key whose places are all gone reaches nothing. On creation, `reach` is a list of `"workspace"` or `"workspace/project"` (ids or slugs; `current` is the caller's current workspace). |
 | `scopes` | What kinds of operations the key may perform (at least one; see below). |
 | `allowed_listeners` | Listener names the key works on (`null` = any). |
 | `allowed_cidrs` | Networks (CIDR) the key works from (`null` = any). The client address is resolved as described in [configuration.md](configuration.md#client-address). |
@@ -42,19 +42,25 @@ A key acts as one user and has these properties:
 
 Kinds of keys:
 
-- **Workspace key** (bound to a workspace): reaches only that workspace. In it, it has its user's
-  permissions, limited by its scopes. `current` can be used as the workspace reference
-  (`/workspaces/current/...`).
-- **Unbound key of a non-admin user**: reaches every workspace its user can see, at the user's
-  permissions, limited by its scopes (like the user's session, without the browser-only operations).
+- **Limited key** (bound): reaches only its places, whole workspaces or single projects, never more
+  even when its user gets more. In them it has its user's permissions, limited by its scopes. A key
+  limited to some projects of a workspace sees only those projects, and none of the workspace-level
+  things (templates, schedules, errands, settings), which need the whole workspace. Changing a limited
+  key's places means making a new key.
+- **Key that follows its user** (unbound, non-admin user): reaches every workspace and project its user
+  can see, at the user's permissions, limited by its scopes (like the user's session, without the
+  browser-only operations). Changing the user's access is enough; the key needs no change.
 - **Admin key** (unbound key of an instance admin): acts as an instance admin, limited by its scopes.
-  Only admin keys may carry `admin:*` scopes. A workspace key of an admin user is not an admin key.
+  Only admin keys may carry `admin:*` scopes. A limited key of an admin user is not an admin key.
+
+`current` names a workspace in paths (`/workspaces/current/...`): a limited key's first place's
+workspace, or else (a key that follows its user, or a session) the one workspace the user owns; with
+none or several, `current` is refused (422) and the workspace has to be named.
 
 Keys are created with `gigg admin key-add`, `POST /me/keys` (keys acting as yourself, needs the
 `keys:self` scope) or `POST /keys` (any user, admins with `admin:keys`). The token is returned once.
 Creating a key with a key can't widen access: the new key's scopes must be a subset of the creating
-key's, a workspace key can only create keys for its workspace, a narrowed key only keys narrowed to its
-projects, listener and network restrictions are inherited and can't be loosened, and the expiry is
+key's, a limited key can only create limited keys within its own places, listener and network restrictions are inherited and can't be loosened, and the expiry is
 capped at the creating key's. With `keys:self`, a key may rotate or revoke only itself and the keys it
 created; rotating another key requires that key to reach no further than the caller.
 
@@ -345,6 +351,8 @@ in [access.md](access.md).
 | GET | `/workspaces/{ws}/members` | Members and roles. |
 | PUT | `/workspaces/{ws}/members/{user}` | Add a member or change their preset (admin, session only). |
 | DELETE | `/workspaces/{ws}/members/{user}` | Remove a member's own rule (admin, session only; also unassigns them if they lose access). |
+| PUT | `/projects/{p}/members/{user}` | Give a user one project (`{"role": "viewer\|consumer\|member"}`, keeping their overrides there) or change it (admin, session only). |
+| DELETE | `/projects/{p}/members/{user}` | Remove a user's own rule for one project (admin, session only; unassigns them from gigs there they can no longer see). |
 | GET | `/workspaces/{ws}/activity` | Activity, newest first. |
 | GET | `/workspaces/{ws}/changes` | Change feed: activity after an id, oldest first. |
 | GET | `/workspaces/{ws}/events` | The same as a Server-Sent Events stream (see above; not in OpenAPI). |
@@ -497,6 +505,7 @@ See [runner-protocol.md](runner-protocol.md) for how these fit together.
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/workspaces/{ws}/gigs/claim` | Take the next matching gig and move it, atomically (204 when nothing matches). |
+| POST | `/gigs/claim` | The same across every workspace and project in reach (see [runner-protocol.md](runner-protocol.md#claiming)). |
 | GET | `/gigs/{id}/runs` | A gig's runs, newest first. |
 | POST | `/gigs/{id}/runs` | Record that a worker started on the gig. |
 | GET | `/runs/{id}` | A run with its timeline. |

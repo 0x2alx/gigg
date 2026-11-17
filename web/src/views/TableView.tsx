@@ -49,11 +49,11 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const project = ws && pid ? ws.projects.find((p) => p.id === pid) : undefined;
   const scope = useMemo(() => (ws ? [ws] : tree), [ws, tree]);
   const scopeKey = scope.map((w) => w.slug).join(",");
-  const canWrite = scope.some(canWriteIn);
+  const canWrite = scope.some((w) => canWriteIn(w) || w.projects.some((p) => canWriteIn(w, p.id)));
   const wsOfGig = (t: Gig) => scope.find((w) => w.id === t.workspace_id);
   const canWriteGig = (t: Gig) => {
     const w = wsOfGig(t);
-    return !!w && canWriteIn(w);
+    return !!w && canWriteIn(w, t.project_id);
   };
 
   // the filters live in the URL (shareable, and what saved views link to)
@@ -492,7 +492,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           ws={openWs}
           statuses={openBoard.statuses.filter((x) => x.category !== "cancelled")}
           labels={openBoard.labels}
-          canWrite={canWriteIn(openWs)}
+          canWrite={canWriteIn(openWs, openGig.pid)}
           onClose={() => setOpenGig(null)}
           onChanged={() => refreshRow(openGig.key)}
           onMoved={(t) => setOpenGig({ pid: t.project_id, key: t.key })}

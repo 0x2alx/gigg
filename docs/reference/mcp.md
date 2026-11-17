@@ -38,8 +38,12 @@ Generic client configuration:
 }
 ```
 
-A workspace-bound key is the usual choice: tools that take a `workspace` argument then default to the
-key's workspace. With an unbound key, pass `workspace` (id or slug) explicitly.
+An agent's MCP key usually follows its user (no places of its own): it reaches whatever the agent is
+given, and changing the agent's access needs no new key. Tools that take a `workspace` argument then
+default to the only workspace in reach, or to the workspace the user owns; `list_gigs`, `summary` and
+`list_projects` with no `workspace` cover every workspace in reach, as
+`{"workspaces": [{"workspace", "slug", "result"}]}`. With a key limited to some places, the default is
+its first place's workspace.
 
 ## How tools work
 
@@ -64,8 +68,8 @@ There are no MCP tools for claiming gigs or recording runs; runners use the REST
 | Tool | Needs | Arguments | Does |
 |---|---|---|---|
 | `whoami` | `workspace:read` | none | `GET /auth/me`: identity, workspaces with permissions, key scopes. |
-| `list_projects` | `workspace:read` | `workspace?` | Projects of a workspace, with ids and gig key prefixes. |
-| `summary` | `gigs:read` | `workspace?` | Plain-text board summary: per project, each status with up to 5 gigs. |
+| `list_projects` | `workspace:read` | `workspace?` | Projects of a workspace (or of every workspace in reach), with ids, gig key prefixes and each project's description: what it is about, context for its gigs. |
+| `summary` | `gigs:read` | `workspace?` | Plain-text board summary: per project, each status with up to 5 gigs (every workspace in reach without `workspace`). |
 | `list_gigs` | `gigs:read` | `workspace?`, `project?`, `category?`, `label?`, `q?`, `priority_min?` (0-4), `sort?`, `limit?` (default 50, max 500), `cursor?`, `archived?` (`only`/`include`), `parent?`, `blocked?` | Finds gigs; filters combine; board order unless `sort` is given. |
 | `get_gig` | `gigs:read` | `gig`, `comments?` | One gig; with `comments: true` (and `comments:read`) returns `{"gig": ..., "comments": ...}`. |
 | `list_runs` | `gigs:read` | `gig` | The gig's runs (sessions, status, cost), newest first. |
@@ -130,7 +134,7 @@ Defaults for timing: every 1 period, window from 00:00 for 1440 minutes, and the
 | `list_errand_runs` | `errands:read` | `id`, `before?`, `limit?` | Its runs, newest first. |
 | `get_errand_run` | `errands:read` | `id` | One run, with its output tail when the key has `errands:output`. |
 | `list_errand_templates` | `errands:read` | `workspace?` | Errand templates. |
-| `save_errand` | `errands:write`, `errands` anywhere | `id?` (change), `workspace?`, `template_id?` or `name`, `command`, `description_md?`, `timeout_s?`, `output?` (`gigg`/`host`), `unsandboxed?`; `schedule_id?` or `freq` (`minutes`/`hours`/`daily`/`weekly`/`monthly`), `interval?`, `weekdays?`, `month_day?`, `tz?`, `at?` (HH:MM), `for_minutes?` (minutes/hours: how long ticking lasts each day); `worker?`, `on_failure_gig?`, `paused?` | Makes an errand, or changes one (omitted fields stay). |
+| `save_errand` | `errands:write`, `errands` anywhere | `id?` (change), `workspace?`, `template_id?` or `name`, `command`, `description_md?`, `timeout_s?`, `output?` (`gigg`/`host`), `unsandboxed?`, `project?` (the project it belongs to: who sees it sees the errand; its failure gigs land there; default the workspace's first); `schedule_id?` or `freq` (`minutes`/`hours`/`daily`/`weekly`/`monthly`), `interval?`, `weekdays?`, `month_day?`, `tz?`, `at?` (HH:MM), `for_minutes?` (minutes/hours: how long ticking lasts each day); `worker?`, `on_failure_gig?`, `paused?` | Makes an errand, or changes one (omitted fields stay). |
 | `pause_errand` | same | `id`, `resume?` | Pauses or resumes an errand. |
 | `run_errand_now` | same | `id` | Runs it once at the executor's next poll. |
 | `delete_errand` | same | `id` | Deletes an errand. |

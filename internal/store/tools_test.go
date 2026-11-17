@@ -46,7 +46,7 @@ func TestSchedulerNeedsToolsPermission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := SetRule(ctx, s.W, a, "user", u.ID, &w.ID, "manager", map[string]bool{"allowed_tools": false}); err != nil {
+	if err := SetRule(ctx, s.W, a, "user", u.ID, &w.ID, nil, "manager", map[string]bool{"allowed_tools": false}); err != nil {
 		t.Fatal(err)
 	}
 	r := &Recurrence{WorkspaceID: w.ID, CreatedBy: u.ID, AllowedTools: []string{"Read"}}
@@ -56,7 +56,7 @@ func TestSchedulerNeedsToolsPermission(t *testing.T) {
 	if r.AllowedTools = nil; !schedulerMayRun(ctx, s.R, r) {
 		t.Fatal("a plain recurring gig should run for a manager")
 	}
-	if err := SetRule(ctx, s.W, a, "user", u.ID, &w.ID, "manager", map[string]bool{"allowed_tools": true}); err != nil {
+	if err := SetRule(ctx, s.W, a, "user", u.ID, &w.ID, nil, "manager", map[string]bool{"allowed_tools": true}); err != nil {
 		t.Fatal(err)
 	}
 	if r.AllowedTools = []string{"Read"}; !schedulerMayRun(ctx, s.R, r) {

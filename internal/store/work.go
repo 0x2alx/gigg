@@ -569,9 +569,24 @@ type Claim struct {
 	DryRun       bool
 }
 
-// ClaimGig returns the claimed gig, or ErrNotFound when nothing matches. Only gigs assigned to the
-// caller are handed out.
+// ClaimPlace is one workspace a claim looks in, and the projects of it the claimer may work in.
+type ClaimPlace struct {
+	WorkspaceID int64
+	Projects    []int64 // nil = every project of the workspace
+}
+
+// ClaimGig returns the claimed gig from one workspace, or ErrNotFound when nothing matches (ErrPaused
+// when its runs are paused). Only gigs assigned to the caller are handed out.
 func ClaimGig(ctx context.Context, q Q, a Actor, ws int64, c Claim) (*Gig, error) {
+	return ClaimGigIn(ctx, q, a, []ClaimPlace{{WorkspaceID: ws, Projects: c.Projects}}, c)
+}
+
+// ClaimGigIn claims one gig from any of the places, each under its own workspace's runner limits
+// (pause, caps). One order across all of them: always-run first, then priority, due date, the
+// workspaces the claimer owns before the others, then the sidebar order of projects, statuses and
+// cards. ErrPaused only when every place is paused; ErrNotFound when nothing matches. Only gigs
+// assigned to the caller are handed out (c.Projects is ignored: each place has its own).
+func ClaimGigIn(ctx context.Context, q Q, a Actor, places []ClaimPlace, c Claim) (*Gig, error) {
 	if c.FromCategory == "" {
 		c.FromCategory = "todo"
 	}
@@ -581,11 +596,8 @@ func ClaimGig(ctx context.Context, q Q, a Actor, ws int64, c Claim) (*Gig, error
 	if !ValidCategory(c.FromCategory) || !ValidCategory(c.ToCategory) {
 		return nil, Invalid("unknown status category")
 	}
-	where := []string{"t.workspace_id = ?", "t.deleted_at IS NULL", "p.deleted_at IS NULL", "p.archived_at IS NULL", "s.category = ?"}
-	args := []any{ws, c.FromCategory}
-	if c.Projects != nil {
-		where, args = append(where, "t.project_id IN ("+placeholders(len(c.Projects))+")"), append(args, int64Args(c.Projects)...)
-	}
+	where := []string{"t.deleted_at IS NULL", "p.deleted_at IS NULL", "p.archived_at IS NULL", "s.category = ?"}
+	args := []any{c.FromCategory}
 	if c.CreatedBy != nil {
 		where, args = append(where, "t.created_by IN ("+placeholders(len(c.CreatedBy))+")"), append(args, int64Args(c.CreatedBy)...)
 	}
@@ -602,14 +614,40 @@ func ClaimGig(ctx context.Context, q Q, a Actor, ws int64, c Claim) (*Gig, error
 	// are never handed out
 	where = append(where, "t.archived_at IS NULL", "NOT "+blockedCond)
 	args = append(args, now, now)
-	// the workspace's runner limits: the pause, the gig caps, always-run only
-	lw, la, err := claimLimits(ctx, q, ws, c.AlwaysOnly)
-	if err != nil {
-		return nil, err
+	// each place: its workspace, its projects, and that workspace's runner limits
+	var alts []string
+	paused := 0
+	for _, pl := range places {
+		if pl.Projects != nil && len(pl.Projects) == 0 {
+			continue
+		}
+		lw, la, err := claimLimits(ctx, q, pl.WorkspaceID, c.AlwaysOnly)
+		if errors.Is(err, ErrPaused) {
+			paused++
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		cond, cargs := []string{"t.workspace_id = ?"}, []any{pl.WorkspaceID}
+		if pl.Projects != nil {
+			cond, cargs = append(cond, "t.project_id IN ("+placeholders(len(pl.Projects))+")"), append(cargs, int64Args(pl.Projects)...)
+		}
+		cond, cargs = append(cond, lw...), append(cargs, la...)
+		alts, args = append(alts, "("+strings.Join(cond, " AND ")+")"), append(args, cargs...)
 	}
-	where, args = append(where, lw...), append(args, la...)
+	if len(alts) == 0 {
+		if paused > 0 {
+			return nil, ErrPaused
+		}
+		return nil, ErrNotFound
+	}
+	where = append(where, "("+strings.Join(alts, " OR ")+")")
+	args = append(args, a.UserID)
 	t, err := scanGig(q.QueryRowContext(ctx, "SELECT "+gigCols+gigFrom+" WHERE "+strings.Join(where, " AND ")+
-		" ORDER BY t.always_run DESC, t.priority DESC, t.due_at IS NULL, t.due_at, p.position, s.position, t.position, t.id LIMIT 1", args...))
+		" ORDER BY t.always_run DESC, t.priority DESC, t.due_at IS NULL, t.due_at,"+
+		" COALESCE((SELECT owner_id FROM workspaces WHERE id = t.workspace_id), 0) = ? DESC, t.workspace_id,"+
+		" p.position, s.position, t.position, t.id LIMIT 1", args...))
 	if err != nil {
 		return nil, err
 	}

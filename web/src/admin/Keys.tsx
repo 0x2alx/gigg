@@ -9,6 +9,7 @@ import {
   SCOPE_GROUPS,
   type AdminMembership,
   type AdminProject,
+  type KeyPlace,
   type AdminUser,
   type AdminWorkspace,
   type ApiKey,
@@ -77,7 +78,7 @@ export function KeysPage() {
   return (
     <AdminPage
       title="API keys"
-      sub="A key acts as its user and never has more than the user. It can be limited to one workspace (or some projects), to read-only, or to picked scopes."
+      sub="A key acts as its user and never has more than the user. It follows the user's access wherever it reaches, or only some workspaces and projects; and it can be read-only or have picked scopes."
       actions={
         <button type="button" className="button" onClick={() => setCreating(true)}>
           + New key
@@ -94,7 +95,7 @@ export function KeysPage() {
                 key={k.id}
                 k={k}
                 user={userById.get(k.user_id)}
-                ws={k.workspace_id !== null ? wsById.get(k.workspace_id) : undefined}
+                wsById={wsById}
                 projects={projects}
                 onRotate={() =>
                   adminApi.rotateKey(k.id).then((r) => {
@@ -118,6 +119,7 @@ export function KeysPage() {
         <CreateKey
           users={users}
           workspaces={workspaces}
+          projects={projects}
           onClose={() => setCreating(false)}
           onDone={(r) => {
             setCreating(false);
@@ -131,17 +133,24 @@ export function KeysPage() {
   );
 }
 
+// placeText: a key's place in words ("Acme", "Acme › Website").
+export function placeText(pl: KeyPlace, wsById: Map<number, AdminWorkspace>, projects: Map<number, AdminProject>): string {
+  const ws = wsById.get(pl.workspace_id)?.name ?? `workspace #${pl.workspace_id}`;
+  if (pl.project_id === undefined || pl.project_id === null) return ws;
+  return `${ws} › ${projects.get(pl.project_id)?.name ?? `project #${pl.project_id}`}`;
+}
+
 function KeyCard({
   k,
   user,
-  ws,
+  wsById,
   projects,
   onRotate,
   onRevoke,
 }: {
   k: ApiKey;
   user: AdminUser | undefined;
-  ws: AdminWorkspace | undefined;
+  wsById: Map<number, AdminWorkspace>;
   projects: Map<number, AdminProject>;
   onRotate: () => Promise<unknown>;
   onRevoke: () => Promise<unknown>;
@@ -155,9 +164,11 @@ function KeyCard({
         <span className="pill pill-key admin-mono">{k.prefix}…</span>
         {st === "revoked" && <span className="pill pill-danger">revoked</span>}
         {st === "expired" && <span className="pill pill-muted">expired</span>}
-        {k.workspace_id === null ? (
-          user?.is_admin ? <span className="pill pill-accent">admin key</span> : <span className="pill pill-ws">member workspaces</span>
-        ) : <span className="pill pill-ws">{ws?.name ?? `workspace #${k.workspace_id}`}</span>}
+        {!k.bound ? (
+          user?.is_admin ? <span className="pill pill-accent">admin key</span> : <span className="pill pill-ws">follows the user</span>
+        ) : (
+          <span className="pill pill-ws">{k.reach.length === 1 ? placeText(k.reach[0]!, wsById, projects) : `${k.reach.length} places`}</span>
+        )}
         <span className="grow" />
         {st === "live" && (
           // the two actions stay together when the header wraps (phone)
@@ -194,18 +205,20 @@ function KeyCard({
             <span className="muted">user #{k.user_id}</span>
           )}
         </dd>
-        {k.project_ids && k.project_ids.length > 0 && (
-          <>
-            <dt>Projects</dt>
-            <dd className="chips">
-              {k.project_ids.map((id) => (
-                <span key={id} className="pill pill-key">
-                  {projects.get(id)?.key ?? `#${id}`}
-                </span>
-              ))}
-            </dd>
-          </>
-        )}
+        <dt>Reaches</dt>
+        <dd className="chips">
+          {!k.bound ? (
+            <span className="muted small">{user?.is_admin ? "everything (instance admin)" : "wherever the user's access reaches; changes with it"}</span>
+          ) : k.reach.length === 0 ? (
+            <span className="pill pill-danger">nothing (its places are gone)</span>
+          ) : (
+            k.reach.map((pl, i) => (
+              <span key={`${pl.workspace_id}/${pl.project_id ?? ""}`} className="pill pill-ws" title={i === 0 ? "First place: its “current” workspace" : undefined}>
+                {placeText(pl, wsById, projects)}
+              </span>
+            ))
+          )}
+        </dd>
         <dt>Scopes</dt>
         <dd className="chips">
           {k.scopes.map((s) => (
@@ -244,50 +257,79 @@ function splitList(s: string): string[] {
     .filter(Boolean);
 }
 
-function CreateKey({ users, workspaces, onClose, onDone }: { users: AdminUser[]; workspaces: AdminWorkspace[]; onClose: () => void; onDone: (r: KeyCreated) => void }) {
+// Place: a row of the key form's reach (project 0 = the whole workspace).
+interface Place {
+  ws: number;
+  project: number;
+}
+
+// seesPlace: whether a member list says the user sees a place (null: unknown yet).
+function seesPlace(members: AdminMembership[] | undefined, user: AdminUser | undefined, pl: Place): boolean | null {
+  if (!members || !user) return null;
+  if (user.is_admin) return true;
+  const m = members.find((x) => x.user_id === user.id);
+  if (!m) return false;
+  if (m.whole !== false) return true; // an older server: whole-workspace members only
+  return pl.project !== 0 && !!m.projects?.some((x) => x.project_id === pl.project && x.role !== "");
+}
+
+function CreateKey({
+  users,
+  workspaces,
+  projects,
+  onClose,
+  onDone,
+}: {
+  users: AdminUser[];
+  workspaces: AdminWorkspace[];
+  projects: Map<number, AdminProject>;
+  onClose: () => void;
+  onDone: (r: KeyCreated) => void;
+}) {
   const active = users.filter((u) => !u.disabled).sort((a, b) => Number(a.kind === "human") - Number(b.kind === "human") || a.username.localeCompare(b.username));
   const [name, setName] = useState("");
   const [userId, setUserId] = useState<number>(active[0]?.id ?? 0);
-  const [wsId, setWsId] = useState<number>(0); // 0 = admin key
-  const [projectIds, setProjectIds] = useState<number[]>([]);
+  const [limited, setLimited] = useState(false); // false: the key follows its user (an admin's: admin key)
+  const [places, setPlaces] = useState<Place[]>([]);
   const [scopes, setScopes] = useState<string[]>(["workspace:read", "gigs:read", "comments:read"]);
   const [mode, setMode] = useState<"full" | "read" | "custom">("full"); // what the key may do, within its user's permissions
   const [listeners, setListeners] = useState("");
   const [cidrs, setCidrs] = useState("");
   const [days, setDays] = useState(365);
-  const [wsProjects, setWsProjects] = useState<AdminProject[]>([]);
-  const [wsMembers, setWsMembers] = useState<AdminMembership[] | null>(null);
+  const [members, setMembers] = useState<Map<number, AdminMembership[]>>(new Map());
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const user = users.find((u) => u.id === userId);
-  const unbound = wsId === 0;
-  const adminKey = unbound && !!user?.is_admin;
+  const adminKey = !limited && !!user?.is_admin;
   const liveWs = workspaces.filter((w) => !w.archived);
+  const wsProjects = (ws: number) => [...projects.values()].filter((p) => p.workspace_id === ws && !p.archived && !p.deleted).sort((a, b) => a.position - b.position);
 
+  // the member lists of the chosen workspaces, for the "can't see it" hints
+  const placeWs = [...new Set(places.map((pl) => pl.ws))].join(",");
   useEffect(() => {
-    setProjectIds([]);
-    setWsProjects([]);
-    setWsMembers(null);
-    if (!wsId) return;
-    adminApi
-      .projects(wsId)
-      .then((r) => setWsProjects(r.items.filter((p) => !p.archived)))
-      .catch(() => undefined);
-    adminApi
-      .members(wsId)
-      .then((r) => setWsMembers(r.items))
-      .catch(() => undefined);
-  }, [wsId]);
+    for (const ws of placeWs ? placeWs.split(",").map(Number) : []) {
+      if (members.has(ws)) continue;
+      adminApi
+        .members(ws)
+        .then((r) => setMembers((m) => new Map(m).set(ws, r.items)))
+        .catch(() => undefined);
+    }
+  }, [placeWs, members]);
 
   // admin:* scopes only on admin keys
   useEffect(() => {
     if (!adminKey) setScopes((s) => s.filter((x) => !x.startsWith("admin:")));
   }, [adminKey]);
 
-  const notMember = !!user && !user.is_admin && !!wsMembers && !wsMembers.some((m) => m.user_id === user.id);
+  const unseen = places.filter((pl) => seesPlace(members.get(pl.ws), user, pl) === false);
   const toggle = (s: string) => setScopes((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
-  const toggleProject = (id: number) => setProjectIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  const setPlace = (i: number, pl: Place) => setPlaces((cur) => cur.map((x, j) => (j === i ? pl : x)));
+  const addPlace = () => setPlaces((cur) => [...cur, { ws: liveWs.find((w) => !cur.some((x) => x.ws === w.id))?.id ?? liveWs[0]?.id ?? 0, project: 0 }]);
+  const chooseLimited = (v: boolean) => {
+    setLimited(v);
+    if (v && places.length === 0) addPlace();
+  };
   const daysOk = Number.isInteger(days) && days >= 1 && days <= MAX_DAYS;
 
   const submit = (e: FormEvent) => {
@@ -303,8 +345,13 @@ function CreateKey({ users, workspaces, onClose, onDone }: { users: AdminUser[];
       return;
     }
     const body: KeyCreate = { name, user_id: userId, scopes: chosen, expires_at: Date.now() + days * DAY };
-    if (!unbound) body.workspace = String(wsId);
-    if (!unbound && projectIds.length) body.project_ids = projectIds;
+    if (limited) {
+      if (places.length === 0) {
+        setError("Add at least one place, or let the key follow its user.");
+        return;
+      }
+      body.reach = places.map((pl) => (pl.project ? `${pl.ws}/${pl.project}` : String(pl.ws)));
+    }
     const ls = splitList(listeners);
     if (ls.length) body.allowed_listeners = ls;
     const cs = splitList(cidrs);
@@ -337,29 +384,56 @@ function CreateKey({ users, workspaces, onClose, onDone }: { users: AdminUser[];
             ))}
           </select>
         </label>
-        <label className="span2">
-          Workspace
-          <select value={wsId} onChange={(e) => setWsId(Number(e.target.value))}>
-            <option value={0}>{user && !user.is_admin ? "Any: every workspace the user can see" : "Any: instance-wide (admin key)"}</option>
-            {liveWs.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} ({w.slug})
-              </option>
-            ))}
-          </select>
-        </label>
-        {notMember && <p className="danger small span2">{user?.username} can't see this workspace; give them access first (Workspaces or Users).</p>}
-        {!unbound && (
-          <div className="field span2">
-            <span className="field-label">Projects <span className="muted small">optional; none selected = every project of the workspace</span></span>
-            <div className="chips">
-              {wsProjects.length === 0 && <span className="muted small">No projects.</span>}
-              {wsProjects.map((p) => (
-                <button key={p.id} type="button" className={"admin-toggle" + (projectIds.includes(p.id) ? " on" : "")} aria-pressed={projectIds.includes(p.id)} onClick={() => toggleProject(p.id)}>
-                  <span className="pill pill-key">{p.key}</span> {p.name}
+        <div className="field span2">
+          <span className="field-label">Where it works</span>
+          <div className="admin-seg" role="radiogroup" aria-label="Where the key works">
+            <button type="button" role="radio" aria-checked={!limited} className={"admin-seg-btn" + (!limited ? " on" : "")} onClick={() => chooseLimited(false)}>
+              {user?.is_admin ? "Everywhere (admin key)" : "Follows the user"}
+            </button>
+            <button type="button" role="radio" aria-checked={limited} className={"admin-seg-btn" + (limited ? " on" : "")} onClick={() => chooseLimited(true)}>
+              Only some places
+            </button>
+          </div>
+          <span className="muted small">
+            {!limited
+              ? user?.is_admin
+                ? "Instance-wide, admin powers included (within the scopes)."
+                : "Wherever the user's access reaches, now and later: change their access and the key follows, no new key needed."
+              : "Only these workspaces and projects, even if the user gets more. To change them, make a new key. The first one is the key's “current” workspace."}
+          </span>
+        </div>
+        {limited && (
+          <div className="field span2 key-places">
+            {places.map((pl, i) => (
+              <div key={i} className="row key-place">
+                <select aria-label={`Place ${i + 1}: workspace`} value={pl.ws} onChange={(e) => setPlace(i, { ws: Number(e.target.value), project: 0 })}>
+                  {liveWs.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+                <select aria-label={`Place ${i + 1}: project`} value={pl.project} onChange={(e) => setPlace(i, { ...pl, project: Number(e.target.value) })}>
+                  <option value={0}>Whole workspace</option>
+                  {wsProjects(pl.ws).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      Only {p.name} ({p.key})
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="icon-button" aria-label={`Remove place ${i + 1}`} title="Remove" onClick={() => setPlaces((cur) => cur.filter((_, j) => j !== i))}>
+                  ✕
                 </button>
-              ))}
-            </div>
+              </div>
+            ))}
+            <button type="button" className="link small key-place-add" onClick={addPlace} disabled={liveWs.length === 0}>
+              + Add a place
+            </button>
+            {unseen.length > 0 && (
+              <p className="danger small">
+                {user?.username} can't see {unseen.map((pl) => placeText({ workspace_id: pl.ws, project_id: pl.project || undefined }, new Map(workspaces.map((w) => [w.id, w])), projects)).join(", ")}; give them access first (Workspaces or Users).
+              </p>
+            )}
           </div>
         )}
         <div className="field span2">
@@ -381,7 +455,7 @@ function CreateKey({ users, workspaces, onClose, onDone }: { users: AdminUser[];
             {mode === "full"
               ? adminKey
                 ? "Acts as the user, admin powers included. A key never has more than its user."
-                : "Acts as the user. A key never has more than its user; the workspace and project limits above still apply."
+                : "Acts as the user. A key never has more than its user; the places above still apply."
               : mode === "read"
                 ? "Sees what the user sees; changes nothing."
                 : "Only the scopes ticked below, within the user's permissions."}

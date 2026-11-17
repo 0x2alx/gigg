@@ -33,6 +33,7 @@ func (b ErrandTemplateBody) template() *store.ErrandTemplate {
 
 // ErrandBody creates an errand: a template (template_id, or its content) and a schedule (schedule_id, or a rule).
 type ErrandBody struct {
+	Project       int64         `json:"project,omitempty" doc:"The project whose work it does (default: the workspace's first)"`
 	TemplateID    int64         `json:"template_id,omitempty" doc:"An existing errand template; or give name, command, ... for a new one"`
 	Name          string        `json:"name,omitempty" maxLength:"80"`
 	DescriptionMD string        `json:"description_md,omitempty" maxLength:"65536"`
@@ -50,6 +51,7 @@ type ErrandBody struct {
 // ErrandPatch changes an errand; omitted fields stay. Content fields change its template (shared by the
 // template's other errands).
 type ErrandPatch struct {
+	Project       *int64        `json:"project,omitempty" doc:"Move it to another project of the workspace"`
 	TemplateID    *int64        `json:"template_id,omitempty"`
 	Name          *string       `json:"name,omitempty" maxLength:"80"`
 	DescriptionMD *string       `json:"description_md,omitempty" maxLength:"65536"`
@@ -87,17 +89,28 @@ func (a *API) errandEdit(p *access.Principal, ws int64) store.ErrandEdit {
 		CanTimeout: allowed(p, ws, "run_timeout") == nil}
 }
 
+// seesErrand: an errand is seen by those who see its project (one without a project: by those who
+// see the whole workspace).
+func seesErrand(p *access.Principal, ws int64, project *int64) bool {
+	if project == nil {
+		return p.Allowed(ws, access.Viewer)
+	}
+	return p.SeesProject(ws, *project)
+}
+
 func (a *API) errand(ctx context.Context, p *access.Principal, id int64) (*store.Errand, error) {
 	c, err := store.GetErrand(ctx, a.st.R, id)
-	if err != nil || !p.SeesWorkspace(c.WorkspaceID) || p.Narrowed() {
+	if err != nil || !seesErrand(p, c.WorkspaceID, c.ProjectID) {
 		return nil, errNotFound()
 	}
 	return c, nil
 }
 
+// errandTemplate: a workspace's errand templates are workspace-level (whole-workspace readers); the
+// shared ones, for anyone who sees some workspace whole.
 func (a *API) errandTemplate(ctx context.Context, p *access.Principal, id int64) (*store.ErrandTemplate, error) {
 	t, err := store.GetErrandTemplate(ctx, a.st.R, id)
-	if err != nil || (t.Shared && !seesShared(p)) || (!t.Shared && !p.SeesWorkspace(t.WorkspaceID)) || p.Narrowed() {
+	if err != nil || (t.Shared && !seesShared(p)) || (!t.Shared && !p.Allowed(t.WorkspaceID, access.Viewer)) {
 		return nil, errNotFound()
 	}
 	return t, nil
@@ -113,11 +126,15 @@ func sharedErrandEdit(p *access.Principal) (store.ErrandEdit, error) {
 }
 
 // errandWorker resolves the worker: yourself by default; another user only with Manage the workspace.
-// The worker must be an agent that can see the workspace (running errands needs no Errands permission).
-func (a *API) errandWorker(ctx context.Context, p *access.Principal, ws int64, name string) (int64, error) {
+// The worker must be an agent that can see the errand's project (running errands needs no Errands
+// permission).
+func (a *API) errandWorker(ctx context.Context, p *access.Principal, ws, project int64, name string) (int64, error) {
 	if name == "" || name == p.User.Username {
 		if p.User.Kind != "agent" {
 			return 0, fail(422, "invalid", "An errand's worker is an agent: name one in worker.")
+		}
+		if !store.UserHasIn(ctx, a.st.R, p.User.ID, ws, project, "view") {
+			return 0, fail(422, "invalid", "You can't see that project.")
 		}
 		return p.User.ID, nil
 	}
@@ -131,8 +148,8 @@ func (a *API) errandWorker(ctx context.Context, p *access.Principal, ws int64, n
 	if u.Kind != "agent" {
 		return 0, fail(422, "invalid", "An errand's worker is an agent.")
 	}
-	if !store.UserHas(ctx, a.st.R, u.ID, ws, "view") { // it runs them, it needn't manage them
-		return 0, fail(422, "invalid", name+" can't see this workspace.")
+	if !store.UserHasIn(ctx, a.st.R, u.ID, ws, project, "view") { // it runs them, it needn't manage them
+		return 0, fail(422, "invalid", name+" can't see that project.")
 	}
 	return u.ID, nil
 }
@@ -165,11 +182,11 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "errands:read"); err != nil {
+		if err := requireScope(p, "errands:read"); err != nil {
 			return nil, err
 		}
 		out := &listErrands{}
-		out.Body.Items, err = store.ListErrands(ctx, a.st.R, w.ID)
+		out.Body.Items, err = store.ListErrands(ctx, a.st.R, w.ID, p.ProjectFilter(w.ID))
 		return out, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "create-errand", Method: "POST", Path: "/workspaces/{ws}/errands", Tags: []string{"errands"},
@@ -190,11 +207,15 @@ func (a *API) registerErrands() {
 			if err := errandEditGuard(p, w.ID, b.TemplateID == 0 && b.Unsandboxed); err != nil {
 				return nil, err
 			}
-			worker, err := a.errandWorker(ctx, p, w.ID, b.Worker)
+			project, err := store.ErrandProject(ctx, a.st.R, w.ID, b.Project)
 			if err != nil {
 				return nil, err
 			}
-			n := store.NewErrand{WorkspaceID: w.ID, WorkerID: worker, TemplateID: b.TemplateID, ScheduleID: b.ScheduleID, OnFailureGig: b.OnFailureGig,
+			worker, err := a.errandWorker(ctx, p, w.ID, project, b.Worker)
+			if err != nil {
+				return nil, err
+			}
+			n := store.NewErrand{WorkspaceID: w.ID, ProjectID: project, WorkerID: worker, TemplateID: b.TemplateID, ScheduleID: b.ScheduleID, OnFailureGig: b.OnFailureGig,
 				Paused: b.Paused}
 			if b.TemplateID == 0 {
 				n.Template = ErrandTemplateBody{Name: b.Name, DescriptionMD: b.DescriptionMD, Command: b.Command, TimeoutS: b.TimeoutS, Output: b.Output,
@@ -224,7 +245,7 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, c.WorkspaceID, access.Viewer, "errands:read"); err != nil {
+		if err := requireScope(p, "errands:read"); err != nil {
 			return nil, err
 		}
 		return &errandOut{ETag: etag(c.Version), Body: c}, nil
@@ -253,15 +274,27 @@ func (a *API) registerErrands() {
 				return nil, err
 			}
 			ch := store.ErrandChange{TemplateID: b.TemplateID, ScheduleID: b.ScheduleID, Name: b.Name, DescriptionMD: b.DescriptionMD,
-				Command: b.Command, TimeoutS: b.TimeoutS, Output: b.Output, Unsandboxed: b.Unsandboxed}
+				Command: b.Command, TimeoutS: b.TimeoutS, Output: b.Output, Unsandboxed: b.Unsandboxed, ProjectID: b.Project}
 			if b.Rule != nil {
 				if b.Rule.TZ == "" {
 					b.Rule.TZ = c.Rule.TZ
 				}
 				ch.Rule = b.Rule.rule()
 			}
+			project := int64(0)
+			if c.ProjectID != nil {
+				project = *c.ProjectID
+			}
+			if b.Project != nil {
+				if project, err = store.ErrandProject(ctx, a.st.R, c.WorkspaceID, *b.Project); err != nil {
+					return nil, err
+				}
+				if b.Worker == nil && !store.UserHasIn(ctx, a.st.R, c.WorkerID, c.WorkspaceID, project, "view") {
+					return nil, fail(422, "invalid", c.WorkerName+" can't see that project.")
+				}
+			}
 			if b.Worker != nil {
-				id, err := a.errandWorker(ctx, p, c.WorkspaceID, *b.Worker)
+				id, err := a.errandWorker(ctx, p, c.WorkspaceID, project, *b.Worker)
 				if err != nil {
 					return nil, err
 				}
@@ -363,7 +396,7 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, c.WorkspaceID, access.Viewer, "errands:read"); err != nil {
+		if err := requireScope(p, "errands:read"); err != nil {
 			return nil, err
 		}
 		out := &struct {
@@ -381,10 +414,13 @@ func (a *API) registerErrands() {
 			return nil, err
 		}
 		r, err := store.GetErrandRun(ctx, a.st.R, in.ID, true)
-		if err != nil || !p.SeesWorkspace(r.WorkspaceID) || p.Narrowed() {
+		if err != nil {
 			return nil, errNotFound()
 		}
-		if err := require(p, r.WorkspaceID, access.Viewer, "errands:read"); err != nil {
+		if _, err := a.errand(ctx, p, r.ErrandID); err != nil {
+			return nil, err
+		}
+		if err := requireScope(p, "errands:read"); err != nil {
 			return nil, err
 		}
 		if !p.HasScope("errands:output") {
@@ -414,7 +450,7 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "errands:run"); err != nil { // running your own errands isn't managing them: a worker without the Errands permission still runs its own
+		if err := requireScope(p, "errands:run"); err != nil { // running your own errands isn't managing them: a worker without the Errands permission still runs its own
 			return nil, err
 		}
 		out := &struct {
@@ -429,7 +465,7 @@ func (a *API) registerErrands() {
 			if in.Body != nil {
 				limit = in.Body.Limit
 			}
-			out.Body.Items, err = store.ClaimErrands(ctx, tx, p.User.ID, w.ID, limit)
+			out.Body.Items, err = store.ClaimErrands(ctx, tx, p.User.ID, w.ID, p.ProjectFilter(w.ID), limit)
 			return err
 		})
 		if errors.Is(err, store.ErrErrandsPaused) {
@@ -458,7 +494,7 @@ func (a *API) registerErrands() {
 			if err != nil || !p.SeesWorkspace(r.WorkspaceID) {
 				return nil, errNotFound()
 			}
-			if err := require(p, r.WorkspaceID, access.Viewer, "errands:run"); err != nil {
+			if err := requireScope(p, "errands:run"); err != nil {
 				return nil, err
 			}
 			if r.WorkerID != p.User.ID {
@@ -548,7 +584,7 @@ func (a *API) registerErrands() {
 			}
 		}{}
 		out.Body.Items = []*store.ErrandTemplate{}
-		if !seesShared(p) || p.Narrowed() {
+		if !seesShared(p) {
 			return out, nil
 		}
 		if err := need(p, "errands:read"); err != nil {

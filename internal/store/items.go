@@ -1026,7 +1026,7 @@ func Notify(ctx context.Context, q Q, a Actor, t *Gig, commentID *int64, kind st
 		if u == a.UserID || u == 0 {
 			continue
 		}
-		if !UserHas(ctx, q, u, t.WorkspaceID, "view") {
+		if !UserHasIn(ctx, q, u, t.WorkspaceID, t.ProjectID, "view") {
 			continue
 		}
 		var dup int

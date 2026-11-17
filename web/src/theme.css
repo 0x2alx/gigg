@@ -1333,6 +1333,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .acc-level { display: flex; flex-direction: column; align-items: flex-start; width: 100%; text-align: left; padding: 0.35rem 0.5rem; border-radius: var(--radius-m); border: 1px solid transparent; background: none; color: var(--text); cursor: pointer; }
 .acc-level.has .acc-level-name { font-weight: 600; }
 .acc-level.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.acc-level.acc-level-project { padding-left: 1.4rem; }
 .acc-level-sum { overflow-wrap: anywhere; }
 .acc-main { min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .acc-editor { display: flex; flex-direction: column; gap: 0.5rem; }

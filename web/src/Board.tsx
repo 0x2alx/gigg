@@ -246,9 +246,10 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   // project in view, else the one last used in view, else the first in view; with none of those
   // writable, the last used anywhere, else the first project of a workspace you can add to
   // the projects in view you can add gigs to (the role, and the Create gigs permission)
-  const writable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "create_gigs", x.ws.id));
-  // every workspace you can add to (the form may move the gig there)
-  const newChoices = tree.filter((w) => canWriteIn(w) && hasCap(me, "create_gigs", w.id) && w.projects.length > 0);
+  const canCreateIn = (w: WorkspaceTree, project: number) => canWriteIn(w, project) && hasCap(me, "create_gigs", w.id, project);
+  const writable = inScope.filter((x) => canCreateIn(x.ws, x.project.id));
+  // every workspace you can add to, with only the projects you can add to (the form may move the gig there)
+  const newChoices = tree.map((w) => ({ ...w, projects: w.projects.filter((p) => canCreateIn(w, p.id)) })).filter((w) => w.projects.length > 0);
   const openNew = useCallback(() => {
     const last = lastProject();
     const at = (single && writable.includes(single) ? single : undefined) ?? writable.find((x) => x.project.id === last) ?? writable[0];
@@ -257,7 +258,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     const p = anywhere.find((x) => x.id === last) ?? anywhere[0];
     if (p) setAdding(p.id);
   }, [single, writable, newChoices]);
-  const archivable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "archive_gigs", x.ws.id));
+  const archivable = inScope.filter((x) => canWriteIn(x.ws, x.project.id) && hasCap(me, "archive_gigs", x.ws.id, x.project.id));
   const action = (what: BoardAction, category?: "done" | "cancelled") => {
     if (what === "archive") {
       // one dialog for any number of projects: up to three in view start ticked; more start unticked, so
@@ -488,7 +489,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     .map((id) => users.get(id))
     .filter((u): u is NonNullable<typeof u> => !!u)
     .sort((a, b) => (a.display_name || a.username).localeCompare(b.display_name || b.username));
-  const wsArchive = inScope.some((x) => canWriteIn(x.ws) && hasCap(me, "archive_gigs", x.ws.id));
+  const wsArchive = inScope.some((x) => canWriteIn(x.ws, x.project.id) && hasCap(me, "archive_gigs", x.ws.id, x.project.id));
   const wsTemplates = inScope.some((x) => hasCap(me, "templates", x.ws.id));
   // the table of what's in view: the one project, the one workspace, else every workspace
   const tableHref = single ? `/w/${single.ws.slug}/p/${single.project.id}/table` : wsInScope.length === 1 ? `/w/${wsInScope[0]!.slug}/table` : "/table";
@@ -539,7 +540,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     const p = projOf(t.project_id);
     const b = boards.get(t.project_id);
     if (!p || !b) return null;
-    const write = !archivedCard && canWriteIn(p.ws);
+    const write = !archivedCard && canWriteIn(p.ws, p.project.id);
     return (
       <Card
         gig={t}
@@ -860,7 +861,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
           ws={panel.ws}
           statuses={openStatuses(panelBoard)}
           labels={panelBoard.labels}
-          canWrite={canWriteIn(panel.ws)}
+          canWrite={canWriteIn(panel.ws, panel.project.id)}
           // opened from the table, My gigs or the bell: closing goes back there
           onClose={() => {
             // opened from a list (pushed from there): step back to it, so Back afterwards doesn't
@@ -1137,7 +1138,7 @@ function TrashModal({ scope: inScope, onClose, onRestored }: { scope: { ws: Work
       <div className="pick-list">
         {(items ?? []).map((t) => {
           const ws = wsOf(t);
-          const may = !!ws && canWriteIn(ws) && hasCap(me, "delete_gigs", ws.id);
+          const may = !!ws && canWriteIn(ws, t.project_id) && hasCap(me, "delete_gigs", ws.id, t.project_id);
           return (
             <div key={t.id} className="pick-item trash-item">
               {ws && <WorkspaceBadge ws={ws} />}

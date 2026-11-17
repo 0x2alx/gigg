@@ -155,7 +155,7 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		out := &runsOut{}
@@ -178,7 +178,7 @@ func (a *API) registerRuns() {
 		if t.Deleted {
 			return nil, trashErr(t)
 		}
-		if err := require(p, t.WorkspaceID, access.Worker, "runs:write"); err != nil {
+		if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Worker, "runs:write"); err != nil {
 			return nil, err
 		}
 		if !slices.Contains(t.Assignees, p.User.ID) {
@@ -200,11 +200,11 @@ func (a *API) registerRuns() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "get-run", Method: "GET", Path: "/runs/{id}", Tags: []string{"runs"},
 		Summary: "A run with its timeline"}, func(ctx context.Context, in *idPath) (*runOut, error) {
-		p, r, err := a.run(ctx, in.ID)
+		p, r, project, err := a.run(ctx, in.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireIn(p, r.WorkspaceID, project, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		ev, err := store.RunEvents(ctx, a.st.R, r.ID)
@@ -212,11 +212,14 @@ func (a *API) registerRuns() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "run-progress", Method: "POST", Path: "/runs/{id}/progress", Tags: []string{"runs"},
 		Summary: "Heartbeat and an optional progress note"}, func(ctx context.Context, in *runProgressIn) (*runOut, error) {
-		p, r, err := a.run(ctx, in.ID)
+		p, r, project, err := a.run(ctx, in.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Worker, "runs:write"); err != nil {
+		if err := requireIn(p, r.WorkspaceID, project, access.Worker, "runs:write"); err != nil {
+			return nil, err
+		}
+		if err := ownRun(p, r); err != nil {
 			return nil, err
 		}
 		err = a.tx(ctx, func(tx *sql.Tx) error {
@@ -236,11 +239,14 @@ func (a *API) registerRuns() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "finish-run", Method: "POST", Path: "/runs/{id}/finish", Tags: []string{"runs"},
 		Summary: "Close a run with what the worker reports; store the report; move the gig if asked"}, func(ctx context.Context, in *runFinishIn) (*struct{ Body *FinishResult }, error) {
-		p, r, err := a.run(ctx, in.ID)
+		p, r, project, err := a.run(ctx, in.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Worker, "runs:write"); err != nil {
+		if err := requireIn(p, r.WorkspaceID, project, access.Worker, "runs:write"); err != nil {
+			return nil, err
+		}
+		if err := ownRun(p, r); err != nil {
 			return nil, err
 		}
 		b := in.Body
@@ -291,49 +297,50 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Worker, "gigs:work"); err != nil {
+		if err := requireScope(p, "gigs:work"); err != nil {
 			return nil, err
 		}
-		c := store.Claim{FromCategory: in.Body.FromCategory, ToCategory: in.Body.ToCategory, StartDue: in.Body.StartDue, DryRun: in.Body.DryRun,
-			AlwaysOnly: in.Body.AlwaysOnly}
-		c.Projects = p.ProjectFilter()
-		if in.Body.Projects != nil {
-			for _, pid := range in.Body.Projects {
-				if !p.SeesProject(w.ID, pid) {
-					return nil, errNotFound()
-				}
-			}
-			c.Projects = in.Body.Projects
-		}
-		for _, ref := range in.Body.CreatedBy {
-			var u *store.User
-			if id, e := strconv.ParseInt(ref, 10, 64); e == nil {
-				u, err = store.GetUser(ctx, a.st.R, id)
-			} else {
-				u, err = store.GetUserByName(ctx, a.st.R, ref)
-			}
-			if err == nil {
-				c.CreatedBy = append(c.CreatedBy, u.ID)
-			}
-		}
-		if in.Body.CreatedBy != nil && c.CreatedBy == nil {
-			return &claimOut{Status: 204}, nil // nobody matches: nothing to claim
-		}
-		var t *store.Gig
-		err = a.tx(ctx, func(tx *sql.Tx) error {
-			var err error
-			t, err = store.ClaimGig(ctx, tx, p.Actor(), w.ID, c)
-			return err
-		})
-		var pr *Problem
-		if errors.As(err, &pr) && pr.Code == "not_found" {
-			return &claimOut{Status: 204}, nil
-		}
+		pl, err := claimPlace(p, w.ID, in.Body.Projects)
 		if err != nil {
 			return nil, err
 		}
-		return &claimOut{Status: 200, ETag: etag(t.Version), Body: t}, nil
+		return a.claim(ctx, p, []store.ClaimPlace{pl}, in.Body)
 	})
+	huma.Register(a.h, huma.Operation{OperationID: "claim-gig-anywhere", Method: "POST", Path: "/gigs/claim", Tags: []string{"runs"},
+		Summary:     "Take the next matching gig from every workspace and project in reach (each under its own workspace's pause and caps), and move it, atomically (204 when nothing matches)",
+		Description: "One order across all of them: always-run first, then priority, due date, the workspaces the caller owns before the others, then the sidebar order of projects, statuses and cards. 423 only when every workspace in reach is paused."},
+		func(ctx context.Context, in *struct{ Body ClaimBody }) (*claimOut, error) {
+			p, err := me(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if err := requireScope(p, "gigs:work"); err != nil {
+				return nil, err
+			}
+			if in.Body.Projects != nil {
+				return nil, fail(422, "invalid", "projects: only with a workspace (POST /workspaces/{ws}/gigs/claim).")
+			}
+			wss := p.Workspaces()
+			if wss == nil { // an instance admin: every workspace
+				all, err := store.ListWorkspaces(ctx, a.st.R, nil)
+				if err != nil {
+					return nil, err
+				}
+				for _, w := range all {
+					wss = append(wss, w.ID)
+				}
+			}
+			places := []store.ClaimPlace{}
+			for _, ws := range wss {
+				if ps := p.ProjectsWith(ws, access.Worker); len(ps) > 0 {
+					places = append(places, store.ClaimPlace{WorkspaceID: ws, Projects: ps})
+				}
+			}
+			if len(places) == 0 {
+				return nil, errNoPermission(access.Worker)
+			}
+			return a.claim(ctx, p, places, in.Body)
+		})
 	huma.Register(a.h, huma.Operation{OperationID: "list-workspace-runs", Method: "GET", Path: "/workspaces/{ws}/runs", Tags: []string{"runs"},
 		Summary: "Runs in a workspace, newest first"}, func(ctx context.Context, in *wsRunsIn) (*runsOut, error) {
 		p, err := me(ctx)
@@ -344,10 +351,10 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireScope(p, "gigs:read"); err != nil {
 			return nil, err
 		}
-		f := store.RunFilter{WorkspaceIDs: []int64{w.ID}, Projects: p.ProjectFilter(), Status: in.Status, Limit: in.Limit}
+		f := store.RunFilter{WorkspaceIDs: []int64{w.ID}, Projects: p.ProjectFilter(w.ID), Status: in.Status, Limit: in.Limit}
 		if in.StartedSince != 0 {
 			f.StartedSince = &in.StartedSince
 		}
@@ -368,14 +375,14 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireScope(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		since := in.Since
 		if since == 0 {
 			since = store.Now() - 24*3600*1000
 		}
-		s, err := store.WorkspaceStats(ctx, a.st.R, w.ID, p.ProjectFilter(), since)
+		s, err := store.WorkspaceStats(ctx, a.st.R, w.ID, p.ProjectFilter(w.ID), since)
 		return &struct{ Body *store.Stats }{Body: s}, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "workspace-summary", Method: "GET", Path: "/workspaces/{ws}/summary", Tags: []string{"workspaces"},
@@ -388,10 +395,10 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireScope(p, "gigs:read"); err != nil {
 			return nil, err
 		}
-		ps, err := store.ListProjects(ctx, a.st.R, w.ID, p.ProjectFilter())
+		ps, err := store.ListProjects(ctx, a.st.R, w.ID, p.ProjectFilter(w.ID))
 		if err != nil {
 			return nil, err
 		}
@@ -408,7 +415,7 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "workspace:read"); err != nil {
+		if err := requireScope(p, "workspace:read"); err != nil {
 			return nil, err
 		}
 		if err := need(p, "gigs:read"); err != nil {
@@ -421,7 +428,7 @@ func (a *API) registerRuns() {
 		if !p.IsInstanceAdmin() {
 			where += " AND action NOT LIKE 'key.%' AND action NOT LIKE 'member.%' AND action NOT LIKE '%.access'"
 		}
-		if pf := p.ProjectFilter(); pf != nil {
+		if pf := p.ProjectFilter(w.ID); pf != nil {
 			where += " AND project_id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(pf)), ",") + ")"
 			for _, x := range pf {
 				args = append(args, x)
@@ -469,10 +476,10 @@ func (a *API) inbox(ctx context.Context, _ *struct{}) (*inboxOut, error) {
 	out := &inboxOut{}
 	out.Body.Items = []InboxItem{}
 	for _, w := range ws {
-		if !p.Can(w.ID, access.Viewer, "gigs:read") || w.Archived {
+		if !p.SeesWorkspace(w.ID) || !p.HasScope("gigs:read") || w.Archived {
 			continue
 		}
-		ps, err := store.ListProjects(ctx, a.st.R, w.ID, p.ProjectFilter())
+		ps, err := store.ListProjects(ctx, a.st.R, w.ID, p.ProjectFilter(w.ID))
 		if err != nil {
 			return nil, err
 		}
@@ -480,7 +487,7 @@ func (a *API) inbox(ctx context.Context, _ *struct{}) (*inboxOut, error) {
 		for _, pr := range ps {
 			names[pr.ID] = pr.Name
 		}
-		ts, _, err := store.ListGigs(ctx, a.st.R, store.GigFilter{WorkspaceID: w.ID, Projects: p.ProjectFilter(), Category: "waiting", Sort: "updated", Limit: 200})
+		ts, _, err := store.ListGigs(ctx, a.st.R, store.GigFilter{WorkspaceID: w.ID, Projects: p.ProjectFilter(w.ID), Category: "waiting", Sort: "updated", Limit: 200})
 		if err != nil {
 			return nil, err
 		}
@@ -497,20 +504,89 @@ func (a *API) inbox(ctx context.Context, _ *struct{}) (*inboxOut, error) {
 	return out, nil
 }
 
-func (a *API) run(ctx context.Context, id int64) (*access.Principal, *store.Run, error) {
+// run resolves a run within reach, with its gig's project.
+func (a *API) run(ctx context.Context, id int64) (*access.Principal, *store.Run, int64, error) {
 	p, err := me(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	r, err := store.GetRun(ctx, a.st.R, id)
 	if err != nil {
-		return nil, nil, errNotFound()
+		return nil, nil, 0, errNotFound()
 	}
 	t, err := store.GetGig(ctx, a.st.R, r.GigID)
 	if err != nil || !p.SeesProject(t.WorkspaceID, t.ProjectID) {
-		return nil, nil, errNotFound()
+		return nil, nil, 0, errNotFound()
 	}
-	return p, r, nil
+	return p, r, t.ProjectID, nil
+}
+
+// ownRun: a run's heartbeats, progress, finish and usage come from its worker (or an instance admin).
+func ownRun(p *access.Principal, r *store.Run) error {
+	if r.WorkerUserID == p.User.ID || p.IsInstanceAdmin() {
+		return nil
+	}
+	return errForbidden("Only the run's worker reports on it.")
+}
+
+// claimPlace: the projects of ws the caller may work in (narrowed to the asked ones).
+func claimPlace(p *access.Principal, ws int64, asked []int64) (store.ClaimPlace, error) {
+	ps := p.ProjectsWith(ws, access.Worker)
+	if len(ps) == 0 {
+		return store.ClaimPlace{}, errNoPermission(access.Worker)
+	}
+	if asked != nil {
+		for _, pid := range asked {
+			if !p.SeesProject(ws, pid) {
+				return store.ClaimPlace{}, errNotFound()
+			}
+		}
+		keep := []int64{}
+		for _, pid := range ps {
+			if slices.Contains(asked, pid) {
+				keep = append(keep, pid)
+			}
+		}
+		ps = keep
+	}
+	return store.ClaimPlace{WorkspaceID: ws, Projects: ps}, nil
+}
+
+// claim runs a claim over the places (204 when nothing matches).
+func (a *API) claim(ctx context.Context, p *access.Principal, places []store.ClaimPlace, b ClaimBody) (*claimOut, error) {
+	c := store.Claim{FromCategory: b.FromCategory, ToCategory: b.ToCategory, StartDue: b.StartDue, DryRun: b.DryRun, AlwaysOnly: b.AlwaysOnly}
+	var err error
+	for _, ref := range b.CreatedBy {
+		var u *store.User
+		if id, e := strconv.ParseInt(ref, 10, 64); e == nil {
+			u, err = store.GetUser(ctx, a.st.R, id)
+		} else {
+			u, err = store.GetUserByName(ctx, a.st.R, ref)
+		}
+		if err == nil {
+			c.CreatedBy = append(c.CreatedBy, u.ID)
+		}
+	}
+	if b.CreatedBy != nil && c.CreatedBy == nil {
+		return &claimOut{Status: 204}, nil // nobody matches: nothing to claim
+	}
+	var t *store.Gig
+	err = a.tx(ctx, func(tx *sql.Tx) error {
+		var err error
+		t, err = store.ClaimGigIn(ctx, tx, p.Actor(), places, c)
+		return err
+	})
+	var pr *Problem
+	if errors.As(err, &pr) && pr.Code == "not_found" {
+		return &claimOut{Status: 204}, nil
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		return &claimOut{Status: 204}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &claimOut{Status: 200, ETag: etag(t.Version), Body: t}, nil
 }
 
 // activity reads the log (newest first) with a WHERE clause built by the caller from constants.

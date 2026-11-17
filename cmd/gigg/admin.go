@@ -28,12 +28,18 @@ const adminUsage = `gigg admin: first setup and recovery, working directly on th
   gigg admin workspace-owner <workspace> <username|none>   whose picture marks the workspace's chips
   gigg admin color user|workspace <username|workspace> <#RRGGBB|none>   its colour on chips, badges, avatars
   gigg admin member <workspace> <username> <viewer|consumer|member|manager|none>
-  gigg admin access <username> <workspace|all> <preset|none> [permission=allow|deny ...]
+  gigg admin member <workspace>/<project> <username> <viewer|consumer|member|none>
+                                               a role in one project only (or different there)
+  gigg admin access <username> <workspace[/project]|all> <preset|none> [permission=allow|deny ...]
                                                set the user's access rule there (replaces it)
-  gigg admin allow|deny <username> <workspace|all|each> <permission> [...]
-                                               add permissions to the user's rule there (keeps the rest)
-  gigg admin project-add <workspace> <slug> <name> <KEY>
-  gigg admin key-add -user U [-workspace W] -scopes a,b [-listeners x,y] [-cidrs c] [-name N] [-days 365] [-out F]
+  gigg admin allow|deny <username> <workspace[/project]|all|each> <permission> [...]
+                                               add permissions to the user's rule there (keeps the rest;
+                                               project rules take the gig-level permissions only)
+  gigg admin project-add <workspace> <slug> <name> <KEY> [description]
+                                               the description is what agents read about the project
+  gigg admin key-add -user U [-reach W,W/P,...] -scopes a,b [-listeners x,y] [-cidrs c] [-name N] [-days 365] [-out F]
+                                               -reach limits the key to those places (else it follows
+                                               the user's rules wherever they reach)
   gigg admin key-rotate <key-id> [-out F]
   gigg admin key-revoke <username> <key-name>  revoke that user's active keys with that name
   gigg admin status-rename <workspace> <category> <new name>   rename that status in every project
@@ -210,12 +216,12 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 		})
 	case "member":
 		if len(args) != 3 {
-			return errors.New("usage: member <workspace> <username> <role|none>")
+			return errors.New("usage: member <workspace>[/<project>] <username> <role|none>")
 		}
 		return st.Tx(ctx, func(tx *sql.Tx) error {
-			w, err := store.GetWorkspaceBySlug(ctx, tx, args[0])
+			ws, project, err := store.ResolvePlace(ctx, tx, args[0])
 			if err != nil {
-				return fmt.Errorf("workspace %s: %w", args[0], err)
+				return err
 			}
 			u, err := store.GetUserByName(ctx, tx, args[1])
 			if err != nil {
@@ -225,11 +231,14 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 			if role == "none" {
 				role = ""
 			}
-			return store.SetMembership(ctx, tx, a, w.ID, u.ID, role)
+			if project != nil {
+				return store.SetProjectMembership(ctx, tx, a, ws, *project, u.ID, role)
+			}
+			return store.SetMembership(ctx, tx, a, ws, u.ID, role)
 		})
 	case "access":
 		if len(args) < 3 {
-			return errors.New("usage: access <username> <workspace|all> <preset|none> [permission=allow|deny ...]")
+			return errors.New("usage: access <username> <workspace[/project]|all> <preset|none> [permission=allow|deny ...]")
 		}
 		preset := args[2]
 		if preset == "none" {
@@ -248,21 +257,23 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 			if err != nil {
 				return fmt.Errorf("user %s: %w", args[0], err)
 			}
-			var ws *int64
+			var ws, project *int64
 			if args[1] != "all" {
-				w, err := store.GetWorkspaceBySlug(ctx, tx, args[1])
+				w, pr, err := store.ResolvePlace(ctx, tx, args[1])
 				if err != nil {
-					return fmt.Errorf("workspace %s: %w", args[1], err)
+					return err
 				}
-				ws = &w.ID
+				ws, project = &w, pr
 			}
-			return store.SetRule(ctx, tx, a, "user", u.ID, ws, preset, over)
+			return store.SetRule(ctx, tx, a, "user", u.ID, ws, project, preset, over)
 		})
 	case "allow", "deny":
 		// adds overrides to a user's rule(s), keeping the rest; "each" = every rule the user has (a deny
-		// meant for the user everywhere has to be on each: the most specific rule wins)
+		// meant for the user everywhere has to be on each: the most specific rule wins). A project
+		// rule only takes the gig-level permissions; the others are left out there (they aren't
+		// decided per project).
 		if len(args) < 3 {
-			return fmt.Errorf("usage: %s <username> <workspace|all|each> <permission> [...]", cmd)
+			return fmt.Errorf("usage: %s <username> <workspace[/project]|all|each> <permission> [...]", cmd)
 		}
 		val := cmd == "allow"
 		done := map[bool]string{true: "allowed", false: "denied"}
@@ -280,18 +291,18 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 			if err != nil {
 				return fmt.Errorf("user %s: %w", args[0], err)
 			}
-			var ws *int64
+			var ws, project *int64
 			switch args[1] {
 			case "all", "each":
 				if _, err := store.GetWorkspaceBySlug(ctx, tx, args[1]); err == nil {
 					return fmt.Errorf("a workspace is named %q: ambiguous, use the UI", args[1])
 				}
 			default:
-				w, err := store.GetWorkspaceBySlug(ctx, tx, args[1])
+				w, pr, err := store.ResolvePlace(ctx, tx, args[1])
 				if err != nil {
-					return fmt.Errorf("workspace %s: %w", args[1], err)
+					return err
 				}
-				ws = &w.ID
+				ws, project = &w, pr
 			}
 			rules, err := store.RulesOfUser(ctx, tx, u.ID)
 			if err != nil {
@@ -299,7 +310,9 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 			}
 			var targets []*store.AccessRule
 			for _, r := range rules {
-				if args[1] == "each" || (args[1] == "all" && r.WorkspaceID == nil) || (ws != nil && r.WorkspaceID != nil && *r.WorkspaceID == *ws) {
+				same := ws != nil && r.WorkspaceID != nil && *r.WorkspaceID == *ws &&
+					((project == nil && r.ProjectID == nil) || (project != nil && r.ProjectID != nil && *r.ProjectID == *project))
+				if args[1] == "each" || (args[1] == "all" && r.WorkspaceID == nil) || same {
 					targets = append(targets, r)
 				}
 			}
@@ -311,13 +324,21 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 				for k, v := range rule.Overrides {
 					ov[k] = v
 				}
+				applied := []string{}
 				for _, perm := range args[2:] {
+					if rule.ProjectID != nil && !store.IsProjectPermission(perm) {
+						continue
+					}
 					if v, ok := ov[perm]; ok && v != val {
 						fmt.Fprintf(os.Stderr, "%s: was %s for %s, now %s\n", perm, done[v], u.Username, done[val])
 					}
 					ov[perm] = val
+					applied = append(applied, perm)
 				}
-				if err := store.SetRule(ctx, tx, a, "user", u.ID, rule.WorkspaceID, rule.Preset, ov); err != nil {
+				if len(applied) == 0 {
+					continue
+				}
+				if err := store.SetRule(ctx, tx, a, "user", u.ID, rule.WorkspaceID, rule.ProjectID, rule.Preset, ov); err != nil {
 					return err
 				}
 				where := "all"
@@ -327,13 +348,19 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 						where = w.Slug
 					}
 				}
-				fmt.Fprintf(os.Stderr, "%s in %s: %s %s\n", u.Username, where, strings.Join(args[2:], ", "), done[val])
+				if rule.ProjectID != nil {
+					where += fmt.Sprintf("/%d", *rule.ProjectID)
+					if pr, err := store.GetProject(ctx, tx, *rule.ProjectID); err == nil {
+						where = where[:strings.LastIndex(where, "/")+1] + pr.Slug
+					}
+				}
+				fmt.Fprintf(os.Stderr, "%s in %s: %s %s\n", u.Username, where, strings.Join(applied, ", "), done[val])
 			}
 			return nil
 		})
 	case "project-add":
-		if len(args) != 4 {
-			return errors.New("usage: project-add <workspace> <slug> <name> <KEY>")
+		if len(args) != 4 && len(args) != 5 {
+			return errors.New("usage: project-add <workspace> <slug> <name> <KEY> [description]")
 		}
 		return st.Tx(ctx, func(tx *sql.Tx) error {
 			w, err := store.GetWorkspaceBySlug(ctx, tx, args[0])
@@ -341,6 +368,9 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 				return fmt.Errorf("workspace %s: %w", args[0], err)
 			}
 			p, err := store.CreateProject(ctx, tx, a, w.ID, args[1], args[2], args[3], nil)
+			if err == nil && len(args) == 5 {
+				p, err = store.PatchProject(ctx, tx, a, p.ID, 0, store.ProjectPatch{DescriptionMD: &args[4]})
+			}
 			if err == nil {
 				fmt.Fprintf(os.Stderr, "project %s/%s created (id %d, key %s)\n", w.Slug, p.Slug, p.ID, p.Key)
 			}
@@ -387,7 +417,7 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 	case "key-add":
 		fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
 		user := fs.String("user", "", "acting user")
-		ws := fs.String("workspace", "", "workspace slug (empty = admin key)")
+		reach := fs.String("reach", "", "limit the key to these places, comma-separated, in order: workspace or workspace/project (empty = wherever the user's rules reach)")
 		scopes := fs.String("scopes", "", "comma-separated scopes")
 		listeners := fs.String("listeners", "", "allowed listeners (comma-separated; empty = any)")
 		cidrs := fs.String("cidrs", "", "allowed networks (comma-separated; empty = any)")
@@ -411,15 +441,16 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 			}
 			n := store.NewKey{Name: *name, Prefix: prefix, SecretHash: auth.HashToken(tok), UserID: u.ID, Scopes: split(*scopes),
 				AllowedListeners: split(*listeners), AllowedCIDRs: split(*cidrs), ExpiresAt: time.Now().Add(time.Duration(*days) * 24 * time.Hour).UnixMilli()}
-			if *ws != "" {
-				w, err := store.GetWorkspaceBySlug(ctx, tx, *ws)
+			for _, ref := range split(*reach) {
+				ws, project, err := store.ResolvePlace(ctx, tx, ref)
 				if err != nil {
-					return fmt.Errorf("workspace %s: %w", *ws, err)
+					return err
 				}
-				if !store.UserHas(ctx, tx, u.ID, w.ID, "view") {
-					return fmt.Errorf("%s can't see %s", u.Username, w.Slug)
+				if !store.UserSees(ctx, tx, u.ID, ws, project) {
+					return fmt.Errorf("%s can't see %s", u.Username, ref)
 				}
-				n.WorkspaceID = &w.ID
+				n.Bound = true
+				n.Reach = append(n.Reach, store.KeyPlace{WorkspaceID: ws, ProjectID: project})
 			}
 			k, err := store.CreateKey(ctx, tx, a, n)
 			if err == nil {

@@ -21,6 +21,7 @@ type groupOut struct {
 // RuleBody sets one rule: a preset and/or overrides at one level.
 type RuleBody struct {
 	WorkspaceID *int64          `json:"workspace_id" doc:"The workspace, or null for all workspaces (future ones too)"`
+	ProjectID   *int64          `json:"project_id,omitempty" doc:"One project of that workspace (gig-level permissions only; presets viewer, consumer, member)"`
 	Preset      string          `json:"preset,omitempty" enum:",viewer,consumer,member,manager" doc:"Fills in permissions; empty = none"`
 	Overrides   map[string]bool `json:"overrides,omitempty" doc:"permission -> true (allow) or false (deny); absent = the preset decides, else inherit"`
 }
@@ -87,7 +88,7 @@ func (a *API) registerGroups() {
 				if _, err := store.GetUser(ctx, tx, in.ID); err != nil {
 					return err
 				}
-				return store.SetRule(ctx, tx, p.Actor(), "user", in.ID, in.Body.WorkspaceID, in.Body.Preset, in.Body.Overrides)
+				return store.SetRule(ctx, tx, p.Actor(), "user", in.ID, in.Body.WorkspaceID, in.Body.ProjectID, in.Body.Preset, in.Body.Overrides)
 			})
 			if err != nil {
 				return nil, err
@@ -115,7 +116,7 @@ func (a *API) registerGroups() {
 				if _, err := store.GetGroup(ctx, tx, in.ID); err != nil {
 					return err
 				}
-				if err := store.SetRule(ctx, tx, p.Actor(), "group", in.ID, in.Body.WorkspaceID, in.Body.Preset, in.Body.Overrides); err != nil {
+				if err := store.SetRule(ctx, tx, p.Actor(), "group", in.ID, in.Body.WorkspaceID, in.Body.ProjectID, in.Body.Preset, in.Body.Overrides); err != nil {
 					return err
 				}
 				g, err = store.GetGroup(ctx, tx, in.ID)

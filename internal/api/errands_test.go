@@ -20,7 +20,7 @@ func TestErrandsAPI(t *testing.T) {
 	ws := e.ids["scout.ws"]
 	key := func(user string, scopes string) cred {
 		t.Helper()
-		code, out, _ := e.req("POST", "/keys", fmt.Sprintf(`{"name":"errand-%s","user_id":%d,"workspace":"%s","scopes":[%s],"allowed_listeners":["internal"]}`,
+		code, out, _ := e.req("POST", "/keys", fmt.Sprintf(`{"name":"errand-%s","user_id":%d,"reach":["%s"],"scopes":[%s],"allowed_listeners":["internal"]}`,
 			user, e.ids[user+".user"], user, scopes), ada)
 		e.ok(code, out, 201)
 		var kc KeyCreated

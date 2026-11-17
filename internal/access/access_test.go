@@ -11,7 +11,11 @@ func ptr(v int64) *int64 { return &v }
 
 var wsAll = []int64{10, 11, 12}
 
-func grants(rules ...*store.AccessRule) *store.Grants { return store.NewGrants(false, rules, wsAll) }
+var projAll = map[int64][]int64{10: {100, 101}, 11: {110}, 12: {120}}
+
+func grants(rules ...*store.AccessRule) *store.Grants {
+	return store.NewGrants(false, rules, wsAll, projAll)
+}
 
 func TestMatrix(t *testing.T) {
 	admin := &store.User{ID: 1, IsAdmin: true}
@@ -27,7 +31,7 @@ func TestMatrix(t *testing.T) {
 	}
 
 	// a workspace key: bound to ws 10, scopes intersected with the permissions
-	key := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{WorkspaceID: ptr(10), Scopes: []string{"gigs:read"}}}
+	key := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{Bound: true, Reach: []store.KeyPlace{{WorkspaceID: 10}}, Scopes: []string{"gigs:read"}}}
 	if key.SeesWorkspace(11) || !key.SeesWorkspace(10) {
 		t.Fatal("key binding")
 	}
@@ -42,23 +46,23 @@ func TestMatrix(t *testing.T) {
 	}
 
 	// narrowed key: only project 100
-	narrow := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{WorkspaceID: ptr(10), ProjectIDs: []int64{100}, Scopes: []string{"gigs:read"}}}
+	narrow := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{Bound: true, Reach: []store.KeyPlace{{WorkspaceID: 10, ProjectID: ptr(100)}}, Scopes: []string{"gigs:read"}}}
 	if !narrow.SeesProject(10, 100) || narrow.SeesProject(10, 101) || narrow.SeesProject(11, 100) {
 		t.Fatal("narrowing")
 	}
 
 	// a key bound to a workspace the user can't see sees nothing
-	stale := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{WorkspaceID: ptr(12), Scopes: []string{"gigs:read"}}}
+	stale := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{Bound: true, Reach: []store.KeyPlace{{WorkspaceID: 12}}, Scopes: []string{"gigs:read"}}}
 	if stale.SeesWorkspace(12) || len(stale.Workspaces()) != 0 {
 		t.Fatal("key for a workspace out of reach")
 	}
 
 	// admin session: everything; admin user's workspace key: everything, but only there
-	ag := store.NewGrants(true, nil, wsAll)
+	ag := store.NewGrants(true, nil, wsAll, projAll)
 	if a := (&Principal{User: admin, Grants: ag}); !a.IsInstanceAdmin() || !a.Allowed(99, Manager) || a.Workspaces() != nil || !a.AdminWith("admin:users") {
 		t.Fatal("admin session")
 	}
-	wsKey := &Principal{User: admin, Grants: ag, Key: &store.APIKey{WorkspaceID: ptr(10), Scopes: []string{"gigs:write"}}}
+	wsKey := &Principal{User: admin, Grants: ag, Key: &store.APIKey{Bound: true, Reach: []store.KeyPlace{{WorkspaceID: 10}}, Scopes: []string{"gigs:write"}}}
 	if wsKey.IsInstanceAdmin() || wsKey.SeesWorkspace(11) || !wsKey.Allowed(10, Manager) || wsKey.AdminWith("admin:users") {
 		t.Fatal("admin's workspace key must not be instance admin")
 	}
@@ -106,7 +110,7 @@ func TestRuleOrder(t *testing.T) {
 		{"errand_unsandboxed is never in a preset", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "manager"}}, 10, "errand_unsandboxed", false, "default"},
 	}
 	for _, c := range cases {
-		d := store.NewGrants(false, c.rules, wsAll).Decide(c.ws, c.perm)
+		d := store.NewGrants(false, c.rules, wsAll, projAll).Decide(c.ws, c.perm)
 		if d.Allowed != c.want || d.Source != c.src {
 			t.Errorf("%s: got %v from %s, want %v from %s", c.name, d.Allowed, d.Source, c.want, c.src)
 		}

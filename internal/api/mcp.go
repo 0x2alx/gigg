@@ -15,6 +15,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/0x2alx/gigg/internal/access"
+	"github.com/0x2alx/gigg/internal/store"
 	"github.com/0x2alx/gigg/internal/version"
 )
 
@@ -106,10 +107,10 @@ func rw(title string, destructive bool) *mcp.ToolAnnotations {
 // Tool inputs. Times are unix milliseconds; gigs are ids or keys like GIG-12.
 type (
 	wsArg struct {
-		Workspace string `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit to use your key's workspace"`
+		Workspace string `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit for your own workspace (a limited key: its first place)"`
 	}
 	listGigsArgs struct {
-		Workspace   string `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit to use your key's workspace"`
+		Workspace   string `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit for every workspace in reach (a limited key: its first place)"`
 		Project     int64  `json:"project,omitempty" jsonschema:"Project id"`
 		Category    string `json:"category,omitempty" jsonschema:"backlog, todo, doing, waiting, done or cancelled"`
 		Label       string `json:"label,omitempty" jsonschema:"Label name"`
@@ -297,11 +298,48 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 	p := access.From(r.Context())
 	call := a.caller(r)
 	s := mcp.NewServer(&mcp.Implementation{Name: "gigg", Title: "gigg gig board", Version: version.Version}, nil)
+	// ws: the named workspace; unnamed, the only workspace in reach, or "current" (a limited key's
+	// first place, or the one workspace the user owns)
 	ws := func(ref string) string {
-		if ref == "" {
-			return "current"
+		if ref != "" {
+			return url.PathEscape(ref)
 		}
-		return url.PathEscape(ref)
+		if ids := p.Workspaces(); p.Current() == nil && len(ids) == 1 {
+			return strconv.FormatInt(ids[0], 10)
+		}
+		return "current"
+	}
+	// span: a read of /workspaces/{ws}<path>; with no workspace named and several in reach (a key that
+	// follows its user), one per workspace, as {"workspaces": [{"workspace", "slug", "result"}]}
+	span := func(ctx context.Context, ref, path string, q url.Values) (int, []byte) {
+		ids := p.Workspaces()
+		if ref != "" || p.Current() != nil || len(ids) <= 1 {
+			return call("GET", "/workspaces/"+ws(ref)+path, q, nil)
+		}
+		type part struct {
+			Workspace int64           `json:"workspace"`
+			Slug      string          `json:"slug"`
+			Result    json.RawMessage `json:"result"`
+		}
+		out := struct {
+			Workspaces []part `json:"workspaces"`
+		}{Workspaces: []part{}}
+		for _, id := range ids {
+			code, body := call("GET", "/workspaces/"+strconv.FormatInt(id, 10)+path, q, nil)
+			if code >= 400 {
+				continue
+			}
+			if !json.Valid(body) { // the plain-text summary
+				body, _ = json.Marshal(string(body))
+			}
+			pt := part{Workspace: id, Result: body}
+			if w, err := store.GetWorkspace(ctx, a.st.R, id); err == nil {
+				pt.Slug = w.Slug
+			}
+			out.Workspaces = append(out.Workspaces, pt)
+		}
+		b, _ := json.Marshal(out)
+		return http.StatusOK, b
 	}
 	t := func(ref string) string { return url.PathEscape(ref) }
 	has := p.HasScope
@@ -311,15 +349,15 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 			func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 				return toolResult(call("GET", "/auth/me", nil, nil))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "list_projects", Description: "Projects (boards) of a workspace, with ids and gig key prefixes.", Annotations: ro("List projects")},
+		mcp.AddTool(s, &mcp.Tool{Name: "list_projects", Description: "Projects of a workspace (every workspace in reach when you name none and reach several): ids, gig key prefixes, and each project's description (what it is about: read it for context before working its gigs).", Annotations: ro("List projects")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in wsArg) (*mcp.CallToolResult, any, error) {
-				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/projects", nil, nil))
+				return toolResult(span(ctx, in.Workspace, "/projects", nil))
 			})
 	}
 	if has("gigs:read") {
-		mcp.AddTool(s, &mcp.Tool{Name: "summary", Description: "Plain-text board summary: per project, each status with up to 5 gigs.", Annotations: ro("Board summary")},
+		mcp.AddTool(s, &mcp.Tool{Name: "summary", Description: "Board summary: per project, each status with up to 5 gigs (every workspace in reach when you name none and reach several).", Annotations: ro("Board summary")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in wsArg) (*mcp.CallToolResult, any, error) {
-				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/summary", nil, nil))
+				return toolResult(span(ctx, in.Workspace, "/summary", nil))
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "list_gigs", Description: "Find gigs; filters combine. Board order unless sort is given.", Annotations: ro("List gigs")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in listGigsArgs) (*mcp.CallToolResult, any, error) {
@@ -344,7 +382,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				if in.Limit != 0 {
 					q.Set("limit", strconv.Itoa(in.Limit))
 				}
-				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/gigs", q, nil))
+				return toolResult(span(ctx, in.Workspace, "/gigs", q))
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "get_gig", Description: "One gig by id or key, optionally with its comments.", Annotations: ro("Get gig")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in getGigArgs) (*mcp.CallToolResult, any, error) {

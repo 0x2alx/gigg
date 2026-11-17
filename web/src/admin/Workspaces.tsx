@@ -10,12 +10,14 @@ import {
   adminApi,
   CATEGORIES,
   errMsg,
+  PROJECT_ROLES,
   ROLES,
   type AdminMembership,
   type AdminProject,
   type AdminStatus,
   type AdminUser,
   type AdminWorkspace,
+  type ProjectRole,
   type Role,
 } from "./adminApi";
 import { CustomFields } from "./CustomFields";
@@ -384,14 +386,21 @@ function Members({ ws, users }: { ws: AdminWorkspace; users: AdminUser[] }) {
   const [items, setItems] = useState<AdminMembership[] | null>(null);
   const [error, setError] = useState("");
   const [addUser, setAddUser] = useState("");
+  const [addWhere, setAddWhere] = useState(0); // 0 = the whole workspace, else one project
   const [addRole, setAddRole] = useState<Role>("member");
+  const [projects, setProjects] = useState<AdminProject[]>([]);
   const byId = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
+  const projById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
   const load = useCallback(() => {
     adminApi
       .members(ws.id)
       .then((r) => setItems(r.items))
       .catch((e: unknown) => setError(errMsg(e)));
+    adminApi
+      .projects(ws.id)
+      .then((r) => setProjects(r.items.filter((p) => !p.deleted).sort((a, b) => a.position - b.position)))
+      .catch(() => undefined);
   }, [ws.id]);
   useEffect(load, [load]);
 
@@ -408,27 +417,35 @@ function Members({ ws, users }: { ws: AdminWorkspace; users: AdminUser[] }) {
         return false;
       });
 
-  const memberIds = new Set((items ?? []).map((m) => m.user_id));
-  const candidates = users.filter((u) => !memberIds.has(u.id) && !u.disabled).sort((a, b) => a.username.localeCompare(b.username));
+  // whole-workspace members can't be added again; project-only ones can get the workspace or more projects
+  const wholeIds = new Set((items ?? []).filter((m) => m.whole !== false).map((m) => m.user_id));
+  const candidates = users.filter((u) => !wholeIds.has(u.id) && !u.disabled).sort((a, b) => a.username.localeCompare(b.username));
+  const roleChoices: readonly Role[] = addWhere ? PROJECT_ROLES : ROLES;
   const add = (e: FormEvent) => {
     e.preventDefault();
     if (!addUser) return;
-    act(adminApi.setMember(ws.id, Number(addUser), addRole)).then((ok) => ok && setAddUser(""));
+    const req = addWhere ? adminApi.setProjectMember(addWhere, Number(addUser), addRole as ProjectRole) : adminApi.setMember(ws.id, Number(addUser), addRole);
+    act(req).then((ok) => ok && setAddUser(""));
   };
+  const sourceWords = (src: string) =>
+    src === "user_all" ? "own rule, all workspaces" : src === "group" || src === "group_project" ? "via a group" : src === "group_all" ? "via a group, all workspaces" : src === "user" ? "workspace rule" : src;
 
   return (
     <section className="card" aria-label="Members">
       <div className="admin-section-head">
         <h2>Members</h2>
-        <span className="muted small">Admins reach every workspace without a membership.</span>
+        <span className="muted small">Admins reach every workspace without a membership. A member of only some projects sees just those (none of the workspace's templates, schedules, errands or settings).</span>
       </div>
       <ErrorLine error={error} />
       {items && items.length === 0 && <Empty>No members yet.</Empty>}
       <ul className="admin-list">
         {(items ?? []).map((m) => {
           const u = byId.get(m.user_id);
+          const whole = m.whole !== false;
+          const own = (m.projects ?? []).filter((pm) => !whole || pm.preset || pm.role);
           return (
-            <li key={m.user_id} className="admin-list-row">
+            <li key={m.user_id} className="admin-member">
+            <div className="admin-list-row">
               {u ? <Avatar user={u} /> : <span className="avatar" />}
               <span className="admin-name">
                 {u ? u.display_name || u.username : `user #${m.user_id}`}
@@ -436,19 +453,19 @@ function Members({ ws, users }: { ws: AdminWorkspace; users: AdminUser[] }) {
               </span>
               {u?.kind === "agent" && <span className="pill pill-agent">agent</span>}
               {u?.is_admin && <span className="pill pill-accent">admin</span>}
-              <RolePill role={m.role} />
-              {m.source && m.source !== "user" && (
+              {whole ? <RolePill role={m.role as Role} /> : <span className="pill pill-muted">some projects</span>}
+              {whole && m.source && m.source !== "user" && (
                 <span className="pill pill-muted" title="Where their access to this workspace comes from">
                   {m.source === "user_all" ? "own rule, all workspaces" : m.source === "group" ? "via a group" : m.source === "group_all" ? "via a group, all workspaces" : m.source}
                 </span>
               )}
               <span className="grow" />
               <select
-                aria-label={`Preset of ${u?.username ?? m.user_id} here`}
+                aria-label={`Preset of ${u?.username ?? m.user_id} in the whole workspace`}
                 value={m.preset ?? m.role}
                 onChange={(e) => e.target.value && act(adminApi.setMember(ws.id, m.user_id, e.target.value as Role))}
               >
-                {(m.preset ?? m.role) === "" && <option value="">no own preset</option>}
+                {(m.preset ?? m.role) === "" && <option value="">{whole ? "no own preset" : "only projects"}</option>}
                 {ROLES.map((r) => (
                   <option key={r} value={r}>
                     {r}
@@ -469,6 +486,51 @@ function Members({ ws, users }: { ws: AdminWorkspace; users: AdminUser[] }) {
                   }
                 />
               )}
+            </div>
+            {own.length > 0 && (
+              <ul className="admin-member-projects" aria-label={`${u?.username ?? "Their"} projects`}>
+                {own.map((pm) => {
+                  const pr = projById.get(pm.project_id);
+                  const name = pr?.name ?? `project #${pm.project_id}`;
+                  return (
+                    <li key={pm.project_id} className="admin-list-row">
+                      <span className="admin-name">
+                        <span className="muted" aria-hidden="true">›</span> {name}
+                      </span>
+                      {pm.role ? <RolePill role={pm.role} /> : <span className="pill pill-danger">can't see it</span>}
+                      {pm.source && pm.source !== "user_project" && <span className="pill pill-muted">{sourceWords(pm.source)}</span>}
+                      <span className="grow" />
+                      <select
+                        aria-label={`Preset of ${u?.username ?? m.user_id} in ${name}`}
+                        value={pm.preset ?? ""}
+                        onChange={(e) => e.target.value && act(adminApi.setProjectMember(pm.project_id, m.user_id, e.target.value as ProjectRole))}
+                      >
+                        {!pm.preset && <option value="">no own preset</option>}
+                        {PROJECT_ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                      {pm.preset ? (
+                        <ConfirmButton
+                          label="Remove"
+                          title={`Remove ${u?.username ?? "them"} from ${name}?`}
+                          message={`Their own rule for ${name} goes; their workspace access and groups stay. Gigs there they can no longer see are unassigned.`}
+                          confirmLabel="Remove"
+                          onConfirm={() =>
+                            adminApi.removeProjectMember(pm.project_id, m.user_id).then(() => {
+                              load();
+                              refresh();
+                            })
+                          }
+                        />
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
             </li>
           );
         })}
@@ -488,9 +550,29 @@ function Members({ ws, users }: { ws: AdminWorkspace; users: AdminUser[] }) {
           </select>
         </label>
         <label>
+          Where
+          <select
+            value={addWhere}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setAddWhere(v);
+              if (v && !(PROJECT_ROLES as readonly string[]).includes(addRole)) setAddRole("member");
+            }}
+          >
+            <option value={0}>The whole workspace</option>
+            {projects
+              .filter((p) => !p.archived)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  Only {p.name}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label>
           Role
           <select value={addRole} onChange={(e) => setAddRole(e.target.value as Role)}>
-            {ROLES.map((r) => (
+            {roleChoices.map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>

@@ -156,7 +156,7 @@ func newEnv(t *testing.T) *env {
 	e.cookie = m[1]
 	// runner keys for both agents, internal listener only (as on the host)
 	for _, name := range []string{"scout", "atlas"} {
-		body := fmt.Sprintf(`{"name":"runner","user_id":%d,"workspace":"%s","scopes":["workspace:read","gigs:read","gigs:work","gigs:write","comments:read","comments:write","runs:write","profile:write","keys:self"],"allowed_listeners":["internal"]}`,
+		body := fmt.Sprintf(`{"name":"runner","user_id":%d,"reach":["%s"],"scopes":["workspace:read","gigs:read","gigs:work","gigs:write","comments:read","comments:write","runs:write","profile:write","keys:self"],"allowed_listeners":["internal"]}`,
 			e.ids[name+".user"], name)
 		code, out, _ := e.req("POST", "/keys", body, e.ada())
 		if code != 201 {
@@ -322,11 +322,11 @@ func TestRolesAndScopes(t *testing.T) {
 func TestNoKeyEscalation(t *testing.T) {
 	e := newEnv(t)
 	cases := map[string]string{
-		"wider scope":           `{"name":"x","workspace":"scout","scopes":["gigs:delete"]}`,
-		"other workspace":       `{"name":"x","workspace":"atlas","scopes":["gigs:read"]}`,
+		"wider scope":           `{"name":"x","reach":["scout"],"scopes":["gigs:delete"]}`,
+		"other workspace":       `{"name":"x","reach":["atlas"],"scopes":["gigs:read"]}`,
 		"admin key":             `{"name":"x","scopes":["gigs:read"]}`,
-		"loosen listener":       `{"name":"x","workspace":"scout","scopes":["gigs:read"],"allowed_listeners":["main"]}`,
-		"admin scope on ws key": `{"name":"x","workspace":"scout","scopes":["admin:users"]}`,
+		"loosen listener":       `{"name":"x","reach":["scout"],"scopes":["gigs:read"],"allowed_listeners":["main"]}`,
+		"admin scope on ws key": `{"name":"x","reach":["scout"],"scopes":["admin:users"]}`,
 	}
 	for name, body := range cases {
 		code, out, _ := e.req("POST", "/me/keys", body, e.key("scout"))
@@ -335,11 +335,11 @@ func TestNoKeyEscalation(t *testing.T) {
 		}
 	}
 	// a narrower key is fine and inherits the listener restriction
-	code, out, _ := e.req("POST", "/me/keys", `{"name":"ro","workspace":"current","scopes":["gigs:read"]}`, e.key("scout"))
+	code, out, _ := e.req("POST", "/me/keys", `{"name":"ro","reach":["current"],"scopes":["gigs:read"]}`, e.key("scout"))
 	if code != 422 { // "current" isn't a slug for creation... use the slug
 		_ = out
 	}
-	code, out, _ = e.req("POST", "/me/keys", `{"name":"ro","workspace":"scout","scopes":["gigs:read"]}`, e.key("scout"))
+	code, out, _ = e.req("POST", "/me/keys", `{"name":"ro","reach":["scout"],"scopes":["gigs:read"]}`, e.key("scout"))
 	e.ok(code, out, 201)
 	var kc KeyCreated
 	_ = json.Unmarshal(out, &kc)
@@ -539,9 +539,9 @@ func (e *env) fingerprint(ws int64) string {
 		`SELECT group_concat(id || name || version, '|') FROM labels WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || version, '|') FROM statuses WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || version || COALESCE(deleted_at,''), '|') FROM projects WHERE workspace_id = ?`,
-		`SELECT group_concat(IFNULL(user_id, '') || IFNULL(group_id, '') || preset || overrides, '|') FROM access_rules WHERE workspace_id = ?`,
+		`SELECT group_concat(IFNULL(user_id, '') || IFNULL(group_id, '') || IFNULL(project_id, '') || preset || overrides, '|') FROM access_rules WHERE workspace_id = ?`,
 		`SELECT group_concat(id || status || version, '|') FROM runs WHERE workspace_id = ?`,
-		`SELECT group_concat(id || version || COALESCE(revoked_at,''), '|') FROM api_keys WHERE workspace_id = ?`,
+		`SELECT group_concat(id || version || COALESCE(revoked_at,''), '|') FROM api_keys WHERE id IN (SELECT key_id FROM api_key_reach WHERE workspace_id = ?)`,
 		`SELECT group_concat(id || name || version, '|') FROM workspaces WHERE id = ?`,
 		`SELECT group_concat(id || template_id || schedule_id || version || COALESCE(deleted_at,''), '|') FROM recurrences WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || version || COALESCE(deleted_at,''), '|') FROM schedules WHERE workspace_id = ?`,
@@ -551,7 +551,7 @@ func (e *env) fingerprint(ws int64) string {
 		`SELECT group_concat(id || text || COALESCE(done_at,'') || position, '|') FROM checklist_items WHERE workspace_id = ?`,
 		`SELECT group_concat(from_gig_id || to_gig_id || kind, '|') FROM gig_relations WHERE workspace_id = ?`,
 		`SELECT group_concat(gig_id || field_id || value, '|') FROM gig_custom_values v JOIN gigs t ON t.id = v.gig_id WHERE t.workspace_id = ?`,
-		`SELECT group_concat(id || template_id || schedule_id || worker_id || version || COALESCE(paused_at,'') || COALESCE(run_now_at,'') || COALESCE(deleted_at,''), '|') FROM errands WHERE workspace_id = ?`,
+		`SELECT group_concat(id || template_id || schedule_id || worker_id || IFNULL(project_id, '') || version || COALESCE(paused_at,'') || COALESCE(run_now_at,'') || COALESCE(deleted_at,''), '|') FROM errands WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || command || unsandboxed || version || COALESCE(deleted_at,''), '|') FROM errand_templates WHERE workspace_id = ?`,
 		`SELECT group_concat(id || status || COALESCE(output_tail,''), '|') FROM errand_runs WHERE workspace_id = ?`,
 	} {
@@ -586,7 +586,7 @@ func TestIsolationSweep(t *testing.T) {
 			scopes = append(scopes, `"`+s+`"`)
 		}
 	}
-	code, out, _ := e.req("POST", "/keys", fmt.Sprintf(`{"name":"sweep","user_id":%d,"workspace":"scout","scopes":[%s],"allowed_listeners":["internal"]}`,
+	code, out, _ := e.req("POST", "/keys", fmt.Sprintf(`{"name":"sweep","user_id":%d,"reach":["scout"],"scopes":[%s],"allowed_listeners":["internal"]}`,
 		e.ids["scout.user"], strings.Join(scopes, ",")), e.ada())
 	e.ok(code, out, 201)
 	var kc KeyCreated
@@ -726,7 +726,7 @@ func TestKeyAndSessionBoundaries(t *testing.T) {
 		}
 	}
 	// revoking (or rotating) a key revokes the keys it created
-	code, out, _ = e.req("POST", "/me/keys", `{"name":"child","workspace":"scout","scopes":["gigs:read"]}`, e.key("scout"))
+	code, out, _ = e.req("POST", "/me/keys", `{"name":"child","reach":["scout"],"scopes":["gigs:read"]}`, e.key("scout"))
 	e.ok(code, out, 201)
 	var child KeyCreated
 	_ = json.Unmarshal(out, &child)
@@ -739,7 +739,7 @@ func TestKeyAndSessionBoundaries(t *testing.T) {
 	}
 	e.keys["scout"] = rot.Token
 	// a key without comments:read gets no comment text from activity, inbox or search
-	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"ro","user_id":%d,"workspace":"scout","scopes":["workspace:read","gigs:read"],"allowed_listeners":["internal"]}`, e.ids["scout.user"]), e.ada())
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"ro","user_id":%d,"reach":["scout"],"scopes":["workspace:read","gigs:read"],"allowed_listeners":["internal"]}`, e.ids["scout.user"]), e.ada())
 	e.ok(code, out, 201)
 	var ro KeyCreated
 	_ = json.Unmarshal(out, &ro)

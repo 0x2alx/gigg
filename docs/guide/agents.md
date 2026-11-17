@@ -35,7 +35,7 @@ A tool rule is `Tool` or `Tool(specifier)`. Commas and spaces are fine inside th
 
 ## Which gig an agent gets next
 
-When a runner claims work, gigg hands out the next gig from **To-Do** in the agent's workspace that is **assigned to the agent** (optionally only gigs made by certain people, or in certain projects). The order is: always-run gigs first, then priority, due date and board position. gigg skips:
+When a runner claims work, gigg hands out the next gig from **To-Do** that is **assigned to the agent**, in its workspace or in every workspace and project its key reaches (an agent can be given one project of another workspace), optionally only gigs made by certain people, or in certain projects. The order is: always-run gigs first, then priority, due date, the agent's own workspace before others, then the sidebar's project order and board position. Each workspace's pause and limits apply to its own gigs. The project's description goes to the agent with the gig, as context. gigg skips:
 
 - gigs that haven't reached their start time (when the runner asks for that);
 - gigs whose window has closed, and missed gigs;

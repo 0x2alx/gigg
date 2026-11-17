@@ -243,7 +243,7 @@ func TestMCPNoCreate(t *testing.T) {
 		t.Fatalf("deny: %d %s", code, out)
 	}
 	// a consumer agent's MCP key: errands read-only
-	body := fmt.Sprintf(`{"name":"mcp","user_id":%d,"workspace":"scout","scopes":["workspace:read","gigs:read","gigs:work","gigs:write","comments:read","comments:write","runs:write","profile:write","errands:read","errands:output"],"allowed_listeners":["internal"]}`, e.ids["scout.user"])
+	body := fmt.Sprintf(`{"name":"mcp","user_id":%d,"reach":["scout"],"scopes":["workspace:read","gigs:read","gigs:work","gigs:write","comments:read","comments:write","runs:write","profile:write","errands:read","errands:output"],"allowed_listeners":["internal"]}`, e.ids["scout.user"])
 	code, out, _ := e.req("POST", "/keys", body, e.ada())
 	if code != 201 {
 		t.Fatalf("mcp key: %d %s", code, out)

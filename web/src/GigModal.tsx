@@ -238,7 +238,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
         ]
       : [];
   const [askDetach, setAskDetach] = useState(false);
-  const canCreate = hasCap(me, "create_gigs", ws.id);
+  const canCreate = hasCap(me, "create_gigs", ws.id, project ?? undefined);
   const canRepeat = editing || hasCap(me, "recurring_gigs", ws.id);
 
   // pick: fills the form from a template (the user can still change everything).
@@ -413,7 +413,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
       setProject(w.projects[0].id);
     }
   };
-  const canRelations = hasCap(me, "edit_gigs", ws.id);
+  const canRelations = hasCap(me, "edit_gigs", ws.id, project ?? undefined);
   const single = !tplMode && !editing && !repeating; // one gig, made now
   const alwaysOk = hasCap(me, "always_run", ws.id);
   // without Run timeouts: an edit keeps the timeout as it is; a new item may only drop the one it got

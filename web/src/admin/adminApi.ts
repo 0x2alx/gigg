@@ -30,10 +30,23 @@ export interface AdminWorkspace {
 export interface AdminMembership {
   workspace_id: number;
   user_id: number;
-  role: Role; // the closest preset to what they can do here
+  role: Role | ""; // the closest preset to what they can do in the whole workspace ("" = only some projects)
   preset?: Role | ""; // their own preset here ("" = access comes from elsewhere)
   source?: string; // where "see the workspace" comes from: user | user_all | group | group_all
+  whole?: boolean; // sees the whole workspace (else only projects)
+  projects?: ProjectMembership[]; // projects with a rule of their own, or (not whole) the ones they see
 }
+
+export interface ProjectMembership {
+  project_id: number;
+  role: ProjectRole | ""; // closest preset of what they can do in it ("" = can't see it)
+  preset?: ProjectRole | ""; // their own preset for this project
+  source?: string;
+}
+
+// The roles a rule for one project can give (workspace-level ones need the whole workspace).
+export const PROJECT_ROLES = ["viewer", "consumer", "member"] as const;
+export type ProjectRole = (typeof PROJECT_ROLES)[number];
 
 export interface AdminProject {
   id: number;
@@ -83,8 +96,8 @@ export interface ApiKey {
   name: string;
   prefix: string;
   user_id: number;
-  workspace_id: number | null; // null = admin key
-  project_ids: number[] | null; // empty = every project of the workspace
+  bound: boolean; // true: only the places in reach; false: wherever its user's rules reach (an admin's: admin key)
+  reach: KeyPlace[]; // a bound key's places, in order (the first one's workspace is its "current")
   scopes: string[];
   allowed_listeners: string[] | null; // null = any
   allowed_cidrs: string[] | null; // null = any
@@ -99,11 +112,16 @@ export interface ApiKey {
   version: number;
 }
 
+// KeyPlace: a whole workspace, or one project of it.
+export interface KeyPlace {
+  workspace_id: number;
+  project_id?: number;
+}
+
 export interface KeyCreate {
   name: string;
   user_id?: number;
-  workspace?: string; // id or slug; empty = admin key
-  project_ids?: number[];
+  reach?: string[]; // "workspace" or "workspace/project" (ids or slugs); empty = follows its user
   scopes: string[];
   allowed_listeners?: string[];
   allowed_cidrs?: string[];
@@ -176,6 +194,8 @@ export const adminApi = {
   members: (ws: number) => call<Items<AdminMembership>>("GET", `/workspaces/${ws}/members`),
   setMember: (ws: number, user: number, role: Role) => call<void>("PUT", `/workspaces/${ws}/members/${user}`, { role }),
   removeMember: (ws: number, user: number) => call<void>("DELETE", `/workspaces/${ws}/members/${user}`),
+  setProjectMember: (project: number, user: number, role: ProjectRole) => call<void>("PUT", `/projects/${project}/members/${user}`, { role }),
+  removeProjectMember: (project: number, user: number) => call<void>("DELETE", `/projects/${project}/members/${user}`),
 
   // projects and statuses
   projects: (ws: number) => call<Items<AdminProject>>("GET", `/workspaces/${ws}/projects`),

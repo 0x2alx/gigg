@@ -99,7 +99,7 @@ func (a *API) registerRunner() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
+		if err := requireScope(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		s, err := a.runnerState(ctx, w)
@@ -149,11 +149,11 @@ func (a *API) registerRunner() {
 				UsagePct float64 `json:"usage_pct" minimum:"0" maximum:"100" doc:"Points of the weekly meter (after minus before)"`
 			}
 		}) (*struct{ Body *store.Run }, error) {
-			p, r, err := a.run(ctx, in.ID)
+			p, r, project, err := a.run(ctx, in.ID)
 			if err != nil {
 				return nil, err
 			}
-			if err := require(p, r.WorkspaceID, access.Worker, "runs:write"); err != nil {
+			if err := requireIn(p, r.WorkspaceID, project, access.Worker, "runs:write"); err != nil {
 				return nil, err
 			}
 			if r.WorkerUserID != p.User.ID && !p.IsInstanceAdmin() {

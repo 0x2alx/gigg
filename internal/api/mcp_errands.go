@@ -15,6 +15,7 @@ type (
 	errandSaveArgs struct {
 		ID            int64  `json:"id,omitempty" jsonschema:"An errand to change (omit to make one); fields you omit stay as they are"`
 		Workspace     string `json:"workspace,omitempty" jsonschema:"New errand: workspace id or slug; omit to use your key's workspace"`
+		Project       *int64 `json:"project,omitempty" jsonschema:"Project id the errand belongs to: whoever sees that project sees the errand, and its failure gigs land there (new errand: default the workspace's first project)"`
 		TemplateID    *int64 `json:"template_id,omitempty" jsonschema:"Use this errand template (see list_errand_templates) instead of name/command/..."`
 		Name          string `json:"name,omitempty" jsonschema:"New errand: required unless template_id"`
 		DescriptionMD string `json:"description_md,omitempty"`
@@ -98,6 +99,9 @@ func addErrandTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(st
 			}
 			if in.Unsandboxed != nil {
 				b["unsandboxed"] = *in.Unsandboxed
+			}
+			if in.Project != nil {
+				b["project"] = *in.Project
 			}
 			if in.TemplateID != nil {
 				b["template_id"] = *in.TemplateID

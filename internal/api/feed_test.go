@@ -122,7 +122,7 @@ func TestFeedPermissions(t *testing.T) {
 		}
 	}
 	// a key without comments:read is refused
-	body := fmt.Sprintf(`{"name":"nocomments","user_id":%d,"workspace":"scout","scopes":["workspace:read","gigs:read"]}`, e.ids["scout.user"])
+	body := fmt.Sprintf(`{"name":"nocomments","user_id":%d,"reach":["scout"],"scopes":["workspace:read","gigs:read"]}`, e.ids["scout.user"])
 	code, out, _ := e.req("POST", "/keys", body, e.ada())
 	e.ok(code, out, 201)
 	var kc KeyCreated
@@ -131,7 +131,7 @@ func TestFeedPermissions(t *testing.T) {
 		t.Fatalf("without comments:read: %d %s", code, out)
 	}
 	// a project-narrowed key sees only its project
-	body = fmt.Sprintf(`{"name":"narrow","user_id":%d,"workspace":"scout","project_ids":[%d],"scopes":["workspace:read","gigs:read","gigs:work","gigs:write","comments:read"]}`,
+	body = fmt.Sprintf(`{"name":"narrow","user_id":%d,"reach":["scout/%d"],"scopes":["workspace:read","gigs:read","gigs:work","gigs:write","comments:read"]}`,
 		e.ids["scout.user"], e.ids["scout.p2"])
 	code, out, _ = e.req("POST", "/keys", body, e.ada())
 	e.ok(code, out, 201)
