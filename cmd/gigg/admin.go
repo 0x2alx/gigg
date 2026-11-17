@@ -265,6 +265,7 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 			return fmt.Errorf("usage: %s <username> <workspace|all|each> <permission> [...]", cmd)
 		}
 		val := cmd == "allow"
+		done := map[bool]string{true: "allowed", false: "denied"}
 		known := map[string]bool{}
 		for _, p := range store.Permissions {
 			known[p.Name] = true
@@ -312,7 +313,7 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 				}
 				for _, perm := range args[2:] {
 					if v, ok := ov[perm]; ok && v != val {
-						fmt.Fprintf(os.Stderr, "%s: was %s for %s, now %sed\n", perm, map[bool]string{true: "allowed", false: "denied"}[v], u.Username, cmd)
+						fmt.Fprintf(os.Stderr, "%s: was %s for %s, now %s\n", perm, done[v], u.Username, done[val])
 					}
 					ov[perm] = val
 				}
@@ -326,7 +327,7 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 						where = w.Slug
 					}
 				}
-				fmt.Fprintf(os.Stderr, "%s in %s: %s %sed\n", u.Username, where, strings.Join(args[2:], ", "), cmd)
+				fmt.Fprintf(os.Stderr, "%s in %s: %s %s\n", u.Username, where, strings.Join(args[2:], ", "), done[val])
 			}
 			return nil
 		})
