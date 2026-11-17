@@ -106,6 +106,23 @@ func TestMCP(t *testing.T) {
 	if r.IsError || !strings.Contains(text(r), `"labels":[]`) || !strings.Contains(text(r), `"priority":4`) {
 		t.Fatalf("update_task: %s", text(r))
 	}
+	// assignees by username, cleared with clear
+	r = call("update_task", map[string]any{"task": "GIG-2", "assignees": []string{"@scout"}})
+	if want := fmt.Sprintf(`"assignees":[%d]`, e.ids["scout.user"]); r.IsError || !strings.Contains(text(r), want) {
+		t.Fatalf("update_task assignees: %s", text(r))
+	}
+	r = call("update_task", map[string]any{"task": "GIG-2", "assignees": []string{"nobody-here"}})
+	if !r.IsError || !strings.Contains(text(r), "No such user") {
+		t.Fatalf("unknown assignee: %s", text(r))
+	}
+	r = call("update_task", map[string]any{"task": "GIG-2", "clear": []string{"assignees"}})
+	if r.IsError || !strings.Contains(text(r), `"assignees":[]`) {
+		t.Fatalf("clear assignees: %s", text(r))
+	}
+	r = call("create_task", map[string]any{"project": e.ids["scout.p"], "title": "assigned via MCP", "assignees": []string{"scout"}})
+	if want := fmt.Sprintf(`"assignees":[%d]`, e.ids["scout.user"]); r.IsError || !strings.Contains(text(r), want) {
+		t.Fatalf("create_task assignees: %s", text(r))
+	}
 
 	// schedules need the permission (not in the member preset): allow it for scout
 	if code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), `{"workspace_id":null,"overrides":{"schedules":true}}`, e.ada()); code != 200 {

@@ -140,6 +140,7 @@ type (
 		Category      string         `json:"category,omitempty" jsonschema:"Status category to start in (default: the project's default status)"`
 		Priority      int64          `json:"priority,omitempty" jsonschema:"0 none, 1 low, 2 medium, 3 high, 4 urgent"`
 		Labels        []string       `json:"labels,omitempty" jsonschema:"Label names (created if missing)"`
+		Assignees     []string       `json:"assignees,omitempty" jsonschema:"Usernames (or user ids) to assign; they must be able to see the workspace"`
 		Color         string         `json:"color,omitempty" jsonschema:"#RRGGBB"`
 		StartAt       int64          `json:"start_at,omitempty" jsonschema:"Unix ms"`
 		DueAt         int64          `json:"due_at,omitempty" jsonschema:"Unix ms"`
@@ -159,6 +160,7 @@ type (
 		DescriptionMD *string  `json:"description_md,omitempty" jsonschema:"Markdown; replaces the description"`
 		Priority      *int64   `json:"priority,omitempty" jsonschema:"0-4"`
 		Labels        []string `json:"labels,omitempty" jsonschema:"Replaces the labels"`
+		Assignees     []string `json:"assignees,omitempty" jsonschema:"Usernames (or user ids); replaces the assignees (clear: assignees removes them all)"`
 		Color         string   `json:"color,omitempty" jsonschema:"#RRGGBB"`
 		StartAt       int64    `json:"start_at,omitempty" jsonschema:"Unix ms"`
 		DueAt         int64    `json:"due_at,omitempty" jsonschema:"Unix ms"`
@@ -168,7 +170,7 @@ type (
 		AlwaysRun     *bool    `json:"always_run,omitempty" jsonschema:"Run it whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  []string `json:"allowed_tools,omitempty" jsonschema:"Replaces the runner tool allowlist ([] clears; needs the allowed_tools permission)"`
 		BlocksParent  *bool    `json:"blocks_parent,omitempty" jsonschema:"For a subtask: true = its parent waits until it is done"`
-		Clear         []string `json:"clear,omitempty" jsonschema:"Fields to clear: color, start_at, due_at, not_after, labels"`
+		Clear         []string `json:"clear,omitempty" jsonschema:"Fields to clear: color, start_at, due_at, not_after, labels, assignees"`
 	}
 	moveTaskArgs struct {
 		Task     string `json:"task" jsonschema:"Task id or key"`
@@ -238,6 +240,49 @@ type (
 		Note string `json:"note,omitempty" jsonschema:"Short progress note"`
 	}
 )
+
+// mcpUserIDs turns usernames (or numeric ids) into user ids for a task's assignees, through the API's
+// user list (the caller's co-members, or everyone for admins: no more than the key can see). Whether
+// each may be assigned (sees the task's workspace) is the task API's check, as for the UI.
+func mcpUserIDs(call apiCall, names []string) ([]int64, *mcp.CallToolResult) {
+	ids := make([]int64, 0, len(names))
+	var known map[string]int64
+	for _, n := range names {
+		n = strings.TrimPrefix(strings.TrimSpace(n), "@")
+		if id, err := strconv.ParseInt(n, 10, 64); err == nil && id > 0 {
+			ids = append(ids, id)
+			continue
+		}
+		if known == nil {
+			code, body := call("GET", "/users", nil, nil)
+			if code != http.StatusOK {
+				res, _, _ := toolResult(code, body)
+				return nil, res
+			}
+			var out struct {
+				Items []struct {
+					ID       int64  `json:"id"`
+					Username string `json:"username"`
+				} `json:"items"`
+			}
+			if err := json.Unmarshal(body, &out); err != nil {
+				res, _, _ := toolResult(http.StatusInternalServerError, []byte(`{"status":500,"detail":"user list unreadable"}`))
+				return nil, res
+			}
+			known = map[string]int64{}
+			for _, u := range out.Items {
+				known[strings.ToLower(u.Username)] = u.ID
+			}
+		}
+		id, ok := known[strings.ToLower(n)]
+		if !ok {
+			res, _, _ := toolResult(422, []byte(fmt.Sprintf(`{"status":422,"code":"invalid","detail":%q}`, "No such user among your workspaces' members: "+n)))
+			return nil, res
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
 
 func (a *API) mcpServer(r *http.Request) *mcp.Server {
 	p := access.From(r.Context())
@@ -350,6 +395,13 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				if len(in.Checklist) > 0 {
 					b["checklist"] = in.Checklist
 				}
+				if in.Assignees != nil {
+					ids, res := mcpUserIDs(call, in.Assignees)
+					if res != nil {
+						return res, nil, nil
+					}
+					b["assignees"] = ids
+				}
 				if len(in.Custom) > 0 {
 					b["custom"] = in.Custom
 				}
@@ -363,7 +415,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				return toolResult(call("POST", fmt.Sprintf("/projects/%d/tasks", in.Project), nil, b))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "update_task", Description: "Change a task's title, description, priority, labels, colour, dates, or how an agent runs it (model, effort, always_run, allowed_tools).", Annotations: rw("Update task", false)},
+		mcp.AddTool(s, &mcp.Tool{Name: "update_task", Description: "Change a task's title, description, priority, labels, assignees, colour, dates, or how an agent runs it (model, effort, always_run, allowed_tools).", Annotations: rw("Update task", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in updateTaskArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{}
 				setIf(b, "title", in.Title)
@@ -376,6 +428,13 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				if in.Labels != nil {
 					b["labels"] = in.Labels
+				}
+				if in.Assignees != nil {
+					ids, res := mcpUserIDs(call, in.Assignees)
+					if res != nil {
+						return res, nil, nil
+					}
+					b["assignees"] = ids
 				}
 				if in.StartAt != 0 {
 					b["start_at"] = in.StartAt
@@ -402,10 +461,10 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				for _, f := range in.Clear {
 					switch f {
-					case "color", "start_at", "due_at", "not_after", "labels":
+					case "color", "start_at", "due_at", "not_after", "labels", "assignees":
 						b[f] = nil
 					default:
-						return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"clear accepts color, start_at, due_at, not_after, labels"}`))
+						return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"clear accepts color, start_at, due_at, not_after, labels, assignees"}`))
 					}
 				}
 				return toolResult(call("PATCH", "/tasks/"+t(in.Task), nil, b))

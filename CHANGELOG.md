@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- MCP `create_task` and `update_task` take `assignees` (usernames or user ids); `update_task`
+  clears them with `clear: ["assignees"]`.
 - **Crons**: shell commands an agent runs on a schedule (every N minutes or hours, optionally on
   some weekdays between two times, or daily, weekly, monthly), in its sandbox, with a run history,
   each run's output and no tasks. A **Crons** page lists them, failing first, with a panel for
