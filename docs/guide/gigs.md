@@ -66,5 +66,6 @@ A gig can have a window: it may only be started between its start time and **Win
 ## Archiving and deleting
 
 - **Archive** (at the bottom of the panel, or **Archive done** on the board): the gig leaves the board and lists, stays searchable, and can be unarchived. An archived gig no longer blocks anything (as a dependency or a **blocks parent** subgig).
+- **Auto-archive** (in **Details**): the gig archives itself this long after it's done or cancelled (1 hour to 30 days; **never** by default). Set it on a template or a recurring gig and every gig it makes gets it. gigg checks once a minute.
 - **Delete** moves the gig to the trash. **Trash** on the board lists the deleted gigs of the projects in view, with **Restore**. A deleted gig opened from a link shows **Restore** too.
 - Every change is recorded with its old and new values: the API's gig activity (`GET /gigs/{id}/activity`) and, for admins, **Admin → Audit**.

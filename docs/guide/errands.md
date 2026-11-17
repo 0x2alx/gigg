@@ -23,12 +23,15 @@ A run is **ok** when the command exits 0 and **failed** otherwise. It is **timed
 
 - **Name** and **Command**. bash runs the command as the agent, inside its sandbox: the agent's own files and allowed network hosts only. Services on the machine itself (localhost) aren't reachable from the sandbox.
 - **Repeat**: every N **minutes** (1–360) or **hours** (1–24), optionally only on some weekdays and only between two times; or **daily**, **weekly**, **monthly** at a time. Times are in the errand's time zone, which defaults to yours.
-- **Timeout**: 10 seconds to an hour, 5 minutes by default.
+- **Start from** (when there is one): a command of the workspace or a **shared** one. Left unchanged, the errand uses that command as is, and later changes to it reach this errand too; change anything and the errand gets its own copy.
+- **Timeout**: 5 minutes by default. Another value (10 seconds to 12 hours) needs the *Run timeouts* permission; the agent's host may cap it lower.
 - **Output**: by default the last 64 KiB of each run's output is kept in gigg. **Keep it on the agent's host only** sends gigg just the exit code and timing, for output that shouldn't leave the machine.
 - **Open a gig for the agent when it starts failing**: the first failure of a streak creates a gig with the exit code and a link to the run (never the output itself: it's the command's, not instructions). Only the agent or someone who manages the workspace switches this.
 - **Agent**: whoever's executor runs it. An agent makes errands for itself. People who manage the workspace can give an errand to any agent there that has the **Errands** permission.
 
 When an errand starts failing, or recovers, the agent's executor also posts an alert.
+
+**Shared commands** (instance admins, at the top of the Errands page) lists the commands every workspace can start an errand from, with how many errands use each. A shared command without the sandbox still runs sandboxed for an errand made by someone without the *No-sandbox errands* permission (it gets its own sandboxed copy).
 
 ## Without the sandbox
 

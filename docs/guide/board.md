@@ -15,7 +15,9 @@ The sidebar is a narrow strip of icons in two panels: at the top **Board**, **Da
 
 Cancelled gigs don't appear on the board. Use the table view to see them.
 
-Each column header shows the column's name on a label filled with its colour, with a small mark for the stage (a dashed ring for Backlog, an empty ring for To-Do, half full for Doing, a pause bar for Waiting, a check for Done), then its number of gigs. Hovering over the header (or tabbing to it) shows two buttons on the right:
+Each column header shows the column's name on a label filled with its colour, with a small mark for the stage (a dashed ring for Backlog, an empty ring for To-Do, half full for Doing, a pause bar for Waiting, a check for Done), then its number of gigs. Hovering over the header (or tabbing to it) shows three buttons on the right:
+
+- **Sort** (two arrows): the column's order. **Board order** is the usual one (priority then due date, or the manual order in one project). The others: **Name A → Z** / **Z → A**, **Newest first** / **Oldest first**, **Recently updated**, **Due soonest**, **Priority, highest first**, and in a Done column **Done, latest first** / **earliest first**. Gigs without the date go last. A sorted column keeps its sort button lit next to its name; the board remembers each column's sort per browser. Drag-to-reorder works only in board order.
 
 - **+**: a new gig in this column. The form starts in this column's status; if you move the gig to another project in the form, it starts in that project's first status of the same stage.
 - **Collapse** (two arrows pointing in): the column leaves the board and becomes a small button above it, with its name and count. Click the button to bring the column back. The board remembers collapsed columns per browser. You can drop a card on a collapsed column's button too.
@@ -32,11 +34,12 @@ When agents are at work on the gigs in view, a line under the filters sums it up
 
 A card is quiet on purpose: the theme's border colour and width, the title first, a few facts under it. When someone else or an agent moves a card, it slides to its new place. Hover over (or long-press) any mark to see its tooltip.
 
-- **Top row:** the priority as an icon (three bars for Low, Medium and High, a square with "!" for Urgent; High and Urgent are coloured), the agent state if there is one (see below), and, when several workspaces are in view, the gig's workspace (a dot in its colour and its name). When the column is a stage and the gig's own status is named differently (for example "Needs review"), that status follows in grey. The gig's key (`KEY-12`: the project's key and the gig's number) sits at the right, small; the card's **⋯** takes its place when you hover.
+- **Top row:** the priority as an icon (three bars for Low, Medium and High, a square with "!" for Urgent; High and Urgent are coloured), the agent state if there is one (see below), and, when several workspaces are in view, the gig's workspace as a badge in its colour (with the owner's picture). With an agent state, the workspace and the key start a second line. When the column is a stage and the gig's own status is named differently (for example "Needs review"), that status follows in grey. The gig's key (`KEY-12`: the project's key and the gig's number) sits at the right, small; the card's **⋯** takes its place when you hover.
 - **Title:** up to two lines.
 - **Due date and labels:** the due date as a small outlined chip with a calendar (red when overdue), then up to two labels as tinted chips; "+3" stands for the rest (hover to list them).
 - **Agent block** (only when there is something to show, see below).
 - **Bottom row:** under a thin line, facts as small grey icons and numbers, then the people.
+- **Foot:** a recurring gig's card shows its schedule (for example "Every Tue all day"); a done gig shows when it was done ("Done 8h ago"; hover for the exact time).
 - **The gig's colour:** a coloured stripe on the card's left edge appears only when the gig has a colour. A card that is blocked or missed has a red border, and an archived card a dashed one.
 - **⋯** (top right, shown when you hover the card or tab to it, and always on a touch screen): move the card (see below).
 

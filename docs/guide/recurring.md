@@ -28,11 +28,21 @@ You can also pick an existing **template** and an existing **schedule** in the s
 - A template or schedule that's in use can't be deleted. Deleting a recurring gig leaves its template and schedule in place, unless you tick **Also delete its template** / **Also delete its schedule** in the confirmation; those are offered only when no other recurring gig uses them.
 - **Pause** on a recurring gig stops new occurrences; the ones already made stay.
 
+## Shared templates and schedules
+
+Instance admins can make a template or a schedule **shared**: it belongs to no workspace and every workspace sees it, marked **Shared**, in the lists and in the template and schedule pickers. Only admins change or delete it.
+
+- A new template's **Scope** row (admins only) chooses **This workspace** or **Shared: every workspace**. A shared template is for any project and has no assignees or custom field values: those belong to each workspace.
+- A new schedule's **Workspace** list offers **Shared: every workspace** to admins.
+- A recurring gig on a shared template picks its own assignees. Changing anything else (title, checklist, run settings...) gives that recurring gig its own copy of the template in its workspace; the shared one stays as it is.
+- Likewise, new timing on a recurring gig that uses a shared schedule moves it to a schedule of its own workspace.
+- Editing a shared template or schedule (admins) changes it for every recurring gig that uses it, in every workspace.
+
 ## Templates
 
 **Recurring**, **Schedules** and **Templates** (in the board's **⋯** menu) list everything across your workspaces, each row with its workspace and project. **Show** at the top narrows the list to one workspace or one project; a project also shows its workspace's templates for every project.
 
-**Templates** lists the templates. You can create one there, edit it, or start a gig from it. A template can be limited to one project or usable in all projects of its workspace.
+**Templates** lists the templates. You can create one there, edit it, or start a gig from it. A template can be limited to one project or usable in all projects of its workspace. Shared templates (see above) are listed once, under any **Show** choice.
 
 ## Schedules
 
