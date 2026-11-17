@@ -9,18 +9,25 @@ are relative to `/api/v1`; see [api.md](api.md) for authentication and conventio
 A runner works for one agent user in one workspace:
 
 1. An agent user (`gigg admin user-add scout -agent`).
-2. Access in the workspace: the `member` preset (it includes `edit_gigs`, which allows claiming and
-   recording runs), e.g. `gigg admin member acme scout member`.
-3. A workspace key for that user with the scopes `workspace:read`, `gigs:read`, `gigs:write`,
-   `comments:read`, `comments:write`, `runs:write`. Restrict it to an internal listener and the
+2. Access in the workspace: `work_gigs` (*Work on gigs*: claiming, moving, recording runs), e.g. the
+   `member` preset (`gigg admin member acme scout member`). A runner needs none of the producer's
+   permissions (`edit_gigs`, `delete_gigs`, `archive_gigs`...): they can be denied.
+3. A workspace key for that user with the scopes `workspace:read`, `gigs:read`, `gigs:work`,
+   `comments:read`, `comments:write`, `runs:write` (no `gigs:write`). Restrict it to an internal listener and the
    runner's network if you can (`-listeners internal -cidrs 10.0.0.0/24`).
 
 | Call | Permission | Scopes |
 |---|---|---|
 | Read runner state, stats, gigs, runs | `view` | `gigs:read` |
-| Claim | `edit_gigs` | `gigs:write` |
-| Start run, progress, usage | `edit_gigs` | `runs:write` |
-| Finish run | `edit_gigs` | `runs:write`; plus `comments:write` with a report, `gigs:write` with a move |
+| Claim | `work_gigs` | `gigs:work` |
+| Start run, progress, usage | `work_gigs` | `runs:write` |
+| Finish run | `work_gigs` | `runs:write`; plus `comments:write` with a report, `gigs:work` with a move |
+
+**A runner works only the gigs assigned to its user.** Claim hands out only gigs that list the caller
+among their assignees, and starting a run on a gig needs the same (403 otherwise). A workspace can hold
+gigs assigned to someone else; a gig assigned to a person *and* the agent is the agent's to work. New
+gigs get the workspace's owner when nobody is assigned (see [gigs](../guide/gigs.md#assignees)), so an
+agent's own workspace hands it everything by default.
 | Pause / resume runs | `pause_runs` (or admin) | `runs:write` |
 
 ## Runner state: caps and pause
@@ -186,7 +193,7 @@ POST /runs/{id}/finish
 | `status` | Required: `done`, `needs_human`, `error`, `timeout`, `interrupted` or `parked`. |
 | `report_md` | Stored as a comment on the gig, linked to the run (up to 64 KiB). Needs `comments:write`. |
 | `comment_kind` | `report` (default), `question` or `comment`. Questions and reports notify the gig's creator and assignees; `@username` mentions notify those users. |
-| `move_to_category` | Move the gig there (first status of that category); empty = leave it. Needs `gigs:write`. Moving a gig that is done, cancelled or waiting back to `todo` or `doing` reopens it: like a manual move, an always-run gig then needs the *Always-run gigs* permission and a gig with a tool allowlist the *Gig tool allowlists* permission (403 otherwise). |
+| `move_to_category` | Move the gig there (first status of that category); empty = leave it. Needs `gigs:work`. Moving a gig that is done, cancelled or waiting back to `todo` or `doing` reopens it: like a manual move, an always-run gig then needs the *Always-run gigs* permission and a gig with a tool allowlist the *Gig tool allowlists* permission (403 otherwise). |
 | `check_at` | Only with `parked`: Unix ms, from now to 7 days ahead. The gig's `start_at` moves there, so a claim with `start_due` skips it until then. |
 | `session_id` | The session id if it changed or wasn't known at start. Also stored on the gig. |
 | `cost_usd` | Added to the run and to the gig's `cost_usd_total`. |
@@ -239,7 +246,7 @@ has a `session_id`, the runner can resume that session instead of starting a new
 the comments since its last run (`GET /gigs/{id}/comments?since_id=<last seen comment id>`). Starting
 the next run clears `resume_requested_at`.
 
-Requesting a resume needs `edit_gigs` and `gigs:write` (plus `comments:write` with a comment), and
+Requesting a resume needs `work_gigs` and `gigs:work` (plus `comments:write` with a comment), and
 `always_run` / `allowed_tools` if the gig carries those settings.
 
 ## Gig run settings

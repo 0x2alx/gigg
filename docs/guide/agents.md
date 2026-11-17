@@ -35,14 +35,20 @@ A tool rule is `Tool` or `Tool(specifier)`. Commas and spaces are fine inside th
 
 ## Which gig an agent gets next
 
-When a runner claims work, gigg hands out the next gig from **To-Do** in the agent's workspace (optionally only gigs made by certain people, or in certain projects). The order is: always-run gigs first, then priority, due date and board position. gigg skips:
+When a runner claims work, gigg hands out the next gig from **To-Do** in the agent's workspace that is **assigned to the agent** (optionally only gigs made by certain people, or in certain projects). The order is: always-run gigs first, then priority, due date and board position. gigg skips:
 
 - gigs that haven't reached their start time (when the runner asks for that);
 - gigs whose window has closed, and missed gigs;
 - blocked gigs: an open "blocks" dependency, or an open subgig marked **blocks parent** (see [Subgigs and dependencies](gigs.md#subgigs-and-dependencies));
 - archived gigs.
 
+A gig assigned to someone else stays where it is: the agent doesn't work it, even in its own workspace. A gig assigned to you *and* the agent is the agent's to work; you're on it to follow along. New gigs get the workspace's owner when nobody is assigned (see [Assignees](gigs.md#assignees)), so an agent works everything in its own workspace unless you assign it elsewhere.
+
 The claim moves the gig to Doing, so two runners never get the same gig.
+
+## What an agent may change
+
+Agents are usually set up as **consumers** of their board: they read their gigs, comment, move them between statuses (To-Do, Doing, Waiting, Done...), tick checklist items and report their runs. Writing gigs is for people (and the admin agent that plans the work): the title, description, model, tools, dates, labels, assignees, custom fields and dependencies, adding or removing checklist items, moving a gig to another project, archiving or deleting it. The permissions behind this are *Work on gigs* and *Edit gigs* (see the access reference).
 
 ## Limits and pausing
 

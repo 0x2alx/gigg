@@ -21,12 +21,13 @@ same workspace: without it, it counts as not held.
 |---|---|---|
 | `view` | Basics | See the workspace, its projects, gigs, comments and runs. Every other permission needs it. |
 | `comment` | Basics | Write comments and edit or delete your own. |
-| `edit_gigs` | Gigs | Change, move and assign gigs; claim gigs and report runs (agents). |
+| `work_gigs` | Gigs | Work on gigs: move them between statuses of their project (and reorder), tick checklist items, ask for a resume; claim gigs assigned to you and report runs (agents). |
+| `edit_gigs` | Gigs | Change and assign gigs (title, description, dates, labels, run settings...) and move them to another project. |
 | `create_gigs` | Gigs | Create one-off gigs, clone gigs, and create gigs from templates (with `edit_gigs`). |
 | `delete_gigs` | Gigs | Move gigs to the trash and restore them (with `edit_gigs`). |
 | `archive_gigs` | Gigs | Archive and unarchive gigs (with `edit_gigs`). |
 | `relations` | Gigs | Add and remove blocking/related links between gigs (with `edit_gigs`). |
-| `checklists` | Gigs | Add, tick and remove checklist items (with `edit_gigs`). An override alone doesn't give a viewer these: the admin page marks it "needs Edit gigs". |
+| `checklists` | Gigs | Add, edit, reorder and remove checklist items (with `edit_gigs`; ticking them is `work_gigs`). An override alone doesn't give a viewer these: the admin page marks it "needs Edit gigs". |
 | `always_run` | Runner | Mark gigs to run whatever the usage budget. The gig caps and pauses still apply. |
 | `allowed_tools` | Runner | Give gigs (templates, recurring gigs) the list of tools the agent runner may use for them, and change gigs that have one. |
 | `run_timeout` | Runner | Set, change or clear how long a runner lets one run of a gig (template, recurring gig) go, and give an errand a timeout other than the default or change it. |
@@ -41,12 +42,22 @@ same workspace: without it, it counts as not held.
 
 `GET /api/v1/permissions` returns this list with labels, the presets and the rule order.
 
+### Producers and consumers
+
+`work_gigs` and `edit_gigs` split working on gigs from writing them. A **consumer** (typically an
+agent) holds `work_gigs` without `edit_gigs`: it reads its gigs, comments, moves them between the
+statuses of their project, ticks checklist items, claims the gigs assigned to it, records runs and asks
+for resumes, but can't change a title, description, prompt, model, tools, dates, labels, assignees,
+custom fields or dependencies, add or remove checklist items, move a gig to another project, or
+delete or archive it. A **producer** (a person, or the admin agent that plans the work) also holds
+`edit_gigs` and the rest. The key scopes follow the same split: `gigs:work` and `gigs:write`.
+
 ### What `always_run` and `allowed_tools` guard
 
 These two decide what an unattended agent does, so they also protect existing gigs:
 
 - Setting or clearing `always_run` on a gig, template or recurring gig needs `always_run`. On a gig
-  that has `always_run` set, these need `always_run` too: changing any field, its checklist, custom
+  that has `always_run` set, these need `always_run` too: changing any field, its checklist (ticking an item excepted), custom
   field values or dependencies; reopening it (moving it into `todo` or `doing` from another category,
   by hand, by a move to another project, or by finishing a run with `move_to_category`); unarchiving
   or restoring it; requesting a resume.
@@ -72,6 +83,7 @@ A preset is a named bundle of permissions. Roles shown in the UI are presets.
 |---|:-:|:-:|:-:|:-:|
 | `view` | x | x | x | x |
 | `comment` | | x | x | x |
+| `work_gigs` | | | x | x |
 | `edit_gigs` | | | x | x |
 | `create_gigs` | | | x | x |
 | `delete_gigs` | | | x | x |
@@ -185,8 +197,9 @@ Typical scope sets:
 | Use | Scopes | Permissions (in the workspace) |
 |---|---|---|
 | Read-only dashboard | `workspace:read`, `gigs:read`, `comments:read` | `viewer` |
-| Agent working gigs via MCP | `workspace:read`, `gigs:read`, `gigs:write`, `comments:read`, `comments:write`, `runs:write` | `member` |
-| Unattended runner | the same | `member`, plus `always_run` / `allowed_tools` overrides only if the runner's agent should be able to set them |
+| Agent working gigs via MCP (a consumer) | `workspace:read`, `gigs:read`, `gigs:work`, `comments:read`, `comments:write`, `runs:write` | `member` minus `edit_gigs`, `create_gigs`, `delete_gigs`, `archive_gigs`, `relations`, `checklists` |
+| Unattended runner | the same | the same |
+| Someone who also writes gigs through a key (a producer) | add `gigs:write` (and `gigs:delete`) | `member` |
 | Admin automation | `admin:*` as needed, plus the workspace scopes | instance admin |
 
 Work done in the background on a user's behalf (recurring gigs creating gigs, notifications,

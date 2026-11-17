@@ -59,6 +59,14 @@ By default a subgig doesn't hold anything back: agents may pick up the parent an
 
 Neither is a queue: agents never run a chain back to back. Among the gigs that aren't held back, they take the next one by the usual order (see [Agents](agents.md#which-gig-an-agent-gets-next)). gigg refuses a link that would make a cycle, where two gigs would each wait for the other.
 
+## Assignees
+
+A gig can have several assignees: people and agents. An agent's runner works only the gigs assigned to it (see [Which gig an agent gets next](agents.md#which-gig-an-agent-gets-next)).
+
+- **By default, the workspace's owner.** A gig, template or recurring gig created with nobody assigned gets the workspace's owner (shown on the workspace's settings), for example the agent whose workspace it is. Creating it with assignees keeps those.
+- **Only when it's created.** Afterwards you may assign anyone else, or nobody; gigg doesn't put the owner back. A gig made by a recurring gig or a template starts with the assignees it carries, and with the owner when it carries none.
+- The owner gets no "assigned" notification for this default.
+
 ## Time windows and missed gigs
 
 A gig can have a window: it may only be started between its start time and **Window closes**. If nobody starts it before the window closes, it's marked **missed** and its creator and assignees get a notification. Recurring gigs use windows to make sure a daily gig doesn't run late.

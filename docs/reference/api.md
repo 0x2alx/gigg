@@ -71,7 +71,8 @@ permission in the workspace (see [access.md](access.md#api-keys-scopes-and-permi
 | `workspace:write` | Defining custom fields. |
 | `projects:write` | Workspace settings, projects, statuses and labels (manager operations). |
 | `gigs:read` | Reading gigs, runs, relations, checklists, custom fields, templates, recurring gigs, schedules, runner state, stats, summary, inbox, notifications and saved filters. |
-| `gigs:write` | Creating, changing, moving, cloning, archiving gigs; claiming; relations, checklists, custom values; templates, recurring gigs, schedules; resume requests. |
+| `gigs:work` | A consumer's actions: moving gigs between statuses of their project (and reordering), ticking checklist items, claiming, resume requests, a finish that moves the gig. |
+| `gigs:write` | A producer's: creating, changing, cloning, archiving gigs; moving them to another project; relations, adding and removing checklist items, custom values; templates, recurring gigs, schedules. |
 | `gigs:delete` | Moving gigs to the trash and restoring them. |
 | `comments:read` | Reading comments (also needed for activity). |
 | `comments:write` | Writing comments, run reports, resume comments. |
