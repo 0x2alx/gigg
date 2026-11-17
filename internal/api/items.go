@@ -243,9 +243,23 @@ func (a *API) registerItems() {
 			After *int64  `json:"after,omitempty" doc:"Move after this item id (0 = top)"`
 		}
 	}) (*gigOut, error) {
-		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
-			if err := allowed(p, t.WorkspaceID, "checklists"); err != nil {
-				return nil, err
+		// ticking is a consumer's action (Work on gigs); text and order are a producer's (Checklists)
+		edit := in.Body.Text != nil || in.Body.After != nil
+		// (ticking an always-run gig or one with tools doesn't change how it runs: no guard)
+		min, scope, op := access.Worker, "gigs:work", opEdit
+		if edit {
+			min, scope, op = access.Member, "gigs:write", opGuarded
+		}
+		return a.withGigOp(ctx, in.ID, "", min, scope, op, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+			if edit {
+				if err := allowed(p, t.WorkspaceID, "checklists"); err != nil {
+					return nil, err
+				}
+			}
+			if in.Body.Done != nil {
+				if err := require(p, t.WorkspaceID, access.Worker, "gigs:work"); err != nil {
+					return nil, err
+				}
 			}
 			if err := store.PatchChecklistItem(ctx, tx, p.Actor(), t, in.Item, store.ChecklistPatch{Text: in.Body.Text, Done: in.Body.Done, After: in.Body.After}); err != nil {
 				return nil, err
@@ -506,6 +520,7 @@ func (a *API) registerItems() {
 		in.Body.apply(t)
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			var err error
+			t.Assignees = store.OwnerDefault(ctx, tx, w.ID, t.Assignees)
 			t, err = store.SaveTemplate(ctx, tx, p.Actor(), t, 0)
 			return err
 		})

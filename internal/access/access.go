@@ -60,7 +60,8 @@ type Principal struct {
 const (
 	Viewer    = "view"
 	Commenter = "comment"
-	Member    = "edit_gigs"
+	Worker    = "work_gigs" // consumer: status moves, ticks, claims, runs
+	Member    = "edit_gigs" // producer: field edits
 	Manager   = "manage_workspace"
 )
 

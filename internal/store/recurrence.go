@@ -338,8 +338,10 @@ func CreateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence) (*Recurr
 		}
 		r.fromTemplate(tpl)
 		if tpl.Shared {
-			r.Assignees = r.OwnAssignees
+			r.Assignees = OwnerDefault(ctx, q, r.WorkspaceID, r.OwnAssignees) // its own, or the workspace owner
 		}
+	} else {
+		r.Assignees = OwnerDefault(ctx, q, r.WorkspaceID, r.Assignees) // its new template's
 	}
 	if r.ScheduleID != 0 {
 		s, err := WorkspaceSchedule(ctx, q, r.WorkspaceID, r.ScheduleID)

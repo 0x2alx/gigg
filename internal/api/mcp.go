@@ -424,7 +424,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				return toolResult(call("POST", fmt.Sprintf("/projects/%d/gigs", in.Project), nil, b))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "update_gig", Description: "Change a gig's title, description, priority, labels, assignees, colour, dates, or how an agent runs it (model, effort, always_run, allowed_tools).", Annotations: rw("Update gig", false)},
+		addToolIf(p.AllowedAnywhere("edit_gigs"), s, &mcp.Tool{Name: "update_gig", Description: "Change a gig's title, description, priority, labels, assignees, colour, dates, or how an agent runs it (model, effort, always_run, allowed_tools).", Annotations: rw("Update gig", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in updateGigArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{}
 				setIf(b, "title", in.Title)
@@ -481,7 +481,18 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				return toolResult(call("PATCH", "/gigs/"+t(in.Gig), nil, b))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "move_gig", Description: "Move a gig to another status (by category or id), position, or project of the same workspace.", Annotations: rw("Move gig", false)},
+		addToolIf(p.AllowedAnywhere("create_gigs"), s, &mcp.Tool{Name: "clone_gig", Description: "Copy a gig, optionally into another project of the workspace.", Annotations: rw("Clone gig", false)},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in cloneGigArgs) (*mcp.CallToolResult, any, error) {
+				b := map[string]any{}
+				if in.Project != 0 {
+					b["project"] = in.Project
+				}
+				setIf(b, "title", in.Title)
+				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/clone", nil, b))
+			})
+	}
+	if has("gigs:work") { // a consumer's actions: status moves, resume requests (Work on gigs)
+		mcp.AddTool(s, &mcp.Tool{Name: "move_gig", Description: "Move a gig to another status (by category or id) or position. Moving it to another project of the workspace also needs Edit gigs and gigs:write.", Annotations: rw("Move gig", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in moveGigArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{}
 				setIf(b, "category", in.Category)
@@ -496,15 +507,6 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 					b["gig"] = in.Relative
 				}
 				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/move", nil, b))
-			})
-		addToolIf(p.AllowedAnywhere("create_gigs"), s, &mcp.Tool{Name: "clone_gig", Description: "Copy a gig, optionally into another project of the workspace.", Annotations: rw("Clone gig", false)},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in cloneGigArgs) (*mcp.CallToolResult, any, error) {
-				b := map[string]any{}
-				if in.Project != 0 {
-					b["project"] = in.Project
-				}
-				setIf(b, "title", in.Title)
-				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/clone", nil, b))
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "resume_gig", Description: "Ask for the gig's agent session to be resumed by the runner (records the request; runs nothing).", Annotations: rw("Request resume", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in resumeArgs) (*mcp.CallToolResult, any, error) {

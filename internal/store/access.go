@@ -33,12 +33,13 @@ type Permission struct {
 var Permissions = []Permission{
 	{"view", "See the workspace", "See the workspace, its projects, gigs, comments and runs. Every other permission needs it.", "Basics"},
 	{"comment", "Comment", "Write comments and edit or delete your own.", "Basics"},
-	{"edit_gigs", "Edit gigs", "Change, move and assign gigs; claim gigs and report runs (agents).", "Gigs"},
+	{"work_gigs", "Work on gigs", "Move gigs between statuses of their project, tick checklist items, ask for a resume; claim gigs assigned to you and report runs (agents).", "Gigs"},
+	{"edit_gigs", "Edit gigs", "Change and assign gigs: title, description, dates, labels, run settings; move them to another project.", "Gigs"},
 	{"create_gigs", "Create gigs", "Create one-off gigs, clone gigs, and create gigs from templates (with Edit gigs).", "Gigs"},
 	{"delete_gigs", "Delete gigs", "Move gigs to the trash and restore them (with Edit gigs).", "Gigs"},
 	{"archive_gigs", "Archive gigs", "Archive and unarchive gigs (with Edit gigs).", "Gigs"},
 	{"relations", "Dependencies", "Add and remove blocking/related links between gigs (with Edit gigs).", "Gigs"},
-	{"checklists", "Checklists", "Add, tick and remove checklist items (with Edit gigs).", "Gigs"},
+	{"checklists", "Checklists", "Add, edit, reorder and remove checklist items (with Edit gigs). Ticking them is Work on gigs.", "Gigs"},
 	{"always_run", "Always-run gigs", "Mark gigs to run whatever the usage budget (cron-like gigs). The gig cap and pauses still apply.", "Runner"},
 	{"run_timeout", "Run timeouts", "Set how long an agent may run on a gig (templates and recurring gigs too) or how long an errand may run, instead of the default. The agent's host caps it.", "Runner"},
 	{"allowed_tools", "Gig tool allowlists", "Give gigs (templates, recurring gigs) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change gigs that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner"},
@@ -56,8 +57,8 @@ var Permissions = []Permission{
 var Presets = map[string][]string{
 	"viewer":    {"view"},
 	"commenter": {"view", "comment"},
-	"member":    {"view", "comment", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "saved_filters"},
-	"manager": {"view", "comment", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "saved_filters",
+	"member":    {"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "saved_filters"},
+	"manager": {"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "saved_filters",
 		"schedules", "templates", "custom_fields", "manage_workspace"},
 }
 

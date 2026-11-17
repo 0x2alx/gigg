@@ -27,7 +27,7 @@ func TestErrandsAPI(t *testing.T) {
 		_ = json.Unmarshal(out, &kc)
 		return cred{token: kc.Token, listener: "internal"}
 	}
-	full := `"errands:read","errands:write","errands:run","errands:output","gigs:read","gigs:write"`
+	full := `"errands:read","errands:write","errands:run","errands:output","gigs:read","gigs:work","gigs:write"`
 	scout := key("scout", full)
 	noOut := key("scout", `"errands:read"`)
 	atlas := key("atlas", full)

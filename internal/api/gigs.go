@@ -598,13 +598,17 @@ func (a *API) registerGigs() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "move-gig", Method: "POST", Path: "/gigs/{id}/move", Tags: []string{"gigs"},
 		Summary: "Move a gig: status, position, or another project of the workspace"}, func(ctx context.Context, in *gigMoveIn) (*gigOut, error) {
-		return a.withGig(ctx, in.ID, in.IfMatch, access.Member, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {
+		return a.withGig(ctx, in.ID, in.IfMatch, access.Worker, "gigs:work", func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {
 			b := in.Body
 			m := store.Move{Category: b.Category, Place: store.Place{Where: b.Position, GigID: b.Gig}}
 			if b.Status != 0 {
 				m.StatusID = &b.Status
 			}
 			if b.Project != 0 && b.Project != t.ProjectID {
+				// another project is a producer's edit (a new key, the target's statuses)
+				if err := require(p, t.WorkspaceID, access.Member, "gigs:write"); err != nil {
+					return nil, err
+				}
 				if !p.SeesProject(t.WorkspaceID, b.Project) {
 					return nil, store.Invalid("no such project in this workspace")
 				}
@@ -669,7 +673,7 @@ func (a *API) registerGigs() {
 	huma.Register(a.h, huma.Operation{OperationID: "resume-gig", Method: "POST", Path: "/gigs/{id}/resume", Tags: []string{"gigs"},
 		Summary: "Ask for the gig's agent session to be resumed: records the request and moves it to todo (gigg runs nothing)"},
 		func(ctx context.Context, in *resumeIn) (*gigOut, error) {
-			return a.withGig(ctx, in.ID, "", access.Member, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+			return a.withGig(ctx, in.ID, "", access.Worker, "gigs:work", func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 				if in.Body.CommentMD != "" && !p.HasScope("comments:write") {
 					return nil, errForbidden("This key lacks the comments:write scope.")
 				}

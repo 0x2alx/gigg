@@ -116,7 +116,13 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 				return toolResult(call("POST", "/me/notifications/read", nil, b))
 			})
 	}
+	// ticking needs gigs:work and Work on gigs; adding and removing items gigs:write and Checklists
+	canTick := has("gigs:work") && p.AllowedAnywhere("work_gigs")
+	canItems := has("gigs:write") && p.AllowedAnywhere("checklists")
 	if !has("gigs:write") {
+		if canTick {
+			addChecklistTool(s, call)
+		}
 		return
 	}
 	if p.AllowedAnywhere("relations") {
@@ -129,31 +135,8 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 				return toolResult(call("DELETE", "/gigs/"+t(in.Gig)+"/relations", url.Values{"gig": {in.Other}, "direction": {in.Direction}}, nil))
 			})
 	}
-	if p.AllowedAnywhere("checklists") {
-		mcp.AddTool(s, &mcp.Tool{Name: "update_checklist", Description: "Add, tick, untick or remove checklist items in one call; returns the checklist.", Annotations: rw("Update checklist", false)},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in checklistArgs) (*mcp.CallToolResult, any, error) {
-				if len(in.Add) > 0 {
-					if code, body := call("POST", "/gigs/"+t(in.Gig)+"/checklist", nil, map[string]any{"items": in.Add}); code >= 300 {
-						return toolResult(code, body)
-					}
-				}
-				for _, set := range []struct {
-					ids  []int64
-					done bool
-				}{{in.Check, true}, {in.Clear, false}} {
-					for _, id := range set.ids {
-						if code, body := call("PATCH", fmt.Sprintf("/gigs/%s/checklist/%d", t(in.Gig), id), nil, map[string]any{"done": set.done}); code >= 300 {
-							return toolResult(code, body)
-						}
-					}
-				}
-				for _, id := range in.Del {
-					if code, body := call("DELETE", fmt.Sprintf("/gigs/%s/checklist/%d", t(in.Gig), id), nil, nil); code >= 300 {
-						return toolResult(code, body)
-					}
-				}
-				return toolResult(call("GET", "/gigs/"+t(in.Gig)+"/checklist", nil, nil))
-			})
+	if canTick || canItems {
+		addChecklistTool(s, call)
 	}
 	if p.AllowedAnywhere("archive_gigs") {
 		mcp.AddTool(s, &mcp.Tool{Name: "archive_gig", Description: "Archive a gig (off the board and lists, not trash), or bring it back with restore.", Annotations: rw("Archive gig", false)},
@@ -220,4 +203,33 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 				return toolResult(call("POST", "/workspaces/"+ws(in.Workspace)+"/templates", nil, b))
 			})
 	}
+}
+
+// addChecklistTool: update_checklist; the API answers each part with its own permission.
+func addChecklistTool(s *mcp.Server, call apiCall) {
+	t := url.PathEscape
+	mcp.AddTool(s, &mcp.Tool{Name: "update_checklist", Description: "Tick or untick checklist items (Work on gigs), or add and remove them (Checklists), in one call; returns the checklist.", Annotations: rw("Update checklist", false)},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in checklistArgs) (*mcp.CallToolResult, any, error) {
+			if len(in.Add) > 0 {
+				if code, body := call("POST", "/gigs/"+t(in.Gig)+"/checklist", nil, map[string]any{"items": in.Add}); code >= 300 {
+					return toolResult(code, body)
+				}
+			}
+			for _, set := range []struct {
+				ids  []int64
+				done bool
+			}{{in.Check, true}, {in.Clear, false}} {
+				for _, id := range set.ids {
+					if code, body := call("PATCH", fmt.Sprintf("/gigs/%s/checklist/%d", t(in.Gig), id), nil, map[string]any{"done": set.done}); code >= 300 {
+						return toolResult(code, body)
+					}
+				}
+			}
+			for _, id := range in.Del {
+				if code, body := call("DELETE", fmt.Sprintf("/gigs/%s/checklist/%d", t(in.Gig), id), nil, nil); code >= 300 {
+					return toolResult(code, body)
+				}
+			}
+			return toolResult(call("GET", "/gigs/"+t(in.Gig)+"/checklist", nil, nil))
+		})
 }

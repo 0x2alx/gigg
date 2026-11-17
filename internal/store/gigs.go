@@ -721,7 +721,8 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 	if err := setLabels(ctx, q, a, p.WorkspaceID, id, n.Labels); err != nil {
 		return nil, err
 	}
-	if err := setAssignees(ctx, q, p.WorkspaceID, id, n.Assignees); err != nil {
+	// the owner by default, quietly: a default isn't someone handing them the gig
+	if err := setAssignees(ctx, q, p.WorkspaceID, id, OwnerDefault(ctx, q, p.WorkspaceID, n.Assignees)); err != nil {
 		return nil, err
 	}
 	data := map[string]any{"key": fmt.Sprintf("%s-%d", p.Key, num), "title": n.Title, "status": st.Name}
@@ -736,7 +737,7 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 		return nil, err
 	}
 	if !n.Quiet {
-		if err := Notify(ctx, q, a, t, nil, "assigned", t.Assignees); err != nil {
+		if err := Notify(ctx, q, a, t, nil, "assigned", n.Assignees); err != nil {
 			return nil, err
 		}
 	}
@@ -774,6 +775,23 @@ func setLabels(ctx context.Context, q Q, a Actor, ws, gig int64, names []string)
 		}
 	}
 	return nil
+}
+
+// OwnerDefault: what a new gig, workspace template or recurring gig is assigned to when it's created
+// with nobody: the workspace's owner, if they can be assigned there (active, sees the workspace).
+// Creation only; later edits may leave it unassigned.
+func OwnerDefault(ctx context.Context, q Q, ws int64, users []int64) []int64 {
+	if len(users) > 0 || ws == 0 {
+		return users
+	}
+	var owner sql.NullInt64
+	if err := q.QueryRowContext(ctx, `SELECT owner_id FROM workspaces WHERE id = ?`, ws).Scan(&owner); err != nil || !owner.Valid {
+		return users
+	}
+	if _, g, err := UserGrants(ctx, q, owner.Int64); err != nil || !g.Has(ws, "view") {
+		return users
+	}
+	return []int64{owner.Int64}
 }
 
 // MaxAssignees bounds a gig's assignee list.

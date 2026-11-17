@@ -156,7 +156,7 @@ func newEnv(t *testing.T) *env {
 	e.cookie = m[1]
 	// runner keys for both agents, internal listener only (as on the host)
 	for _, name := range []string{"scout", "atlas"} {
-		body := fmt.Sprintf(`{"name":"runner","user_id":%d,"workspace":"%s","scopes":["workspace:read","gigs:read","gigs:write","comments:read","comments:write","artifacts:write","runs:write","profile:write","keys:self"],"allowed_listeners":["internal"]}`,
+		body := fmt.Sprintf(`{"name":"runner","user_id":%d,"workspace":"%s","scopes":["workspace:read","gigs:read","gigs:work","gigs:write","comments:read","comments:write","artifacts:write","runs:write","profile:write","keys:self"],"allowed_listeners":["internal"]}`,
 			e.ids[name+".user"], name)
 		code, out, _ := e.req("POST", "/keys", body, e.ada())
 		if code != 201 {

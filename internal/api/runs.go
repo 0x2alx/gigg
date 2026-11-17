@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -177,8 +178,11 @@ func (a *API) registerRuns() {
 		if t.Deleted {
 			return nil, trashErr(t)
 		}
-		if err := require(p, t.WorkspaceID, access.Member, "runs:write"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Worker, "runs:write"); err != nil {
 			return nil, err
+		}
+		if !slices.Contains(t.Assignees, p.User.ID) {
+			return nil, errForbidden("Only an assignee of the gig starts runs on it.")
 		}
 		var r *store.Run
 		err = a.tx(ctx, func(tx *sql.Tx) error {
@@ -212,7 +216,7 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Member, "runs:write"); err != nil {
+		if err := require(p, r.WorkspaceID, access.Worker, "runs:write"); err != nil {
 			return nil, err
 		}
 		err = a.tx(ctx, func(tx *sql.Tx) error {
@@ -236,15 +240,15 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Member, "runs:write"); err != nil {
+		if err := require(p, r.WorkspaceID, access.Worker, "runs:write"); err != nil {
 			return nil, err
 		}
 		b := in.Body
 		if b.ReportMD != "" && !p.HasScope("comments:write") {
 			return nil, errForbidden("This key lacks the comments:write scope.")
 		}
-		if b.MoveToCategory != "" && !p.HasScope("gigs:write") {
-			return nil, errForbidden("This key lacks the gigs:write scope.")
+		if b.MoveToCategory != "" && !p.HasScope("gigs:work") {
+			return nil, errForbidden("This key lacks the gigs:work scope.")
 		}
 		// moving the gig back to To-Do or Doing reopens it: the same check as move-gig (an always-run
 		// gig, or one with a tool allowlist, only by people allowed to run those)
@@ -287,7 +291,7 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Member, "gigs:write"); err != nil {
+		if err := require(p, w.ID, access.Worker, "gigs:work"); err != nil {
 			return nil, err
 		}
 		c := store.Claim{FromCategory: in.Body.FromCategory, ToCategory: in.Body.ToCategory, StartDue: in.Body.StartDue, DryRun: in.Body.DryRun,

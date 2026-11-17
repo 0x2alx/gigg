@@ -153,7 +153,7 @@ func (a *API) registerRunner() {
 			if err != nil {
 				return nil, err
 			}
-			if err := require(p, r.WorkspaceID, access.Member, "runs:write"); err != nil {
+			if err := require(p, r.WorkspaceID, access.Worker, "runs:write"); err != nil {
 				return nil, err
 			}
 			if r.WorkerUserID != p.User.ID && !p.IsInstanceAdmin() {

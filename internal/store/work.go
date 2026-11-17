@@ -569,7 +569,8 @@ type Claim struct {
 	DryRun       bool
 }
 
-// ClaimGig returns the claimed gig, or ErrNotFound when nothing matches.
+// ClaimGig returns the claimed gig, or ErrNotFound when nothing matches. Only gigs assigned to the
+// caller are handed out.
 func ClaimGig(ctx context.Context, q Q, a Actor, ws int64, c Claim) (*Gig, error) {
 	if c.FromCategory == "" {
 		c.FromCategory = "todo"
@@ -588,6 +589,8 @@ func ClaimGig(ctx context.Context, q Q, a Actor, ws int64, c Claim) (*Gig, error
 	if c.CreatedBy != nil {
 		where, args = append(where, "t.created_by IN ("+placeholders(len(c.CreatedBy))+")"), append(args, int64Args(c.CreatedBy)...)
 	}
+	// only gigs assigned to the claimer: a workspace may hold gigs for someone else
+	where, args = append(where, "EXISTS (SELECT 1 FROM gig_assignees ga WHERE ga.gig_id = t.id AND ga.user_id = ?)"), append(args, a.UserID)
 	if c.StartDue {
 		where, args = append(where, "(t.start_at IS NULL OR t.start_at <= ?)"), append(args, Now())
 	}
