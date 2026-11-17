@@ -15,7 +15,7 @@ import { repeatOfSchedule, sameTiming } from "./scheduleTiming";
 import { ChecklistDraft, DependenciesDraft, FieldsDraft, Row, SubgigsDraft, type DraftDep } from "./GigSections";
 import { GigEditor, type EditorMode } from "./GigEditor";
 import { defaultRepeat, fmtInstant, localTZ, repeatFromRule, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
-import { Modal } from "./ui";
+import { ConfirmModal, Modal } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
@@ -229,6 +229,15 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     setPickedSchedule(x);
     if (x) setRepeat((r) => repeatOfSchedule(x, r));
   };
+  // what saving this edit takes the recurring gig off (the server makes workspace copies)
+  const detaching =
+    editing && schedule && repeating
+      ? [
+          ...(schedule.template_shared && !usesPicked ? [`the shared template “${schedule.template_name}”: it gets its own copy in this workspace`] : []),
+          ...(schedule.schedule_shared && !usesSchedule ? [`the shared schedule “${schedule.schedule_name}”: it gets a schedule of its own`] : []),
+        ]
+      : [];
+  const [askDetach, setAskDetach] = useState(false);
   const canCreate = hasCap(me, "create_gigs", ws.id);
   const canRepeat = editing || hasCap(me, "schedules", ws.id);
 
@@ -317,6 +326,16 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
       setErr(problem);
       return;
     }
+    // an edit that takes a recurring gig off a shared template or schedule: ask first
+    if (detaching.length) {
+      setAskDetach(true);
+      return;
+    }
+    save();
+  };
+
+  const save = () => {
+    setAskDetach(false);
     setBusy(true);
     setErr("");
     const fail = (e: unknown) => {
@@ -585,6 +604,17 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           </button>
         </div>
       </form>
+      {askDetach && (
+        <ConfirmModal title="Leave the shared library?" confirmLabel="Save anyway" onConfirm={save} onCancel={() => setAskDetach(false)}>
+          <p>Saving this edit moves this recurring gig off</p>
+          <ul>
+            {detaching.map((d) => (
+              <li key={d}>{d}.</li>
+            ))}
+          </ul>
+          <p className="muted small">Later changes an admin makes to the shared one won't reach it. The shared one and the other workspaces stay as they are.</p>
+        </ConfirmModal>
+      )}
     </Modal>
   );
 }

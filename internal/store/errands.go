@@ -75,21 +75,23 @@ type Errand struct {
 	CreatedAt    int64      `json:"created_at"`
 	Version      int64      `json:"version"`
 	// the template
-	TemplateID    int64  `json:"template_id"`
-	Name          string `json:"name"`
-	DescriptionMD string `json:"description_md"`
-	Command       string `json:"command"`
-	TimeoutS      int64  `json:"timeout_s"`
-	Output        string `json:"output"`
-	Unsandboxed   bool   `json:"unsandboxed"`
-	CommandSetBy  int64  `json:"command_set_by"`
-	UnsandboxedBy *int64 `json:"unsandboxed_set_by"`
-	TemplateUses  int64  `json:"template_uses"`
+	TemplateID     int64  `json:"template_id"`
+	Name           string `json:"name"`
+	DescriptionMD  string `json:"description_md"`
+	Command        string `json:"command"`
+	TimeoutS       int64  `json:"timeout_s"`
+	Output         string `json:"output"`
+	Unsandboxed    bool   `json:"unsandboxed"`
+	CommandSetBy   int64  `json:"command_set_by"`
+	UnsandboxedBy  *int64 `json:"unsandboxed_set_by"`
+	TemplateUses   int64  `json:"template_uses"`
+	TemplateShared bool   `json:"template_shared" doc:"Its content is a shared errand template (a change gives it its own copy)"`
 	// the schedule
-	ScheduleID   int64  `json:"schedule_id"`
-	ScheduleName string `json:"schedule_name"`
-	ScheduleText string `json:"schedule_text" doc:"The schedule in words"`
-	Rule         Rule   `json:"rule"`
+	ScheduleID     int64  `json:"schedule_id"`
+	ScheduleName   string `json:"schedule_name"`
+	ScheduleShared bool   `json:"schedule_shared" doc:"Its schedule is a shared one (new timing gives it its own)"`
+	ScheduleText   string `json:"schedule_text" doc:"The schedule in words"`
+	Rule           Rule   `json:"rule"`
 }
 
 // Errand limits.
@@ -354,8 +356,8 @@ func DeleteErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate) 
 const errandCols = `c.id, c.workspace_id, c.worker_id, COALESCE(w.username, ''), c.created_by, c.on_failure_gig, c.next_at, c.run_now_at,
 	c.paused_at IS NOT NULL, c.state, c.fail_streak, c.failing_since, c.last_run_id, c.created_at, c.version,
 	t.id, t.name, t.description_md, t.command, t.timeout_s, t.output, t.unsandboxed, t.command_set_by, t.unsandboxed_set_by,
-	(SELECT count(*) FROM errands u WHERE u.template_id = t.id AND u.deleted_at IS NULL),
-	s.id, s.name, s.freq, s.interval_n, s.weekdays, s.month_day, s.tz, s.window_start, s.window_minutes, s.lead_minutes`
+	(SELECT count(*) FROM errands u WHERE u.template_id = t.id AND u.deleted_at IS NULL), t.workspace_id IS NULL,
+	s.id, s.name, s.workspace_id IS NULL, s.freq, s.interval_n, s.weekdays, s.month_day, s.tz, s.window_start, s.window_minutes, s.lead_minutes`
 
 const errandFrom = `errands c JOIN errand_templates t ON t.id = c.template_id JOIN schedules s ON s.id = c.schedule_id LEFT JOIN users w ON w.id = c.worker_id`
 
@@ -365,7 +367,7 @@ func scanErrand(row interface{ Scan(...any) error }) (*Errand, int64, error) {
 	var weekdays string
 	if err := row.Scan(&c.ID, &c.WorkspaceID, &c.WorkerID, &c.WorkerName, &c.CreatedBy, &c.OnFailureGig, &next, &now, &c.Paused, &c.State,
 		&c.FailStreak, &since, &last, &c.CreatedAt, &c.Version, &c.TemplateID, &c.Name, &c.DescriptionMD, &c.Command, &c.TimeoutS, &c.Output,
-		&c.Unsandboxed, &c.CommandSetBy, &ub, &c.TemplateUses, &c.ScheduleID, &c.ScheduleName, &c.Rule.Freq, &c.Rule.Interval, &weekdays, &md,
+		&c.Unsandboxed, &c.CommandSetBy, &ub, &c.TemplateUses, &c.TemplateShared, &c.ScheduleID, &c.ScheduleName, &c.ScheduleShared, &c.Rule.Freq, &c.Rule.Interval, &weekdays, &md,
 		&c.Rule.TZ, &c.Rule.WindowStart, &c.Rule.WindowMinutes, &c.Rule.LeadMinutes); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, ErrNotFound

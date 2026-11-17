@@ -12,7 +12,7 @@ import { RfRow } from "./RepeatFields";
 import { WEEKDAYS, localTZ, ordinal } from "./recurrence";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
-import { Avatar, ClearFilters, Modal } from "./ui";
+import { Avatar, ClearFilters, ConfirmModal, Modal } from "./ui";
 import { PRIORITY_COLOR } from "./theme";
 import {
   RUN_STATUS_TEXT,
@@ -21,6 +21,7 @@ import {
   errandApi,
   errandBody,
   errandProblem,
+  detaching,
   defaultErrandForm,
   describeErrand,
   durMS,
@@ -73,7 +74,7 @@ export function ErrandsPage({ open }: { open?: number }) {
   const [state, setState] = useState<StateFilter>(() => (new URLSearchParams(location.search).get("state") === "failing" ? "failing" : ""));
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Errand | "new" | null>(null);
-  const [library, setLibrary] = useState(false); // the shared commands (instance admins)
+  const [library, setLibrary] = useState(false); // the shared errand templates (instance admins)
   const [now, setNow] = useState(Date.now());
 
   const wsKey = tree.map((w) => w.id).join(",");
@@ -142,8 +143,8 @@ export function ErrandsPage({ open }: { open?: number }) {
         </div>
         <div className="row">
           {me.admin && (
-            <button type="button" className="button secondary" onClick={() => setLibrary(true)} data-tip="Commands every workspace can start an errand from">
-              <Icon name="template" /> Shared commands
+            <button type="button" className="button secondary" onClick={() => setLibrary(true)} data-tip="Errand templates every workspace can start an errand from">
+              <Icon name="template" /> Shared templates
             </button>
           )}
           {writable.length > 0 && (
@@ -317,7 +318,7 @@ export function ErrandsPage({ open }: { open?: number }) {
           <p className="muted">This errand doesn't exist, or you can't see it.</p>
         </aside>
       )}
-      {library && <SharedCommands ws={writable[0] ?? tree[0]!} onClose={() => setLibrary(false)} />}
+      {library && <SharedTemplates ws={writable[0] ?? tree[0]!} onClose={() => setLibrary(false)} />}
       {editing && (editing !== "new" || writable.length > 0) && (
         <ErrandEditor
           errand={editing === "new" ? null : editing}
@@ -474,7 +475,7 @@ function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChan
         {c.template_uses > 1 && (
           <>
             <dt>Shared</dt>
-            <dd>its command is shared by {c.template_uses} errands</dd>
+            <dd>its template is shared by {c.template_uses} errands</dd>
           </>
         )}
       </dl>
@@ -563,9 +564,9 @@ const UNIT: Record<ErrandFreq, [string, string]> = {
   monthly: ["month", "months"],
 };
 
-// SharedCommands: the shared errand templates (instance admins): list, new, edit, delete. Each is
+// SharedTemplates: the shared errand templates (instance admins): list, new, edit, delete. Each is
 // edited in the errand editor (its command half).
-function SharedCommands({ ws, onClose }: { ws: WorkspaceTree; onClose: () => void }) {
+function SharedTemplates({ ws, onClose }: { ws: WorkspaceTree; onClose: () => void }) {
   const [items, setItems] = useState<ErrandTemplate[] | null>(null);
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState<ErrandTemplate | "new" | null>(null);
@@ -573,7 +574,7 @@ function SharedCommands({ ws, onClose }: { ws: WorkspaceTree; onClose: () => voi
   const load = useCallback(() => {
     errandApi.sharedTemplates().then(
       (r) => setItems(r.items.sort((a, b) => a.name.localeCompare(b.name))),
-      (e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't load the shared commands."),
+      (e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't load the shared errand templates."),
     );
   }, []);
   useEffect(load, [load]);
@@ -601,17 +602,17 @@ function SharedCommands({ ws, onClose }: { ws: WorkspaceTree; onClose: () => voi
       />
     );
   return (
-    <Modal title="Shared commands" onClose={onClose} wide>
-      <p className="muted small">Every workspace can start an errand from these. Changing one changes every errand that uses it as is; an errand that changes the command gets its own copy.</p>
+    <Modal title="Shared errand templates" onClose={onClose} wide>
+      <p className="muted small">Every workspace can start an errand from these. Changing one changes every errand that uses it as is; an errand that changes its content gets its own copy.</p>
       {err && (
         <p className="danger" role="alert">
           {err}
         </p>
       )}
       {items === null && !err && <p className="muted">Loading…</p>}
-      {items?.length === 0 && <p className="muted">No shared commands yet.</p>}
+      {items?.length === 0 && <p className="muted">No shared errand templates yet.</p>}
       {!!items?.length && (
-        <ul className="schedules" aria-label="Shared commands">
+        <ul className="schedules" aria-label="Shared errand templates">
           {items.map((t) => (
             <li key={t.id} className="schedule">
               <div className="schedule-top">
@@ -632,7 +633,7 @@ function SharedCommands({ ws, onClose }: { ws: WorkspaceTree; onClose: () => voi
               <div className="schedule-actions">
                 {confirm === t.id ? (
                   <>
-                    <span className="small">Delete this shared command?</span>
+                    <span className="small">Delete this shared template?</span>
                     <button type="button" className="button danger-button small" onClick={() => remove(t)}>
                       Delete
                     </button>
@@ -650,7 +651,7 @@ function SharedCommands({ ws, onClose }: { ws: WorkspaceTree; onClose: () => voi
                       className="button danger-button small"
                       onClick={() => setConfirm(t.id)}
                       disabled={t.uses > 0}
-                      title={t.uses > 0 ? "Errands use it: delete them or change their command first" : undefined}
+                      title={t.uses > 0 ? "Errands use it: delete them or change their content first" : undefined}
                       aria-label={`Delete ${t.name}`}
                     >
                       <Icon name="trash" /> Delete
@@ -664,14 +665,14 @@ function SharedCommands({ ws, onClose }: { ws: WorkspaceTree; onClose: () => voi
       )}
       <div className="row end">
         <button type="button" className="button" onClick={() => setEditing("new")}>
-          + New shared command
+          + New shared template
         </button>
       </div>
     </Modal>
   );
 }
 
-// ErrandEditor: a new errand, an errand, or (template) a shared command: then only its command half
+// ErrandEditor: a new errand, an errand, or (template) a shared errand template: then only its command half
 // (name, command, timeout, output, sandbox, notes), saved to the shared library.
 function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, onTemplateSaved }: {
   errand: Errand | null; template?: ErrandTemplate | "new"; choices: WorkspaceTree[]; initialWs: WorkspaceTree; onClose: () => void; onSaved: (c: Errand) => void; onTemplateSaved?: () => void;
@@ -685,7 +686,7 @@ function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, 
   const set = (p: Partial<ErrandForm>) => setF((x) => ({ ...x, ...p }));
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  // a new errand may start from a command of its workspace or a shared one
+  // a new errand may start from an errand template of its workspace or a shared one
   const [library, setLibrary] = useState<ErrandTemplate[]>([]);
   const [picked, setPicked] = useState<ErrandTemplate | null>(null);
   useEffect(() => {
@@ -719,8 +720,10 @@ function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, 
   const int = (v: string, d: number) => (Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) : d);
   const loosing = !!errand?.unsandboxed && !canUnsandbox;
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
+  // an edit that takes the errand off a shared template or schedule asks first
+  const [askDetach, setAskDetach] = useState<string[] | null>(null);
+  const submit = (e: FormEvent | null, confirmed = false) => {
+    e?.preventDefault();
     if (problem) return setErr(problem);
     setBusy(true);
     setErr("");
@@ -734,6 +737,13 @@ function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, 
       return;
     }
     const body = errandBody({ ...f, worker }, errand, canUnsandbox, picked);
+    const leaving = detaching(errand, body);
+    if (leaving.length && !confirmed) {
+      setBusy(false);
+      setAskDetach(leaving);
+      return;
+    }
+    setAskDetach(null);
     (errand ? errandApi.patch(errand.id, body, errand.version) : errandApi.create(ws.id, body))
       .then(onSaved)
       .catch((e: unknown) => setErr(e instanceof ApiError ? (e.status === 412 ? "Someone changed this errand meanwhile. Close and reopen it." : e.message) : "Couldn't save the errand."))
@@ -741,11 +751,11 @@ function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, 
   };
 
   return (
-    <Modal title={tplMode ? (tpl ? `Edit shared command ${tpl.name}` : "New shared command") : errand ? `Edit ${errand.name}` : "New errand"} onClose={onClose} wide>
-      <form className="form-grid errand-form" onSubmit={submit} aria-label={tplMode ? "Shared command" : errand ? "Edit errand" : "New errand"}>
+    <Modal title={tplMode ? (tpl ? `Edit shared errand template ${tpl.name}` : "New shared errand template") : errand ? `Edit ${errand.name}` : "New errand"} onClose={onClose} wide>
+      <form className="form-grid errand-form" onSubmit={submit} aria-label={tplMode ? "Shared errand template" : errand ? "Edit errand" : "New errand"}>
         {tpl && tpl.uses > 0 && (
           <p className="span2 small muted" role="note">
-            {tpl.uses} errand{tpl.uses === 1 ? " uses" : "s use"} this command as is: changing it changes {tpl.uses === 1 ? "it" : "them all"}, in every workspace.
+            {tpl.uses} errand{tpl.uses === 1 ? " uses" : "s use"} this template as is: changing it changes {tpl.uses === 1 ? "it" : "them all"}, in every workspace.
           </p>
         )}
         {!errand && !tplMode && choices.length > 1 && (
@@ -769,7 +779,7 @@ function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, 
           <label className="span2">
             Start from
             <select value={picked?.id ?? ""} onChange={(e) => pick(library.find((t) => t.id === Number(e.target.value)) ?? null)}>
-              <option value="">— a new command —</option>
+              <option value="">— blank —</option>
               {library.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -781,7 +791,7 @@ function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, 
               <span className="muted small">
                 {usesPicked
                   ? `Uses “${picked.name}” as is: changes to it reach this errand too.${picked.unsandboxed && !hasCap(me, "errand_unsandboxed", ws.id) ? " It gets its own copy, in the sandbox." : ""}`
-                  : `Changed from “${picked.name}”: saved as this errand's own command.`}
+                  : `Changed from “${picked.name}”: saved as this errand's own template.`}
               </span>
             )}
           </label>
@@ -945,10 +955,21 @@ function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, 
             Cancel
           </button>
           <button type="submit" className="button" disabled={busy || !!problem} title={problem ?? undefined}>
-            {tplMode ? "Save command" : errand ? "Save" : "Create errand"}
+            {tplMode ? "Save template" : errand ? "Save" : "Create errand"}
           </button>
         </div>
       </form>
+      {askDetach && (
+        <ConfirmModal title="Leave the shared library?" confirmLabel="Save anyway" onConfirm={() => submit(null, true)} onCancel={() => setAskDetach(null)}>
+          <p>Saving this edit moves this errand off</p>
+          <ul>
+            {askDetach.map((d) => (
+              <li key={d}>{d}.</li>
+            ))}
+          </ul>
+          <p className="muted small">Later changes an admin makes to the shared one won't reach it. The shared one and the other workspaces stay as they are.</p>
+        </ConfirmModal>
+      )}
     </Modal>
   );
 }

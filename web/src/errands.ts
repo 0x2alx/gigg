@@ -63,8 +63,10 @@ export interface Errand {
   command_set_by: number | null;
   unsandboxed_set_by: number | null;
   template_uses: number;
+  template_shared?: boolean;
   schedule_id: number;
   schedule_name: string;
+  schedule_shared?: boolean;
   schedule_text: string;
   rule: ErrandRule;
 }
@@ -309,8 +311,8 @@ export function describeErrand(f: ErrandForm): string {
 
 // errandBody: what to send. A new errand gets everything; an edit only what changed (so a save that
 // doesn't touch the timing keeps a shared schedule, and the sandbox flag is only sent by someone who may set it).
-// errandBody: what to send. A new errand whose form still has a picked template's content sends that
-// template's id instead of the content (it then uses it as is; the server copies a shared one when needed).
+// A new errand whose form still has a picked template's content sends that template's id instead of the
+// content (it then uses it as is; the server copies a shared one when needed).
 export function errandBody(f: ErrandForm, cur: Errand | null, canUnsandbox: boolean, picked?: ErrandTemplate | null): ErrandBody {
   const b: ErrandBody = {};
   if (!cur && picked && sameContent(f, picked)) {
@@ -333,6 +335,17 @@ export function errandBody(f: ErrandForm, cur: Errand | null, canUnsandbox: bool
   if (f.worker && (!cur || f.worker !== cur.worker_username)) b.worker = f.worker;
   if (!cur ? f.onFailureGig : f.onFailureGig !== cur.on_failure_gig) b.on_failure_gig = f.onFailureGig;
   return b;
+}
+
+// detaching: what saving this edit (body) takes the errand off: a shared errand template (its content
+// changes) or a shared schedule (its timing changes). The server gives it copies of its own.
+export function detaching(cur: Errand | null, b: ErrandBody): string[] {
+  if (!cur) return [];
+  const out: string[] = [];
+  const content = ["name", "description_md", "command", "timeout_s", "output", "unsandboxed"] as const;
+  if (cur.template_shared && content.some((k) => k in b)) out.push(`the shared errand template “${cur.name}”: it gets its own copy in this workspace`);
+  if (cur.schedule_shared && b.rule) out.push(`the shared schedule “${cur.schedule_name}”: it gets a schedule of its own`);
+  return out;
 }
 
 // ---- display

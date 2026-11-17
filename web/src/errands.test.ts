@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentOf, errandBody, errandProblem, errandRule, defaultErrandForm, describeErrand, durMS, formOfErrand, relTime, sameTiming, schedText, type Errand, type ErrandForm, type ErrandTemplate } from "./errands";
+import { contentOf, detaching, errandBody, errandProblem, errandRule, defaultErrandForm, describeErrand, durMS, formOfErrand, relTime, sameTiming, schedText, type Errand, type ErrandForm, type ErrandTemplate } from "./errands";
 
 const base = (p: Partial<ErrandForm> = {}): ErrandForm => ({ ...defaultErrandForm(new Date(2026, 10, 16)), name: "disk", command: "df -h /", tz: "UTC", ...p });
 
@@ -128,5 +128,20 @@ describe("starting from a command", () => {
     const b = errandBody({ ...f, command: "df -h /" }, null, false, t);
     expect(b.template_id).toBeUndefined();
     expect(b).toMatchObject({ name: "disk", command: "df -h /", timeout_s: 600 });
+  });
+});
+
+describe("detaching", () => {
+  it("names the shared template or schedule an edit leaves, and nothing otherwise", () => {
+    const c = errand({ template_shared: true, schedule_shared: true });
+    const f = formOfErrand(c);
+    expect(detaching(c, errandBody(f, c, true))).toEqual([]);
+    expect(detaching(c, errandBody({ ...f, worker: "atlas" }, c, true))).toEqual([]);
+    const both = detaching(c, errandBody({ ...f, command: "df -h", interval: 10 }, c, true));
+    expect(both).toHaveLength(2);
+    expect(both[0]).toContain("shared errand template “disk”");
+    expect(both[1]).toContain("shared schedule “Every 5 min”");
+    expect(detaching(errand(), errandBody({ ...f, command: "df -h" }, errand(), true))).toEqual([]);
+    expect(detaching(null, errandBody(f, null, true))).toEqual([]);
   });
 });

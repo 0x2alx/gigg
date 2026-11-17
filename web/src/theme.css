@@ -1784,3 +1784,6 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .errand-props { align-items: center; }
 .banner > .icon, .banner > svg { flex: none; }
 .errand-cmd-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85em; }
+.confirm-body { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.confirm-body p, .confirm-body ul { margin: 0; }
+.confirm-body ul { padding-left: 1.2rem; }

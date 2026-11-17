@@ -397,3 +397,20 @@ export function MoreMenu({ label, children, icon, className, buttonClass, face }
     </div>
   );
 }
+
+// ConfirmModal: a yes/no question on top of another dialog (Cancel keeps the dialog below as it was).
+export function ConfirmModal({ title, children, confirmLabel, onConfirm, onCancel }: { title: string; children: ReactNode; confirmLabel: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <Modal title={title} onClose={onCancel}>
+      <div className="confirm-body">{children}</div>
+      <div className="row end">
+        <button type="button" className="button secondary" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="button" className="button" onClick={onConfirm} data-autofocus>
+          {confirmLabel}
+        </button>
+      </div>
+    </Modal>
+  );
+}
