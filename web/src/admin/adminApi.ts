@@ -137,7 +137,7 @@ export const SCOPE_GROUPS: { name: string; scopes: string[] }[] = [
   },
   {
     name: "Admin",
-    scopes: ["admin:workspaces", "admin:members", "admin:users", "admin:keys", "admin:transfer", "admin:audit", "admin:export", "admin:settings"],
+    scopes: ["admin:workspaces", "admin:members", "admin:users", "admin:keys", "admin:audit"],
   },
 ];
 

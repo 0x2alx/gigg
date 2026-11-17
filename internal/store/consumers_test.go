@@ -11,7 +11,7 @@ import (
 // TestConsumersMigration: 0016 gives work_gigs wherever a rule says something about edit_gigs and
 // gigs:work to every key with gigs:write; turns commenter rules into viewer + comment, renames
 // schedules to recurring_gigs, folds a checklists or relations deny into edit_gigs and drops
-// artifacts:write; and assigns the workspace owner to open gigs, workspace
+// the scopes nothing checked; and assigns the workspace owner to open gigs, workspace
 // templates and recurring gigs on a shared template that had nobody (not to done gigs, not where the
 // owner can't be assigned).
 func TestConsumersMigration(t *testing.T) {
@@ -107,6 +107,7 @@ func TestConsumersMigration(t *testing.T) {
 		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('w', 'gk_w', x'00', ?3, ?2, '["gigs:read","gigs:write"]', 9000000000000, 1)`,
 		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('r', 'gk_r', x'00', ?3, ?2, '["gigs:read"]', 9000000000000, 1)`,
 		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('a', 'gk_a', x'00', ?3, ?2, '["artifacts:write","gigs:read"]', 9000000000000, 1)`,
+		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('adm', 'gk_adm', x'00', 1, NULL, '["admin:export","admin:keys","admin:settings","admin:transfer"]', 9000000000000, 1)`,
 		`INSERT INTO groups (id, name, created_at) VALUES (90, 'g', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?4, 'commenter', '{}', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?2, 'member', '{"schedules":true,"checklists":false,"relations":true}', 1)`,
@@ -143,6 +144,10 @@ func TestConsumersMigration(t *testing.T) {
 	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'a'`).Scan(&scopesA))
 	if scopesA != `["gigs:read"]` {
 		t.Fatalf("artifacts:write left: %s", scopesA)
+	}
+	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'adm'`).Scan(&scopesA))
+	if scopesA != `["admin:keys"]` {
+		t.Fatalf("unused admin scopes left: %s", scopesA)
 	}
 	g, err := GetGig(ctx, s.R, open)
 	must(t, err)

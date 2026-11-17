@@ -23,7 +23,8 @@ UPDATE api_keys
 --   - "schedules" is called "recurring_gigs", which is what it covers;
 --   - "checklists" and "relations" fold into edit_gigs: a rule that denied either now denies
 --     edit_gigs (a merged permission is allowed only where all its parts were);
---   - the scope artifacts:write, which no endpoint ever checked, is dropped from keys.
+--   - the scopes no endpoint ever checked (artifacts:write, admin:transfer, admin:export,
+--     admin:settings) are dropped from keys.
 -- The table is rebuilt for the preset CHECK (migrations run with foreign keys off; nothing refers
 -- to access_rules).
 CREATE TABLE access_rules_new (
@@ -63,8 +64,10 @@ UPDATE access_rules
  WHERE json_type(overrides, '$.checklists') IS NOT NULL OR json_type(overrides, '$.relations') IS NOT NULL;
 
 UPDATE api_keys
-   SET scopes = (SELECT json_group_array(value) FROM json_each(api_keys.scopes) WHERE value != 'artifacts:write')
- WHERE EXISTS (SELECT 1 FROM json_each(api_keys.scopes) WHERE value = 'artifacts:write');
+   SET scopes = (SELECT json_group_array(value) FROM json_each(api_keys.scopes)
+                  WHERE value NOT IN ('artifacts:write', 'admin:transfer', 'admin:export', 'admin:settings'))
+ WHERE EXISTS (SELECT 1 FROM json_each(api_keys.scopes)
+                WHERE value IN ('artifacts:write', 'admin:transfer', 'admin:export', 'admin:settings'));
 
 -- A gig, workspace template or recurring gig created with nobody assigned now gets the workspace's
 -- owner. The ones made before get it here, once: open gigs (not done, cancelled, trashed or archived)

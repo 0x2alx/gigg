@@ -125,8 +125,7 @@ type APIKey struct {
 var AllScopes = []string{
 	"workspace:read", "workspace:write", "gigs:read", "gigs:work", "gigs:write", "gigs:delete", "comments:read", "comments:write",
 	"runs:write", "projects:write", "profile:write", "keys:self", "errands:read", "errands:output", "errands:write", "errands:run",
-	"admin:workspaces", "admin:members", "admin:users", "admin:keys", "admin:transfer", "admin:audit",
-	"admin:export", "admin:settings",
+	"admin:workspaces", "admin:members", "admin:users", "admin:keys", "admin:audit",
 }
 
 // IsAdminScope reports an admin:* scope.

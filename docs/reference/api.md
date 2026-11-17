@@ -88,7 +88,6 @@ permission in the workspace (see [access.md](access.md#api-keys-scopes-and-permi
 | `admin:users` | Users, agent pictures, groups and access rules (several of these also need a browser session, see below). |
 | `admin:keys` | Every user's keys. |
 | `admin:audit` | The instance-wide audit log. |
-| `admin:transfer`, `admin:export`, `admin:settings` | Accepted on admin keys. Note: not used by any endpoint yet. |
 
 Operations that work only from an admin's browser session, never with a key: setting access rules
 (`PUT /users/{id}/access`, `PUT /groups/{id}/access`), creating, changing and deleting groups, adding and
