@@ -120,6 +120,7 @@ const P: Record<string, ReactNode> = {
     </>
   ),
   play: <path d="M6 4v16l14-8z" />,
+  sort: <path d="M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4" />,
   refresh: (
     <>
       <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5" />

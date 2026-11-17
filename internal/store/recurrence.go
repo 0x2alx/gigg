@@ -25,7 +25,10 @@ type Recurrence struct {
 	Priority      int64    `json:"priority"`
 	Color         *string  `json:"color"`
 	Labels        []string `json:"labels"`
-	Assignees     []int64  `json:"assignees"`
+	Assignees     []int64  `json:"assignees" doc:"Who its gigs go to: its own assignees (assignees_own), else its template's"`
+	AssigneesOwn  bool     `json:"assignees_own" doc:"It sets its own assignees (with a shared template), not its template's"`
+	OwnAssignees  []int64  `json:"-"` // the request's assignees (nil: not given), kept as its own when the template is shared
+	AutoArchive   *int64   `json:"auto_archive_minutes" doc:"Its gigs archive themselves this many minutes after done or cancelled (the template's; null: never)"`
 	Model         string   `json:"model"`
 	Effort        string   `json:"effort"`
 	AlwaysRun     bool     `json:"always_run"`
@@ -50,27 +53,30 @@ type Recurrence struct {
 	CreatedAt     int64    `json:"created_at"`
 	Version       int64    `json:"version"`
 	// the template
-	TemplateID   int64            `json:"template_id"`
-	TemplateName string           `json:"template_name"`
-	TemplateBy   int64            `json:"template_created_by"`
-	TemplateUses int64            `json:"template_uses" doc:"Live recurring gigs using the template, this one included"`
-	Checklist    []string         `json:"checklist"`
-	Subgigs      []TemplateSubgig `json:"subgigs"`
-	Custom       map[string]any   `json:"custom"`
+	TemplateID     int64            `json:"template_id"`
+	TemplateName   string           `json:"template_name"`
+	TemplateBy     int64            `json:"template_created_by"`
+	TemplateUses   int64            `json:"template_uses" doc:"Live recurring gigs using the template, this one included"`
+	TemplateShared bool             `json:"template_shared" doc:"The template is shared by every workspace: editing the content here gives this recurring gig its own copy"`
+	Checklist      []string         `json:"checklist"`
+	Subgigs        []TemplateSubgig `json:"subgigs"`
+	Custom         map[string]any   `json:"custom"`
 	// the schedule
-	ScheduleID   int64  `json:"schedule_id"`
-	ScheduleName string `json:"schedule_name"`
-	ScheduleUses int64  `json:"schedule_uses" doc:"Live recurring gigs using the schedule, this one included"`
+	ScheduleID     int64  `json:"schedule_id"`
+	ScheduleName   string `json:"schedule_name"`
+	ScheduleUses   int64  `json:"schedule_uses" doc:"Live recurring gigs using the schedule, this one included"`
+	ScheduleShared bool   `json:"schedule_shared" doc:"The schedule is shared by every workspace: changing the timing here moves this recurring gig to a schedule of its workspace"`
 }
 
 // recCols reads a recurring gig with its template's content and its schedule's timing; select
 // FROM recFrom.
-const recCols = `r.id, r.workspace_id, r.project_id, r.created_by, t.title, t.description_md, t.priority, t.color, t.labels, t.assignees,
+const recCols = `r.id, r.workspace_id, r.project_id, r.created_by, t.title, t.description_md, t.priority, t.color, t.labels, COALESCE(r.assignees, t.assignees),
 	s.freq, s.interval_n, s.weekdays, s.month_day, s.tz, s.window_start, s.window_minutes, s.lead_minutes, r.starts_on, r.ends_on, r.max_count,
 	r.overlap, r.next_at, r.created_count, r.skipped_count, r.last_gig_id, r.paused_at IS NOT NULL, r.created_at, r.version, t.model, t.effort,
 	t.always_run, t.allowed_tools, t.id, t.name, t.created_by, t.checklist, t.custom, t.subgigs,
 	(SELECT count(*) FROM recurrences u WHERE u.template_id = t.id AND u.deleted_at IS NULL),
-	s.id, s.name, (SELECT count(*) FROM recurrences u WHERE u.schedule_id = s.id AND u.deleted_at IS NULL)`
+	s.id, s.name, (SELECT count(*) FROM recurrences u WHERE u.schedule_id = s.id AND u.deleted_at IS NULL),
+	r.assignees IS NOT NULL, t.auto_archive_minutes, t.workspace_id IS NULL, s.workspace_id IS NULL`
 
 const recFrom = `recurrences r JOIN gig_templates t ON t.id = r.template_id JOIN schedules s ON s.id = r.schedule_id`
 
@@ -78,18 +84,19 @@ func scanRecurrence(row interface{ Scan(...any) error }) (*Recurrence, error) {
 	var r Recurrence
 	var color sql.NullString
 	var labels, assignees, weekdays, checklist, custom, tools, subs string
-	var md, ends, max, next, last sql.NullInt64
+	var md, ends, max, next, last, autoArch sql.NullInt64
 	if err := row.Scan(&r.ID, &r.WorkspaceID, &r.ProjectID, &r.CreatedBy, &r.Title, &r.DescriptionMD, &r.Priority, &color, &labels, &assignees,
 		&r.Freq, &r.Interval, &weekdays, &md, &r.TZ, &r.WindowStart, &r.WindowMinutes, &r.LeadMinutes, &r.StartsOn, &ends, &max, &r.Overlap,
 		&next, &r.CreatedCount, &r.SkippedCount, &last, &r.Paused, &r.CreatedAt, &r.Version, &r.Model, &r.Effort, &r.AlwaysRun, &tools,
 		&r.TemplateID, &r.TemplateName, &r.TemplateBy, &checklist, &custom, &subs, &r.TemplateUses,
-		&r.ScheduleID, &r.ScheduleName, &r.ScheduleUses); err != nil {
+		&r.ScheduleID, &r.ScheduleName, &r.ScheduleUses, &r.AssigneesOwn, &autoArch, &r.TemplateShared, &r.ScheduleShared); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
 	r.Color, r.MonthDay, r.EndsOn, r.MaxCount, r.NextAt, r.LastGigID = ptrStr(color), ptrInt(md), ptrInt(ends), ptrInt(max), ptrInt(next), ptrInt(last)
+	r.AutoArchive = ptrInt(autoArch)
 	_ = json.Unmarshal([]byte(labels), &r.Labels)
 	_ = json.Unmarshal([]byte(assignees), &r.Assignees)
 	_ = json.Unmarshal([]byte(weekdays), &r.Weekdays)
@@ -329,6 +336,9 @@ func CreateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence) (*Recurr
 			return nil, err
 		}
 		r.fromTemplate(tpl)
+		if tpl.Shared {
+			r.Assignees = r.OwnAssignees
+		}
 	}
 	if r.ScheduleID != 0 {
 		s, err := WorkspaceSchedule(ctx, q, r.WorkspaceID, r.ScheduleID)
@@ -365,8 +375,9 @@ func CreateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence) (*Recurr
 		next = at
 	}
 	res, err := q.ExecContext(ctx, `INSERT INTO recurrences (workspace_id, project_id, created_by, template_id, schedule_id, starts_on, ends_on,
-		max_count, overlap, next_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-		r.WorkspaceID, r.ProjectID, a.UserID, r.TemplateID, r.ScheduleID, r.StartsOn, nullInt(r.EndsOn), nullInt(r.MaxCount), r.Overlap, next, Now())
+		max_count, overlap, next_at, created_at, assignees) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		r.WorkspaceID, r.ProjectID, a.UserID, r.TemplateID, r.ScheduleID, r.StartsOn, nullInt(r.EndsOn), nullInt(r.MaxCount), r.Overlap, next, Now(),
+		ownAssignees(ctx, q, r))
 	if err != nil {
 		return nil, err
 	}
@@ -391,11 +402,21 @@ func pairFree(ctx context.Context, q Q, project, tpl, sched, except int64) error
 	return nil
 }
 
-// RecurrenceTemplate loads a template a recurring gig in project (of workspace ws) may use: same
-// workspace, and for that project or any project.
+// ownAssignees: what the recurrences.assignees column holds for r: its assignees when its template is
+// shared (NULL when it has none), else NULL (they live in its template).
+func ownAssignees(ctx context.Context, q Q, r *Recurrence) any {
+	var shared bool
+	if err := q.QueryRowContext(ctx, `SELECT workspace_id IS NULL FROM gig_templates WHERE id = ?`, r.TemplateID).Scan(&shared); err != nil || !shared || len(r.Assignees) == 0 {
+		return nil
+	}
+	return mustJSON(r.Assignees)
+}
+
+// RecurrenceTemplate loads a template a recurring gig in project (of workspace ws) may use: the
+// workspace's own (for that project or any project) or a shared one.
 func RecurrenceTemplate(ctx context.Context, q Q, ws, project, id int64) (*Template, error) {
 	t, err := GetTemplate(ctx, q, id)
-	if err != nil || t.WorkspaceID != ws {
+	if err != nil || (t.WorkspaceID != ws && !t.Shared) {
 		return nil, Invalid("no such template in this workspace")
 	}
 	if t.ProjectID != nil && *t.ProjectID != project {
@@ -409,7 +430,7 @@ func (r *Recurrence) fromTemplate(t *Template) {
 	r.TemplateID, r.TemplateName, r.TemplateBy = t.ID, t.Name, t.CreatedBy
 	r.Title, r.DescriptionMD, r.Priority, r.Color, r.Labels, r.Assignees = t.Title, t.DescriptionMD, t.Priority, t.Color, t.Labels, t.Assignees
 	r.Checklist, r.Custom, r.Model, r.Effort, r.AlwaysRun, r.AllowedTools = t.Checklist, t.Custom, t.Model, t.Effort, t.AlwaysRun, t.AllowedTools
-	r.Subgigs = t.Subgigs
+	r.Subgigs, r.AutoArchive, r.TemplateShared = t.Subgigs, t.AutoArchive, t.Shared
 }
 
 // fromSchedule copies a schedule's timing (and identity) into the recurring gig.
@@ -423,7 +444,7 @@ func (r *Recurrence) newTemplate() *Template {
 	project := r.ProjectID
 	return &Template{WorkspaceID: r.WorkspaceID, ProjectID: &project, Name: templateName(r.Title), Title: r.Title, DescriptionMD: r.DescriptionMD,
 		Priority: r.Priority, Color: r.Color, Labels: r.Labels, Assignees: r.Assignees, Checklist: r.Checklist, Custom: r.Custom,
-		Model: r.Model, Effort: r.Effort, AlwaysRun: r.AlwaysRun, AllowedTools: r.AllowedTools, Subgigs: r.Subgigs}
+		Model: r.Model, Effort: r.Effort, AlwaysRun: r.AlwaysRun, AllowedTools: r.AllowedTools, Subgigs: r.Subgigs, AutoArchive: r.AutoArchive}
 }
 
 // GetRecurrence loads a live recurring gig.
@@ -478,6 +499,9 @@ func UpdateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence, expect i
 			return nil, err
 		}
 		r.fromTemplate(tpl)
+		if tpl.Shared {
+			r.Assignees = r.OwnAssignees
+		}
 	} else {
 		if r.Checklist == nil {
 			r.Checklist = cur.Checklist
@@ -499,7 +523,36 @@ func UpdateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence, expect i
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
-	if ch.Template == 0 {
+	if ch.Template == 0 && cur.TemplateShared {
+		// a shared template is never written through one workspace's recurring gig: new content goes into
+		// a copy of the workspace (any project), new assignees stay the recurring gig's own
+		tpl, err := GetTemplate(ctx, q, cur.TemplateID)
+		if err != nil {
+			return nil, err
+		}
+		if r.OwnAssignees != nil {
+			r.Assignees = r.OwnAssignees
+		}
+		if r.Assignees == nil {
+			r.Assignees = []int64{}
+		}
+		probe := *tpl
+		probe.Assignees = r.Assignees
+		if r.AllowedTools == nil {
+			r.AllowedTools = tpl.AllowedTools
+		}
+		if !probe.sameContent(r) || !eqIntPtr(tpl.AutoArchive, r.AutoArchive) {
+			cp := &Template{WorkspaceID: r.WorkspaceID, Name: tpl.Name, Title: r.Title, DescriptionMD: r.DescriptionMD, Priority: r.Priority,
+				Color: r.Color, Labels: r.Labels, Assignees: r.Assignees, Checklist: r.Checklist, Custom: r.Custom, Model: r.Model, Effort: r.Effort,
+				AlwaysRun: r.AlwaysRun, AllowedTools: r.AllowedTools, Subgigs: r.Subgigs, AutoArchive: r.AutoArchive}
+			saved, err := SaveTemplate(ctx, q, a, cp, 0)
+			if err != nil {
+				return nil, err
+			}
+			ch.Template = saved.ID // below: no in-place write, and the column holds no own assignees
+		}
+	}
+	if ch.Template == 0 && !cur.TemplateShared {
 		tpl, err := GetTemplate(ctx, q, cur.TemplateID)
 		if err != nil {
 			return nil, err
@@ -509,16 +562,27 @@ func UpdateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence, expect i
 		}
 		tpl.Title, tpl.DescriptionMD, tpl.Priority, tpl.Color, tpl.Labels, tpl.Assignees = r.Title, r.DescriptionMD, r.Priority, r.Color, r.Labels, r.Assignees
 		tpl.Checklist, tpl.Custom, tpl.Model, tpl.Effort, tpl.AlwaysRun = r.Checklist, r.Custom, r.Model, r.Effort, r.AlwaysRun
-		tpl.Subgigs = r.Subgigs
+		tpl.Subgigs, tpl.AutoArchive = r.Subgigs, r.AutoArchive
 		if r.AllowedTools != nil {
 			tpl.AllowedTools = r.AllowedTools
 		}
-		if !tpl.sameContent(cur) || tpl.Name != cur.TemplateName {
+		if !tpl.sameContent(cur) || tpl.Name != cur.TemplateName || !eqIntPtr(tpl.AutoArchive, cur.AutoArchive) {
 			if _, err := SaveTemplate(ctx, q, a, tpl, 0); err != nil {
 				return nil, err
 			}
 		}
 		r.TemplateID = cur.TemplateID
+	} else if ch.Template != 0 {
+		r.TemplateID = ch.Template
+	}
+	if ch.Schedule == 0 && cur.ScheduleShared && !r.Rule().Same(cur.Rule()) {
+		// the same for a shared schedule: new timing moves this recurring gig to a schedule of its workspace
+		s, err := scheduleFor(ctx, q, a, r.WorkspaceID, r.Rule())
+		if err != nil {
+			return nil, err
+		}
+		r.fromSchedule(s)
+		ch.Schedule = s.ID
 	}
 	if ch.Schedule == 0 {
 		r.ScheduleID = cur.ScheduleID
@@ -545,8 +609,8 @@ func UpdateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence, expect i
 		paused = Now()
 	}
 	if _, err := q.ExecContext(ctx, `UPDATE recurrences SET template_id=?, schedule_id=?, starts_on=?, ends_on=?, max_count=?, overlap=?, next_at=?,
-		paused_at=?, created_by=?, version = version + 1 WHERE id = ?`,
-		r.TemplateID, r.ScheduleID, r.StartsOn, nullInt(r.EndsOn), nullInt(r.MaxCount), r.Overlap, next, paused, a.UserID, r.ID); err != nil {
+		paused_at=?, created_by=?, assignees=?, version = version + 1 WHERE id = ?`,
+		r.TemplateID, r.ScheduleID, r.StartsOn, nullInt(r.EndsOn), nullInt(r.MaxCount), r.Overlap, next, paused, a.UserID, ownAssignees(ctx, q, r), r.ID); err != nil {
 		return nil, err
 	}
 	if _, err := Activity(ctx, q, a, &r.WorkspaceID, &r.ProjectID, "recurrence.updated", "recurrence", r.ID,
@@ -562,6 +626,10 @@ func (t *Template) sameContent(r *Recurrence) bool {
 		mustJSON(t.Labels) == mustJSON(r.Labels) && mustJSON(t.Assignees) == mustJSON(r.Assignees) &&
 		mustJSON(t.Checklist) == mustJSON(r.Checklist) && mustJSON(t.Custom) == mustJSON(r.Custom) && sameSubgigs(t.Subgigs, r.Subgigs) &&
 		t.Model == r.Model && t.Effort == r.Effort && t.AlwaysRun == r.AlwaysRun && (r.AllowedTools == nil || SameTools(t.AllowedTools, r.AllowedTools))
+}
+
+func eqIntPtr(a, b *int64) bool {
+	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
 
 // SameContent reports whether two versions of a recurring gig create the same gigs (nil
@@ -586,7 +654,7 @@ func SameContent(a, b *Recurrence) bool {
 	t := Template{Title: a.Title, DescriptionMD: a.DescriptionMD, Priority: a.Priority, Color: a.Color, Labels: a.Labels, Assignees: a.Assignees,
 		Checklist: a.Checklist, Custom: a.Custom, Model: a.Model, Effort: a.Effort, AlwaysRun: a.AlwaysRun, AllowedTools: a.AllowedTools,
 		Subgigs: a.Subgigs}
-	return t.sameContent(&c)
+	return t.sameContent(&c) && eqIntPtr(a.AutoArchive, c.AutoArchive)
 }
 
 // sameSubgigs compares two subgig lists as stored (titles trimmed; nil and empty are the same).
@@ -623,12 +691,13 @@ func maxI(a, b int64) int64 {
 
 // JanitorResult reports what one housekeeping pass did.
 type JanitorResult struct {
-	Created int
-	Skipped int
-	Missed  int
-	Stale   int      // runs closed as interrupted: no heartbeat for StaleRunAfter
-	Paused  []int64  // schedules paused because creating their gig failed
-	Errors  []string // what went wrong (logged by the caller); one bad row never stops the rest
+	Created  int
+	Skipped  int
+	Missed   int
+	Stale    int      // runs closed as interrupted: no heartbeat for StaleRunAfter
+	Paused   []int64  // schedules paused because creating their gig failed
+	Archived int      // done or cancelled gigs that archived themselves (auto_archive_minutes)
+	Errors   []string // what went wrong (logged by the caller); one bad row never stops the rest
 }
 
 // Housekeeping runs the scheduled data work: create due occurrences, mark missed windows. It only
@@ -650,6 +719,13 @@ func (s *Store) Housekeeping(ctx context.Context, now int64) (JanitorResult, err
 	}
 	if err := s.Tx(ctx, func(tx *sql.Tx) error { errandHousekeeping(ctx, tx, now, &res); return nil }); err != nil {
 		res.Errors = append(res.Errors, "errands: "+err.Error())
+	}
+	if err := s.Tx(ctx, func(tx *sql.Tx) error {
+		n, err := autoArchive(ctx, tx, now)
+		res.Archived = n
+		return err
+	}); err != nil {
+		res.Errors = append(res.Errors, "auto-archive: "+err.Error())
 	}
 	err := s.Tx(ctx, func(tx *sql.Tx) error {
 		// missed first: a gig whose window closed must not count as "still open" for overlap
@@ -753,7 +829,7 @@ func materialize(ctx context.Context, tx *sql.Tx, r *Recurrence, now int64) (cre
 			t, err := CreateGig(ctx, tx, sys, NewGig{ProjectID: r.ProjectID, Title: r.Title, DescriptionMD: r.DescriptionMD, Priority: r.Priority,
 				Color: r.Color, StartAt: &start, DueAt: &due, NotAfter: &due, Labels: r.Labels, Assignees: validAssignees(ctx, tx, r),
 				RecurrenceID: &r.ID, OccurrenceAt: &start, Model: r.Model, Effort: r.Effort, AlwaysRun: r.AlwaysRun,
-				AllowedTools: r.AllowedTools})
+				AllowedTools: r.AllowedTools, AutoArchive: r.AutoArchive})
 			if err != nil {
 				return created, skipped, err
 			}
@@ -774,6 +850,41 @@ func materialize(ctx context.Context, tx *sql.Tx, r *Recurrence, now int64) (cre
 	_, err = tx.ExecContext(ctx, `UPDATE recurrences SET next_at = ?, created_count = ?, skipped_count = ?, last_gig_id = ? WHERE id = ?`,
 		nullInt(r.NextAt), r.CreatedCount, r.SkippedCount, nullInt(r.LastGigID), r.ID)
 	return created, skipped, err
+}
+
+// autoArchive archives the done or cancelled gigs whose auto-archive delay has passed since they were
+// done (cancelled ones: since their last change), at most 500 a pass, each with its own activity entry.
+func autoArchive(ctx context.Context, tx *sql.Tx, now int64) (int, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT t.id, t.workspace_id, t.project_id, t.auto_archive_minutes FROM gigs t JOIN statuses s ON s.id = t.status_id
+		WHERE t.auto_archive_minutes IS NOT NULL AND t.archived_at IS NULL AND t.deleted_at IS NULL AND s.category IN ('done', 'cancelled')
+		AND COALESCE(t.done_at, t.updated_at) + t.auto_archive_minutes * 60000 <= ? ORDER BY t.id LIMIT 500`, now)
+	if err != nil {
+		return 0, err
+	}
+	type due struct{ id, ws, project, minutes int64 }
+	var ds []due
+	for rows.Next() {
+		var d due
+		if err := rows.Scan(&d.id, &d.ws, &d.project, &d.minutes); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		ds = append(ds, d)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	sys := Actor{Listener: "scheduler"}
+	for _, d := range ds {
+		if _, err := tx.ExecContext(ctx, `UPDATE gigs SET archived_at = ?, updated_at = ?, version = version + 1 WHERE id = ?`, now, now, d.id); err != nil {
+			return 0, err
+		}
+		if _, err := Activity(ctx, tx, sys, &d.ws, &d.project, "gig.archived", "gig", d.id, map[string]any{"auto_archive_minutes": d.minutes}); err != nil {
+			return 0, err
+		}
+	}
+	return len(ds), nil
 }
 
 // validAssignees drops template assignees who are no longer members (or admins).

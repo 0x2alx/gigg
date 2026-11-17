@@ -10,8 +10,9 @@ import (
 	"github.com/0x2alx/gigg/internal/store"
 )
 
-// Schedules: named timing (rule, window, create-early) of a workspace. Recurring gigs pair one
-// with a template. Reading needs view; changing needs the Recurring gigs permission.
+// Schedules: named timing (rule, window, create-early) of a workspace, or shared by every workspace.
+// Recurring gigs pair one with a template. Reading needs view; changing needs the Recurring gigs
+// permission (a shared one: an instance admin).
 
 // ScheduleBody creates or replaces a schedule.
 type ScheduleBody struct {
@@ -39,10 +40,21 @@ type scheduleOut struct {
 
 func (a *API) schedule(ctx context.Context, p *access.Principal, id int64) (*store.Schedule, error) {
 	s, err := store.GetSchedule(ctx, a.st.R, id)
-	if err != nil || !p.SeesWorkspace(s.WorkspaceID) {
+	if err != nil || (s.Shared && !seesShared(p)) || (!s.Shared && !p.SeesWorkspace(s.WorkspaceID)) {
 		return nil, errNotFound()
 	}
 	return s, nil
+}
+
+// sharedScheduleWrite: changing a shared schedule (instance admins) retimes errands too when some use it.
+func sharedScheduleWrite(p *access.Principal, s *store.Schedule) error {
+	if err := sharedWrite(p, "gigs:write"); err != nil {
+		return err
+	}
+	if s != nil && s.ErrandUses > 0 {
+		return need(p, "errands:write")
+	}
+	return nil
 }
 
 // scheduleUsedOutside: a live recurring gig outside the projects a narrowed key reaches uses it.
@@ -128,6 +140,59 @@ func (a *API) registerSchedules() {
 		}
 		return &scheduleOut{ETag: etag(s.Version), Body: s}, nil
 	})
+	huma.Register(a.h, huma.Operation{OperationID: "list-shared-schedules", Method: "GET", Path: "/shared/schedules", Tags: []string{"recurrence"},
+		Summary: "The shared schedules (every workspace can use them)"}, func(ctx context.Context, _ *struct{}) (*struct {
+		Body struct {
+			Items []*store.Schedule `json:"items"`
+		}
+	}, error) {
+		p, err := me(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := &struct {
+			Body struct {
+				Items []*store.Schedule `json:"items"`
+			}
+		}{}
+		out.Body.Items = []*store.Schedule{}
+		if !seesShared(p) {
+			return out, nil
+		}
+		if err := need(p, "gigs:read"); err != nil {
+			return nil, err
+		}
+		ss, err := store.ListSchedules(ctx, a.st.R, 0)
+		if ss != nil {
+			out.Body.Items = ss
+		}
+		return out, storeErr(err)
+	})
+	huma.Register(a.h, huma.Operation{OperationID: "create-shared-schedule", Method: "POST", Path: "/shared/schedules", Tags: []string{"recurrence"},
+		Summary: "Make a shared schedule (instance admins)", DefaultStatus: 201}, func(ctx context.Context, in *struct {
+		Body ScheduleBody
+	}) (*scheduleOut, error) {
+		p, err := me(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := sharedScheduleWrite(p, nil); err != nil {
+			return nil, err
+		}
+		s := &store.Schedule{}
+		if in.Body.TZ == "" {
+			in.Body.TZ = userTZ(p)
+		}
+		in.Body.apply(s)
+		if err := a.tx(ctx, func(tx *sql.Tx) error {
+			var err error
+			s, err = store.SaveSchedule(ctx, tx, p.Actor(), s, 0)
+			return err
+		}); err != nil {
+			return nil, err
+		}
+		return &scheduleOut{ETag: etag(s.Version), Body: s}, nil
+	})
 	huma.Register(a.h, huma.Operation{OperationID: "get-schedule", Method: "GET", Path: "/schedules/{id}", Tags: []string{"recurrence"},
 		Summary: "A schedule"}, func(ctx context.Context, in *idPath) (*scheduleOut, error) {
 		p, err := me(ctx)
@@ -138,7 +203,7 @@ func (a *API) registerSchedules() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, s.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := readIn(p, s.WorkspaceID, "gigs:read"); err != nil {
 			return nil, err
 		}
 		return &scheduleOut{ETag: etag(s.Version), Body: s}, nil
@@ -156,6 +221,27 @@ func (a *API) registerSchedules() {
 		s, err := a.schedule(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
+		}
+		if s.Shared {
+			if err := sharedScheduleWrite(p, s); err != nil {
+				return nil, err
+			}
+			v, err := ifMatch(in.IfMatch)
+			if err != nil {
+				return nil, err
+			}
+			if in.Body.TZ == "" {
+				in.Body.TZ = s.TZ
+			}
+			in.Body.apply(s)
+			if err := a.tx(ctx, func(tx *sql.Tx) error {
+				var err error
+				s, err = store.SaveSchedule(ctx, tx, p.Actor(), s, v)
+				return err
+			}); err != nil {
+				return nil, err
+			}
+			return &scheduleOut{ETag: etag(s.Version), Body: s}, nil
 		}
 		if err := require(p, s.WorkspaceID, "schedules", "gigs:write"); err != nil {
 			return nil, err
@@ -215,7 +301,11 @@ func (a *API) registerSchedules() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, s.WorkspaceID, "schedules", "gigs:write"); err != nil {
+		if s.Shared {
+			if err := sharedScheduleWrite(p, s); err != nil {
+				return nil, err
+			}
+		} else if err := require(p, s.WorkspaceID, "schedules", "gigs:write"); err != nil {
 			return nil, err
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteSchedule(ctx, tx, p.Actor(), s) })

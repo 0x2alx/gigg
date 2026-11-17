@@ -206,6 +206,7 @@ type GigCreate struct {
 	Effort        string                 `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
 	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Work it whatever the usage budget, day or night (needs the always_run permission)"`
 	AllowedTools  []string               `json:"allowed_tools,omitempty" maxItems:"64" doc:"The only tools a runner should allow for it (Claude Code-style permission rules, one per entry, e.g. Read, Bash(git status *)). Needs the allowed_tools permission"`
+	AutoArchive   *int64                 `json:"auto_archive_minutes,omitempty" minimum:"5" maximum:"527040" doc:"Archive it this many minutes after it is done or cancelled"`
 }
 
 type gigCreateIn struct {
@@ -232,6 +233,7 @@ type gigPatchIn struct {
 		Effort        Opt[string]   `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for; null or empty = the agent's default"`
 		AlwaysRun     Opt[bool]     `json:"always_run,omitempty" doc:"Work it whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  Opt[[]string] `json:"allowed_tools,omitempty" maxItems:"64" doc:"Replaces the runner's tool allowlist; null or [] clears (needs the allowed_tools permission)"`
+		AutoArchive   Opt[int64]    `json:"auto_archive_minutes,omitempty" doc:"Archive it this many minutes (5-527040) after it is done or cancelled; null: never"`
 	}
 }
 
@@ -418,7 +420,8 @@ func (a *API) registerGigs() {
 		}
 		n := store.NewGig{ProjectID: pr.ID, Title: b.Title, DescriptionMD: b.DescriptionMD, Priority: b.Priority, Color: b.Color,
 			StartAt: b.StartAt, DueAt: b.DueAt, NotAfter: b.NotAfter, ParentID: b.ParentID, Labels: b.Labels, Assignees: b.Assignees,
-			Model: strings.TrimSpace(b.Model), Effort: b.Effort, AlwaysRun: b.AlwaysRun, AllowedTools: b.AllowedTools, BlocksParent: b.BlocksParent}
+			Model: strings.TrimSpace(b.Model), Effort: b.Effort, AlwaysRun: b.AlwaysRun, AllowedTools: b.AllowedTools, BlocksParent: b.BlocksParent,
+			AutoArchive: b.AutoArchive}
 		if p.Key != nil {
 			n.CreatedViaKey = &p.Key.ID
 		}
@@ -515,7 +518,7 @@ func (a *API) registerGigs() {
 				}
 			}
 			patch := store.GigPatch{Title: b.Title.Val(), DescriptionMD: b.DescriptionMD.Val(), Priority: b.Priority.Val(), Color: b.Color.Ptr(),
-				StartAt: b.StartAt.Ptr(), DueAt: b.DueAt.Ptr(), NotAfter: b.NotAfter.Ptr(), ParentID: b.ParentID.Ptr()}
+				StartAt: b.StartAt.Ptr(), DueAt: b.DueAt.Ptr(), NotAfter: b.NotAfter.Ptr(), ParentID: b.ParentID.Ptr(), AutoArchive: b.AutoArchive.Ptr()}
 			if b.BlocksParent.Set {
 				on := false
 				if v := b.BlocksParent.Val(); v != nil {

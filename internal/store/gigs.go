@@ -48,6 +48,8 @@ type Gig struct {
 	NotAfter          *int64         `json:"not_after"` // the window closes: not claimable after this
 	MissedAt          *int64         `json:"missed_at"`
 	ArchivedAt        *int64         `json:"archived_at"`
+	AutoArchive       *int64         `json:"auto_archive_minutes" doc:"Archive it this many minutes after it is done or cancelled (null: never)"`
+	Schedule          *GigSchedule   `json:"schedule,omitempty" doc:"Gigs made by a recurring gig: its schedule, named and in words"`
 	SubgigCount       int64          `json:"subgig_count"`
 	SubgigDone        int64          `json:"subgig_done"`
 	ChecklistTotal    int64          `json:"checklist_total"`
@@ -94,6 +96,12 @@ type QuestionBrief struct {
 
 const questionBriefLen = 280
 
+// GigSchedule is the schedule of the recurring gig that made a gig.
+type GigSchedule struct {
+	Name string `json:"name"`
+	Text string `json:"text" doc:"The rule in words, e.g. Every weekday 09:00–11:00"`
+}
+
 // GigTag is a label as shown on a gig.
 type GigTag struct {
 	ID    int64   `json:"id"`
@@ -113,7 +121,7 @@ const gigCols = `t.id, p.key || '-' || t.number, t.workspace_id, t.project_id, t
 	(SELECT count(*) FROM gig_relations r JOIN gigs b ON b.id = r.from_gig_id JOIN statuses bs ON bs.id = b.status_id
 		WHERE r.to_gig_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled')),
 	` + blockingSubgigs + `,
-	t.model, t.effort, t.always_run, t.allowed_tools, t.blocks_parent`
+	t.model, t.effort, t.always_run, t.allowed_tools, t.blocks_parent, t.auto_archive_minutes`
 
 // blockingSubgigs counts t's open subgigs that hold it back (blocks_parent; not archived ones,
 // which agents never get either), except those that
@@ -134,13 +142,13 @@ const gigFrom = ` FROM gigs t JOIN projects p ON p.id = t.project_id JOIN status
 func scanGig(row interface{ Scan(...any) error }) (*Gig, error) {
 	var t Gig
 	var color, sess sql.NullString
-	var start, due, done, parent, cloned, viaKey, lastRun, resume, rec, occ, notAfter, missed, archived sql.NullInt64
+	var start, due, done, parent, cloned, viaKey, lastRun, resume, rec, occ, notAfter, missed, archived, autoArch sql.NullInt64
 	var tools string
 	if err := row.Scan(&t.ID, &t.Key, &t.WorkspaceID, &t.ProjectID, &t.Number, &t.Title, &t.DescriptionMD, &t.StatusID,
 		&t.StatusName, &t.StatusCategory, &t.Position, &t.Priority, &color, &start, &due, &done, &parent, &cloned,
 		&t.CreatedBy, &t.CreatedByUsername, &t.CreatedByAdmin, &viaKey, &t.CreatedAt, &t.UpdatedAt, &sess, &lastRun,
 		&resume, &t.CostUSDTotal, &t.CommentCount, &t.Deleted, &t.Version, &rec, &occ, &notAfter, &missed, &archived,
-		&t.SubgigCount, &t.SubgigDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubgigs, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent); err != nil {
+		&t.SubgigCount, &t.SubgigDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubgigs, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent, &autoArch); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -150,7 +158,7 @@ func scanGig(row interface{ Scan(...any) error }) (*Gig, error) {
 	t.StartAt, t.DueAt, t.DoneAt, t.ParentID, t.ClonedFromID = ptrInt(start), ptrInt(due), ptrInt(done), ptrInt(parent), ptrInt(cloned)
 	t.CreatedViaKeyID, t.LastRunID, t.ResumeRequestedAt = ptrInt(viaKey), ptrInt(lastRun), ptrInt(resume)
 	t.RecurrenceID, t.OccurrenceAt, t.NotAfter, t.MissedAt = ptrInt(rec), ptrInt(occ), ptrInt(notAfter), ptrInt(missed)
-	t.ArchivedAt = ptrInt(archived)
+	t.ArchivedAt, t.AutoArchive = ptrInt(archived), ptrInt(autoArch)
 	t.Labels, t.Assignees, t.Aliases, t.Custom = []GigTag{}, []int64{}, []string{}, map[string]any{}
 	t.AllowedTools = []string{}
 	_ = json.Unmarshal([]byte(tools), &t.AllowedTools)
@@ -218,6 +226,9 @@ func fill(ctx context.Context, q Q, ts []*Gig) error {
 	}
 	rows.Close()
 	if err := fillRuns(ctx, q, ts); err != nil {
+		return err
+	}
+	if err := fillSchedules(ctx, q, ts); err != nil {
 		return err
 	}
 	rows, err = q.QueryContext(ctx, `SELECT gig_id, project_key || '-' || number FROM gig_aliases WHERE gig_id IN (`+in+`)`, int64Args(ids)...)
@@ -316,6 +327,46 @@ type GigFilter struct {
 }
 
 // ListGigs returns gigs matching f.
+// fillSchedules names the schedule behind each gig a recurring gig made (the recurring gig's current
+// schedule; none once the recurring gig is deleted).
+func fillSchedules(ctx context.Context, q Q, ts []*Gig) error {
+	byRec := map[int64][]*Gig{}
+	recs := []int64{}
+	for _, t := range ts {
+		if t.RecurrenceID != nil {
+			if _, ok := byRec[*t.RecurrenceID]; !ok {
+				recs = append(recs, *t.RecurrenceID)
+			}
+			byRec[*t.RecurrenceID] = append(byRec[*t.RecurrenceID], t)
+		}
+	}
+	if len(recs) == 0 {
+		return nil
+	}
+	rows, err := q.QueryContext(ctx, `SELECT r.id, s.name, s.freq, s.interval_n, s.weekdays, s.month_day, s.tz, s.window_start, s.window_minutes, s.lead_minutes
+		FROM recurrences r JOIN schedules s ON s.id = r.schedule_id WHERE r.deleted_at IS NULL AND r.id IN (`+placeholders(len(recs))+`)`, int64Args(recs)...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var name, weekdays string
+		var md sql.NullInt64
+		var r Rule
+		if err := rows.Scan(&id, &name, &r.Freq, &r.Interval, &weekdays, &md, &r.TZ, &r.WindowStart, &r.WindowMinutes, &r.LeadMinutes); err != nil {
+			return err
+		}
+		r.MonthDay = ptrInt(md)
+		_ = json.Unmarshal([]byte(weekdays), &r.Weekdays)
+		gs := &GigSchedule{Name: name, Text: r.Describe()}
+		for _, t := range byRec[id] {
+			t.Schedule = gs
+		}
+	}
+	return rows.Err()
+}
+
 // fillRuns attaches each gig's latest run, in brief.
 func fillRuns(ctx context.Context, q Q, ts []*Gig) error {
 	byRun := map[int64]*Gig{}
@@ -551,8 +602,9 @@ type NewGig struct {
 	Effort        string
 	AlwaysRun     bool
 	AllowedTools  []string
-	BlocksParent  bool // a subgig that holds its parent back while open (needs ParentID)
-	Quiet         bool // no "assigned" notification (subgigs made together with their parent)
+	BlocksParent  bool   // a subgig that holds its parent back while open (needs ParentID)
+	AutoArchive   *int64 // minutes after done/cancelled (nil: never)
+	Quiet         bool   // no "assigned" notification (subgigs made together with their parent)
 }
 
 // Efforts are the claude -p effort levels (” = the agent's default).
@@ -649,11 +701,11 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 	}
 	res, err := q.ExecContext(ctx, `INSERT INTO gigs (workspace_id, project_id, number, title, description_md, status_id, position,
 		priority, color, start_at, due_at, done_at, parent_id, cloned_from_id, created_by, created_via_key_id, created_at, updated_at,
-		not_after, recurrence_id, occurrence_at, model, effort, always_run, allowed_tools, blocks_parent)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, p.WorkspaceID, p.ID, num, n.Title, n.DescriptionMD, st.ID, pos, n.Priority,
+		not_after, recurrence_id, occurrence_at, model, effort, always_run, allowed_tools, blocks_parent, auto_archive_minutes)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, p.WorkspaceID, p.ID, num, n.Title, n.DescriptionMD, st.ID, pos, n.Priority,
 		nullStr(n.Color), nullInt(n.StartAt), nullInt(n.DueAt), doneAt, nullInt(n.ParentID), nullInt(n.ClonedFromID),
 		a.UserID, nullInt(n.CreatedViaKey), now, now, nullInt(n.NotAfter), nullInt(n.RecurrenceID), nullInt(n.OccurrenceAt),
-		n.Model, n.Effort, n.AlwaysRun, mustJSON(tools), n.BlocksParent)
+		n.Model, n.Effort, n.AlwaysRun, mustJSON(tools), n.BlocksParent, nullInt(n.AutoArchive))
 	if err != nil {
 		return nil, err
 	}
@@ -766,6 +818,7 @@ type GigPatch struct {
 	AlwaysRun     *bool
 	AllowedTools  []string // nil = unchanged, empty = cleared
 	BlocksParent  *bool
+	AutoArchive   **int64 // minutes after done/cancelled; *nil = never
 }
 
 // PatchGig applies a change and records old and new values (old text in full).
@@ -891,6 +944,12 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 		} else if cyc {
 			return nil, Conflict("the parent already depends on %s: blocking it would be a cycle", t.Key)
 		}
+	}
+	if p.AutoArchive != nil && !eqIntPtr(*p.AutoArchive, t.AutoArchive) {
+		if err := validAutoArchive(*p.AutoArchive); err != nil {
+			return nil, err
+		}
+		changed["auto_archive_minutes"], data["auto_archive_minutes"] = nullInt(*p.AutoArchive), map[string]any{"old": t.AutoArchive, "new": *p.AutoArchive}
 	}
 	if p.Labels != nil {
 		if err := setLabels(ctx, q, a, t.WorkspaceID, t.ID, p.Labels); err != nil {
@@ -1118,7 +1177,7 @@ func MoveGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, m Move) (*
 // dependencies, comments or runs.
 func CloneGig(ctx context.Context, q Q, a Actor, t *Gig, project *int64, title *string, viaKey *int64, checklist bool) (*Gig, error) {
 	n := NewGig{ProjectID: t.ProjectID, Title: t.Title, DescriptionMD: t.DescriptionMD, Priority: t.Priority, Color: t.Color, Model: t.Model, Effort: t.Effort,
-		StartAt: t.StartAt, DueAt: t.DueAt, Assignees: t.Assignees, ClonedFromID: &t.ID, CreatedViaKey: viaKey}
+		StartAt: t.StartAt, DueAt: t.DueAt, Assignees: t.Assignees, ClonedFromID: &t.ID, CreatedViaKey: viaKey, AutoArchive: t.AutoArchive}
 	if project != nil {
 		n.ProjectID = *project
 		tp, err := GetProject(ctx, q, *project)

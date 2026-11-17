@@ -278,6 +278,11 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .column-tools .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
 .column-tools .icon-button:hover { color: var(--text); }
 .column:not(:hover):not(:focus-within) .column-tools { opacity: 0; }
+/* a column's sort: an icon among the tools, lit and always shown beside the title once the column is sorted */
+.col-sort .menu { min-width: 13rem; }
+.col-sort > .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
+.col-sort.on > .icon-button { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: var(--radius-s); }
+.menu-check { display: inline-block; width: 1em; color: var(--accent); }
 @media (hover: none) {
   .column .column-tools { opacity: 1 !important; }
   .column-tools .icon-button { width: 2.25rem; height: 2.25rem; } /* a finger-sized target */
@@ -401,6 +406,11 @@ a.pulse-item:hover { color: var(--text); }
 }
 .card-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: var(--sp-3); }
 .card-foot:has(> .meta:empty):not(:has(> .people)) { display: none; }
+/* the card's last line: the schedule that made it, and when it was done */
+.card-when { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.2rem var(--sp-4); margin-top: calc(-1 * var(--sp-2)); }
+.card-when .meta-item { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-done-at { margin-left: auto; }
+.card-top .ws-chip { max-width: 10rem; }
 /* who: 20px avatars stacked with a ring of the card colour; a person handing a gig to an agent shows
    as creator, a small arrow, then the assignees */
 .people { display: inline-flex; align-items: center; margin-left: auto; flex: none; }

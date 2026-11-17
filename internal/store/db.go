@@ -71,6 +71,33 @@ func nullStr(s *string) any {
 	return *s
 }
 
+// wsArg is a workspace id for SQL: NULL for 0 (a shared template or schedule has no workspace).
+func wsArg(ws int64) any {
+	if ws == 0 {
+		return nil
+	}
+	return ws
+}
+
+// wsRef is a workspace id for Activity: nil for 0 (shared).
+func wsRef(ws int64) *int64 {
+	if ws == 0 {
+		return nil
+	}
+	return &ws
+}
+
+// AutoArchiveMax is the longest auto-archive delay (a leap year, in minutes); the shortest is 5.
+const AutoArchiveMax = 527040
+
+// validAutoArchive checks an auto-archive delay in minutes (nil: never).
+func validAutoArchive(m *int64) error {
+	if m != nil && (*m < 5 || *m > AutoArchiveMax) {
+		return Invalid("auto_archive_minutes: 5 to %d (or none)", AutoArchiveMax)
+	}
+	return nil
+}
+
 func nullInt(i *int64) any {
 	if i == nil {
 		return nil

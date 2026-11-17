@@ -170,7 +170,8 @@ type (
 		AlwaysRun     *bool    `json:"always_run,omitempty" jsonschema:"Run it whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  []string `json:"allowed_tools,omitempty" jsonschema:"Replaces the runner tool allowlist ([] clears; needs the allowed_tools permission)"`
 		BlocksParent  *bool    `json:"blocks_parent,omitempty" jsonschema:"For a subgig: true = its parent waits until it is done"`
-		Clear         []string `json:"clear,omitempty" jsonschema:"Fields to clear: color, start_at, due_at, not_after, labels, assignees"`
+		AutoArchive   int64    `json:"auto_archive_minutes,omitempty" jsonschema:"Archive it this many minutes (5-527040) after it is done or cancelled"`
+		Clear         []string `json:"clear,omitempty" jsonschema:"Fields to clear: color, start_at, due_at, not_after, labels, assignees, auto_archive_minutes"`
 	}
 	moveGigArgs struct {
 		Gig      string `json:"gig" jsonschema:"Gig id or key"`
@@ -467,12 +468,15 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				if in.BlocksParent != nil {
 					b["blocks_parent"] = *in.BlocksParent
 				}
+				if in.AutoArchive != 0 {
+					b["auto_archive_minutes"] = in.AutoArchive
+				}
 				for _, f := range in.Clear {
 					switch f {
-					case "color", "start_at", "due_at", "not_after", "labels", "assignees":
+					case "color", "start_at", "due_at", "not_after", "labels", "assignees", "auto_archive_minutes":
 						b[f] = nil
 					default:
-						return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"clear accepts color, start_at, due_at, not_after, labels, assignees"}`))
+						return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"clear accepts color, start_at, due_at, not_after, labels, assignees, auto_archive_minutes"}`))
 					}
 				}
 				return toolResult(call("PATCH", "/gigs/"+t(in.Gig), nil, b))

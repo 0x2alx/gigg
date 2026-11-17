@@ -324,8 +324,9 @@ func (s *Server) housekeepOnce(ctx context.Context) {
 		for _, e := range res.Errors {
 			s.log.Error("housekeeping", "err", e)
 		}
-		if res.Created+res.Skipped+res.Missed+res.Stale+len(res.Paused) > 0 {
-			s.log.Info("housekeeping", "created", res.Created, "skipped", res.Skipped, "missed", res.Missed, "paused", res.Paused, "stale_runs", res.Stale)
+		if res.Created+res.Skipped+res.Missed+res.Stale+len(res.Paused)+res.Archived > 0 {
+			s.log.Info("housekeeping", "created", res.Created, "skipped", res.Skipped, "missed", res.Missed, "paused", res.Paused, "stale_runs", res.Stale,
+				"auto_archived", res.Archived)
 		}
 	}
 	s.nightlyBackup(ctx, time.Now())

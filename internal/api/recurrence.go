@@ -30,7 +30,8 @@ type RecurrenceBody struct {
 	Priority      int64                  `json:"priority,omitempty" minimum:"0" maximum:"4"`
 	Color         *string                `json:"color,omitempty"`
 	Labels        []string               `json:"labels,omitempty" maxItems:"20"`
-	Assignees     []int64                `json:"assignees,omitempty" maxItems:"50"`
+	Assignees     []int64                `json:"assignees,omitempty" maxItems:"50" doc:"Who its gigs go to. With a shared template (also when template_id names one), the recurring gig's own assignees"`
+	AutoArchive   *int64                 `json:"auto_archive_minutes,omitempty" minimum:"0" maximum:"527040" doc:"Its gigs archive themselves this many minutes after done or cancelled (kept in its template); omit to keep, 0 clears"`
 	Model         string                 `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
 	Effort        string                 `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
 	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Its gigs run whatever the usage budget (needs the always_run permission)"`
@@ -60,7 +61,14 @@ func (b RecurrenceBody) apply(r *store.Recurrence) {
 		if b.AllowedTools != nil {
 			r.AllowedTools = b.AllowedTools
 		}
+		if b.AutoArchive != nil {
+			r.AutoArchive = b.AutoArchive
+			if *b.AutoArchive == 0 {
+				r.AutoArchive = nil
+			}
+		}
 	}
+	r.OwnAssignees = b.Assignees
 	if b.ScheduleID == nil {
 		r.SetRule(store.Rule{Freq: b.Freq, Interval: b.Interval, Weekdays: b.Weekdays, MonthDay: b.MonthDay, TZ: b.TZ, WindowStart: b.WindowStart,
 			WindowMinutes: b.WindowMinutes, LeadMinutes: b.LeadMinutes})
@@ -270,7 +278,7 @@ func (a *API) registerRecurrence() {
 			if strings.TrimSpace(r.Title) == "" {
 				return nil, fail(422, "invalid", "A recurring gig needs a title.")
 			}
-			if !store.SameContent(&old, r) {
+			if !store.SameContent(&old, r) && !old.TemplateShared { // a shared one isn't changed: this recurring gig gets a copy
 				// the content lives in a template: someone else's needs Gig templates to change, and a
 				// key limited to some projects can't change one for every project
 				if old.TemplateBy != p.User.ID {
@@ -289,7 +297,7 @@ func (a *API) registerRecurrence() {
 			if in.Body.Freq == "" {
 				return nil, fail(422, "invalid", "A recurring gig needs freq (or a schedule_id).")
 			}
-			if rule := r.Rule(); rule.Validate() == nil && !rule.Same(old.Rule()) {
+			if rule := r.Rule(); rule.Validate() == nil && !rule.Same(old.Rule()) && !old.ScheduleShared { // shared: it moves to its own
 				if p.Narrowed() && a.scheduleUsedOutside(ctx, p, old.ScheduleID) {
 					return nil, errForbidden("This schedule is used outside the projects this key reaches; pick or make another one.")
 				}
@@ -340,6 +348,9 @@ func (a *API) registerRecurrence() {
 				return nil, err
 			}
 			var tpl *store.Template
+			// shared templates and schedules belong to the instance: deleting a recurring gig keeps them
+			in.Template = in.Template && !r.TemplateShared
+			in.Schedule = in.Schedule && !r.ScheduleShared
 			if in.Template {
 				// as for changing its content: someone else's template needs Gig templates, and a key
 				// limited to some projects can't delete one for every project

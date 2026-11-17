@@ -19,7 +19,8 @@ import (
 // ErrandTemplate is an errand's content.
 type ErrandTemplate struct {
 	ID               int64  `json:"id"`
-	WorkspaceID      int64  `json:"workspace_id"`
+	WorkspaceID      int64  `json:"workspace_id" doc:"0 for a shared template"`
+	Shared           bool   `json:"shared" doc:"Shared by every workspace (admins make and change it; an errand that changes it gets its own copy)"`
 	Name             string `json:"name"`
 	DescriptionMD    string `json:"description_md"`
 	Command          string `json:"command" doc:"Run by bash in the agent's sandbox (or unsandboxed, see unsandboxed)"`
@@ -102,7 +103,7 @@ const (
 	errandTemplatesPerWS = 500
 )
 
-const ctCols = `t.id, t.workspace_id, t.name, t.description_md, t.command, t.timeout_s, t.output, t.unsandboxed, t.command_set_by,
+const ctCols = `t.id, COALESCE(t.workspace_id, 0), t.name, t.description_md, t.command, t.timeout_s, t.output, t.unsandboxed, t.command_set_by,
 	COALESCE((SELECT username FROM users WHERE id = t.command_set_by), ''), t.command_set_at, t.unsandboxed_set_by, t.created_by, t.created_at, t.version,
 	(SELECT count(*) FROM errands c WHERE c.template_id = t.id AND c.deleted_at IS NULL)`
 
@@ -117,6 +118,7 @@ func scanErrandTemplate(row interface{ Scan(...any) error }) (*ErrandTemplate, e
 		return nil, err
 	}
 	t.UnsandboxedBy = ptrInt(ub)
+	t.Shared = t.WorkspaceID == 0
 	return t, nil
 }
 
@@ -125,9 +127,11 @@ func GetErrandTemplate(ctx context.Context, q Q, id int64) (*ErrandTemplate, err
 	return scanErrandTemplate(q.QueryRowContext(ctx, "SELECT "+ctCols+" FROM errand_templates t WHERE t.id = ? AND t.deleted_at IS NULL", id))
 }
 
-// ListErrandTemplates returns a workspace's live errand templates, by name.
+// ListErrandTemplates returns the live errand templates a workspace can use, by name: its own, then the
+// shared ones. ws 0: only the shared ones.
 func ListErrandTemplates(ctx context.Context, q Q, ws int64) ([]*ErrandTemplate, error) {
-	rows, err := q.QueryContext(ctx, "SELECT "+ctCols+" FROM errand_templates t WHERE t.workspace_id = ? AND t.deleted_at IS NULL ORDER BY t.name COLLATE NOCASE, t.id", ws)
+	rows, err := q.QueryContext(ctx, "SELECT "+ctCols+` FROM errand_templates t WHERE (t.workspace_id = ? OR t.workspace_id IS NULL) AND t.deleted_at IS NULL
+		ORDER BY t.workspace_id IS NULL, t.name COLLATE NOCASE, t.id`, ws)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +202,7 @@ func SaveErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ex
 	now := Now()
 	if t.ID == 0 {
 		var n int
-		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM errand_templates WHERE workspace_id = ? AND deleted_at IS NULL`, t.WorkspaceID).Scan(&n); err != nil {
+		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM errand_templates WHERE workspace_id IS ? AND deleted_at IS NULL`, wsArg(t.WorkspaceID)).Scan(&n); err != nil {
 			return nil, err
 		}
 		if n >= errandTemplatesPerWS {
@@ -209,14 +213,14 @@ func SaveErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ex
 			ub = a.UserID
 		}
 		res, err := q.ExecContext(ctx, `INSERT INTO errand_templates (workspace_id, name, description_md, command, timeout_s, output, unsandboxed,
-			command_set_by, command_set_at, unsandboxed_set_by, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, t.WorkspaceID, t.Name,
+			command_set_by, command_set_at, unsandboxed_set_by, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, wsArg(t.WorkspaceID), t.Name,
 			t.DescriptionMD, t.Command, t.TimeoutS, t.Output, t.Unsandboxed, a.UserID, now, ub, a.UserID, now)
 		if err != nil {
 			return nil, err
 		}
 		t.ID, _ = res.LastInsertId()
-		if _, err := Activity(ctx, q, a, &t.WorkspaceID, nil, "errand_template.created", "errand_template", t.ID,
-			map[string]any{"name": t.Name, "unsandboxed": t.Unsandboxed}); err != nil {
+		if _, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), nil, "errand_template.created", "errand_template", t.ID,
+			map[string]any{"name": t.Name, "unsandboxed": t.Unsandboxed, "shared": t.WorkspaceID == 0}); err != nil {
 			return nil, err
 		}
 		return GetErrandTemplate(ctx, q, t.ID)
@@ -256,7 +260,7 @@ func SaveErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ex
 		return nil, err
 	}
 	data := map[string]any{"name": t.Name, "command_changed": t.Command != cur.Command, "unsandboxed": t.Unsandboxed}
-	if _, err := Activity(ctx, q, a, &t.WorkspaceID, nil, "errand_template.updated", "errand_template", t.ID, data); err != nil {
+	if _, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), nil, "errand_template.updated", "errand_template", t.ID, data); err != nil {
 		return nil, err
 	}
 	return GetErrandTemplate(ctx, q, t.ID)
@@ -274,18 +278,18 @@ func clearUnsandboxed(ctx context.Context, q Q, a Actor, tplID int64) error {
 		return nil
 	}
 	var ws int64
-	if err := q.QueryRowContext(ctx, `SELECT workspace_id FROM errand_templates WHERE id = ?`, tplID).Scan(&ws); err != nil {
+	if err := q.QueryRowContext(ctx, `SELECT COALESCE(workspace_id, 0) FROM errand_templates WHERE id = ?`, tplID).Scan(&ws); err != nil {
 		return err
 	}
-	_, err = Activity(ctx, q, a, &ws, nil, "errand_template.updated", "errand_template", tplID, map[string]any{"unsandboxed_cleared": true})
+	_, err = Activity(ctx, q, a, wsRef(ws), nil, "errand_template.updated", "errand_template", tplID, map[string]any{"unsandboxed_cleared": true})
 	return err
 }
 
-// sandboxedFor returns the template an errand touched by someone without errand_unsandboxed should use: the
-// same one when it's sandboxed; when it isn't, its flag is turned off if no other errand uses it, else
-// (so other people's errands keep running as they were set up) a sandboxed copy, with the command's
-// author kept.
-func sandboxedFor(ctx context.Context, q Q, a Actor, tplID, errandID int64, alwaysCopy bool) (int64, error) {
+// sandboxedFor returns the template an errand (of workspace ws) touched by someone without
+// errand_unsandboxed should use: the same one when it's sandboxed; when it isn't, its flag is turned
+// off if no other errand uses it, else (so other people's errands keep running as they were set up) a
+// sandboxed copy in ws, with the command's author kept. A shared template is always copied.
+func sandboxedFor(ctx context.Context, q Q, a Actor, ws, tplID, errandID int64, alwaysCopy bool) (int64, error) {
 	t, err := GetErrandTemplate(ctx, q, tplID)
 	if err != nil {
 		return 0, err
@@ -297,18 +301,31 @@ func sandboxedFor(ctx context.Context, q Q, a Actor, tplID, errandID int64, alwa
 	if err := q.QueryRowContext(ctx, `SELECT count(*) FROM errands WHERE template_id = ? AND deleted_at IS NULL AND id != ?`, tplID, errandID).Scan(&others); err != nil {
 		return 0, err
 	}
-	if others == 0 && !alwaysCopy {
+	if others == 0 && !alwaysCopy && !t.Shared {
 		return tplID, clearUnsandboxed(ctx, q, a, tplID)
 	}
+	return copyErrandTemplate(ctx, q, a, t, ws, true)
+}
+
+// copyErrandTemplate copies a template into workspace ws for one errand, provenance kept (who set the
+// command and when; who turned the sandbox off, unless sandboxed makes the copy run in the sandbox).
+func copyErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ws int64, sandboxed bool) (int64, error) {
+	unsandboxed, ub := t.Unsandboxed && !sandboxed, any(nil)
+	if unsandboxed {
+		ub = nullInt(t.UnsandboxedBy)
+	}
 	res, err := q.ExecContext(ctx, `INSERT INTO errand_templates (workspace_id, name, description_md, command, timeout_s, output, unsandboxed,
-		command_set_by, command_set_at, created_by, created_at) VALUES (?,?,?,?,?,?,0,?,?,?,?)`, t.WorkspaceID, t.Name, t.DescriptionMD, t.Command,
-		t.TimeoutS, t.Output, t.CommandSetBy, t.CommandSetAt, a.UserID, Now())
+		command_set_by, command_set_at, unsandboxed_set_by, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, ws, t.Name, t.DescriptionMD, t.Command,
+		t.TimeoutS, t.Output, unsandboxed, t.CommandSetBy, t.CommandSetAt, ub, a.UserID, Now())
 	if err != nil {
 		return 0, err
 	}
 	id, _ := res.LastInsertId()
-	_, err = Activity(ctx, q, a, &t.WorkspaceID, nil, "errand_template.created", "errand_template", id,
-		map[string]any{"name": t.Name, "sandboxed_copy_of": tplID})
+	data := map[string]any{"name": t.Name, "copy_of": t.ID}
+	if sandboxed && t.Unsandboxed {
+		data = map[string]any{"name": t.Name, "sandboxed_copy_of": t.ID}
+	}
+	_, err = Activity(ctx, q, a, &ws, nil, "errand_template.created", "errand_template", id, data)
 	return id, err
 }
 
@@ -320,7 +337,7 @@ func DeleteErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate) 
 	if _, err := q.ExecContext(ctx, `UPDATE errand_templates SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), t.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &t.WorkspaceID, nil, "errand_template.deleted", "errand_template", t.ID, map[string]any{"name": t.Name})
+	_, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), nil, "errand_template.deleted", "errand_template", t.ID, map[string]any{"name": t.Name, "shared": t.Shared})
 	return err
 }
 
@@ -468,11 +485,11 @@ func CreateErrand(ctx context.Context, q Q, a Actor, n NewErrand, e ErrandEdit) 
 		tplID = t.ID
 	} else {
 		t, err := GetErrandTemplate(ctx, q, tplID)
-		if err != nil || t.WorkspaceID != n.WorkspaceID {
+		if err != nil || (t.WorkspaceID != n.WorkspaceID && !t.Shared) {
 			return nil, Invalid("no such errand template in this workspace")
 		}
 		if t.Unsandboxed && !e.CanUnsandbox {
-			if tplID, err = sandboxedFor(ctx, q, a, tplID, 0, true); err != nil {
+			if tplID, err = sandboxedFor(ctx, q, a, n.WorkspaceID, tplID, 0, true); err != nil {
 				return nil, err
 			}
 		}
@@ -558,13 +575,13 @@ func UpdateErrand(ctx context.Context, q Q, a Actor, id, expect int64, ch Errand
 			return nil, Invalid("change the template or its content, not both at once")
 		}
 		t, err := GetErrandTemplate(ctx, q, *ch.TemplateID)
-		if err != nil || t.WorkspaceID != c.WorkspaceID {
+		if err != nil || (t.WorkspaceID != c.WorkspaceID && !t.Shared) {
 			return nil, Invalid("no such errand template in this workspace")
 		}
 		tplID = t.ID
 	}
 	if !e.CanUnsandbox { // asking to turn it on doesn't skip the copy: the save below refuses that
-		if tplID, err = sandboxedFor(ctx, q, a, tplID, c.ID, tplID != c.TemplateID); err != nil {
+		if tplID, err = sandboxedFor(ctx, q, a, c.WorkspaceID, tplID, c.ID, tplID != c.TemplateID); err != nil {
 			return nil, err
 		}
 	}
@@ -572,6 +589,14 @@ func UpdateErrand(ctx context.Context, q Q, a Actor, id, expect int64, ch Errand
 		t, err := GetErrandTemplate(ctx, q, tplID)
 		if err != nil {
 			return nil, err
+		}
+		if t.Shared { // a shared template is never written through one workspace's errand: it gets its own copy
+			if tplID, err = copyErrandTemplate(ctx, q, a, t, c.WorkspaceID, false); err != nil {
+				return nil, err
+			}
+			if t, err = GetErrandTemplate(ctx, q, tplID); err != nil {
+				return nil, err
+			}
 		}
 		set := func(dst *string, src *string) {
 			if src != nil {

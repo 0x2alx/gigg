@@ -19,6 +19,7 @@ import {
   type BoardFilter,
 } from "./boardModel";
 import { loadCollapsed, saveCollapsed, toggleId } from "./collapse";
+import { loadSorts, saveSorts, sortGigs, sortsFor, SORT_LABEL, type ColumnSort } from "./columnSort";
 import { applyMove, reorderIndex, type MoveBody } from "./dnd";
 import { useNarrow } from "./narrow";
 import { setMentionUsers } from "./markdown";
@@ -27,9 +28,9 @@ import { SchedulesModal } from "./Schedules";
 import { TemplatesModal } from "./Templates";
 import { GigModal, lastProject } from "./GigModal";
 import { GigPanel } from "./GigPanel";
-import { backTo, viewsApi } from "./views/viewsApi";
+import { backTo, relTime, viewsApi } from "./views/viewsApi";
 import { CATEGORY_COLOR, colorFor, readableOn } from "./theme";
-import { ClearFilters, Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, GigBadges, reducedMotion } from "./ui";
+import { ClearFilters, Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, GigBadges, WorkspaceChip, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
@@ -295,6 +296,17 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-col-focus="${id}"]`)?.focus());
   };
 
+  // per-column sort, remembered per board like the collapsed columns
+  const [sorts, setSorts] = useState<Record<string, ColumnSort>>(() => loadSorts(collapseKey));
+  useEffect(() => setSorts(loadSorts(collapseKey)), [collapseKey]);
+  const setSort = (col: string, sort: ColumnSort) =>
+    setSorts((cur) => {
+      const next = { ...cur, [col]: sort };
+      saveSorts(collapseKey, next);
+      return next;
+    });
+  const sortOf = (c: { key: string }): ColumnSort => sorts[c.key] ?? "manual";
+
   const allGigs = useMemo(() => [...boards.values()].flatMap((b) => b.statuses.flatMap((s) => s.gigs)), [boards]);
   const gigById = (id: number) => allGigs.find((t) => t.id === id);
 
@@ -424,11 +436,15 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const me_ = me.user.id;
   // a manual order only makes sense on the whole column: with a gig filter on, drops go last
   const manual = !!single && !(filter.a || filter.l || filter.pr || filter.q);
-  const columns: BoardColumn[] = single
-    ? boards.get(single.project.id)
-      ? statusColumns(boards.get(single.project.id)!, filter, me_)
-      : []
-    : categoryColumns(scopeIds.map((id) => boards.get(id)).filter((b): b is Board => !!b), filter, me_);
+  const columns: BoardColumn[] = (
+    single
+      ? boards.get(single.project.id)
+        ? statusColumns(boards.get(single.project.id)!, filter, me_)
+        : []
+      : categoryColumns(scopeIds.map((id) => boards.get(id)).filter((b): b is Board => !!b), filter, me_)
+  ).map((c) => ({ ...c, gigs: sortGigs(c.gigs, sortOf(c)) }));
+  // drag-to-reorder and its drop line only where the column shows its manual order
+  const manualIn = (c: BoardColumn) => manual && sortOf(c) === "manual";
   const countOpen = (cols: BoardColumn[]) => cols.filter((c) => c.category !== "done").reduce((n, c) => n + c.gigs.length, 0);
   const open = countOpen(columns);
   // with a gig filter (assignee, label, priority, search) on, the count says how many of all match
@@ -488,7 +504,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     let index = -1;
-    if (manual && !atEnd) {
+    if (manualIn(c) && !atEnd) {
       const cards = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-gig-id]")].filter((el) => Number(el.dataset.gigId) !== drag);
       index = cards.findIndex((el) => {
         const r = el.getBoundingClientRect();
@@ -503,7 +519,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     e.preventDefault();
     if (c.statusId !== undefined) {
       const all = boards.get(single!.project.id)?.statuses.find((s) => s.id === c.statusId)?.gigs ?? c.gigs; // unfiltered
-      const index = manual && drop?.col === c.key && drop.index >= 0 ? drop.index : all.filter((t) => t.id !== drag).length;
+      const index = manualIn(c) && drop?.col === c.key && drop.index >= 0 ? drop.index : all.filter((t) => t.id !== drag).length;
       moveInProject(drag, c.statusId, index);
     } else moveToCat(drag, c.category);
     endDrag();
@@ -533,7 +549,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
         showWs={wsInScope.length > 1}
         labels={b.labels}
         canWrite={write}
-        canReorder={write && c.statusId !== undefined && manual}
+        canReorder={write && c.statusId !== undefined && manualIn(c)}
         statusLabel={c.statusId === undefined && t.status_name !== c.name ? t.status_name : undefined}
         dragging={t.id === drag}
         onDragStart={() => {
@@ -756,7 +772,9 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
                     {c.gigs.length}
                   </span>
                 </h2>
+                {sortOf(c) !== "manual" && <SortMenu column={c.name} sorts={sortsFor(c.category)} value={sortOf(c)} onChange={(s) => setSort(c.key, s)} />}
                 <span className="column-tools">
+                  {sortOf(c) === "manual" && <SortMenu column={c.name} sorts={sortsFor(c.category)} value={sortOf(c)} onChange={(s) => setSort(c.key, s)} />}
                   {addHere && (
                     <button type="button" className="icon-button" aria-label={`New gig in ${c.name}`} onClick={() => addIn(c)}>
                       <Icon name="plus" strokeWidth={2} />
@@ -772,7 +790,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
               <div className="cards">
                 {c.gigs.map((t, i) => {
                   if (t.id !== drag) k++;
-                  const showLine = manual && c.statusId !== undefined && t.id !== drag && k === line;
+                  const showLine = manualIn(c) && c.statusId !== undefined && t.id !== drag && k === line;
                   return (
                     <div key={t.id} className="card-slot" data-slot={t.id} data-place={`${c.key}:${i}:${c.gigs.length}`}>
                       {showLine && <div className="drop-line" aria-hidden="true" />}
@@ -785,7 +803,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
                     {cardFor(t, c, 0, true)}
                   </div>
                 ))}
-                {manual && c.statusId !== undefined && line === others.length && <div className="drop-line" aria-hidden="true" />}
+                {manualIn(c) && c.statusId !== undefined && line === others.length && <div className="drop-line" aria-hidden="true" />}
                 {c.gigs.length === 0 && (drag !== null || archivedIn(c).length === 0) && <div className="empty">{drag !== null ? "Drop here" : "Nothing here"}</div>}
                 {addHere && c.category !== "done" && (
                   <button type="button" className="column-add" onClick={() => addIn(c)}>
@@ -1262,6 +1280,27 @@ function useNow(every: number): number {
 
 // StageIcon: a column's stage as a small ring in its colour: dashed (backlog), empty (to do),
 // half full (doing), with a pause bar (waiting), filled with a check (done), crossed (cancelled).
+// SortMenu: a column's sort, as an icon button with a drop-down of the orders it offers. Sorted columns
+// show it lit, beside the title.
+function SortMenu({ column, sorts, value, onChange }: { column: string; sorts: ColumnSort[]; value: ColumnSort; onChange: (s: ColumnSort) => void }) {
+  const on = value !== "manual";
+  return (
+    <MoreMenu
+      label={on ? `${column}: sorted by ${SORT_LABEL[value].toLowerCase()}` : `Sort ${column}`}
+      className={"col-sort" + (on ? " on" : "")}
+      buttonClass={"icon-button" + (on ? " on" : "")}
+      face={<Icon name="sort" />}
+    >
+      <div className="menu-label">Sort</div>
+      {sorts.map((s) => (
+        <button key={s} type="button" role="menuitemradio" aria-checked={s === value} onClick={() => onChange(s)}>
+          <span className="menu-check" aria-hidden="true">{s === value ? "✓" : ""}</span> {SORT_LABEL[s]}
+        </button>
+      ))}
+    </MoreMenu>
+  );
+}
+
 function StageIcon({ category, color }: { category: Category; color: string }) {
   return (
     <svg className="stage-icon" viewBox="0 0 16 16" width="1em" height="1em" aria-hidden="true" style={{ color }}>
@@ -1371,7 +1410,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusL
   const handOff = !!creator && creator.kind !== "agent" && assignees.some((u) => u.kind === "agent");
   const createdBy = creator ? `Created by ${nameOf(creator)}` : "";
   const assigneeTip = (u: { username: string; display_name: string; kind: string }) => `Assigned to ${nameOf(u)}${u.kind === "agent" ? " (agent)" : ""}${createdBy ? `\n${createdBy}` : ""}`;
-  const wsColor = colorFor(ws.slug, ws.color);
+  const done = gig.status_category === "done" ? gig.done_at : null;
   const state = cardState(gig);
   const run = gig.last_run;
   const running = state?.kind === "running";
@@ -1420,12 +1459,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusL
               {running && run && <span className="mono">· {elapsed(now - run.started_at)}</span>}
             </span>
           )}
-          {showWs && (
-            <span className="card-ws" data-tip={`Workspace: ${ws.name}`}>
-              <span className="dot" style={{ background: wsColor }} />
-              {ws.name}
-            </span>
-          )}
+          {showWs && <WorkspaceChip ws={ws} />}
           {statusLabel && (
             <span className="card-status" data-tip={`Its project's status: ${statusLabel}`}>
               {statusLabel}
@@ -1436,7 +1470,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusL
               <Icon name="archive" /> archived
             </span>
           )}
-          <span className="key card-key">{gig.key}</span>
+          <span className="pill pill-key card-key">{gig.key}</span>
         </div>
         <div className="card-title">{gig.title}</div>
         {(gig.labels.length > 0 || showDue) && (
@@ -1512,6 +1546,20 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusL
             </span>
           )}
         </div>
+        {(gig.schedule || done) && (
+          <div className="card-when">
+            {gig.schedule && (
+              <span className="meta-item" data-tip={`Schedule: ${gig.schedule.name}`}>
+                <Icon name="refresh" /> {gig.schedule.text}
+              </span>
+            )}
+            {done && (
+              <span className="meta-item card-done-at" data-tip={`Done ${fmtTime(done)}`}>
+                <Icon name="check" /> Done {relTime(done)}
+              </span>
+            )}
+          </div>
+        )}
       </button>
       {state?.kind === "failed" && run && (
         <div className="card-fail">

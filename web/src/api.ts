@@ -126,6 +126,8 @@ export interface Gig {
   not_after?: number | null; // the window closes: agents can't claim it after this
   missed_at?: number | null; // the window closed while nobody had touched it
   archived_at?: number | null;
+  done_at?: number | null; // when it entered a done status (null when it isn't done)
+  schedule?: { name: string; text: string }; // made by a recurring gig: its schedule, in words
   parent_id?: number | null;
   subgig_count?: number;
   subgig_done?: number;

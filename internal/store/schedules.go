@@ -333,10 +333,12 @@ func windowText(start string, minutes int64) string {
 	return "from " + start + " for " + d
 }
 
-// Schedule is a named rule of a workspace; recurring gigs pair it with a template.
+// Schedule is a named rule of a workspace (or shared by all of them); recurring gigs and errands pair
+// it with a template.
 type Schedule struct {
 	ID          int64  `json:"id"`
-	WorkspaceID int64  `json:"workspace_id"`
+	WorkspaceID int64  `json:"workspace_id" doc:"0 for a shared schedule"`
+	Shared      bool   `json:"shared" doc:"Shared by every workspace (admins make and change it)"`
 	Name        string `json:"name"`
 	Rule
 	CreatedBy  int64 `json:"created_by"`
@@ -347,7 +349,7 @@ type Schedule struct {
 }
 
 // schColsPre13 is the column list without the errand count (migration steps before 0013 add ", 0").
-const schColsPre13 = `id, workspace_id, name, freq, interval_n, weekdays, month_day, tz, window_start, window_minutes, lead_minutes, created_by, created_at, version,
+const schColsPre13 = `id, COALESCE(workspace_id, 0), name, freq, interval_n, weekdays, month_day, tz, window_start, window_minutes, lead_minutes, created_by, created_at, version,
 	(SELECT count(*) FROM recurrences r WHERE r.schedule_id = schedules.id AND r.deleted_at IS NULL)`
 
 const schCols = schColsPre13 + `, (SELECT count(*) FROM errands c WHERE c.schedule_id = schedules.id AND c.deleted_at IS NULL)`
@@ -364,6 +366,7 @@ func scanSchedule(row interface{ Scan(...any) error }) (*Schedule, error) {
 		return nil, err
 	}
 	s.MonthDay = ptrInt(md)
+	s.Shared = s.WorkspaceID == 0
 	_ = json.Unmarshal([]byte(weekdays), &s.Weekdays)
 	if s.Weekdays == nil {
 		s.Weekdays = []int{}
@@ -371,9 +374,11 @@ func scanSchedule(row interface{ Scan(...any) error }) (*Schedule, error) {
 	return s, nil
 }
 
-// ListSchedules returns a workspace's live schedules, by name.
+// ListSchedules returns the live schedules a workspace can use, by name: its own, then the shared
+// ones. ws 0: only the shared ones.
 func ListSchedules(ctx context.Context, q Q, ws int64) ([]*Schedule, error) {
-	rows, err := q.QueryContext(ctx, "SELECT "+schCols+" FROM schedules WHERE workspace_id = ? AND deleted_at IS NULL ORDER BY name COLLATE NOCASE, id", ws)
+	rows, err := q.QueryContext(ctx, "SELECT "+schCols+` FROM schedules WHERE (workspace_id = ? OR workspace_id IS NULL) AND deleted_at IS NULL
+		ORDER BY workspace_id IS NULL, name COLLATE NOCASE, id`, ws)
 	if err != nil {
 		return nil, err
 	}
@@ -394,17 +399,18 @@ func GetSchedule(ctx context.Context, q Q, id int64) (*Schedule, error) {
 	return scanSchedule(q.QueryRowContext(ctx, "SELECT "+schCols+" FROM schedules WHERE id = ? AND deleted_at IS NULL", id))
 }
 
-// WorkspaceSchedule loads a live schedule of workspace ws (Invalid otherwise).
+// WorkspaceSchedule loads a live schedule workspace ws can use: its own or a shared one (Invalid
+// otherwise).
 func WorkspaceSchedule(ctx context.Context, q Q, ws, id int64) (*Schedule, error) {
 	s, err := GetSchedule(ctx, q, id)
-	if err != nil || s.WorkspaceID != ws {
+	if err != nil || (s.WorkspaceID != ws && !s.Shared) {
 		return nil, Invalid("no such schedule in this workspace")
 	}
 	return s, nil
 }
 
-// scheduleFor returns a live schedule of the workspace with exactly this rule, or makes one named
-// after it.
+// scheduleFor returns a live schedule the workspace can use (its own first, then a shared one) with
+// exactly this rule, or makes one in the workspace named after it.
 func scheduleFor(ctx context.Context, q Q, a Actor, ws int64, rule Rule) (*Schedule, error) {
 	ss, err := ListSchedules(ctx, q, ws)
 	if err != nil {
@@ -434,14 +440,14 @@ func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) 
 	action := "schedule.updated"
 	if s.ID == 0 {
 		var n int
-		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM schedules WHERE workspace_id = ? AND deleted_at IS NULL`, s.WorkspaceID).Scan(&n); err != nil {
+		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM schedules WHERE workspace_id IS ? AND deleted_at IS NULL`, wsArg(s.WorkspaceID)).Scan(&n); err != nil {
 			return nil, err
 		}
 		if n >= 200 {
-			return nil, Invalid("a workspace has at most 200 schedules")
+			return nil, Invalid("a workspace (and the shared library) has at most 200 schedules")
 		}
 		res, err := q.ExecContext(ctx, `INSERT INTO schedules (workspace_id, name, freq, interval_n, weekdays, month_day, tz, window_start, window_minutes,
-			lead_minutes, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, s.WorkspaceID, s.Name, s.Freq, s.Interval, mustJSON(s.Weekdays),
+			lead_minutes, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, wsArg(s.WorkspaceID), s.Name, s.Freq, s.Interval, mustJSON(s.Weekdays),
 			nullInt(s.MonthDay), s.TZ, s.WindowStart, s.WindowMinutes, s.LeadMinutes, a.UserID, Now())
 		if err != nil {
 			return nil, err
@@ -473,7 +479,7 @@ func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) 
 			}
 		}
 	}
-	if _, err := Activity(ctx, q, a, &s.WorkspaceID, nil, action, "schedule", s.ID, map[string]any{"name": s.Name}); err != nil {
+	if _, err := Activity(ctx, q, a, wsRef(s.WorkspaceID), nil, action, "schedule", s.ID, map[string]any{"name": s.Name, "shared": s.Shared || s.WorkspaceID == 0}); err != nil {
 		return nil, err
 	}
 	return GetSchedule(ctx, q, s.ID)
@@ -537,7 +543,7 @@ func DeleteSchedule(ctx context.Context, q Q, a Actor, s *Schedule) error {
 	if _, err := q.ExecContext(ctx, `UPDATE schedules SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), s.ID); err != nil {
 		return err
 	}
-	_, err = Activity(ctx, q, a, &s.WorkspaceID, nil, "schedule.deleted", "schedule", s.ID, map[string]any{"name": s.Name})
+	_, err = Activity(ctx, q, a, wsRef(s.WorkspaceID), nil, "schedule.deleted", "schedule", s.ID, map[string]any{"name": s.Name, "shared": s.Shared})
 	return err
 }
 

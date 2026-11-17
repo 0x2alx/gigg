@@ -562,7 +562,8 @@ type TemplateSubgig struct {
 // Template is a reusable gig blueprint.
 type Template struct {
 	ID            int64            `json:"id"`
-	WorkspaceID   int64            `json:"workspace_id"`
+	WorkspaceID   int64            `json:"workspace_id" doc:"0 for a shared template"`
+	Shared        bool             `json:"shared" doc:"Shared by every workspace (admins make and change it; recurring gigs set their own assignees)"`
 	ProjectID     *int64           `json:"project_id" doc:"null = usable in any project of the workspace"`
 	Name          string           `json:"name"`
 	Title         string           `json:"title"`
@@ -578,28 +579,30 @@ type Template struct {
 	Effort        string           `json:"effort"`
 	AlwaysRun     bool             `json:"always_run"`
 	AllowedTools  []string         `json:"allowed_tools" doc:"Tool allowlist for the runner (permission rules); empty = the runner's usual mode"`
+	AutoArchive   *int64           `json:"auto_archive_minutes" doc:"Gigs made from it archive themselves this many minutes after done or cancelled (null: never)"`
 	CreatedBy     int64            `json:"created_by"`
 	CreatedAt     int64            `json:"created_at"`
 	Version       int64            `json:"version"`
 	Recurring     int64            `json:"recurring" doc:"Live recurring gigs that create their gigs from this template"`
 }
 
-const tplCols = `id, workspace_id, project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools, subgigs,
+const tplCols = `id, COALESCE(workspace_id, 0), project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes,
 	(SELECT count(*) FROM recurrences r WHERE r.template_id = gig_templates.id AND r.deleted_at IS NULL)`
 
 func scanTemplate(row interface{ Scan(...any) error }) (*Template, error) {
 	t := &Template{}
-	var proj sql.NullInt64
+	var proj, autoArch sql.NullInt64
 	var color sql.NullString
 	var labels, assignees, checklist, custom, tools, subs string
 	if err := row.Scan(&t.ID, &t.WorkspaceID, &proj, &t.Name, &t.Title, &t.DescriptionMD, &t.Priority, &color, &labels, &assignees, &checklist, &custom,
-		&t.CreatedBy, &t.CreatedAt, &t.Version, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &subs, &t.Recurring); err != nil {
+		&t.CreatedBy, &t.CreatedAt, &t.Version, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &subs, &autoArch, &t.Recurring); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
-	t.ProjectID, t.Color = ptrInt(proj), ptrStr(color)
+	t.ProjectID, t.Color, t.AutoArchive = ptrInt(proj), ptrStr(color), ptrInt(autoArch)
+	t.Shared = t.WorkspaceID == 0
 	_ = json.Unmarshal([]byte(labels), &t.Labels)
 	_ = json.Unmarshal([]byte(assignees), &t.Assignees)
 	_ = json.Unmarshal([]byte(checklist), &t.Checklist)
@@ -682,17 +685,31 @@ func (t *Template) validate() error {
 	if len(t.Custom) > 30 {
 		return Invalid("at most 30 custom values")
 	}
+	if err := validAutoArchive(t.AutoArchive); err != nil {
+		return err
+	}
+	if t.WorkspaceID == 0 { // shared: nothing that belongs to one workspace
+		switch {
+		case t.ProjectID != nil:
+			return Invalid("a shared template is for any project")
+		case len(t.Custom) > 0:
+			return Invalid("a shared template has no custom field values (fields belong to a workspace)")
+		case len(t.Assignees) > 0:
+			return Invalid("a shared template has no assignees: each recurring gig that uses it sets its own")
+		}
+	}
 	return validTemplateLists(t.Labels, t.Assignees, 0, nil)
 }
 
-// Templates lists a workspace's templates (narrowed to projects when given; workspace-wide ones always show).
+// Templates lists the templates a workspace can use: its own (narrowed to projects when given;
+// workspace-wide ones always show), then the shared ones. ws 0: only the shared ones.
 func Templates(ctx context.Context, q Q, ws int64, projects []int64) ([]*Template, error) {
-	where, args := "workspace_id = ? AND deleted_at IS NULL", []any{ws}
+	where, args := "(workspace_id = ? OR workspace_id IS NULL) AND deleted_at IS NULL", []any{ws}
 	if projects != nil {
 		where += " AND (project_id IS NULL OR project_id IN (" + placeholders(len(projects)) + "))"
 		args = append(args, int64Args(projects)...)
 	}
-	rows, err := q.QueryContext(ctx, "SELECT "+tplCols+" FROM gig_templates WHERE "+where+" ORDER BY name", args...)
+	rows, err := q.QueryContext(ctx, "SELECT "+tplCols+" FROM gig_templates WHERE "+where+" ORDER BY workspace_id IS NULL, name", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -720,7 +737,7 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 	}
 	if t.ProjectID != nil {
 		p, err := GetProject(ctx, q, *t.ProjectID)
-		if err != nil || p.WorkspaceID != t.WorkspaceID {
+		if err != nil || t.WorkspaceID == 0 || p.WorkspaceID != t.WorkspaceID {
 			return nil, Invalid("no such project in this workspace")
 		}
 		if t.ID != 0 {
@@ -738,7 +755,7 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			return nil, Invalid("custom: keys are field ids")
 		}
 		f, err := GetCustomField(ctx, q, id)
-		if err != nil || f.WorkspaceID != t.WorkspaceID {
+		if err != nil || t.WorkspaceID == 0 || f.WorkspaceID != t.WorkspaceID {
 			return nil, Invalid("no custom field %s in this workspace", k)
 		}
 		if v != nil {
@@ -751,16 +768,16 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 	}
 	if t.ID == 0 {
 		var n int
-		_ = q.QueryRowContext(ctx, `SELECT count(*) FROM gig_templates WHERE workspace_id = ? AND deleted_at IS NULL`, t.WorkspaceID).Scan(&n)
+		_ = q.QueryRowContext(ctx, `SELECT count(*) FROM gig_templates WHERE workspace_id IS ? AND deleted_at IS NULL`, wsArg(t.WorkspaceID)).Scan(&n)
 		if n >= 200 {
-			return nil, Invalid("a workspace has at most 200 templates")
+			return nil, Invalid("a workspace (and the shared library) has at most 200 templates")
 		}
 	}
 	action := "template.updated"
 	if t.ID == 0 {
 		res, err := q.ExecContext(ctx, `INSERT INTO gig_templates (workspace_id, project_id, name, title, description_md, priority, color, labels, assignees,
-			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subgigs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, t.WorkspaceID, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
-			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs))
+			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, wsArg(t.WorkspaceID), nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
+			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive))
 		if err != nil {
 			return nil, err
 		}
@@ -775,12 +792,12 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			return nil, ErrVersion
 		}
 		if _, err := q.ExecContext(ctx, `UPDATE gig_templates SET project_id = ?, name = ?, title = ?, description_md = ?, priority = ?, color = ?, labels = ?,
-			assignees = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, subgigs = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
-			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), t.ID); err != nil {
+			assignees = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, subgigs = ?, auto_archive_minutes = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
+			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive), t.ID); err != nil {
 			return nil, err
 		}
 	}
-	if _, err := Activity(ctx, q, a, &t.WorkspaceID, t.ProjectID, action, "template", t.ID, map[string]any{"name": t.Name}); err != nil {
+	if _, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), t.ProjectID, action, "template", t.ID, map[string]any{"name": t.Name, "shared": t.WorkspaceID == 0}); err != nil {
 		return nil, err
 	}
 	return GetTemplate(ctx, q, t.ID)
@@ -794,7 +811,7 @@ func DeleteTemplate(ctx context.Context, q Q, a Actor, t *Template) error {
 	if _, err := q.ExecContext(ctx, `UPDATE gig_templates SET deleted_at = ? WHERE id = ?`, Now(), t.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &t.WorkspaceID, t.ProjectID, "template.deleted", "template", t.ID, map[string]any{"name": t.Name})
+	_, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), t.ProjectID, "template.deleted", "template", t.ID, map[string]any{"name": t.Name, "shared": t.WorkspaceID == 0})
 	return err
 }
 
@@ -864,11 +881,11 @@ func templateExtras(ctx context.Context, q Q, a Actor, t *Gig, checklist []strin
 
 // GigFromTemplate creates a gig in project p from template tpl (fields in over override the template).
 func GigFromTemplate(ctx context.Context, q Q, a Actor, tpl *Template, p *Project, title *string, viaKey *int64) (*Gig, error) {
-	if tpl.WorkspaceID != p.WorkspaceID || (tpl.ProjectID != nil && *tpl.ProjectID != p.ID) {
+	if (tpl.WorkspaceID != 0 && tpl.WorkspaceID != p.WorkspaceID) || (tpl.ProjectID != nil && *tpl.ProjectID != p.ID) {
 		return nil, Invalid("this template isn't for that project")
 	}
 	n := NewGig{ProjectID: p.ID, Title: tpl.Title, DescriptionMD: tpl.DescriptionMD, Priority: tpl.Priority, Color: tpl.Color,
-		Model: tpl.Model, Effort: tpl.Effort, AlwaysRun: tpl.AlwaysRun, AllowedTools: tpl.AllowedTools,
+		Model: tpl.Model, Effort: tpl.Effort, AlwaysRun: tpl.AlwaysRun, AllowedTools: tpl.AllowedTools, AutoArchive: tpl.AutoArchive,
 		Labels: tpl.Labels, Assignees: validAssignees(ctx, q, &Recurrence{WorkspaceID: p.WorkspaceID, Assignees: tpl.Assignees}), CreatedViaKey: viaKey}
 	if title != nil && strings.TrimSpace(*title) != "" {
 		n.Title = *title

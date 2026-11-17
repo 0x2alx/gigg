@@ -96,10 +96,19 @@ func (a *API) errand(ctx context.Context, p *access.Principal, id int64) (*store
 
 func (a *API) errandTemplate(ctx context.Context, p *access.Principal, id int64) (*store.ErrandTemplate, error) {
 	t, err := store.GetErrandTemplate(ctx, a.st.R, id)
-	if err != nil || !p.SeesWorkspace(t.WorkspaceID) || p.Narrowed() {
+	if err != nil || (t.Shared && !seesShared(p)) || (!t.Shared && !p.SeesWorkspace(t.WorkspaceID)) || p.Narrowed() {
 		return nil, errNotFound()
 	}
 	return t, nil
+}
+
+// sharedErrandEdit: a shared errand template is saved by an instance admin (who holds every permission,
+// No-sandbox errands included) whose key has errands:write.
+func sharedErrandEdit(p *access.Principal) (store.ErrandEdit, error) {
+	if err := sharedWrite(p, "errands:write"); err != nil {
+		return store.ErrandEdit{}, err
+	}
+	return store.ErrandEdit{CanUnsandbox: true, CanManage: true}, nil
 }
 
 // errandWorker resolves the worker: yourself by default; another user only with Manage the workspace.
@@ -522,6 +531,57 @@ func (a *API) registerErrands() {
 		}
 		return &errandTemplateOut{ETag: etag(t.Version), Body: t}, nil
 	})
+	huma.Register(a.h, huma.Operation{OperationID: "list-shared-errand-templates", Method: "GET", Path: "/shared/errand-templates", Tags: []string{"errands"},
+		Summary: "The shared errand templates (every workspace can use them)"}, func(ctx context.Context, _ *struct{}) (*struct {
+		Body struct {
+			Items []*store.ErrandTemplate `json:"items"`
+		}
+	}, error) {
+		p, err := me(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := &struct {
+			Body struct {
+				Items []*store.ErrandTemplate `json:"items"`
+			}
+		}{}
+		out.Body.Items = []*store.ErrandTemplate{}
+		if !seesShared(p) || p.Narrowed() {
+			return out, nil
+		}
+		if err := need(p, "errands:read"); err != nil {
+			return nil, err
+		}
+		ts, err := store.ListErrandTemplates(ctx, a.st.R, 0)
+		if ts != nil {
+			out.Body.Items = ts
+		}
+		return out, storeErr(err)
+	})
+	huma.Register(a.h, huma.Operation{OperationID: "create-shared-errand-template", Method: "POST", Path: "/shared/errand-templates", Tags: []string{"errands"},
+		Summary: "Make a shared errand template (instance admins)", DefaultStatus: 201}, func(ctx context.Context, in *struct {
+		Body ErrandTemplateBody
+	}) (*errandTemplateOut, error) {
+		p, err := me(ctx)
+		if err != nil {
+			return nil, err
+		}
+		e, err := sharedErrandEdit(p)
+		if err != nil {
+			return nil, err
+		}
+		t := in.Body.template()
+		t.WorkspaceID = 0
+		if err := a.tx(ctx, func(tx *sql.Tx) error {
+			var err error
+			t, err = store.SaveErrandTemplate(ctx, tx, p.Actor(), t, 0, e)
+			return err
+		}); err != nil {
+			return nil, err
+		}
+		return &errandTemplateOut{ETag: etag(t.Version), Body: t}, nil
+	})
 	huma.Register(a.h, huma.Operation{OperationID: "get-errand-template", Method: "GET", Path: "/errand-templates/{id}", Tags: []string{"errands"},
 		Summary: "An errand template"}, func(ctx context.Context, in *idPath) (*errandTemplateOut, error) {
 		p, err := me(ctx)
@@ -532,7 +592,7 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "errands:read"); err != nil {
+		if err := readIn(p, t.WorkspaceID, "errands:read"); err != nil {
 			return nil, err
 		}
 		return &errandTemplateOut{ETag: etag(t.Version), Body: t}, nil
@@ -552,8 +612,16 @@ func (a *API) registerErrands() {
 			if err != nil {
 				return nil, err
 			}
-			if err := errandEditGuard(p, cur.WorkspaceID, in.Body.Unsandboxed && !cur.Unsandboxed); err != nil {
-				return nil, err
+			var e store.ErrandEdit
+			if cur.Shared {
+				if e, err = sharedErrandEdit(p); err != nil {
+					return nil, err
+				}
+			} else {
+				if err := errandEditGuard(p, cur.WorkspaceID, in.Body.Unsandboxed && !cur.Unsandboxed); err != nil {
+					return nil, err
+				}
+				e = a.errandEdit(p, cur.WorkspaceID)
 			}
 			v, err := ifMatch(in.IfMatch)
 			if err != nil {
@@ -563,7 +631,7 @@ func (a *API) registerErrands() {
 			t.ID, t.WorkspaceID = cur.ID, cur.WorkspaceID
 			if err := a.tx(ctx, func(tx *sql.Tx) error {
 				var err error
-				t, err = store.SaveErrandTemplate(ctx, tx, p.Actor(), t, v, a.errandEdit(p, cur.WorkspaceID))
+				t, err = store.SaveErrandTemplate(ctx, tx, p.Actor(), t, v, e)
 				return err
 			}); err != nil {
 				return nil, err
@@ -580,7 +648,11 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := errandEditGuard(p, t.WorkspaceID, false); err != nil {
+		if t.Shared {
+			if _, err := sharedErrandEdit(p); err != nil {
+				return nil, err
+			}
+		} else if err := errandEditGuard(p, t.WorkspaceID, false); err != nil {
 			return nil, err
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteErrandTemplate(ctx, tx, p.Actor(), t) })

@@ -353,8 +353,9 @@ export function GigBadges({ gig, now = Date.now(), items, fields }: {
 
 // MoreMenu: a "⋯" button with a drop-down of actions (page heads). Closes on a choice, a tap outside
 // or Esc. `icon` makes it a square "⋯" button named by the label (for the wide page head); `className`
-// goes on the wrapper, `buttonClass` replaces the button's classes.
-export function MoreMenu({ label, children, icon, className, buttonClass }: { label: string; children: ReactNode; icon?: boolean; className?: string; buttonClass?: string }) {
+// goes on the wrapper, `buttonClass` replaces the button's classes, `face` replaces the button's
+// contents (the label then names the button, as with `icon`).
+export function MoreMenu({ label, children, icon, className, buttonClass, face }: { label: string; children: ReactNode; icon?: boolean; className?: string; buttonClass?: string; face?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -382,11 +383,11 @@ export function MoreMenu({ label, children, icon, className, buttonClass }: { la
         className={buttonClass ?? "button secondary" + (icon ? " button-icon" : "")}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={icon ? label : undefined}
-        data-tip={icon ? label : undefined}
+        aria-label={icon || face ? label : undefined}
+        data-tip={icon || face ? label : undefined}
         onClick={() => setOpen((o) => !o)}
       >
-        {icon ? "⋯" : buttonClass ? `${label} ▾` : `⋯ ${label}`}
+        {face ?? (icon ? "⋯" : buttonClass ? `${label} ▾` : `⋯ ${label}`)}
       </button>
       {open && (
         <div className="menu" role="menu" onClick={() => setOpen(false)}>

@@ -63,12 +63,13 @@ type templateBody struct {
 	Effort        string                 `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
 	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Gigs made from it run whatever the usage budget (needs the always_run permission)"`
 	AllowedTools  []string               `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its gigs get for the runner (permission rules); on update, omit to keep, [] clears. Needs the allowed_tools permission"`
+	AutoArchive   *int64                 `json:"auto_archive_minutes,omitempty" minimum:"5" maximum:"527040" doc:"Gigs made from it archive themselves this many minutes after done or cancelled (omit: never)"`
 }
 
 func (b templateBody) apply(t *store.Template) {
 	t.ProjectID, t.Name, t.Title, t.DescriptionMD, t.Priority, t.Color = b.Project, b.Name, b.Title, b.DescriptionMD, b.Priority, b.Color
 	t.Labels, t.Assignees, t.Checklist, t.Custom, t.Subgigs = b.Labels, b.Assignees, b.Checklist, b.Custom, b.Subgigs
-	t.Model, t.Effort, t.AlwaysRun = b.Model, b.Effort, b.AlwaysRun
+	t.Model, t.Effort, t.AlwaysRun, t.AutoArchive = b.Model, b.Effort, b.AlwaysRun, b.AutoArchive
 	if b.AllowedTools != nil || t.ID == 0 {
 		t.AllowedTools = b.AllowedTools
 	}
@@ -82,10 +83,36 @@ type fieldBody struct {
 
 func (a *API) template(ctx context.Context, p *access.Principal, id int64) (*store.Template, error) {
 	t, err := store.GetTemplate(ctx, a.st.R, id)
-	if err != nil || !p.SeesWorkspace(t.WorkspaceID) || (t.ProjectID != nil && !p.SeesProject(t.WorkspaceID, *t.ProjectID)) {
+	if err != nil || (t.Shared && !seesShared(p)) || (!t.Shared && !p.SeesWorkspace(t.WorkspaceID)) ||
+		(t.ProjectID != nil && !p.SeesProject(t.WorkspaceID, *t.ProjectID)) {
 		return nil, errNotFound()
 	}
 	return t, nil
+}
+
+// seesShared: the shared templates and schedules are there for anyone who sees a workspace (they can
+// use them in it), and for admins.
+func seesShared(p *access.Principal) bool {
+	ws := p.Workspaces()
+	return ws == nil || len(ws) > 0
+}
+
+// readIn checks a read of an item that is a workspace's (ws) or shared (ws 0): the workspace's viewer
+// role and the scope; for a shared one, the scope only (the caller checked seesShared).
+func readIn(p *access.Principal, ws int64, scope string) error {
+	if ws == 0 {
+		return need(p, scope)
+	}
+	return require(p, ws, access.Viewer, scope)
+}
+
+// sharedWrite: shared templates and schedules are made, changed and deleted by instance admins (a
+// session, or a key not bound to a workspace) whose key holds the scope.
+func sharedWrite(p *access.Principal, scope string) error {
+	if !p.IsInstanceAdmin() {
+		return errForbidden("Shared templates and schedules are changed by instance admins.")
+	}
+	return need(p, scope)
 }
 
 func (a *API) field(ctx context.Context, p *access.Principal, id int64) (*store.CustomField, error) {
@@ -480,6 +507,44 @@ func (a *API) registerItems() {
 		})
 		return &struct{ Body *store.Template }{t}, err
 	})
+	huma.Register(a.h, huma.Operation{OperationID: "list-shared-templates", Method: "GET", Path: "/shared/templates", Tags: []string{"templates"},
+		Summary: "The shared gig templates (every workspace can use them)"}, func(ctx context.Context, _ *struct{}) (*itemsOut[*store.Template], error) {
+		p, err := me(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !seesShared(p) {
+			return items([]*store.Template{}), nil
+		}
+		if err := need(p, "gigs:read"); err != nil {
+			return nil, err
+		}
+		ts, err := store.Templates(ctx, a.st.R, 0, nil)
+		if err != nil {
+			return nil, err
+		}
+		return items(ts), nil
+	})
+	huma.Register(a.h, huma.Operation{OperationID: "create-shared-template", Method: "POST", Path: "/shared/templates", Tags: []string{"templates"},
+		Summary: "Save a shared gig template (instance admins)", DefaultStatus: 201}, func(ctx context.Context, in *struct {
+		Body templateBody
+	}) (*struct{ Body *store.Template }, error) {
+		p, err := me(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := sharedWrite(p, "gigs:write"); err != nil {
+			return nil, err
+		}
+		t := &store.Template{}
+		in.Body.apply(t)
+		err = a.tx(ctx, func(tx *sql.Tx) error {
+			var err error
+			t, err = store.SaveTemplate(ctx, tx, p.Actor(), t, 0)
+			return err
+		})
+		return &struct{ Body *store.Template }{t}, err
+	})
 	huma.Register(a.h, huma.Operation{OperationID: "get-template", Method: "GET", Path: "/templates/{id}", Tags: []string{"templates"},
 		Summary: "A gig template"}, func(ctx context.Context, in *idPath) (*struct{ Body *store.Template }, error) {
 		p, err := me(ctx)
@@ -490,7 +555,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
+		if err := readIn(p, t.WorkspaceID, "gigs:read"); err != nil {
 			return nil, err
 		}
 		return &struct{ Body *store.Template }{t}, nil
@@ -509,27 +574,35 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Member, "gigs:write"); err != nil {
-			return nil, err
-		}
-		if in.Body.Project != nil && !p.SeesProject(t.WorkspaceID, *in.Body.Project) {
-			return nil, errNotFound()
-		}
-		if p.Narrowed() && (in.Body.Project == nil || t.ProjectID == nil) {
-			return nil, errForbidden("A key limited to some projects only changes templates of those projects.")
-		}
-		if err := allowed(p, t.WorkspaceID, "templates"); err != nil {
-			return nil, err
+		if t.Shared {
+			if err := sharedWrite(p, "gigs:write"); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := require(p, t.WorkspaceID, access.Member, "gigs:write"); err != nil {
+				return nil, err
+			}
+			if in.Body.Project != nil && !p.SeesProject(t.WorkspaceID, *in.Body.Project) {
+				return nil, errNotFound()
+			}
+			if p.Narrowed() && (in.Body.Project == nil || t.ProjectID == nil) {
+				return nil, errForbidden("A key limited to some projects only changes templates of those projects.")
+			}
+			if err := allowed(p, t.WorkspaceID, "templates"); err != nil {
+				return nil, err
+			}
 		}
 		v, err := ifMatch(in.IfMatch)
 		if err != nil {
 			return nil, err
 		}
-		if err := alwaysRunGuard(p, t.WorkspaceID, t.AlwaysRun || in.Body.AlwaysRun); err != nil {
-			return nil, err
-		}
-		if err := toolsGuard(p, t.WorkspaceID, len(t.AllowedTools) > 0 || len(in.Body.AllowedTools) > 0); err != nil {
-			return nil, err
+		if !t.Shared { // an admin holds every permission
+			if err := alwaysRunGuard(p, t.WorkspaceID, t.AlwaysRun || in.Body.AlwaysRun); err != nil {
+				return nil, err
+			}
+			if err := toolsGuard(p, t.WorkspaceID, len(t.AllowedTools) > 0 || len(in.Body.AllowedTools) > 0); err != nil {
+				return nil, err
+			}
 		}
 		in.Body.apply(t)
 		err = a.tx(ctx, func(tx *sql.Tx) error {
@@ -548,6 +621,12 @@ func (a *API) registerItems() {
 		t, err := a.template(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
+		}
+		if t.Shared {
+			if err := sharedWrite(p, "gigs:write"); err != nil {
+				return nil, err
+			}
+			return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteTemplate(ctx, tx, p.Actor(), t) })
 		}
 		if err := require(p, t.WorkspaceID, access.Member, "gigs:write"); err != nil {
 			return nil, err
