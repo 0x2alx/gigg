@@ -65,7 +65,7 @@ A gig can have several assignees: people and agents. An agent's runner works onl
 
 - **By default, the workspace's owner.** A gig, template or recurring gig created with nobody assigned gets the workspace's owner (shown on the workspace's settings), for example the agent whose workspace it is. Creating it with assignees keeps those.
 - **Only when it's created.** Afterwards you may assign anyone else, or nobody; gigg doesn't put the owner back. A gig made by a recurring gig or a template starts with the assignees it carries, and with the owner when it carries none.
-- The owner gets no "assigned" notification for this default.
+- The owner is notified as for any assignment (unless they created the gig themselves).
 
 ## Time windows and missed gigs
 

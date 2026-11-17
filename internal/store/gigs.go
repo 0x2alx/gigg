@@ -721,7 +721,6 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 	if err := setLabels(ctx, q, a, p.WorkspaceID, id, n.Labels); err != nil {
 		return nil, err
 	}
-	// the owner by default, quietly: a default isn't someone handing them the gig
 	if err := setAssignees(ctx, q, p.WorkspaceID, id, OwnerDefault(ctx, q, p.WorkspaceID, n.Assignees)); err != nil {
 		return nil, err
 	}
@@ -737,7 +736,7 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 		return nil, err
 	}
 	if !n.Quiet {
-		if err := Notify(ctx, q, a, t, nil, "assigned", n.Assignees); err != nil {
+		if err := Notify(ctx, q, a, t, nil, "assigned", t.Assignees); err != nil {
 			return nil, err
 		}
 	}

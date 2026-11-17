@@ -121,11 +121,11 @@ func TestOwnerAndAssigneeRules(t *testing.T) {
 	if !slices.Equal(bobs.Assignees, []int64{bob}) {
 		t.Fatalf("explicit assignee: %v", bobs.Assignees)
 	}
-	// the default is quiet: no "assigned" notification for the owner
+	// the default is an assignment like any other: the owner is notified
 	var n int
-	_ = e.st.R.QueryRow(`SELECT count(*) FROM notifications WHERE user_id = ? AND kind = 'assigned'`, scout).Scan(&n)
-	if n != 0 {
-		t.Fatalf("%d assigned notifications for the default", n)
+	_ = e.st.R.QueryRow(`SELECT count(*) FROM notifications WHERE user_id = ? AND kind = 'assigned' AND gig_id = ?`, scout, own.ID).Scan(&n)
+	if n != 1 {
+		t.Fatalf("%d assigned notifications for the default, want 1", n)
 	}
 	// later edits may leave it unassigned
 	code, out, _ = e.req("PATCH", "/gigs/"+own.Key, `{"assignees":[]}`, ada)

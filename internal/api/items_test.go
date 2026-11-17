@@ -242,7 +242,7 @@ func TestBadInputAndIsolation(t *testing.T) {
 	}
 	e.req("POST", "/me/notifications/read", `{"all":true}`, scout)
 	var unread int
-	_ = e.st.R.QueryRow(`SELECT count(*) FROM notifications WHERE workspace_id = ? AND read_at IS NULL`, e.ids["atlas.ws"]).Scan(&unread)
+	_ = e.st.R.QueryRow(`SELECT count(*) FROM notifications WHERE user_id = ? AND workspace_id = ? AND read_at IS NULL`, e.ids["scout.user"], e.ids["atlas.ws"]).Scan(&unread)
 	if unread != 1 {
 		t.Fatal("scout's key marked another workspace's notifications read")
 	}
