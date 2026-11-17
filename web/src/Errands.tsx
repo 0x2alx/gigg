@@ -32,6 +32,10 @@ import {
   type ErrandForm,
   type ErrandFreq,
   type ErrandRun,
+  contentOf,
+  sameContent,
+  templateBodyOf,
+  type ErrandTemplate,
 } from "./errands";
 
 type StateFilter = "" | "failing" | "paused";
@@ -69,6 +73,7 @@ export function ErrandsPage({ open }: { open?: number }) {
   const [state, setState] = useState<StateFilter>(() => (new URLSearchParams(location.search).get("state") === "failing" ? "failing" : ""));
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Errand | "new" | null>(null);
+  const [library, setLibrary] = useState(false); // the shared commands (instance admins)
   const [now, setNow] = useState(Date.now());
 
   const wsKey = tree.map((w) => w.id).join(",");
@@ -135,11 +140,18 @@ export function ErrandsPage({ open }: { open?: number }) {
           </h1>
           <p className="muted small">Commands the agents run on a schedule, in their sandbox. Each run is recorded here; errands make no gigs.</p>
         </div>
-        {writable.length > 0 && (
-          <button type="button" className="button" onClick={() => setEditing("new")}>
-            <Icon name="plus" /> New errand
-          </button>
-        )}
+        <div className="row">
+          {me.admin && (
+            <button type="button" className="button secondary" onClick={() => setLibrary(true)} data-tip="Commands every workspace can start an errand from">
+              <Icon name="template" /> Shared commands
+            </button>
+          )}
+          {writable.length > 0 && (
+            <button type="button" className="button" onClick={() => setEditing("new")}>
+              <Icon name="plus" /> New errand
+            </button>
+          )}
+        </div>
       </header>
       {err && (
         <p className="danger" role="alert">
@@ -305,6 +317,7 @@ export function ErrandsPage({ open }: { open?: number }) {
           <p className="muted">This errand doesn't exist, or you can't see it.</p>
         </aside>
       )}
+      {library && <SharedCommands ws={writable[0] ?? tree[0]!} onClose={() => setLibrary(false)} />}
       {editing && (editing !== "new" || writable.length > 0) && (
         <ErrandEditor
           errand={editing === "new" ? null : editing}
@@ -550,22 +563,157 @@ const UNIT: Record<ErrandFreq, [string, string]> = {
   monthly: ["month", "months"],
 };
 
-function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand: Errand | null; choices: WorkspaceTree[]; initialWs: WorkspaceTree; onClose: () => void; onSaved: (c: Errand) => void }) {
+// SharedCommands: the shared errand templates (instance admins): list, new, edit, delete. Each is
+// edited in the errand editor (its command half).
+function SharedCommands({ ws, onClose }: { ws: WorkspaceTree; onClose: () => void }) {
+  const [items, setItems] = useState<ErrandTemplate[] | null>(null);
+  const [err, setErr] = useState("");
+  const [editing, setEditing] = useState<ErrandTemplate | "new" | null>(null);
+  const [confirm, setConfirm] = useState<number | null>(null);
+  const load = useCallback(() => {
+    errandApi.sharedTemplates().then(
+      (r) => setItems(r.items.sort((a, b) => a.name.localeCompare(b.name))),
+      (e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't load the shared commands."),
+    );
+  }, []);
+  useEffect(load, [load]);
+  const remove = (t: ErrandTemplate) =>
+    errandApi.removeTemplate(t.id).then(
+      () => {
+        setConfirm(null);
+        load();
+      },
+      (e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't delete it."),
+    );
+  if (editing)
+    return (
+      <ErrandEditor
+        errand={null}
+        template={editing}
+        choices={[ws]}
+        initialWs={ws}
+        onClose={() => setEditing(null)}
+        onSaved={() => undefined}
+        onTemplateSaved={() => {
+          setEditing(null);
+          load();
+        }}
+      />
+    );
+  return (
+    <Modal title="Shared commands" onClose={onClose} wide>
+      <p className="muted small">Every workspace can start an errand from these. Changing one changes every errand that uses it as is; an errand that changes the command gets its own copy.</p>
+      {err && (
+        <p className="danger" role="alert">
+          {err}
+        </p>
+      )}
+      {items === null && !err && <p className="muted">Loading…</p>}
+      {items?.length === 0 && <p className="muted">No shared commands yet.</p>}
+      {!!items?.length && (
+        <ul className="schedules" aria-label="Shared commands">
+          {items.map((t) => (
+            <li key={t.id} className="schedule">
+              <div className="schedule-top">
+                <span className="pill pill-accent">
+                  <Icon name="template" />
+                </span>
+                <strong className="schedule-title">{t.name}</strong>
+                <span className="pill pill-shared">Shared</span>
+                {t.unsandboxed && <span className="pill pill-danger">no sandbox</span>}
+              </div>
+              <code className="schedule-rule errand-cmd-line">{t.command.split("\n")[0]}</code>
+              <div className="chips">
+                <span className={"pill " + (t.uses > 0 ? "pill-accent" : "pill-muted")}>
+                  {t.uses} errand{t.uses === 1 ? "" : "s"}
+                </span>
+                <span className="pill pill-muted">timeout {durMS(t.timeout_s * 1000)}</span>
+              </div>
+              <div className="schedule-actions">
+                {confirm === t.id ? (
+                  <>
+                    <span className="small">Delete this shared command?</span>
+                    <button type="button" className="button danger-button small" onClick={() => remove(t)}>
+                      Delete
+                    </button>
+                    <button type="button" className="button secondary small" onClick={() => setConfirm(null)}>
+                      Keep
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="button secondary small" onClick={() => setEditing(t)} aria-label={`Edit ${t.name}`}>
+                      <Icon name="pencil" /> Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="button danger-button small"
+                      onClick={() => setConfirm(t.id)}
+                      disabled={t.uses > 0}
+                      title={t.uses > 0 ? "Errands use it: delete them or change their command first" : undefined}
+                      aria-label={`Delete ${t.name}`}
+                    >
+                      <Icon name="trash" /> Delete
+                    </button>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="row end">
+        <button type="button" className="button" onClick={() => setEditing("new")}>
+          + New shared command
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ErrandEditor: a new errand, an errand, or (template) a shared command: then only its command half
+// (name, command, timeout, output, sandbox, notes), saved to the shared library.
+function ErrandEditor({ errand, template, choices, initialWs, onClose, onSaved, onTemplateSaved }: {
+  errand: Errand | null; template?: ErrandTemplate | "new"; choices: WorkspaceTree[]; initialWs: WorkspaceTree; onClose: () => void; onSaved: (c: Errand) => void; onTemplateSaved?: () => void;
+}) {
   const { me, users, members } = useApp();
+  const tplMode = !!template;
+  const tpl = template && template !== "new" ? template : null;
   const [wsId, setWsId] = useState(initialWs.id);
   const ws = errand ? initialWs : (choices.find((w) => w.id === wsId) ?? initialWs);
-  const [f, setF] = useState<ErrandForm>(() => (errand ? formOfErrand(errand) : defaultErrandForm()));
+  const [f, setF] = useState<ErrandForm>(() => (errand ? formOfErrand(errand) : tpl ? { ...defaultErrandForm(), ...contentOf(tpl) } : defaultErrandForm()));
   const set = (p: Partial<ErrandForm>) => setF((x) => ({ ...x, ...p }));
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const canUnsandbox = hasCap(me, "errand_unsandboxed", ws.id);
-  const canTimeout = hasCap(me, "run_timeout", ws.id); // another timeout than the default, or a change
+  // a new errand may start from a command of its workspace or a shared one
+  const [library, setLibrary] = useState<ErrandTemplate[]>([]);
+  const [picked, setPicked] = useState<ErrandTemplate | null>(null);
+  useEffect(() => {
+    if (errand || tplMode) return;
+    let live = true;
+    errandApi.templates(ws.id).then(
+      (r) => live && setLibrary(r.items.sort((a, b) => Number(!!b.shared) - Number(!!a.shared) || a.name.localeCompare(b.name))),
+      () => live && setLibrary([]),
+    );
+    setPicked(null);
+    return () => {
+      live = false;
+    };
+  }, [ws.id, errand, tplMode]);
+  const pick = (t: ErrandTemplate | null) => {
+    setPicked(t);
+    if (t) set(contentOf(t));
+  };
+  const usesPicked = !!picked && sameContent(f, picked);
+  const canUnsandbox = tplMode || hasCap(me, "errand_unsandboxed", ws.id);
+  // another timeout than the default, or a change (a picked command brings its own, used as is)
+  const canTimeout = tplMode || hasCap(me, "run_timeout", ws.id);
   const manager = hasCap(me, "manage_workspace", ws.id);
   // the agents who can run it: yourself (an agent), or with Manage the workspace any agent member
   const agents = useMemo(() => (members.get(ws.id) ?? []).map((id) => users.get(id)).filter((u) => u && u.kind === "agent"), [members, users, ws.id]);
   const defaultWorker = me.user.kind === "agent" ? me.user.username : (users.get(ws.owner_id ?? 0)?.kind === "agent" ? users.get(ws.owner_id!)!.username : agents[0]?.username) ?? "";
   const worker = f.worker || defaultWorker;
-  const problem = errandProblem(f) ?? (!worker ? "Pick the agent that runs it." : null);
+  const problem = errandProblem(f) ?? (!worker && !tplMode ? "Pick the agent that runs it." : null);
   const fr = frequent(f.freq);
   const toggleDay = (d: number) => set({ weekdays: f.weekdays.includes(d) ? f.weekdays.filter((x) => x !== d) : [...f.weekdays, d] });
   const int = (v: string, d: number) => (Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) : d);
@@ -576,7 +724,16 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
     if (problem) return setErr(problem);
     setBusy(true);
     setErr("");
-    const body = errandBody({ ...f, worker }, errand, canUnsandbox);
+    const failed = (e: unknown) => setErr(e instanceof ApiError ? (e.status === 412 ? "Someone changed this meanwhile. Close and reopen it." : e.message) : "Couldn't save it.");
+    if (tplMode) {
+      const tb = templateBodyOf(f);
+      (tpl ? errandApi.putTemplate(tpl.id, tb, tpl.version) : errandApi.createSharedTemplate(tb))
+        .then(() => onTemplateSaved?.())
+        .catch(failed)
+        .finally(() => setBusy(false));
+      return;
+    }
+    const body = errandBody({ ...f, worker }, errand, canUnsandbox, picked);
     (errand ? errandApi.patch(errand.id, body, errand.version) : errandApi.create(ws.id, body))
       .then(onSaved)
       .catch((e: unknown) => setErr(e instanceof ApiError ? (e.status === 412 ? "Someone changed this errand meanwhile. Close and reopen it." : e.message) : "Couldn't save the errand."))
@@ -584,9 +741,14 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
   };
 
   return (
-    <Modal title={errand ? `Edit ${errand.name}` : "New errand"} onClose={onClose} wide>
-      <form className="form-grid errand-form" onSubmit={submit} aria-label={errand ? "Edit errand" : "New errand"}>
-        {!errand && choices.length > 1 && (
+    <Modal title={tplMode ? (tpl ? `Edit shared command ${tpl.name}` : "New shared command") : errand ? `Edit ${errand.name}` : "New errand"} onClose={onClose} wide>
+      <form className="form-grid errand-form" onSubmit={submit} aria-label={tplMode ? "Shared command" : errand ? "Edit errand" : "New errand"}>
+        {tpl && tpl.uses > 0 && (
+          <p className="span2 small muted" role="note">
+            {tpl.uses} errand{tpl.uses === 1 ? " uses" : "s use"} this command as is: changing it changes {tpl.uses === 1 ? "it" : "them all"}, in every workspace.
+          </p>
+        )}
+        {!errand && !tplMode && choices.length > 1 && (
           <label className="span2">
             Workspace
             <select value={ws.id} onChange={(e) => (setWsId(Number(e.target.value)), set({ worker: "" }))}>
@@ -603,6 +765,27 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
             {errand.template_uses} errands share this command: changing its name, command, timeout or output changes them all.
           </p>
         )}
+        {!errand && !tplMode && library.length > 0 && (
+          <label className="span2">
+            Start from
+            <select value={picked?.id ?? ""} onChange={(e) => pick(library.find((t) => t.id === Number(e.target.value)) ?? null)}>
+              <option value="">— a new command —</option>
+              {library.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.shared ? " (shared)" : ""}
+                </option>
+              ))}
+            </select>
+            {picked && (
+              <span className="muted small">
+                {usesPicked
+                  ? `Uses “${picked.name}” as is: changes to it reach this errand too.${picked.unsandboxed && !hasCap(me, "errand_unsandboxed", ws.id) ? " It gets its own copy, in the sandbox." : ""}`
+                  : `Changed from “${picked.name}”: saved as this errand's own command.`}
+              </span>
+            )}
+          </label>
+        )}
         <label className="span2">
           Name
           <input value={f.name} onChange={(e) => set({ name: e.target.value })} maxLength={80} placeholder="Disk space check" data-autofocus="" required />
@@ -613,6 +796,7 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
           </span>
           <textarea className="mono errand-cmd-input" rows={5} value={f.command} onChange={(e) => set({ command: e.target.value })} spellCheck={false} placeholder={"df -h / | awk 'NR==2 && $5+0 > 90 {exit 1}'"} required />
         </label>
+        {!tplMode && (
         <div className="repeat span2" role="group" aria-label="Schedule">
           <div className="rf">
             <RfRow label="Repeat">
@@ -685,12 +869,14 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
             <Icon name="clock" /> {describeErrand(f)}
           </p>
         </div>
+        )}
         <label title={canTimeout ? undefined : "Changing it needs the Run timeouts permission"}>
           <span>
             Timeout <span className="muted small">seconds, 10–43200 (12 h)</span>
           </span>
           <input type="number" min={10} max={43200} value={f.timeout} disabled={!canTimeout} onChange={(e) => set({ timeout: int(e.target.value, 300) })} />
         </label>
+        {!tplMode && (
         <label>
           Agent
           {manager || (errand && errand.worker_username !== me.user.username) ? (
@@ -706,6 +892,7 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
             <input value={worker || "(you need an agent)"} disabled />
           )}
         </label>
+        )}
         <fieldset className="span2 errand-opts">
           <legend className="field-label">Output</legend>
           <label className="check">
@@ -715,9 +902,11 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
             <input type="radio" name="output" checked={f.output === "host"} onChange={() => set({ output: "host" })} /> keep it on the agent's host only <span className="muted small">(for output that shouldn't leave it)</span>
           </label>
         </fieldset>
+        {!tplMode && (
         <label className="check span2">
           <input type="checkbox" checked={f.onFailureGig} onChange={(e) => set({ onFailureGig: e.target.checked })} /> Open a gig for the agent when it starts failing
         </label>
+        )}
         {canUnsandbox && (
           <div className="span2 errand-unsandbox">
             <label className="check">
@@ -756,7 +945,7 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
             Cancel
           </button>
           <button type="submit" className="button" disabled={busy || !!problem} title={problem ?? undefined}>
-            {errand ? "Save" : "Create errand"}
+            {tplMode ? "Save command" : errand ? "Save" : "Create errand"}
           </button>
         </div>
       </form>

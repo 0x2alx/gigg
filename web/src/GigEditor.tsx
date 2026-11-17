@@ -52,6 +52,9 @@ export function GigEditor(p: {
   places?: WorkspaceTree[]; // a new gig may move to these workspaces
   onWorkspace?: (id: number) => void;
   anyProject?: { on: boolean; set: (on: boolean) => void }; // a template may be for any project
+  // a template shared by every workspace (instance admins): set given = the scope can still be chosen.
+  // Shared: no workspace, any project, no assignees (each recurring gig names its own)
+  shared?: { on: boolean; set?: (on: boolean) => void };
   projectLocked?: boolean;
   statuses?: Status[]; // the status row (none for a template or a recurring gig)
   statusBusy?: boolean;
@@ -106,6 +109,24 @@ export function GigEditor(p: {
       <div className="tp-side">
         <div className="tp-props">
           <PropGroup icon="layers" title="Where">
+            {p.shared && (
+              <Row tip="A shared template is offered in every workspace; only instance admins change it" label="Scope">
+                {p.shared.set ? (
+                  <select value={p.shared.on ? "shared" : "ws"} onChange={(e) => p.shared!.set!(e.target.value === "shared")} aria-label="Scope">
+                    <option value="ws">This workspace</option>
+                    <option value="shared">Shared: every workspace</option>
+                  </select>
+                ) : (
+                  <span className="pill pill-shared">{p.shared.on ? "Shared: every workspace" : "This workspace"}</span>
+                )}
+              </Row>
+            )}
+            {p.shared?.on ? (
+              <Row label="Project">
+                <span className="pill pill-ws">any project</span>
+              </Row>
+            ) : (
+            <>
             <Row label="Workspace">
               {p.places && p.places.length > 1 && p.onWorkspace ? (
                 <select value={ws.id} onChange={(e) => p.onWorkspace!(Number(e.target.value))} aria-label="Workspace">
@@ -144,6 +165,8 @@ export function GigEditor(p: {
                 ws.projects.find((x) => x.id === v.project)?.name
               )}
             </Row>
+            </>
+            )}
             {p.statuses && (
               <Row label="Status">
                 {canWrite ? (
@@ -208,6 +231,7 @@ export function GigEditor(p: {
                 </div>
               )}
             </Row>
+            {!p.shared?.on && (
             <Row label="Assignees" wide>
               {canWrite ? (
                 <AssigneePicker value={v.assignees} onChange={(assignees) => set({ assignees })} candidates={withCurrent(p.candidates, v.assignees, users)} />
@@ -220,6 +244,7 @@ export function GigEditor(p: {
                 </div>
               )}
             </Row>
+            )}
             <Row label="Colour" wide>
               {canWrite ? (
                 <ColorPicker value={v.color} onChange={(color) => set({ color })} />

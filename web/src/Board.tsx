@@ -1459,6 +1459,8 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusL
               {running && run && <span className="mono">· {elapsed(now - run.started_at)}</span>}
             </span>
           )}
+          {/* with a run state, the workspace and the key always start the next line (never just the key) */}
+          {state && showWs && <span className="card-break" aria-hidden="true" />}
           {showWs && <WorkspaceChip ws={ws} />}
           {statusLabel && (
             <span className="card-status" data-tip={`Its project's status: ${statusLabel}`}>

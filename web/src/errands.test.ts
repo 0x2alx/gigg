@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { errandBody, errandProblem, errandRule, defaultErrandForm, describeErrand, durMS, formOfErrand, relTime, sameTiming, schedText, type Errand, type ErrandForm } from "./errands";
+import { contentOf, errandBody, errandProblem, errandRule, defaultErrandForm, describeErrand, durMS, formOfErrand, relTime, sameTiming, schedText, type Errand, type ErrandForm, type ErrandTemplate } from "./errands";
 
 const base = (p: Partial<ErrandForm> = {}): ErrandForm => ({ ...defaultErrandForm(new Date(2026, 10, 16)), name: "disk", command: "df -h /", tz: "UTC", ...p });
 
@@ -111,5 +111,22 @@ describe("display", () => {
     expect(durMS(60_000)).toBe("1 min");
     expect(relTime(1_000_000 + 5 * 60_000, 1_000_000)).toBe("in 5 min");
     expect(relTime(1_000_000 - 3 * 3_600_000, 1_000_000)).toBe("3 h ago");
+  });
+});
+
+describe("starting from a command", () => {
+  const t: ErrandTemplate = { id: 7, workspace_id: 0, shared: true, name: "disk", description_md: "", command: "df -h", timeout_s: 600, output: "gigg", unsandboxed: false, version: 1, uses: 2 };
+  const f: ErrandForm = { ...defaultErrandForm(), ...contentOf(t), worker: "scout" };
+  it("sends the template as is while its content is unchanged", () => {
+    const b = errandBody(f, null, false, t);
+    expect(b.template_id).toBe(7);
+    expect(b).not.toHaveProperty("command");
+    expect(b.worker).toBe("scout");
+    expect(b.rule).toMatchObject({ freq: "minutes" });
+  });
+  it("sends its own content once changed", () => {
+    const b = errandBody({ ...f, command: "df -h /" }, null, false, t);
+    expect(b.template_id).toBeUndefined();
+    expect(b).toMatchObject({ name: "disk", command: "df -h /", timeout_s: 600 });
   });
 });

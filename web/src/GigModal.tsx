@@ -45,6 +45,8 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const [known, setKnown] = useState<Tag[]>(labels);
   const [tplName, setTplName] = useState(tpl?.name ?? "");
   const [tplAnyProject, setTplAnyProject] = useState(tpl ? tpl.project_id === null : false);
+  // a shared template (every workspace's): instance admins choose it for a new one; an existing one keeps its scope
+  const [shared, setShared] = useState(!!tpl?.shared);
   const [checklist, setChecklist] = useState<string[]>(schedule?.checklist ?? tpl?.checklist ?? []);
   const [subgigs, setSubgigs] = useState<TemplateSubgig[]>(normSubs(schedule?.subgigs ?? tpl?.subgigs ?? []));
   const [deps, setDeps] = useState<DraftDep[]>([]);
@@ -218,7 +220,8 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const problem = run.tools_error ? `Allowed tools: “${run.tools_error}” isn't one permission rule.` : tplMode ? null : repeatProblem(repeat);
   const canTemplates = hasCap(me, "templates", ws.id);
   // a picked template (editing: the current one), unchanged: the recurring gig uses it as is
-  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, gigLabels, assignees, color, run, checklist, subgigs, custom });
+  // (a shared template has no assignees: the recurring gig names its own, so they don't count)
+  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, gigLabels, assignees: picked.shared ? (picked.assignees ?? []) : assignees, color, run, checklist, subgigs, custom });
   // likewise a picked schedule whose timing wasn't changed
   const usesSchedule = repeating && !!pickedSchedule && sameTiming(repeat, pickedSchedule);
   const pickSchedule = (id: number) => {
@@ -237,7 +240,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     setDescription(t.description_md);
     setPriority(t.priority);
     setGigLabels(t.labels ?? []);
-    setAssignees(t.assignees ?? []);
+    if (!t.shared) setAssignees(t.assignees ?? []);
     setColor(t.color);
     setRun(runFrom(t));
     setChecklist(t.checklist ?? []);
@@ -246,14 +249,14 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   };
 
   const templateBody = (name: string): TemplateBody => {
-    const b: TemplateBody = { name, title, description_md: description, priority, labels: gigLabels, assignees, ...runBody(run) };
+    const b: TemplateBody = { name, title, description_md: description, priority, labels: gigLabels, assignees: shared ? [] : assignees, ...runBody(run) };
     if (tpl) b.allowed_tools = run.allowed_tools; // an edit sends the list, so clearing it clears it
-    if (!(tplMode && tplAnyProject)) b.project_id = project;
+    if (!(tplMode && (tplAnyProject || shared))) b.project_id = project;
     if (color) b.color = color;
     if (checklist.length) b.checklist = checklist;
     if (subgigs.length) b.subgigs = normSubs(subgigs);
     const c = cleanCustom(custom);
-    if (c) b.custom = c;
+    if (c && !shared) b.custom = c;
     return b;
   };
 
@@ -324,10 +327,12 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     let done: Promise<string | undefined>;
     if (tplMode) {
       const body = templateBody(tplName.trim());
-      done = (tpl ? api.putTemplate(tpl.id, body, tpl.version) : api.createTemplate(ws.id, body)).then((t) => `Template “${t.name}” saved`);
+      done = (tpl ? api.putTemplate(tpl.id, body, tpl.version) : shared ? api.createSharedTemplate(body) : api.createTemplate(ws.id, body)).then(
+        (t) => `${t.shared ? "Shared template" : "Template"} “${t.name}” saved`,
+      );
     } else if (repeating) {
       const content: Partial<RecurrenceBody> = usesPicked
-        ? { template_id: picked!.id }
+        ? { template_id: picked!.id, ...(picked!.shared ? { assignees } : {}) }
         : {
             title,
             description_md: description,
@@ -427,6 +432,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           places={!editing && !tpl ? places : undefined}
           onWorkspace={moveWs}
           anyProject={tplMode ? { on: tplAnyProject, set: setTplAnyProject } : undefined}
+          shared={tplMode && (me.admin || shared) ? { on: shared, set: me.admin && !tpl ? setShared : undefined } : undefined}
           projectLocked={editing}
           statuses={!repeating && !tplMode ? projectStatuses : undefined}
           statusBusy={!statusReady && !statusErr}
@@ -452,7 +458,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
                         {templates.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.name}
-                            {t.project_id === null ? " (any project)" : ""}
+                            {t.shared ? " (shared)" : t.project_id === null ? " (any project)" : ""}
                           </option>
                         ))}
                       </select>
@@ -465,13 +471,19 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
                       {picked && repeating && !editing && (
                         <span className="muted small rf-note">
                           {usesPicked
-                            ? `Uses template “${picked.name}” itself: later edits to that template change the gigs it creates. Change anything here to save it as a new template instead.`
+                            ? picked.shared
+                              ? `Uses the shared template “${picked.name}”, with the assignees chosen here. Change anything else to give this workspace its own copy.`
+                              : `Uses template “${picked.name}” itself: later edits to that template change the gigs it creates. Change anything here to save it as a new template instead.`
                             : `Changed from “${picked.name}”: saved as a new template with what's here.`}
                         </span>
                       )}
                       {picked && editing && schedule && picked.id !== schedule.template_id && (
                         <span className="muted small rf-note">
-                          {usesPicked ? `Switches to template “${picked.name}”.` : `Changed from “${picked.name}”: the changes are saved to the current template “${schedule.template_name}” instead.`}
+                          {usesPicked
+                            ? `Switches to template “${picked.name}”.`
+                            : schedule.template_shared
+                              ? `Changed from “${picked.name}”: saved as this workspace's own copy.`
+                              : `Changed from “${picked.name}”: the changes are saved to the current template “${schedule.template_name}” instead.`}
                         </span>
                       )}
                     </Row>
@@ -506,6 +518,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
                             {schedules.map((x) => (
                               <option key={x.id} value={x.id}>
                                 {x.name}
+                                {x.shared ? " (shared)" : ""}
                               </option>
                             ))}
                           </select>
@@ -516,7 +529,9 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
                                 ? `Switches to “${pickedSchedule!.name}”.`
                                 : ""
                               : editing && schedule
-                                ? `Timing changes are saved to “${schedule.schedule_name}”.`
+                                ? schedule.schedule_shared
+                                  ? `“${schedule.schedule_name}” is shared: new timing moves this recurring gig to a schedule of this workspace.`
+                                  : `Timing changes are saved to “${schedule.schedule_name}”.`
                                 : "Saved as a new schedule (or the existing one with exactly this timing).";
                             return hint && <span className="muted small rf-note">{hint}</span>;
                           })()}
@@ -529,7 +544,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           rightSecs={
             <>
               {single && canRelations && <DependenciesDraft wsId={ws.id} items={deps} onChange={setDeps} />}
-              <FieldsDraft fields={fields} values={custom} onChange={setCustom} />
+              {!shared && <FieldsDraft fields={fields} values={custom} onChange={setCustom} />}
             </>
           }
         />
@@ -601,11 +616,17 @@ function ScheduleTemplateNote({ schedule: s }: { schedule: Recurrence }) {
   const others = (n: number) => `${n} other recurring gig${n === 1 ? "" : "s"}`;
   return (
     <p className="small muted sched-tpl" role="note">
-      <Icon name="template" /> Content: template <strong>“{s.template_name}”</strong>
-      {tOthers > 0 && <> (also used by {others(tOthers)}: content changes apply to them too)</>}
-      {s.template_created_by !== me.user.id && !hasCap(me, "templates", s.workspace_id) && <> · changing the content needs the Gig templates permission</>}
-      <br /><Icon name="clock" /> Timing: schedule <strong>“{s.schedule_name}”</strong>
-      {sOthers > 0 && <> (also used by {others(sOthers)}: timing changes move them too)</>}
+      <Icon name="template" /> Content: {s.template_shared ? "shared template" : "template"} <strong>“{s.template_name}”</strong>
+      {s.template_shared ? (
+        <> (every workspace's: content changes give this recurring gig its own copy; the assignees are its own)</>
+      ) : (
+        <>
+          {tOthers > 0 && <> (also used by {others(tOthers)}: content changes apply to them too)</>}
+          {s.template_created_by !== me.user.id && !hasCap(me, "templates", s.workspace_id) && <> · changing the content needs the Gig templates permission</>}
+        </>
+      )}
+      <br /><Icon name="clock" /> Timing: {s.schedule_shared ? "shared schedule" : "schedule"} <strong>“{s.schedule_name}”</strong>
+      {s.schedule_shared ? <> (every workspace's: new timing moves this recurring gig to a schedule of its own)</> : sOthers > 0 && <> (also used by {others(sOthers)}: timing changes move them too)</>}
     </p>
   );
 }

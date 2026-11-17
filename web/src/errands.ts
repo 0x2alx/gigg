@@ -69,7 +69,26 @@ export interface Errand {
   rule: ErrandRule;
 }
 
+// ErrandTemplate: an errand's content (name, command, timeout, output, sandbox). Errands share one when
+// it's the same; a shared one (workspace_id 0) is every workspace's, changed only by instance admins.
+export interface ErrandTemplate {
+  id: number;
+  workspace_id: number;
+  shared?: boolean;
+  name: string;
+  description_md: string;
+  command: string;
+  timeout_s: number;
+  output: "gigg" | "host";
+  unsandboxed: boolean;
+  version: number;
+  uses: number; // live errands using it
+}
+
+export type ErrandTemplateBody = Pick<ErrandTemplate, "name" | "description_md" | "command" | "timeout_s" | "output" | "unsandboxed">;
+
 export interface ErrandBody {
+  template_id?: number; // an existing template (its content as is) instead of the content fields
   name?: string;
   description_md?: string;
   command?: string;
@@ -93,7 +112,28 @@ export const errandApi = {
   runNow: (id: number) => call<Errand>("POST", `/errands/${id}/run-now`),
   runs: (id: number, before = 0, limit = 30) => call<{ items: ErrandRun[] }>("GET", `/errands/${id}/runs?limit=${limit}${before ? `&before=${before}` : ""}`),
   run: (id: number) => call<ErrandRun>("GET", `/errand-runs/${id}`),
+  templates: (ws: string | number) => call<{ items: ErrandTemplate[] }>("GET", `/workspaces/${ws}/errand-templates`),
+  sharedTemplates: () => call<{ items: ErrandTemplate[] }>("GET", `/shared/errand-templates`),
+  createSharedTemplate: (body: ErrandTemplateBody) => call<ErrandTemplate>("POST", `/shared/errand-templates`, body),
+  putTemplate: (id: number, body: ErrandTemplateBody, version?: number) => call<ErrandTemplate>("PUT", `/errand-templates/${id}`, body, version),
+  removeTemplate: (id: number) => call<void>("DELETE", `/errand-templates/${id}`),
 };
+
+// contentOf: the form fields a template fills in.
+export function contentOf(t: ErrandTemplate): Pick<ErrandForm, "name" | "description" | "command" | "timeout" | "output" | "unsandboxed"> {
+  return { name: t.name, description: t.description_md, command: t.command, timeout: t.timeout_s, output: t.output, unsandboxed: t.unsandboxed };
+}
+
+// sameContent: the form still has the template's content (then the errand uses that template as is).
+export function sameContent(f: ErrandForm, t: ErrandTemplate): boolean {
+  const c = contentOf(t);
+  return f.name.trim() === c.name && f.description === c.description && f.command === c.command && f.timeout === c.timeout && f.output === c.output && f.unsandboxed === c.unsandboxed;
+}
+
+// templateBodyOf: a template's content from the form.
+export function templateBodyOf(f: ErrandForm): ErrandTemplateBody {
+  return { name: f.name.trim(), description_md: f.description, command: f.command, timeout_s: f.timeout, output: f.output, unsandboxed: f.unsandboxed };
+}
 
 // ---- the editor's form
 
@@ -269,8 +309,17 @@ export function describeErrand(f: ErrandForm): string {
 
 // errandBody: what to send. A new errand gets everything; an edit only what changed (so a save that
 // doesn't touch the timing keeps a shared schedule, and the sandbox flag is only sent by someone who may set it).
-export function errandBody(f: ErrandForm, cur: Errand | null, canUnsandbox: boolean): ErrandBody {
+// errandBody: what to send. A new errand whose form still has a picked template's content sends that
+// template's id instead of the content (it then uses it as is; the server copies a shared one when needed).
+export function errandBody(f: ErrandForm, cur: Errand | null, canUnsandbox: boolean, picked?: ErrandTemplate | null): ErrandBody {
   const b: ErrandBody = {};
+  if (!cur && picked && sameContent(f, picked)) {
+    b.template_id = picked.id;
+    b.rule = errandRule(f);
+    if (f.worker) b.worker = f.worker;
+    if (f.onFailureGig) b.on_failure_gig = true;
+    return b;
+  }
   const content: [keyof ErrandBody, unknown, unknown][] = [
     ["name", f.name.trim(), cur?.name],
     ["description_md", f.description, cur?.description_md],

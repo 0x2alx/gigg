@@ -1,6 +1,8 @@
 // Every schedule in reach, across the workspaces (an optional workspace filter): named timing (rule,
 // window, create-early) that recurring gigs pair with templates. List, new, edit (every recurring gig
 // on it moves), delete when unused. Minutes/hours timings belong to errands and are left out (the Errands page has them).
+// Shared schedules (every workspace's) come with each workspace's list: shown once, under any filter, changed
+// only by instance admins; a workspace that retimes a recurring gig on one moves it to a schedule of its own.
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api, ApiError, hasCap, isGigSchedule, type GigSchedule as Schedule } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
@@ -36,16 +38,17 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
       const all: Schedule[] = [];
       const bad: string[] = [];
       res.forEach((r, i) => (r.status === "fulfilled" ? all.push(...r.value.items.filter(isGigSchedule)) : bad.push(tree[i]!.name)));
-      setItems(all.sort((a, b) => a.name.localeCompare(b.name)));
+      const seen = new Set<number>(); // a shared one comes with every workspace's list
+      setItems(all.filter((x) => !seen.has(x.id) && !!seen.add(x.id)).sort((a, b) => Number(!!a.shared) - Number(!!b.shared) || a.name.localeCompare(b.name)));
       setErr(bad.length ? `Couldn't load the schedules of ${bad.join(", ")}.` : "");
     });
   }, [wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(load, [load]);
   const wsOf = useCallback((id: number) => tree.find((w) => w.id === id), [tree]);
   const canWriteWs = useCallback((w: WorkspaceTree) => canWriteIn(w) && hasCap(me, "schedules", w.id), [me]);
-  const shown = useMemo(() => (items ?? []).filter((x) => placeMatch(place, tree, x.workspace_id, null)), [items, place, tree]);
+  const shown = useMemo(() => (items ?? []).filter((x) => x.shared || placeMatch(place, tree, x.workspace_id, null)), [items, place, tree]);
   const writable = useMemo(() => tree.filter(canWriteWs), [tree, canWriteWs]);
-  const startWs = (place.startsWith("w:") ? writable.find((w) => w.id === Number(place.slice(2))) : undefined) ?? writable[0];
+  const startWs = (place.startsWith("w:") ? writable.find((w) => w.id === Number(place.slice(2))) : undefined) ?? writable[0] ?? (me.admin ? tree[0] : undefined);
 
   const remove = (s: Schedule) => {
     setErr("");
@@ -58,12 +61,13 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't delete the schedule."));
   };
 
-  const editWs = editing && editing !== "new" ? wsOf(editing.workspace_id) : startWs;
+  const editWs = editing && editing !== "new" ? (editing.shared ? (writable[0] ?? tree[0]) : wsOf(editing.workspace_id)) : startWs;
   if (editing && editWs) {
     return (
       <ScheduleModal
         ws={editWs}
         choices={editing === "new" ? writable : undefined}
+        canShare={editing === "new" && me.admin}
         schedule={editing === "new" ? undefined : editing}
         onClose={closeEdit}
         onSaved={(msg) => {
@@ -92,14 +96,20 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
       {shown.length > 0 && (
         <ul className="schedules" aria-label="Schedules">
           {shown.map((s) => {
-            const sws = wsOf(s.workspace_id);
-            const canWrite = !!sws && canWriteWs(sws);
+            const sws = s.shared ? undefined : wsOf(s.workspace_id);
+            const canWrite = s.shared ? me.admin : !!sws && canWriteWs(sws);
             return (
             <li key={s.id} className="schedule">
               <div className="schedule-top">
                 <span className="pill pill-accent"><Icon name="clock" /></span>
                 <strong className="schedule-title">{s.name}</strong>
-                {sws && tree.length > 1 && <WorkspaceBadge ws={sws} />}
+                {s.shared ? (
+                  <span className="pill pill-shared" data-tip="Offered in every workspace; only instance admins change it">
+                    Shared
+                  </span>
+                ) : (
+                  sws && tree.length > 1 && <WorkspaceBadge ws={sws} />
+                )}
                 {s.tz !== tz && <span className="pill pill-ws">{s.tz}</span>}
               </div>
               {!s.name.startsWith(describeRule(s)) && (
@@ -165,9 +175,14 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
   );
 }
 
-function ScheduleModal({ ws: ws0, choices, schedule, onClose, onSaved }: { ws: WorkspaceTree; choices?: WorkspaceTree[]; schedule?: Schedule; onClose: () => void; onSaved: (msg?: string) => void }) {
+// ScheduleModal: new or edit. canShare (instance admins, new): the workspace list offers "Shared: every
+// workspace" (wsId 0).
+function ScheduleModal({ ws: ws0, choices, canShare, schedule, onClose, onSaved }: {
+  ws: WorkspaceTree; choices?: WorkspaceTree[]; canShare?: boolean; schedule?: Schedule; onClose: () => void; onSaved: (msg?: string) => void;
+}) {
   const [wsId, setWsId] = useState(ws0.id);
   const ws = choices?.find((w) => w.id === wsId) ?? ws0;
+  const shared = schedule ? !!schedule.shared : canShare && wsId === 0;
   const [name, setName] = useState(schedule?.name ?? "");
   const [repeat, setRepeat] = useState<RepeatState>(() => (schedule ? repeatOfSchedule(schedule) : { ...defaultRepeat(), freq: "weekly" }));
   const [err, setErr] = useState("");
@@ -179,9 +194,9 @@ function ScheduleModal({ ws: ws0, choices, schedule, onClose, onSaved }: { ws: W
     setBusy(true);
     setErr("");
     const body = scheduleBody(name, repeat);
-    (schedule ? api.putSchedule(schedule.id, body, schedule.version) : api.createSchedule(ws.id, body))
+    (schedule ? api.putSchedule(schedule.id, body, schedule.version) : shared ? api.createSharedSchedule(body) : api.createSchedule(ws.id, body))
       .then((s) => {
-        onSaved(`Schedule “${s.name}” saved`);
+        onSaved(`${s.shared ? "Shared schedule" : "Schedule"} “${s.name}” saved`);
         onClose();
       })
       .catch((e: unknown) => setErr(e instanceof ApiError ? (e.status === 412 ? "Someone changed this schedule meanwhile. Close and reopen it." : e.message) : "Couldn't save the schedule."))
@@ -195,11 +210,17 @@ function ScheduleModal({ ws: ws0, choices, schedule, onClose, onSaved }: { ws: W
             ⟳ {schedule.uses} recurring gig{schedule.uses === 1 ? " runs" : "s run"} on this schedule: changing the timing moves {schedule.uses === 1 ? "it" : "them all"}.
           </p>
         )}
-        {choices && choices.length > 1 && (
+        {schedule?.shared && (
+          <p className="span2 small muted sched-tpl" role="note">
+            Shared: every workspace may use this schedule. Changing it moves every recurring gig and errand on it, in every workspace.
+          </p>
+        )}
+        {((choices && choices.length > 1) || canShare) && (
           <label className="span2">
             Workspace
-            <select value={ws.id} onChange={(e) => setWsId(Number(e.target.value))}>
-              {choices.map((w) => (
+            <select value={shared ? 0 : ws.id} onChange={(e) => setWsId(Number(e.target.value))}>
+              {canShare && <option value={0}>Shared: every workspace</option>}
+              {(choices ?? [ws0]).map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.name}
                 </option>

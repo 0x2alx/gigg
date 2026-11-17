@@ -244,6 +244,7 @@ export interface Template {
   custom: Record<string, unknown> | null;
   version: number;
   recurring?: number; // live recurring gigs that create their gigs from it
+  shared?: boolean; // every workspace's (workspace_id 0): admins change it; any project, no assignees or field values
 }
 
 export interface GigCreateBody {
@@ -348,12 +349,15 @@ export interface Recurrence {
   template_name: string;
   template_created_by: number;
   template_uses: number; // live recurring gigs using it, this one included
+  template_shared?: boolean; // a shared template: editing the content here gives this recurring gig its own copy
+  assignees_own?: boolean; // its own assignees (with a shared template)
   checklist: string[] | null;
   subgigs?: TemplateSubgig[] | null;
   custom: Record<string, unknown> | null;
   schedule_id: number;
   schedule_name: string;
   schedule_uses: number; // live recurring gigs on it, this one included
+  schedule_shared?: boolean; // a shared schedule: new timing moves it to a schedule of its workspace
 }
 
 // Schedule: named timing of a workspace (rule, window, create-early); recurring gigs pair one with a
@@ -373,6 +377,7 @@ export interface Schedule {
   version: number;
   uses: number; // live recurring gigs on it
   errand_uses?: number; // live errands on it
+  shared?: boolean; // every workspace's (workspace_id 0): admins change it
 }
 
 // GigSchedule: a schedule recurring gigs can use (not a minutes/hours one).
@@ -538,6 +543,7 @@ export const api = {
     call<void>("DELETE", `/recurrences/${id}${also.template || also.schedule ? "?" + [also.template && "template=true", also.schedule && "schedule=true"].filter(Boolean).join("&") : ""}`),
   schedules: (ws: string | number) => call<{ items: Schedule[] }>("GET", `/workspaces/${ws}/schedules`),
   createSchedule: (ws: string | number, body: ScheduleBody) => call<Schedule>("POST", `/workspaces/${ws}/schedules`, body),
+  createSharedSchedule: (body: ScheduleBody) => call<Schedule>("POST", `/shared/schedules`, body),
   putSchedule: (id: number, body: ScheduleBody, version?: number) =>
     call<Schedule>("PUT", `/schedules/${id}`, body, version ? { "If-Match": `"${version}"` } : undefined),
   deleteSchedule: (id: number) => call<void>("DELETE", `/schedules/${id}`),
@@ -563,6 +569,7 @@ export const api = {
   setCustom: (id: number, values: Record<string, unknown>) => call<Gig>("PATCH", `/gigs/${id}/custom`, { values }),
   templates: (ws: string | number, project?: number) => call<{ items: Template[] }>("GET", `/workspaces/${ws}/templates${project ? `?project=${project}` : ""}`),
   createTemplate: (ws: string | number, body: TemplateBody) => call<Template>("POST", `/workspaces/${ws}/templates`, body),
+  createSharedTemplate: (body: TemplateBody) => call<Template>("POST", `/shared/templates`, body),
   putTemplate: (id: number, body: TemplateBody, version?: number) =>
     call<Template>("PUT", `/templates/${id}`, body, version ? { "If-Match": `"${version}"` } : undefined),
   deleteTemplate: (id: number) => call<void>("DELETE", `/templates/${id}`),
