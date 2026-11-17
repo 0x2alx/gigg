@@ -24,7 +24,7 @@ type ErrandTemplate struct {
 	Name             string `json:"name"`
 	DescriptionMD    string `json:"description_md"`
 	Command          string `json:"command" doc:"Run by bash in the agent's sandbox (or unsandboxed, see unsandboxed)"`
-	TimeoutS         int64  `json:"timeout_s" doc:"Seconds before the executor kills it (10-3600)"`
+	TimeoutS         int64  `json:"timeout_s" doc:"Seconds before the executor kills it (10-43200, default 300; other than the default needs the run_timeout permission; the host caps it)"`
 	Output           string `json:"output" enum:"gigg,host" doc:"gigg: the output's last 64 KiB is stored with the run; host: only the exit code and timing reach gigg, the output stays on the agent's host"`
 	Unsandboxed      bool   `json:"unsandboxed" doc:"Run outside the agent's sandbox (needs the No-sandbox errands permission; any change by someone without it turns it off)"`
 	CommandSetBy     int64  `json:"command_set_by" doc:"Who last changed the command text"`
@@ -98,6 +98,7 @@ const (
 	ErrandOutputMax      = 65536
 	ErrandKeepRuns       = 200           // newest runs kept per errand ...
 	ErrandKeepDays       = 14            // ... and every run newer than this
+	errandDefaultTimeout = 300           // seconds
 	errandStaleGraceMS   = 5 * 60 * 1000 // a run with no report this long past its timeout is closed
 	errandsPerWorkspace  = 500
 	errandTemplatesPerWS = 500
@@ -163,10 +164,10 @@ func (t *ErrandTemplate) Validate() error {
 		return Invalid("command: no NUL characters")
 	}
 	if t.TimeoutS == 0 {
-		t.TimeoutS = 300
+		t.TimeoutS = errandDefaultTimeout
 	}
-	if t.TimeoutS < 10 || t.TimeoutS > 3600 {
-		return Invalid("timeout_s: 10-3600 seconds")
+	if t.TimeoutS < ErrandTimeoutMin || t.TimeoutS > ErrandTimeoutMax {
+		return Invalid("timeout_s: %d-%d seconds", ErrandTimeoutMin, ErrandTimeoutMax)
 	}
 	if t.Output == "" {
 		t.Output = "gigg"
@@ -182,6 +183,7 @@ func (t *ErrandTemplate) Validate() error {
 type ErrandEdit struct {
 	CanUnsandbox bool
 	CanManage    bool
+	CanTimeout   bool // run_timeout: set a timeout other than the default, or change one
 }
 
 // SaveErrandTemplate creates (ID 0) or replaces a template. Provenance, which the executor trusts:
@@ -195,6 +197,9 @@ type ErrandEdit struct {
 func SaveErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, expect int64, e ErrandEdit) (*ErrandTemplate, error) {
 	if err := t.Validate(); err != nil {
 		return nil, err
+	}
+	if t.ID == 0 && t.TimeoutS != errandDefaultTimeout && !e.CanTimeout {
+		return nil, Denied("a timeout other than %d s needs the Run timeouts permission", errandDefaultTimeout)
 	}
 	if t.Unsandboxed && !e.CanUnsandbox && t.ID == 0 {
 		return nil, Invalid("only people with the No-sandbox errands permission can make an unsandboxed errand")
@@ -231,6 +236,9 @@ func SaveErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ex
 	}
 	if expect != 0 && expect != cur.Version {
 		return nil, ErrVersion
+	}
+	if t.TimeoutS != cur.TimeoutS && !e.CanTimeout {
+		return nil, Denied("changing an errand's timeout needs the Run timeouts permission")
 	}
 	if t.Unsandboxed && !cur.Unsandboxed && !e.CanUnsandbox {
 		return nil, Invalid("only people with the No-sandbox errands permission can turn the sandbox off")

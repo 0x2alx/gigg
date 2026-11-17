@@ -48,6 +48,7 @@ type Gig struct {
 	NotAfter          *int64         `json:"not_after"` // the window closes: not claimable after this
 	MissedAt          *int64         `json:"missed_at"`
 	ArchivedAt        *int64         `json:"archived_at"`
+	RunTimeout        *int64         `json:"run_timeout_minutes" doc:"How long a runner lets one run go, in minutes (null: the agent's default)"`
 	AutoArchive       *int64         `json:"auto_archive_minutes" doc:"Archive it this many minutes after it is done or cancelled (null: never)"`
 	Schedule          *GigSchedule   `json:"schedule,omitempty" doc:"Gigs made by a recurring gig: its schedule, named and in words"`
 	SubgigCount       int64          `json:"subgig_count"`
@@ -121,7 +122,7 @@ const gigCols = `t.id, p.key || '-' || t.number, t.workspace_id, t.project_id, t
 	(SELECT count(*) FROM gig_relations r JOIN gigs b ON b.id = r.from_gig_id JOIN statuses bs ON bs.id = b.status_id
 		WHERE r.to_gig_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled')),
 	` + blockingSubgigs + `,
-	t.model, t.effort, t.always_run, t.allowed_tools, t.blocks_parent, t.auto_archive_minutes`
+	t.model, t.effort, t.always_run, t.allowed_tools, t.blocks_parent, t.auto_archive_minutes, t.run_timeout_minutes`
 
 // blockingSubgigs counts t's open subgigs that hold it back (blocks_parent; not archived ones,
 // which agents never get either), except those that
@@ -142,13 +143,13 @@ const gigFrom = ` FROM gigs t JOIN projects p ON p.id = t.project_id JOIN status
 func scanGig(row interface{ Scan(...any) error }) (*Gig, error) {
 	var t Gig
 	var color, sess sql.NullString
-	var start, due, done, parent, cloned, viaKey, lastRun, resume, rec, occ, notAfter, missed, archived, autoArch sql.NullInt64
+	var start, due, done, parent, cloned, viaKey, lastRun, resume, rec, occ, notAfter, missed, archived, autoArch, runTO sql.NullInt64
 	var tools string
 	if err := row.Scan(&t.ID, &t.Key, &t.WorkspaceID, &t.ProjectID, &t.Number, &t.Title, &t.DescriptionMD, &t.StatusID,
 		&t.StatusName, &t.StatusCategory, &t.Position, &t.Priority, &color, &start, &due, &done, &parent, &cloned,
 		&t.CreatedBy, &t.CreatedByUsername, &t.CreatedByAdmin, &viaKey, &t.CreatedAt, &t.UpdatedAt, &sess, &lastRun,
 		&resume, &t.CostUSDTotal, &t.CommentCount, &t.Deleted, &t.Version, &rec, &occ, &notAfter, &missed, &archived,
-		&t.SubgigCount, &t.SubgigDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubgigs, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent, &autoArch); err != nil {
+		&t.SubgigCount, &t.SubgigDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubgigs, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent, &autoArch, &runTO); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -158,7 +159,7 @@ func scanGig(row interface{ Scan(...any) error }) (*Gig, error) {
 	t.StartAt, t.DueAt, t.DoneAt, t.ParentID, t.ClonedFromID = ptrInt(start), ptrInt(due), ptrInt(done), ptrInt(parent), ptrInt(cloned)
 	t.CreatedViaKeyID, t.LastRunID, t.ResumeRequestedAt = ptrInt(viaKey), ptrInt(lastRun), ptrInt(resume)
 	t.RecurrenceID, t.OccurrenceAt, t.NotAfter, t.MissedAt = ptrInt(rec), ptrInt(occ), ptrInt(notAfter), ptrInt(missed)
-	t.ArchivedAt, t.AutoArchive = ptrInt(archived), ptrInt(autoArch)
+	t.ArchivedAt, t.AutoArchive, t.RunTimeout = ptrInt(archived), ptrInt(autoArch), ptrInt(runTO)
 	t.Labels, t.Assignees, t.Aliases, t.Custom = []GigTag{}, []int64{}, []string{}, map[string]any{}
 	t.AllowedTools = []string{}
 	_ = json.Unmarshal([]byte(tools), &t.AllowedTools)
@@ -604,6 +605,7 @@ type NewGig struct {
 	AllowedTools  []string
 	BlocksParent  bool   // a subgig that holds its parent back while open (needs ParentID)
 	AutoArchive   *int64 // minutes after done/cancelled (nil: never)
+	RunTimeout    *int64 // minutes a runner lets one run go (nil: the agent's default)
 	Quiet         bool   // no "assigned" notification (subgigs made together with their parent)
 }
 
@@ -696,16 +698,22 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 	if st.Category == "done" {
 		doneAt = now
 	}
+	if err := validRunTimeout(n.RunTimeout); err != nil {
+		return nil, err
+	}
+	if err := validAutoArchive(n.AutoArchive); err != nil {
+		return nil, err
+	}
 	if n.NotAfter != nil && n.StartAt != nil && *n.NotAfter <= *n.StartAt {
 		return nil, Invalid("the window must close after it opens")
 	}
 	res, err := q.ExecContext(ctx, `INSERT INTO gigs (workspace_id, project_id, number, title, description_md, status_id, position,
 		priority, color, start_at, due_at, done_at, parent_id, cloned_from_id, created_by, created_via_key_id, created_at, updated_at,
-		not_after, recurrence_id, occurrence_at, model, effort, always_run, allowed_tools, blocks_parent, auto_archive_minutes)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, p.WorkspaceID, p.ID, num, n.Title, n.DescriptionMD, st.ID, pos, n.Priority,
+		not_after, recurrence_id, occurrence_at, model, effort, always_run, allowed_tools, blocks_parent, auto_archive_minutes, run_timeout_minutes)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, p.WorkspaceID, p.ID, num, n.Title, n.DescriptionMD, st.ID, pos, n.Priority,
 		nullStr(n.Color), nullInt(n.StartAt), nullInt(n.DueAt), doneAt, nullInt(n.ParentID), nullInt(n.ClonedFromID),
 		a.UserID, nullInt(n.CreatedViaKey), now, now, nullInt(n.NotAfter), nullInt(n.RecurrenceID), nullInt(n.OccurrenceAt),
-		n.Model, n.Effort, n.AlwaysRun, mustJSON(tools), n.BlocksParent, nullInt(n.AutoArchive))
+		n.Model, n.Effort, n.AlwaysRun, mustJSON(tools), n.BlocksParent, nullInt(n.AutoArchive), nullInt(n.RunTimeout))
 	if err != nil {
 		return nil, err
 	}
@@ -819,6 +827,7 @@ type GigPatch struct {
 	AllowedTools  []string // nil = unchanged, empty = cleared
 	BlocksParent  *bool
 	AutoArchive   **int64 // minutes after done/cancelled; *nil = never
+	RunTimeout    **int64 // minutes; *nil = the agent's default
 }
 
 // PatchGig applies a change and records old and new values (old text in full).
@@ -950,6 +959,12 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 			return nil, err
 		}
 		changed["auto_archive_minutes"], data["auto_archive_minutes"] = nullInt(*p.AutoArchive), map[string]any{"old": t.AutoArchive, "new": *p.AutoArchive}
+	}
+	if p.RunTimeout != nil && !eqIntPtr(*p.RunTimeout, t.RunTimeout) {
+		if err := validRunTimeout(*p.RunTimeout); err != nil {
+			return nil, err
+		}
+		changed["run_timeout_minutes"], data["run_timeout_minutes"] = nullInt(*p.RunTimeout), map[string]any{"old": t.RunTimeout, "new": *p.RunTimeout}
 	}
 	if p.Labels != nil {
 		if err := setLabels(ctx, q, a, t.WorkspaceID, t.ID, p.Labels); err != nil {

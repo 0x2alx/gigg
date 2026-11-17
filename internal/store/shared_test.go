@@ -157,7 +157,7 @@ func TestSharedTemplatesAndSchedules(t *testing.T) {
 func TestSharedErrandTemplate(t *testing.T) {
 	f := newFixture(t)
 	tx := func(fn func(tx *sql.Tx) error) { t.Helper(); must(t, f.s.Tx(f.ctx, fn)) }
-	holder, plain := ErrandEdit{CanUnsandbox: true, CanManage: true}, ErrandEdit{}
+	holder, plain := ErrandEdit{CanUnsandbox: true, CanManage: true, CanTimeout: true}, ErrandEdit{}
 	var tpl *ErrandTemplate
 	tx(func(tx *sql.Tx) error {
 		var err error
@@ -195,6 +195,13 @@ func TestSharedErrandTemplate(t *testing.T) {
 		t.Fatalf("holder's errand: %+v", c2)
 	}
 	timeout := int64(60)
+	// a timeout change needs Run timeouts (CanTimeout)
+	if err := f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := UpdateErrand(f.ctx, tx, f.a, c1.ID, 0, ErrandChange{TimeoutS: &timeout}, plain)
+		return err
+	}); !errors.Is(err, ErrDenied) {
+		t.Fatalf("timeout without the permission: %v", err)
+	}
 	tx(func(tx *sql.Tx) error {
 		var err error
 		c2, err = UpdateErrand(f.ctx, tx, f.a, c2.ID, 0, ErrandChange{TimeoutS: &timeout}, holder)

@@ -579,6 +579,7 @@ type Template struct {
 	Effort        string           `json:"effort"`
 	AlwaysRun     bool             `json:"always_run"`
 	AllowedTools  []string         `json:"allowed_tools" doc:"Tool allowlist for the runner (permission rules); empty = the runner's usual mode"`
+	RunTimeout    *int64           `json:"run_timeout_minutes" doc:"Its gigs' run timeout in minutes (null: the agent's default)"`
 	AutoArchive   *int64           `json:"auto_archive_minutes" doc:"Gigs made from it archive themselves this many minutes after done or cancelled (null: never)"`
 	CreatedBy     int64            `json:"created_by"`
 	CreatedAt     int64            `json:"created_at"`
@@ -586,22 +587,22 @@ type Template struct {
 	Recurring     int64            `json:"recurring" doc:"Live recurring gigs that create their gigs from this template"`
 }
 
-const tplCols = `id, COALESCE(workspace_id, 0), project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes,
+const tplCols = `id, COALESCE(workspace_id, 0), project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes, run_timeout_minutes,
 	(SELECT count(*) FROM recurrences r WHERE r.template_id = gig_templates.id AND r.deleted_at IS NULL)`
 
 func scanTemplate(row interface{ Scan(...any) error }) (*Template, error) {
 	t := &Template{}
-	var proj, autoArch sql.NullInt64
+	var proj, autoArch, runTO sql.NullInt64
 	var color sql.NullString
 	var labels, assignees, checklist, custom, tools, subs string
 	if err := row.Scan(&t.ID, &t.WorkspaceID, &proj, &t.Name, &t.Title, &t.DescriptionMD, &t.Priority, &color, &labels, &assignees, &checklist, &custom,
-		&t.CreatedBy, &t.CreatedAt, &t.Version, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &subs, &autoArch, &t.Recurring); err != nil {
+		&t.CreatedBy, &t.CreatedAt, &t.Version, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &subs, &autoArch, &runTO, &t.Recurring); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
-	t.ProjectID, t.Color, t.AutoArchive = ptrInt(proj), ptrStr(color), ptrInt(autoArch)
+	t.ProjectID, t.Color, t.AutoArchive, t.RunTimeout = ptrInt(proj), ptrStr(color), ptrInt(autoArch), ptrInt(runTO)
 	t.Shared = t.WorkspaceID == 0
 	_ = json.Unmarshal([]byte(labels), &t.Labels)
 	_ = json.Unmarshal([]byte(assignees), &t.Assignees)
@@ -686,6 +687,9 @@ func (t *Template) validate() error {
 		return Invalid("at most 30 custom values")
 	}
 	if err := validAutoArchive(t.AutoArchive); err != nil {
+		return err
+	}
+	if err := validRunTimeout(t.RunTimeout); err != nil {
 		return err
 	}
 	if t.WorkspaceID == 0 { // shared: nothing that belongs to one workspace
@@ -776,8 +780,8 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 	action := "template.updated"
 	if t.ID == 0 {
 		res, err := q.ExecContext(ctx, `INSERT INTO gig_templates (workspace_id, project_id, name, title, description_md, priority, color, labels, assignees,
-			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, wsArg(t.WorkspaceID), nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
-			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive))
+			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes, run_timeout_minutes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, wsArg(t.WorkspaceID), nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
+			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive), nullInt(t.RunTimeout))
 		if err != nil {
 			return nil, err
 		}
@@ -792,8 +796,8 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			return nil, ErrVersion
 		}
 		if _, err := q.ExecContext(ctx, `UPDATE gig_templates SET project_id = ?, name = ?, title = ?, description_md = ?, priority = ?, color = ?, labels = ?,
-			assignees = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, subgigs = ?, auto_archive_minutes = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
-			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive), t.ID); err != nil {
+			assignees = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, subgigs = ?, auto_archive_minutes = ?, run_timeout_minutes = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
+			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive), nullInt(t.RunTimeout), t.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -885,7 +889,7 @@ func GigFromTemplate(ctx context.Context, q Q, a Actor, tpl *Template, p *Projec
 		return nil, Invalid("this template isn't for that project")
 	}
 	n := NewGig{ProjectID: p.ID, Title: tpl.Title, DescriptionMD: tpl.DescriptionMD, Priority: tpl.Priority, Color: tpl.Color,
-		Model: tpl.Model, Effort: tpl.Effort, AlwaysRun: tpl.AlwaysRun, AllowedTools: tpl.AllowedTools, AutoArchive: tpl.AutoArchive,
+		Model: tpl.Model, Effort: tpl.Effort, AlwaysRun: tpl.AlwaysRun, AllowedTools: tpl.AllowedTools, AutoArchive: tpl.AutoArchive, RunTimeout: tpl.RunTimeout,
 		Labels: tpl.Labels, Assignees: validAssignees(ctx, q, &Recurrence{WorkspaceID: p.WorkspaceID, Assignees: tpl.Assignees}), CreatedViaKey: viaKey}
 	if title != nil && strings.TrimSpace(*title) != "" {
 		n.Title = *title

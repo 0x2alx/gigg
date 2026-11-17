@@ -67,7 +67,7 @@ func (c errandFix) create(n NewErrand, can bool) (*Errand, error) {
 	var out *Errand
 	err := c.s.Tx(c.ctx, func(tx *sql.Tx) error {
 		var err error
-		out, err = CreateErrand(c.ctx, tx, c.a, n, ErrandEdit{CanUnsandbox: can})
+		out, err = CreateErrand(c.ctx, tx, c.a, n, ErrandEdit{CanUnsandbox: can, CanTimeout: true})
 		return err
 	})
 	return out, err
@@ -307,7 +307,7 @@ func TestErrandProvenance(t *testing.T) {
 	}))
 	ten := int64(600)
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-		_, err := UpdateErrand(f.ctx, tx, f.a, mine.ID, 0, ErrandChange{TimeoutS: &ten}, ErrandEdit{CanUnsandbox: true, CanManage: true})
+		_, err := UpdateErrand(f.ctx, tx, f.a, mine.ID, 0, ErrandChange{TimeoutS: &ten}, ErrandEdit{CanUnsandbox: true, CanManage: true, CanTimeout: true})
 		return err
 	}))
 	mine, _ = GetErrand(f.ctx, f.s.R, mine.ID)
@@ -375,7 +375,7 @@ func TestErrandProvenance(t *testing.T) {
 	}))
 	// a stale version is refused (the errand is read again inside the transaction)
 	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-		_, err := UpdateErrand(f.ctx, tx, f.a, three.ID, three.Version, ErrandChange{TimeoutS: &ten}, ErrandEdit{CanUnsandbox: true})
+		_, err := UpdateErrand(f.ctx, tx, f.a, three.ID, three.Version, ErrandChange{TimeoutS: &ten}, ErrandEdit{CanUnsandbox: true, CanTimeout: true})
 		return err
 	})
 	if !errors.Is(err, ErrVersion) {

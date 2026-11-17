@@ -21,7 +21,7 @@ type ErrandTemplateBody struct {
 	Name          string `json:"name" minLength:"1" maxLength:"80"`
 	DescriptionMD string `json:"description_md,omitempty" maxLength:"65536"`
 	Command       string `json:"command" minLength:"1" maxLength:"16384" doc:"Run by bash, in the worker agent's sandbox unless unsandboxed"`
-	TimeoutS      int64  `json:"timeout_s,omitempty" minimum:"0" maximum:"3600" doc:"Seconds (10-3600, default 300)"`
+	TimeoutS      int64  `json:"timeout_s,omitempty" minimum:"0" maximum:"43200" doc:"Seconds (10-43200, default 300; another value needs the run_timeout permission; the host caps it)"`
 	Output        string `json:"output,omitempty" enum:"gigg,host" doc:"gigg (default): the output's last 64 KiB is kept with each run; host: only the exit code and timing reach gigg"`
 	Unsandboxed   bool   `json:"unsandboxed,omitempty" doc:"Run outside the agent's sandbox (needs the No-sandbox errands permission)"`
 }
@@ -37,7 +37,7 @@ type ErrandBody struct {
 	Name          string        `json:"name,omitempty" maxLength:"80"`
 	DescriptionMD string        `json:"description_md,omitempty" maxLength:"65536"`
 	Command       string        `json:"command,omitempty" maxLength:"16384"`
-	TimeoutS      int64         `json:"timeout_s,omitempty" minimum:"0" maximum:"3600"`
+	TimeoutS      int64         `json:"timeout_s,omitempty" minimum:"0" maximum:"43200"`
 	Output        string        `json:"output,omitempty" enum:"gigg,host"`
 	Unsandboxed   bool          `json:"unsandboxed,omitempty"`
 	ScheduleID    int64         `json:"schedule_id,omitempty" doc:"An existing schedule; or give a rule"`
@@ -54,7 +54,7 @@ type ErrandPatch struct {
 	Name          *string       `json:"name,omitempty" maxLength:"80"`
 	DescriptionMD *string       `json:"description_md,omitempty" maxLength:"65536"`
 	Command       *string       `json:"command,omitempty" maxLength:"16384"`
-	TimeoutS      *int64        `json:"timeout_s,omitempty" minimum:"0" maximum:"3600"`
+	TimeoutS      *int64        `json:"timeout_s,omitempty" minimum:"0" maximum:"43200"`
 	Output        *string       `json:"output,omitempty" enum:"gigg,host"`
 	Unsandboxed   *bool         `json:"unsandboxed,omitempty"`
 	ScheduleID    *int64        `json:"schedule_id,omitempty"`
@@ -83,7 +83,8 @@ type errandTemplateOut struct {
 }
 
 func (a *API) errandEdit(p *access.Principal, ws int64) store.ErrandEdit {
-	return store.ErrandEdit{CanUnsandbox: p.Can(ws, "errand_unsandboxed", "errands:write"), CanManage: allowed(p, ws, access.Manager) == nil}
+	return store.ErrandEdit{CanUnsandbox: p.Can(ws, "errand_unsandboxed", "errands:write"), CanManage: allowed(p, ws, access.Manager) == nil,
+		CanTimeout: allowed(p, ws, "run_timeout") == nil}
 }
 
 func (a *API) errand(ctx context.Context, p *access.Principal, id int64) (*store.Errand, error) {
@@ -108,7 +109,7 @@ func sharedErrandEdit(p *access.Principal) (store.ErrandEdit, error) {
 	if err := sharedWrite(p, "errands:write"); err != nil {
 		return store.ErrandEdit{}, err
 	}
-	return store.ErrandEdit{CanUnsandbox: true, CanManage: true}, nil
+	return store.ErrandEdit{CanUnsandbox: true, CanManage: true, CanTimeout: true}, nil
 }
 
 // errandWorker resolves the worker: yourself by default; another user only with Manage the workspace.

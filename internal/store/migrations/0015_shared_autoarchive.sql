@@ -13,6 +13,11 @@
 --
 -- Auto-archive: a gig (and a template, for the gigs it makes) can archive itself this many minutes after
 -- it was done or cancelled (housekeeping does it). NULL: never.
+--
+-- Run timeouts: a gig (and a template) can name how long an agent's runner lets a run go (5-300
+-- minutes; NULL: the agent's default, 60). Below the 6 h after which the server closes a silent run.
+-- Errand timeouts go up to 12 h. Setting either needs the run_timeout permission; the executors cap
+-- both at their host's ceiling.
 
 CREATE TABLE gig_templates_new (
   id              INTEGER PRIMARY KEY,
@@ -37,6 +42,7 @@ CREATE TABLE gig_templates_new (
   allowed_tools   TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(allowed_tools)),
   subgigs         TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(subgigs)),
   auto_archive_minutes INTEGER CHECK (auto_archive_minutes IS NULL OR auto_archive_minutes BETWEEN 5 AND 527040),
+  run_timeout_minutes INTEGER CHECK (run_timeout_minutes IS NULL OR run_timeout_minutes BETWEEN 5 AND 300),
   CHECK (workspace_id IS NOT NULL OR (project_id IS NULL AND custom = '{}'))
 ) STRICT;
 INSERT INTO gig_templates_new (id, workspace_id, project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom,
@@ -53,7 +59,7 @@ CREATE TABLE errand_templates_new (
   name            TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
   description_md  TEXT NOT NULL DEFAULT '' CHECK (length(description_md) <= 65536),
   command         TEXT NOT NULL CHECK (length(command) BETWEEN 1 AND 16384),
-  timeout_s       INTEGER NOT NULL DEFAULT 300 CHECK (timeout_s BETWEEN 10 AND 3600),
+  timeout_s       INTEGER NOT NULL DEFAULT 300 CHECK (timeout_s BETWEEN 10 AND 43200),
   output          TEXT NOT NULL DEFAULT 'gigg' CHECK (output IN ('gigg', 'host')),
   unsandboxed     INTEGER NOT NULL DEFAULT 0 CHECK (unsandboxed IN (0, 1)),
   command_set_by  INTEGER NOT NULL REFERENCES users(id),
@@ -100,5 +106,6 @@ CREATE INDEX schedules_ws ON schedules(workspace_id) WHERE deleted_at IS NULL;
 ALTER TABLE recurrences ADD COLUMN assignees TEXT CHECK (assignees IS NULL OR json_valid(assignees)); -- NULL: the template's
 
 ALTER TABLE gigs ADD COLUMN auto_archive_minutes INTEGER CHECK (auto_archive_minutes IS NULL OR auto_archive_minutes BETWEEN 5 AND 527040);
+ALTER TABLE gigs ADD COLUMN run_timeout_minutes INTEGER CHECK (run_timeout_minutes IS NULL OR run_timeout_minutes BETWEEN 5 AND 300);
 -- what housekeeping scans: done or cancelled gigs that archive themselves and aren't archived yet
 CREATE INDEX gigs_auto_archive ON gigs(updated_at) WHERE auto_archive_minutes IS NOT NULL AND archived_at IS NULL AND deleted_at IS NULL;

@@ -207,6 +207,7 @@ type GigCreate struct {
 	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Work it whatever the usage budget, day or night (needs the always_run permission)"`
 	AllowedTools  []string               `json:"allowed_tools,omitempty" maxItems:"64" doc:"The only tools a runner should allow for it (Claude Code-style permission rules, one per entry, e.g. Read, Bash(git status *)). Needs the allowed_tools permission"`
 	AutoArchive   *int64                 `json:"auto_archive_minutes,omitempty" minimum:"5" maximum:"527040" doc:"Archive it this many minutes after it is done or cancelled"`
+	RunTimeout    *int64                 `json:"run_timeout_minutes,omitempty" minimum:"5" maximum:"300" doc:"How long a runner lets one run go (default: the agent's, 60). Needs the run_timeout permission; the agent's host caps it"`
 }
 
 type gigCreateIn struct {
@@ -234,6 +235,7 @@ type gigPatchIn struct {
 		AlwaysRun     Opt[bool]     `json:"always_run,omitempty" doc:"Work it whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  Opt[[]string] `json:"allowed_tools,omitempty" maxItems:"64" doc:"Replaces the runner's tool allowlist; null or [] clears (needs the allowed_tools permission)"`
 		AutoArchive   Opt[int64]    `json:"auto_archive_minutes,omitempty" doc:"Archive it this many minutes (5-527040) after it is done or cancelled; null: never"`
+		RunTimeout    Opt[int64]    `json:"run_timeout_minutes,omitempty" doc:"How long a runner lets one run go (5-300 min); null: the agent's default. Needs the run_timeout permission"`
 	}
 }
 
@@ -415,13 +417,16 @@ func (a *API) registerGigs() {
 		if err := alwaysRunChange(p, pr.WorkspaceID, false, b.AlwaysRun); err != nil {
 			return nil, err
 		}
+		if err := timeoutChange(p, pr.WorkspaceID, nil, b.RunTimeout); err != nil {
+			return nil, err
+		}
 		if err := toolsChange(p, pr.WorkspaceID, nil, b.AllowedTools); err != nil {
 			return nil, err
 		}
 		n := store.NewGig{ProjectID: pr.ID, Title: b.Title, DescriptionMD: b.DescriptionMD, Priority: b.Priority, Color: b.Color,
 			StartAt: b.StartAt, DueAt: b.DueAt, NotAfter: b.NotAfter, ParentID: b.ParentID, Labels: b.Labels, Assignees: b.Assignees,
 			Model: strings.TrimSpace(b.Model), Effort: b.Effort, AlwaysRun: b.AlwaysRun, AllowedTools: b.AllowedTools, BlocksParent: b.BlocksParent,
-			AutoArchive: b.AutoArchive}
+			AutoArchive: b.AutoArchive, RunTimeout: b.RunTimeout}
 		if p.Key != nil {
 			n.CreatedViaKey = &p.Key.ID
 		}
@@ -518,7 +523,12 @@ func (a *API) registerGigs() {
 				}
 			}
 			patch := store.GigPatch{Title: b.Title.Val(), DescriptionMD: b.DescriptionMD.Val(), Priority: b.Priority.Val(), Color: b.Color.Ptr(),
-				StartAt: b.StartAt.Ptr(), DueAt: b.DueAt.Ptr(), NotAfter: b.NotAfter.Ptr(), ParentID: b.ParentID.Ptr(), AutoArchive: b.AutoArchive.Ptr()}
+				StartAt: b.StartAt.Ptr(), DueAt: b.DueAt.Ptr(), NotAfter: b.NotAfter.Ptr(), ParentID: b.ParentID.Ptr(), AutoArchive: b.AutoArchive.Ptr(), RunTimeout: b.RunTimeout.Ptr()}
+			if b.RunTimeout.Set {
+				if err := timeoutChange(p, t.WorkspaceID, t.RunTimeout, b.RunTimeout.Val()); err != nil {
+					return nil, err
+				}
+			}
 			if b.BlocksParent.Set {
 				on := false
 				if v := b.BlocksParent.Val(); v != nil {

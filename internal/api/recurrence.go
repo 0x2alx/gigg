@@ -32,6 +32,7 @@ type RecurrenceBody struct {
 	Labels        []string               `json:"labels,omitempty" maxItems:"20"`
 	Assignees     []int64                `json:"assignees,omitempty" maxItems:"50" doc:"Who its gigs go to. With a shared template (also when template_id names one), the recurring gig's own assignees"`
 	AutoArchive   *int64                 `json:"auto_archive_minutes,omitempty" minimum:"0" maximum:"527040" doc:"Its gigs archive themselves this many minutes after done or cancelled (kept in its template); omit to keep, 0 clears"`
+	RunTimeout    *int64                 `json:"run_timeout_minutes,omitempty" minimum:"0" maximum:"300" doc:"Its gigs' run timeout in minutes (kept in its template); omit to keep, 0 clears (the agent's default). Needs the run_timeout permission"`
 	Model         string                 `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
 	Effort        string                 `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
 	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Its gigs run whatever the usage budget (needs the always_run permission)"`
@@ -65,6 +66,12 @@ func (b RecurrenceBody) apply(r *store.Recurrence) {
 			r.AutoArchive = b.AutoArchive
 			if *b.AutoArchive == 0 {
 				r.AutoArchive = nil
+			}
+		}
+		if b.RunTimeout != nil {
+			r.RunTimeout = b.RunTimeout
+			if *b.RunTimeout == 0 {
+				r.RunTimeout = nil
 			}
 		}
 	}
@@ -164,13 +171,13 @@ func (a *API) registerRecurrence() {
 				in.Body.TZ = userTZ(p)
 			}
 			in.Body.apply(r)
-			always, tools := in.Body.AlwaysRun, in.Body.AllowedTools
+			always, tools, timeout := in.Body.AlwaysRun, in.Body.AllowedTools, r.RunTimeout
 			if in.Body.TemplateID != nil {
 				tpl, err := store.RecurrenceTemplate(ctx, a.st.R, pr.WorkspaceID, pr.ID, *in.Body.TemplateID)
 				if err != nil {
 					return nil, storeErr(err)
 				}
-				r.TemplateID, always, tools = tpl.ID, tpl.AlwaysRun, tpl.AllowedTools
+				r.TemplateID, always, tools, timeout = tpl.ID, tpl.AlwaysRun, tpl.AllowedTools, tpl.RunTimeout
 			} else if strings.TrimSpace(in.Body.Title) == "" {
 				return nil, fail(422, "invalid", "A recurring gig needs a title (or a template_id).")
 			}
@@ -183,6 +190,9 @@ func (a *API) registerRecurrence() {
 				return nil, err
 			}
 			if err := toolsChange(p, pr.WorkspaceID, nil, tools); err != nil {
+				return nil, err
+			}
+			if err := timeoutChange(p, pr.WorkspaceID, nil, timeout); err != nil {
 				return nil, err
 			}
 			err = a.tx(ctx, func(tx *sql.Tx) error {
@@ -274,6 +284,17 @@ func (a *API) registerRecurrence() {
 			in.Body.TZ = r.TZ // an edit that names no zone keeps the current one
 		}
 		in.Body.apply(r)
+		newTimeout := r.RunTimeout
+		if ch.Template != 0 {
+			tpl, err := store.GetTemplate(ctx, a.st.R, ch.Template)
+			if err != nil {
+				return nil, storeErr(err)
+			}
+			newTimeout = tpl.RunTimeout
+		}
+		if err := timeoutChange(p, r.WorkspaceID, old.RunTimeout, newTimeout); err != nil {
+			return nil, err
+		}
 		if in.Body.TemplateID == nil {
 			if strings.TrimSpace(r.Title) == "" {
 				return nil, fail(422, "invalid", "A recurring gig needs a title.")

@@ -90,6 +90,20 @@ func wsRef(ws int64) *int64 {
 // AutoArchiveMax is the longest auto-archive delay (a leap year, in minutes); the shortest is 5.
 const AutoArchiveMax = 527040
 
+// Run timeouts in minutes (gigs; NULL: the agent's default) and seconds (errands).
+const (
+	RunTimeoutMin, RunTimeoutMax       = 5, 300
+	ErrandTimeoutMin, ErrandTimeoutMax = 10, 43200
+)
+
+// validRunTimeout checks a gig's run timeout in minutes (nil: the agent's default).
+func validRunTimeout(m *int64) error {
+	if m != nil && (*m < RunTimeoutMin || *m > RunTimeoutMax) {
+		return Invalid("run_timeout_minutes: %d to %d (or none: the agent's default)", RunTimeoutMin, RunTimeoutMax)
+	}
+	return nil
+}
+
 // validAutoArchive checks an auto-archive delay in minutes (nil: never).
 func validAutoArchive(m *int64) error {
 	if m != nil && (*m < 5 || *m > AutoArchiveMax) {

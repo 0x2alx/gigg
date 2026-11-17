@@ -40,6 +40,7 @@ var Permissions = []Permission{
 	{"relations", "Dependencies", "Add and remove blocking/related links between gigs (with Edit gigs).", "Gigs"},
 	{"checklists", "Checklists", "Add, tick and remove checklist items (with Edit gigs).", "Gigs"},
 	{"always_run", "Always-run gigs", "Mark gigs to run whatever the usage budget (cron-like gigs). The gig cap and pauses still apply.", "Runner"},
+	{"run_timeout", "Run timeouts", "Set how long an agent may run on a gig (templates and recurring gigs too) or how long an errand may run, instead of the default. The agent's host caps it.", "Runner"},
 	{"allowed_tools", "Gig tool allowlists", "Give gigs (templates, recurring gigs) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change gigs that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner"},
 	{"errands", "Errands", "Create, change, pause and delete errands (commands an agent's executor runs on a schedule, sandboxed) and errand templates. An errand's worker is yourself, or any agent with Manage the workspace.", "Runner"},
 	{"errand_unsandboxed", "No-sandbox errands", "Let an errand run outside its agent's sandbox. Any change to such an errand by someone without this permission turns its sandbox back on.", "Runner"},

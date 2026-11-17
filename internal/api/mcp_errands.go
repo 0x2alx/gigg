@@ -19,7 +19,7 @@ type (
 		Name          string `json:"name,omitempty" jsonschema:"New errand: required unless template_id"`
 		DescriptionMD string `json:"description_md,omitempty"`
 		Command       string `json:"command,omitempty" jsonschema:"Run by bash in the worker agent's sandbox (no access to localhost services: use MCP from a gig for those)"`
-		TimeoutS      int64  `json:"timeout_s,omitempty" jsonschema:"Seconds, 10-3600 (default 300)"`
+		TimeoutS      int64  `json:"timeout_s,omitempty" jsonschema:"Seconds, 10-43200 (default 300; another value needs the run_timeout permission)"`
 		Output        string `json:"output,omitempty" jsonschema:"gigg (default: the last 64 KiB of output is kept with each run) or host (only exit code and timing reach gigg)"`
 		Unsandboxed   *bool  `json:"unsandboxed,omitempty" jsonschema:"Run outside the sandbox: needs the No-sandbox errands permission; any change by someone without it turns it off"`
 		ScheduleID    *int64 `json:"schedule_id,omitempty" jsonschema:"Use this schedule (see list_schedules) instead of freq/interval/..."`

@@ -601,6 +601,15 @@ func allowedAnywhere(p *access.Principal, perm string) error {
 	return errNoPermission(perm)
 }
 
+// timeoutChange: setting, changing or clearing a gig's (template's, recurring gig's) run timeout needs
+// the run_timeout permission.
+func timeoutChange(p *access.Principal, ws int64, old, new *int64) error {
+	if (old == nil && new == nil) || (old != nil && new != nil && *old == *new) {
+		return nil
+	}
+	return allowed(p, ws, "run_timeout")
+}
+
 // alwaysRunChange: setting or clearing always_run (skips the usage budget) needs the always_run permission.
 func alwaysRunChange(p *access.Principal, ws int64, old, new bool) error {
 	if old == new {

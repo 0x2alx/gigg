@@ -64,12 +64,13 @@ type templateBody struct {
 	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Gigs made from it run whatever the usage budget (needs the always_run permission)"`
 	AllowedTools  []string               `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its gigs get for the runner (permission rules); on update, omit to keep, [] clears. Needs the allowed_tools permission"`
 	AutoArchive   *int64                 `json:"auto_archive_minutes,omitempty" minimum:"5" maximum:"527040" doc:"Gigs made from it archive themselves this many minutes after done or cancelled (omit: never)"`
+	RunTimeout    *int64                 `json:"run_timeout_minutes,omitempty" minimum:"5" maximum:"300" doc:"Its gigs' run timeout in minutes (omit: the agent's default). Needs the run_timeout permission"`
 }
 
 func (b templateBody) apply(t *store.Template) {
 	t.ProjectID, t.Name, t.Title, t.DescriptionMD, t.Priority, t.Color = b.Project, b.Name, b.Title, b.DescriptionMD, b.Priority, b.Color
 	t.Labels, t.Assignees, t.Checklist, t.Custom, t.Subgigs = b.Labels, b.Assignees, b.Checklist, b.Custom, b.Subgigs
-	t.Model, t.Effort, t.AlwaysRun, t.AutoArchive = b.Model, b.Effort, b.AlwaysRun, b.AutoArchive
+	t.Model, t.Effort, t.AlwaysRun, t.AutoArchive, t.RunTimeout = b.Model, b.Effort, b.AlwaysRun, b.AutoArchive, b.RunTimeout
 	if b.AllowedTools != nil || t.ID == 0 {
 		t.AllowedTools = b.AllowedTools
 	}
@@ -495,6 +496,9 @@ func (a *API) registerItems() {
 		if err := alwaysRunChange(p, w.ID, false, in.Body.AlwaysRun); err != nil {
 			return nil, err
 		}
+		if err := timeoutChange(p, w.ID, nil, in.Body.RunTimeout); err != nil {
+			return nil, err
+		}
 		if err := toolsChange(p, w.ID, nil, in.Body.AllowedTools); err != nil {
 			return nil, err
 		}
@@ -603,6 +607,9 @@ func (a *API) registerItems() {
 			if err := toolsGuard(p, t.WorkspaceID, len(t.AllowedTools) > 0 || len(in.Body.AllowedTools) > 0); err != nil {
 				return nil, err
 			}
+			if err := timeoutChange(p, t.WorkspaceID, t.RunTimeout, in.Body.RunTimeout); err != nil {
+				return nil, err
+			}
 		}
 		in.Body.apply(t)
 		err = a.tx(ctx, func(tx *sql.Tx) error {
@@ -676,6 +683,9 @@ func (a *API) registerItems() {
 			}
 		}
 		if err := alwaysRunChange(p, pr.WorkspaceID, false, tpl.AlwaysRun); err != nil {
+			return nil, err
+		}
+		if err := timeoutChange(p, pr.WorkspaceID, nil, tpl.RunTimeout); err != nil {
 			return nil, err
 		}
 		if err := toolsChange(p, pr.WorkspaceID, nil, tpl.AllowedTools); err != nil {
