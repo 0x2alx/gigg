@@ -693,7 +693,7 @@ func DeleteErrand(ctx context.Context, q Q, a Actor, c *Errand) error {
 	if _, err := q.ExecContext(ctx, `UPDATE errands SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), c.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &c.WorkspaceID, nil, "cron.deleted", "errand", c.ID, map[string]any{"name": c.Name})
+	_, err := Activity(ctx, q, a, &c.WorkspaceID, nil, "errand.deleted", "errand", c.ID, map[string]any{"name": c.Name})
 	return err
 }
 
