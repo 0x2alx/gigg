@@ -187,7 +187,7 @@ type RelationIn struct {
 type GigCreate struct {
 	Checklist     []string               `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items to start with"`
 	Subgigs       []store.TemplateSubgig `json:"subgigs,omitempty" maxItems:"50" doc:"Subgigs to create with it, made like it (project, priority, assignees, window, run settings); blocks_parent = it waits for that subgig"`
-	Relations     []RelationIn           `json:"relations,omitempty" maxItems:"50" doc:"Dependencies to start with (needs the relations permission)"`
+	Relations     []RelationIn           `json:"relations,omitempty" maxItems:"50" doc:"Dependencies to start with (part of Edit gigs)"`
 	Custom        map[string]any         `json:"custom,omitempty" doc:"Custom field values by field id"`
 	Title         string                 `json:"title" minLength:"1" maxLength:"250"`
 	DescriptionMD string                 `json:"description_md,omitempty" maxLength:"65536"`
@@ -396,22 +396,11 @@ func (a *API) registerGigs() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Member, "gigs:write"); err != nil {
+		if err := require(p, pr.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if err := allowed(p, pr.WorkspaceID, "create_gigs"); err != nil {
 			return nil, err
-		}
-		if len(in.Body.Checklist) > 0 {
-			if err := allowed(p, pr.WorkspaceID, "checklists"); err != nil {
-				return nil, err
-			}
-		}
-		// a subgig that blocks its parent holds another gig back, like a dependency
-		if len(in.Body.Relations) > 0 || in.Body.BlocksParent || anyGate(in.Body.Subgigs) {
-			if err := allowed(p, pr.WorkspaceID, "relations"); err != nil {
-				return nil, err
-			}
 		}
 		b := in.Body
 		if err := alwaysRunChange(p, pr.WorkspaceID, false, b.AlwaysRun); err != nil {
@@ -509,7 +498,7 @@ func (a *API) registerGigs() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "patch-gig", Method: "PATCH", Path: "/gigs/{id}", Tags: []string{"gigs"},
 		Summary: "Change a gig's fields (null clears)"}, func(ctx context.Context, in *gigPatchIn) (*gigOut, error) {
-		return a.withGig(ctx, in.ID, in.IfMatch, access.Member, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {
+		return a.withGig(ctx, in.ID, in.IfMatch, access.Editor, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {
 			b := in.Body
 			if err := alwaysRunGuard(p, t.WorkspaceID, t.AlwaysRun); err != nil {
 				return nil, err
@@ -535,13 +524,6 @@ func (a *API) registerGigs() {
 					on = *v
 				}
 				patch.BlocksParent = &on
-			}
-			// switching a subgig's hold on its parent, or moving a holding subgig under another
-			// parent, is a dependency change
-			if (patch.BlocksParent != nil && *patch.BlocksParent != t.BlocksParent) || (b.ParentID.Set && t.BlocksParent) {
-				if err := allowed(p, t.WorkspaceID, "relations"); err != nil {
-					return nil, err
-				}
 			}
 			if b.Model.Set {
 				m := ""
@@ -606,7 +588,7 @@ func (a *API) registerGigs() {
 			}
 			if b.Project != 0 && b.Project != t.ProjectID {
 				// another project is a producer's edit (a new key, the target's statuses)
-				if err := require(p, t.WorkspaceID, access.Member, "gigs:write"); err != nil {
+				if err := require(p, t.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 					return nil, err
 				}
 				if !p.SeesProject(t.WorkspaceID, b.Project) {
@@ -633,7 +615,7 @@ func (a *API) registerGigs() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "clone-gig", Method: "POST", Path: "/gigs/{id}/clone", Tags: []string{"gigs"},
 		Summary: "Copy a gig (optionally into another project of the workspace)", DefaultStatus: 201}, func(ctx context.Context, in *gigCloneIn) (*gigOut, error) {
-		return a.withGig(ctx, in.ID, "", access.Member, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+		return a.withGig(ctx, in.ID, "", access.Editor, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if err := allowed(p, t.WorkspaceID, "create_gigs"); err != nil {
 				return nil, err
 			}
@@ -648,13 +630,12 @@ func (a *API) registerGigs() {
 			if p.Key != nil {
 				via = &p.Key.ID
 			}
-			// the checklist comes along when the caller may add one (as when creating a gig)
-			return store.CloneGig(ctx, tx, p.Actor(), t, proj, in.Body.Title, via, p.Allowed(t.WorkspaceID, "checklists"))
+			return store.CloneGig(ctx, tx, p.Actor(), t, proj, in.Body.Title, via)
 		})
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-gig", Method: "DELETE", Path: "/gigs/{id}", Tags: []string{"gigs"},
 		Summary: "Move a gig to the trash (restore with /restore)"}, func(ctx context.Context, in *gigPath) (*gigOut, error) {
-		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:delete", opTrashed, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+		return a.withGigOp(ctx, in.ID, "", access.Editor, "gigs:delete", opTrashed, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if err := allowed(p, t.WorkspaceID, "delete_gigs"); err != nil {
 				return nil, err
 			}
@@ -663,7 +644,7 @@ func (a *API) registerGigs() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "restore-gig", Method: "POST", Path: "/gigs/{id}/restore", Tags: []string{"gigs"},
 		Summary: "Restore a gig from the trash"}, func(ctx context.Context, in *gigPath) (*gigOut, error) {
-		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:delete", opTrashed|opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+		return a.withGigOp(ctx, in.ID, "", access.Editor, "gigs:delete", opTrashed|opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if err := allowed(p, t.WorkspaceID, "delete_gigs"); err != nil {
 				return nil, err
 			}
@@ -893,14 +874,4 @@ func (a *API) withGigOp(ctx context.Context, ref, ifm string, min, scope string,
 		return nil, err
 	}
 	return &gigOut{ETag: etag(out.Version), Body: out}, nil
-}
-
-// anyGate: some of these subgigs would hold their parent back (that needs the relations permission).
-func anyGate(subs []store.TemplateSubgig) bool {
-	for _, s := range subs {
-		if s.BlocksParent {
-			return true
-		}
-	}
-	return false
 }

@@ -123,7 +123,7 @@ func (a *API) registerSchedules() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, "schedules", "gigs:write"); err != nil {
+		if err := require(p, w.ID, "recurring_gigs", "gigs:write"); err != nil {
 			return nil, err
 		}
 		s := &store.Schedule{WorkspaceID: w.ID}
@@ -243,7 +243,7 @@ func (a *API) registerSchedules() {
 			}
 			return &scheduleOut{ETag: etag(s.Version), Body: s}, nil
 		}
-		if err := require(p, s.WorkspaceID, "schedules", "gigs:write"); err != nil {
+		if err := require(p, s.WorkspaceID, "recurring_gigs", "gigs:write"); err != nil {
 			return nil, err
 		}
 		if a.scheduleUsedOutside(ctx, p, s.ID) {
@@ -305,7 +305,7 @@ func (a *API) registerSchedules() {
 			if err := sharedScheduleWrite(p, s); err != nil {
 				return nil, err
 			}
-		} else if err := require(p, s.WorkspaceID, "schedules", "gigs:write"); err != nil {
+		} else if err := require(p, s.WorkspaceID, "recurring_gigs", "gigs:write"); err != nil {
 			return nil, err
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteSchedule(ctx, tx, p.Actor(), s) })

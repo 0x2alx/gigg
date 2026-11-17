@@ -116,16 +116,16 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 				return toolResult(call("POST", "/me/notifications/read", nil, b))
 			})
 	}
-	// ticking needs gigs:work and Work on gigs; adding and removing items gigs:write and Checklists
+	// ticking needs gigs:work and Work on gigs; adding and removing items gigs:write and Edit gigs
 	canTick := has("gigs:work") && p.AllowedAnywhere("work_gigs")
-	canItems := has("gigs:write") && p.AllowedAnywhere("checklists")
+	canItems := has("gigs:write") && p.AllowedAnywhere("edit_gigs")
 	if !has("gigs:write") {
 		if canTick {
 			addChecklistTool(s, call)
 		}
 		return
 	}
-	if p.AllowedAnywhere("relations") {
+	if p.AllowedAnywhere("edit_gigs") {
 		mcp.AddTool(s, &mcp.Tool{Name: "link_gigs", Description: "Add a dependency: blocks, blocked_by or relates. A blocked gig isn't handed out by claim until its blockers are done.", Annotations: rw("Link gigs", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in linkArgs) (*mcp.CallToolResult, any, error) {
 				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/relations", nil, map[string]any{"gig": in.Other, "direction": in.Direction}))
@@ -208,7 +208,7 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 // addChecklistTool: update_checklist; the API answers each part with its own permission.
 func addChecklistTool(s *mcp.Server, call apiCall) {
 	t := url.PathEscape
-	mcp.AddTool(s, &mcp.Tool{Name: "update_checklist", Description: "Tick or untick checklist items (Work on gigs), or add and remove them (Checklists), in one call; returns the checklist.", Annotations: rw("Update checklist", false)},
+	mcp.AddTool(s, &mcp.Tool{Name: "update_checklist", Description: "Tick or untick checklist items (Work on gigs), or add and remove them (Edit gigs), in one call; returns the checklist.", Annotations: rw("Update checklist", false)},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in checklistArgs) (*mcp.CallToolResult, any, error) {
 			if len(in.Add) > 0 {
 				if code, body := call("POST", "/gigs/"+t(in.Gig)+"/checklist", nil, map[string]any{"items": in.Add}); code >= 300 {

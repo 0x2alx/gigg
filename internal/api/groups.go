@@ -21,7 +21,7 @@ type groupOut struct {
 // RuleBody sets one rule: a preset and/or overrides at one level.
 type RuleBody struct {
 	WorkspaceID *int64          `json:"workspace_id" doc:"The workspace, or null for all workspaces (future ones too)"`
-	Preset      string          `json:"preset,omitempty" enum:",viewer,commenter,member,manager" doc:"Fills in permissions; empty = none"`
+	Preset      string          `json:"preset,omitempty" enum:",viewer,consumer,member,manager" doc:"Fills in permissions; empty = none"`
 	Overrides   map[string]bool `json:"overrides,omitempty" doc:"permission -> true (allow) or false (deny); absent = the preset decides, else inherit"`
 }
 

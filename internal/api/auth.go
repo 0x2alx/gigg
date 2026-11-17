@@ -41,7 +41,7 @@ type WorkspaceAccess struct {
 	Color *string `json:"color"`
 	// OwnerID: the user the workspace belongs to (display only), or null.
 	OwnerID *int64 `json:"owner_id"`
-	Role    string `json:"role" enum:"viewer,commenter,member,manager,admin" doc:"The closest preset to what the caller may do here (display only)"`
+	Role    string `json:"role" enum:"viewer,consumer,member,manager,admin" doc:"The closest preset to what the caller may do here (display only)"`
 	// Permissions held here (see GET /permissions), after the key's limits.
 	Permissions []string `json:"permissions"`
 }

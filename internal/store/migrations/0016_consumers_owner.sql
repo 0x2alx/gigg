@@ -1,4 +1,4 @@
--- 0016: Work on gigs, and the workspace owner as the default assignee.
+-- 0016: Work on gigs, a tidier permission list, and the workspace owner as the default assignee.
 --
 -- work_gigs (scope gigs:work) is a consumer's share of what edit_gigs (gigs:write) used to cover:
 -- status moves inside the project, ticking checklist items, resume requests, claims and runs.
@@ -15,6 +15,56 @@ UPDATE api_keys
    SET scopes = json_insert(scopes, '$[#]', 'gigs:work')
  WHERE EXISTS (SELECT 1 FROM json_each(api_keys.scopes) WHERE value = 'gigs:write')
    AND NOT EXISTS (SELECT 1 FROM json_each(api_keys.scopes) WHERE value = 'gigs:work');
+
+-- The permission list, tidied (what each rule allows stays the same, except as noted):
+--   - the presets are viewer, consumer, member and manager: "commenter" is gone, and its rules become
+--     viewer plus Comment (consumer is new; manager also gets errands, pause_runs and the run
+--     settings, which widens it on purpose);
+--   - "schedules" is called "recurring_gigs", which is what it covers;
+--   - "checklists" and "relations" fold into edit_gigs: a rule that denied either now denies
+--     edit_gigs (a merged permission is allowed only where all its parts were);
+--   - the scope artifacts:write, which no endpoint ever checked, is dropped from keys.
+-- The table is rebuilt for the preset CHECK (migrations run with foreign keys off; nothing refers
+-- to access_rules).
+CREATE TABLE access_rules_new (
+  id            INTEGER PRIMARY KEY,
+  user_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  group_id      INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+  workspace_id  INTEGER REFERENCES workspaces(id) ON DELETE CASCADE, -- NULL: all workspaces, future ones too
+  preset        TEXT NOT NULL DEFAULT '' CHECK (preset IN ('', 'viewer', 'consumer', 'member', 'manager')),
+  overrides     TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(overrides) AND json_type(overrides) = 'object'),
+  created_at    INTEGER NOT NULL,
+  CHECK ((user_id IS NULL) != (group_id IS NULL))
+) STRICT;
+INSERT INTO access_rules_new (id, user_id, group_id, workspace_id, preset, overrides, created_at)
+SELECT id, user_id, group_id, workspace_id,
+       CASE preset WHEN 'commenter' THEN 'viewer' ELSE preset END,
+       CASE WHEN preset = 'commenter' AND json_type(overrides, '$.comment') IS NULL
+            THEN json_set(overrides, '$.comment', json('true')) ELSE overrides END,
+       created_at
+  FROM access_rules;
+DROP TABLE access_rules;
+ALTER TABLE access_rules_new RENAME TO access_rules;
+CREATE UNIQUE INDEX access_rules_key ON access_rules(IFNULL(user_id, 0), IFNULL(group_id, 0), IFNULL(workspace_id, 0));
+CREATE INDEX access_rules_user ON access_rules(user_id);
+CREATE INDEX access_rules_group ON access_rules(group_id);
+CREATE INDEX access_rules_ws ON access_rules(workspace_id);
+
+UPDATE access_rules
+   SET overrides = json_remove(json_set(overrides, '$.recurring_gigs',
+         CASE json_type(overrides, '$.schedules') WHEN 'true' THEN json('true') ELSE json('false') END), '$.schedules')
+ WHERE json_type(overrides, '$.schedules') IN ('true', 'false');
+
+UPDATE access_rules
+   SET overrides = json_set(overrides, '$.edit_gigs', json('false'))
+ WHERE json_type(overrides, '$.checklists') = 'false' OR json_type(overrides, '$.relations') = 'false';
+UPDATE access_rules
+   SET overrides = json_remove(overrides, '$.checklists', '$.relations')
+ WHERE json_type(overrides, '$.checklists') IS NOT NULL OR json_type(overrides, '$.relations') IS NOT NULL;
+
+UPDATE api_keys
+   SET scopes = (SELECT json_group_array(value) FROM json_each(api_keys.scopes) WHERE value != 'artifacts:write')
+ WHERE EXISTS (SELECT 1 FROM json_each(api_keys.scopes) WHERE value = 'artifacts:write');
 
 -- A gig, workspace template or recurring gig created with nobody assigned now gets the workspace's
 -- owner. The ones made before get it here, once: open gigs (not done, cancelled, trashed or archived)

@@ -38,7 +38,7 @@ func addScheduleTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(
 				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/schedules", nil, nil))
 			})
 	}
-	if !p.HasScope("gigs:write") || !p.AllowedAnywhere("schedules") {
+	if !p.HasScope("gigs:write") || !p.AllowedAnywhere("recurring_gigs") {
 		return
 	}
 	mcp.AddTool(s, &mcp.Tool{Name: "save_schedule", Description: "Make a schedule, or change one (id): every recurring gig on it moves to the new timing.", Annotations: rw("Save schedule", false)},

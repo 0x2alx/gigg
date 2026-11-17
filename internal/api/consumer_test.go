@@ -17,7 +17,7 @@ func TestConsumerKey(t *testing.T) {
 	ws, pid, p2 := e.ids["scout.ws"], e.ids["scout.p"], e.ids["scout.p2"]
 	// a consumer agent: member, minus the producer's permissions
 	code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member",
-		"overrides":{"edit_gigs":false,"delete_gigs":false,"archive_gigs":false,"relations":false,"checklists":false,"create_gigs":false}}`, ws), ada)
+		"overrides":{"edit_gigs":false,"delete_gigs":false,"archive_gigs":false,"create_gigs":false}}`, ws), ada)
 	e.ok(code, out, 200)
 	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"consumer","user_id":%d,"workspace":"scout",
 		"scopes":["workspace:read","gigs:read","gigs:work","comments:read","comments:write","runs:write"],"allowed_listeners":["internal"]}`, e.ids["scout.user"]), ada)

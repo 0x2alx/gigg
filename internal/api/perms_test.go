@@ -22,11 +22,11 @@ func TestAccess(t *testing.T) {
 		t.Fatalf("member one-off gig: %d %s", code, out)
 	}
 	code, out, _ := e.req("POST", sched, body, scout)
-	if code != 403 || !strings.Contains(string(out), "schedules") {
+	if code != 403 || !strings.Contains(string(out), "recurring_gigs") {
 		t.Fatalf("member schedule: %d %s", code, out)
 	}
 	code, out, _ = e.req("GET", "/auth/me", "", scout)
-	if code != 200 || strings.Contains(string(out), `"schedules"`) || !strings.Contains(string(out), `"create_gigs"`) || !strings.Contains(string(out), `"role":"member"`) {
+	if code != 200 || strings.Contains(string(out), `"recurring_gigs"`) || !strings.Contains(string(out), `"create_gigs"`) || !strings.Contains(string(out), `"role":"member"`) {
 		t.Fatalf("me permissions: %s", out)
 	}
 	code, out, _ = e.req("GET", "/permissions", "", scout)
@@ -42,7 +42,7 @@ func TestAccess(t *testing.T) {
 	}
 	_ = json.Unmarshal(out, &g)
 	gAccess := fmt.Sprintf("/groups/%d/access", g.ID)
-	code, out, _ = e.req("PUT", gAccess, `{"workspace_id":null,"overrides":{"schedules":true}}`, e.ada())
+	code, out, _ = e.req("PUT", gAccess, `{"workspace_id":null,"overrides":{"recurring_gigs":true}}`, e.ada())
 	if code != 200 || !strings.Contains(string(out), `"rules":[{`) {
 		t.Fatalf("group rule: %d %s", code, out)
 	}
@@ -51,16 +51,16 @@ func TestAccess(t *testing.T) {
 	}
 	// the user's own all-workspaces deny beats the group's allow
 	uAccess := fmt.Sprintf("/users/%d/access", e.ids["scout.user"])
-	code, out, _ = e.req("PUT", uAccess, `{"workspace_id":null,"overrides":{"schedules":false}}`, e.ada())
+	code, out, _ = e.req("PUT", uAccess, `{"workspace_id":null,"overrides":{"recurring_gigs":false}}`, e.ada())
 	e.ok(code, out, 200)
-	if !strings.Contains(string(out), `"name":"schedules","allowed":false,"source":"user_all"`) || !strings.Contains(string(out), `"planners"`) {
+	if !strings.Contains(string(out), `"name":"recurring_gigs","allowed":false,"source":"user_all"`) || !strings.Contains(string(out), `"planners"`) {
 		t.Fatalf("resolved access: %s", out)
 	}
 	if code, _, _ := e.req("POST", sched, body, scout); code != 403 {
 		t.Fatalf("user deny over group allow: %d", code)
 	}
 	// and the user's rule for this workspace beats their all-workspaces rule
-	code, out, _ = e.req("PUT", uAccess, fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"schedules":true}}`, ws), e.ada())
+	code, out, _ = e.req("PUT", uAccess, fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"recurring_gigs":true}}`, ws), e.ada())
 	e.ok(code, out, 200)
 	if code, out, _ := e.req("POST", sched, body, scout); code != 201 {
 		t.Fatalf("workspace allow over all-workspaces deny: %d %s", code, out)
@@ -78,7 +78,7 @@ func TestAccess(t *testing.T) {
 	if code, _, _ := e.req("GET", newGig, "", scout); code != 404 {
 		t.Fatalf("no rule, no workspace: %d", code)
 	}
-	e.req("PUT", gAccess, `{"workspace_id":null,"preset":"viewer","overrides":{"schedules":true}}`, e.ada())
+	e.req("PUT", gAccess, `{"workspace_id":null,"preset":"viewer","overrides":{"recurring_gigs":true}}`, e.ada())
 	if code, _, _ := e.req("GET", newGig, "", scout); code != 200 {
 		t.Fatalf("viewer through the group: %d", code)
 	}

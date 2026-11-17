@@ -157,10 +157,7 @@ func (a *API) registerItems() {
 		return items(vis), nil
 	})
 	link := func(ctx context.Context, id, other, dir string, del bool) (*gigOut, error) {
-		return a.withGigOp(ctx, id, "", access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
-			if err := allowed(p, t.WorkspaceID, "relations"); err != nil {
-				return nil, err
-			}
+		return a.withGigOp(ctx, id, "", access.Editor, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			o, err := a.gig(ctx, p, other)
 			if err != nil {
 				return nil, store.Invalid("no such gig %q", other)
@@ -223,10 +220,7 @@ func (a *API) registerItems() {
 			Items []string `json:"items" minItems:"1" maxItems:"200"`
 		}
 	}) (*gigOut, error) {
-		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
-			if err := allowed(p, t.WorkspaceID, "checklists"); err != nil {
-				return nil, err
-			}
+		return a.withGigOp(ctx, in.ID, "", access.Editor, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if err := store.AddChecklistItems(ctx, tx, p.Actor(), t, in.Body.Items); err != nil {
 				return nil, err
 			}
@@ -243,19 +237,14 @@ func (a *API) registerItems() {
 			After *int64  `json:"after,omitempty" doc:"Move after this item id (0 = top)"`
 		}
 	}) (*gigOut, error) {
-		// ticking is a consumer's action (Work on gigs); text and order are a producer's (Checklists)
+		// ticking is a consumer's action (Work on gigs); text and order are a producer's (Edit gigs)
 		edit := in.Body.Text != nil || in.Body.After != nil
 		// (ticking an always-run gig or one with tools doesn't change how it runs: no guard)
 		min, scope, op := access.Worker, "gigs:work", opEdit
 		if edit {
-			min, scope, op = access.Member, "gigs:write", opGuarded
+			min, scope, op = access.Editor, "gigs:write", opGuarded
 		}
 		return a.withGigOp(ctx, in.ID, "", min, scope, op, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
-			if edit {
-				if err := allowed(p, t.WorkspaceID, "checklists"); err != nil {
-					return nil, err
-				}
-			}
 			if in.Body.Done != nil {
 				if err := require(p, t.WorkspaceID, access.Worker, "gigs:work"); err != nil {
 					return nil, err
@@ -269,10 +258,7 @@ func (a *API) registerItems() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-checklist-item", Method: "DELETE", Path: "/gigs/{id}/checklist/{item}", Tags: []string{"gigs"},
 		Summary: "Remove a checklist item"}, func(ctx context.Context, in *checklistItemPath) (*gigOut, error) {
-		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
-			if err := allowed(p, t.WorkspaceID, "checklists"); err != nil {
-				return nil, err
-			}
+		return a.withGigOp(ctx, in.ID, "", access.Editor, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if err := store.DeleteChecklistItem(ctx, tx, p.Actor(), t, in.Item); err != nil {
 				return nil, err
 			}
@@ -289,7 +275,7 @@ func (a *API) registerItems() {
 		}
 		huma.Register(a.h, huma.Operation{OperationID: op, Method: "POST", Path: path, Tags: []string{"gigs"}, Summary: sum},
 			func(ctx context.Context, in *gigPath) (*gigOut, error) {
-				return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:write", archiveOp(arch), func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+				return a.withGigOp(ctx, in.ID, "", access.Editor, "gigs:write", archiveOp(arch), func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 					if err := allowed(p, t.WorkspaceID, "archive_gigs"); err != nil {
 						return nil, err
 					}
@@ -317,7 +303,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Member, "gigs:write"); err != nil {
+		if err := require(p, pr.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if err := allowed(p, pr.WorkspaceID, "archive_gigs"); err != nil {
@@ -441,7 +427,7 @@ func (a *API) registerItems() {
 			Values map[string]any `json:"values"`
 		}
 	}) (*gigOut, error) {
-		return a.withGigOp(ctx, in.ID, in.IfMatch, access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {
+		return a.withGigOp(ctx, in.ID, in.IfMatch, access.Editor, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {
 			if v != 0 && v != t.Version {
 				return nil, store.ErrVersion
 			}
@@ -495,7 +481,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Member, "gigs:write"); err != nil {
+		if err := require(p, w.ID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if in.Body.Project != nil && !p.SeesProject(w.ID, *in.Body.Project) {
@@ -598,7 +584,7 @@ func (a *API) registerItems() {
 				return nil, err
 			}
 		} else {
-			if err := require(p, t.WorkspaceID, access.Member, "gigs:write"); err != nil {
+			if err := require(p, t.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 				return nil, err
 			}
 			if in.Body.Project != nil && !p.SeesProject(t.WorkspaceID, *in.Body.Project) {
@@ -650,7 +636,7 @@ func (a *API) registerItems() {
 			}
 			return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteTemplate(ctx, tx, p.Actor(), t) })
 		}
-		if err := require(p, t.WorkspaceID, access.Member, "gigs:write"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if p.Narrowed() && t.ProjectID == nil {
@@ -681,21 +667,11 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Member, "gigs:write"); err != nil {
+		if err := require(p, pr.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if err := allowed(p, pr.WorkspaceID, "create_gigs"); err != nil {
 			return nil, err
-		}
-		if len(tpl.Checklist) > 0 {
-			if err := allowed(p, pr.WorkspaceID, "checklists"); err != nil {
-				return nil, err
-			}
-		}
-		if anyGate(tpl.Subgigs) {
-			if err := allowed(p, pr.WorkspaceID, "relations"); err != nil {
-				return nil, err
-			}
 		}
 		if err := alwaysRunChange(p, pr.WorkspaceID, false, tpl.AlwaysRun); err != nil {
 			return nil, err

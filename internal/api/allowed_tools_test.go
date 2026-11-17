@@ -64,8 +64,8 @@ func TestAllowedTools(t *testing.T) {
 	}
 	e.req("POST", fmt.Sprintf("/gigs/%d/move", id(out)), `{"category":"done"}`, ada)
 
-	// templates and recurring gigs (scout as a manager: templates and schedules, but no allowed_tools)
-	code, out, _ = e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"manager"}`, ws), ada)
+	// templates and recurring gigs (scout as a manager without allowed_tools)
+	code, out, _ = e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"manager","overrides":{"allowed_tools":false}}`, ws), ada)
 	e.ok(code, out, 200)
 	code, out, _ = e.req("POST", "/workspaces/scout/templates", `{"name":"Brief","title":"Morning brief","allowed_tools":["Read","WebFetch(domain:example.com)"]}`, scout)
 	denied("template create", code, out)
@@ -247,7 +247,7 @@ func TestGuardsEverywhere(t *testing.T) {
 		ScheduleID int64 `json:"schedule_id"`
 	}
 	_ = json.Unmarshal(out, &rec)
-	code, out, _ = e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"manager"}`, e.ids["scout.ws"]), ada)
+	code, out, _ = e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"manager","overrides":{"always_run":false}}`, e.ids["scout.ws"]), ada)
 	e.ok(code, out, 200)
 	code, out, _ = e.req("PUT", fmt.Sprintf("/schedules/%d", rec.ScheduleID), `{"name":"x","freq":"daily","tz":"UTC","window_start":"03:00","window_minutes":60}`, scout)
 	denied("schedule edit", code, out)

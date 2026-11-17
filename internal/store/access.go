@@ -34,36 +34,39 @@ var Permissions = []Permission{
 	{"view", "See the workspace", "See the workspace, its projects, gigs, comments and runs. Every other permission needs it.", "Basics"},
 	{"comment", "Comment", "Write comments and edit or delete your own.", "Basics"},
 	{"work_gigs", "Work on gigs", "Move gigs between statuses of their project, tick checklist items, ask for a resume; claim gigs assigned to you and report runs (agents).", "Gigs"},
-	{"edit_gigs", "Edit gigs", "Change and assign gigs: title, description, dates, labels, run settings; move them to another project.", "Gigs"},
+	{"edit_gigs", "Edit gigs", "Change and assign gigs: title, description, dates, labels, run settings, checklist items and dependencies; move them to another project.", "Gigs"},
 	{"create_gigs", "Create gigs", "Create one-off gigs, clone gigs, and create gigs from templates (with Edit gigs).", "Gigs"},
 	{"delete_gigs", "Delete gigs", "Move gigs to the trash and restore them (with Edit gigs).", "Gigs"},
 	{"archive_gigs", "Archive gigs", "Archive and unarchive gigs (with Edit gigs).", "Gigs"},
-	{"relations", "Dependencies", "Add and remove blocking/related links between gigs (with Edit gigs).", "Gigs"},
-	{"checklists", "Checklists", "Add, edit, reorder and remove checklist items (with Edit gigs). Ticking them is Work on gigs.", "Gigs"},
 	{"always_run", "Always-run gigs", "Mark gigs to run whatever the usage budget (cron-like gigs). The gig cap and pauses still apply.", "Runner"},
 	{"run_timeout", "Run timeouts", "Set how long an agent may run on a gig (templates and recurring gigs too) or how long an errand may run, instead of the default. The agent's host caps it.", "Runner"},
 	{"allowed_tools", "Gig tool allowlists", "Give gigs (templates, recurring gigs) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change gigs that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner"},
 	{"errands", "Errands", "Create, change, pause and delete errands (commands an agent's executor runs on a schedule, sandboxed) and errand templates. An errand's worker is yourself, or any agent with Manage the workspace.", "Runner"},
 	{"errand_unsandboxed", "No-sandbox errands", "Let an errand run outside its agent's sandbox. Any change to such an errand by someone without this permission turns its sandbox back on.", "Runner"},
 	{"pause_runs", "Pause gig runs", "Pause and resume new agent gig runs and errand runs; with an all-workspaces rule, every workspace at once. Changing the caps stays with admins.", "Runner"},
-	{"schedules", "Recurring gigs", "Create, change, pause and stop recurring gig schedules (with Edit gigs; they make gigs with Create gigs).", "Planning"},
+	{"recurring_gigs", "Recurring gigs", "Create, change, pause and stop recurring gigs (with Edit gigs; they make gigs with Create gigs).", "Planning"},
 	{"templates", "Gig templates", "Create, change and delete gig templates, with Edit gigs (using one only needs Create gigs).", "Planning"},
 	{"custom_fields", "Custom fields", "Define the workspace's custom fields.", "Planning"},
 	{"saved_filters", "Saved filters", "Save personal filtered views.", "Planning"},
 	{"manage_workspace", "Manage the workspace", "Projects, columns, sections and labels, and other people's comments.", "Admin"},
 }
 
-// Presets fill in permissions; roles are presets.
+// Presets fill in permissions; roles are presets. Each one includes the one before it:
+//   - viewer sees, and changes nothing;
+//   - consumer works on what it's given: comments, status moves, ticks, claims and runs;
+//   - member also makes and shapes gigs;
+//   - manager also runs the workspace (planning, errands, runner settings). No-sandbox errands stay
+//     a grant of their own, and admins are above every preset.
 var Presets = map[string][]string{
-	"viewer":    {"view"},
-	"commenter": {"view", "comment"},
-	"member":    {"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "saved_filters"},
-	"manager": {"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "saved_filters",
-		"schedules", "templates", "custom_fields", "manage_workspace"},
+	"viewer":   {"view"},
+	"consumer": {"view", "comment", "work_gigs"},
+	"member":   {"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "saved_filters"},
+	"manager": {"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "saved_filters",
+		"recurring_gigs", "templates", "custom_fields", "manage_workspace", "errands", "pause_runs", "always_run", "run_timeout", "allowed_tools"},
 }
 
 // Roles (presets) in increasing order of power.
-var Roles = []string{"viewer", "commenter", "member", "manager"}
+var Roles = []string{"viewer", "consumer", "member", "manager"}
 
 // ValidRole reports a preset name.
 func ValidRole(r string) bool { return slices.Contains(Roles, r) }
@@ -288,8 +291,8 @@ func RoleLabel(admin bool, perms []string) string {
 		return "manager"
 	case slices.Contains(perms, "edit_gigs"):
 		return "member"
-	case slices.Contains(perms, "comment"):
-		return "commenter"
+	case slices.Contains(perms, "work_gigs"):
+		return "consumer"
 	case slices.Contains(perms, "view"):
 		return "viewer"
 	}
@@ -416,7 +419,7 @@ func SetRule(ctx context.Context, q Q, a Actor, subject string, id int64, ws *in
 		return Invalid("subject is user or group")
 	}
 	if preset != "" && !ValidRole(preset) {
-		return Invalid("preset is viewer, commenter, member, manager or empty")
+		return Invalid("preset is viewer, consumer, member, manager or empty")
 	}
 	for name := range overrides {
 		if !ValidPermission(name) {
@@ -456,7 +459,7 @@ func SetRule(ctx context.Context, q Q, a Actor, subject string, id int64, ws *in
 // removes their own rule for the workspace (access from groups or all-workspace rules remains).
 func SetMembership(ctx context.Context, q Q, a Actor, ws, user int64, role string) error {
 	if role != "" && !ValidRole(role) {
-		return Invalid("role is viewer, commenter, member or manager")
+		return Invalid("role is viewer, consumer, member or manager")
 	}
 	ov := map[string]bool{}
 	if role != "" {

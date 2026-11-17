@@ -100,7 +100,7 @@ type memberPutIn struct {
 	WS   string `path:"ws"`
 	User int64  `path:"user"`
 	Body struct {
-		Role string `json:"role" enum:"viewer,commenter,member,manager"`
+		Role string `json:"role" enum:"viewer,consumer,member,manager"`
 	}
 }
 

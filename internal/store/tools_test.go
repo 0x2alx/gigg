@@ -46,7 +46,7 @@ func TestSchedulerNeedsToolsPermission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := SetRule(ctx, s.W, a, "user", u.ID, &w.ID, "manager", nil); err != nil {
+	if err := SetRule(ctx, s.W, a, "user", u.ID, &w.ID, "manager", map[string]bool{"allowed_tools": false}); err != nil {
 		t.Fatal(err)
 	}
 	r := &Recurrence{WorkspaceID: w.ID, CreatedBy: u.ID, AllowedTools: []string{"Read"}}

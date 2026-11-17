@@ -1204,10 +1204,10 @@ func MoveGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, m Move) (*
 
 // CloneGig copies a gig into a project of the same workspace (default: its own), at the bottom of
 // the target's default status. Title, description, priority, colour, dates, labels, assignees, model,
-// effort and custom field values are copied, and with checklist the checklist (every item unticked);
+// effort and custom field values are copied, and the checklist (every item unticked);
 // always_run and allowed_tools are not (setting those needs their own permissions), nor subgigs,
 // dependencies, comments or runs.
-func CloneGig(ctx context.Context, q Q, a Actor, t *Gig, project *int64, title *string, viaKey *int64, checklist bool) (*Gig, error) {
+func CloneGig(ctx context.Context, q Q, a Actor, t *Gig, project *int64, title *string, viaKey *int64) (*Gig, error) {
 	n := NewGig{ProjectID: t.ProjectID, Title: t.Title, DescriptionMD: t.DescriptionMD, Priority: t.Priority, Color: t.Color, Model: t.Model, Effort: t.Effort,
 		StartAt: t.StartAt, DueAt: t.DueAt, Assignees: t.Assignees, ClonedFromID: &t.ID, CreatedViaKey: viaKey, AutoArchive: t.AutoArchive}
 	if project != nil {
@@ -1229,14 +1229,12 @@ func CloneGig(ctx context.Context, q Q, a Actor, t *Gig, project *int64, title *
 		return nil, err
 	}
 	var items []string
-	if checklist {
-		ck, err := Checklist(ctx, q, t.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, it := range ck {
-			items = append(items, it.Text)
-		}
+	ck, err := Checklist(ctx, q, t.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, it := range ck {
+		items = append(items, it.Text)
 	}
 	if len(items) == 0 && len(t.Custom) == 0 {
 		return c, nil

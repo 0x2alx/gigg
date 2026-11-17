@@ -125,7 +125,7 @@ func TestMCP(t *testing.T) {
 	}
 
 	// schedules need the permission (not in the member preset): allow it for scout
-	if code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), `{"workspace_id":null,"overrides":{"schedules":true}}`, e.ada()); code != 200 {
+	if code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), `{"workspace_id":null,"overrides":{"recurring_gigs":true}}`, e.ada()); code != 200 {
 		t.Fatalf("grant: %d %s", code, out)
 	}
 	s.Close()
@@ -243,7 +243,7 @@ func TestMCPNoCreate(t *testing.T) {
 		t.Fatalf("deny: %d %s", code, out)
 	}
 	// a consumer agent's MCP key: errands read-only
-	body := fmt.Sprintf(`{"name":"mcp","user_id":%d,"workspace":"scout","scopes":["workspace:read","gigs:read","gigs:work","gigs:write","comments:read","comments:write","artifacts:write","runs:write","profile:write","errands:read","errands:output"],"allowed_listeners":["internal"]}`, e.ids["scout.user"])
+	body := fmt.Sprintf(`{"name":"mcp","user_id":%d,"workspace":"scout","scopes":["workspace:read","gigs:read","gigs:work","gigs:write","comments:read","comments:write","runs:write","profile:write","errands:read","errands:output"],"allowed_listeners":["internal"]}`, e.ids["scout.user"])
 	code, out, _ := e.req("POST", "/keys", body, e.ada())
 	if code != 201 {
 		t.Fatalf("mcp key: %d %s", code, out)

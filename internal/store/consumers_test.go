@@ -4,11 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"slices"
+	"strconv"
 	"testing"
 )
 
 // TestConsumersMigration: 0016 gives work_gigs wherever a rule says something about edit_gigs and
-// gigs:work to every key with gigs:write, and assigns the workspace owner to open gigs, workspace
+// gigs:work to every key with gigs:write; turns commenter rules into viewer + comment, renames
+// schedules to recurring_gigs, folds a checklists or relations deny into edit_gigs and drops
+// artifacts:write; and assigns the workspace owner to open gigs, workspace
 // templates and recurring gigs on a shared template that had nobody (not to done gigs, not where the
 // owner can't be assigned).
 func TestConsumersMigration(t *testing.T) {
@@ -103,6 +106,11 @@ func TestConsumersMigration(t *testing.T) {
 		`INSERT INTO access_rules (user_id, workspace_id, preset, overrides, created_at) VALUES (?1, ?4, 'member', '{"edit_gigs":false,"delete_gigs":false}', 1)`,
 		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('w', 'gk_w', x'00', ?3, ?2, '["gigs:read","gigs:write"]', 9000000000000, 1)`,
 		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('r', 'gk_r', x'00', ?3, ?2, '["gigs:read"]', 9000000000000, 1)`,
+		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('a', 'gk_a', x'00', ?3, ?2, '["artifacts:write","gigs:read"]', 9000000000000, 1)`,
+		`INSERT INTO groups (id, name, created_at) VALUES (90, 'g', 1)`,
+		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?4, 'commenter', '{}', 1)`,
+		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?2, 'member', '{"schedules":true,"checklists":false,"relations":true}', 1)`,
+		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, NULL, 'manager', '{"schedules":false}', 1)`,
 	} {
 		if _, err := s.W.ExecContext(ctx, q, deny, ws2, own, ws); err != nil {
 			t.Fatalf("%s: %v", q, err)
@@ -119,6 +127,22 @@ func TestConsumersMigration(t *testing.T) {
 	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'r'`).Scan(&scopesR))
 	if overrides != `{"edit_gigs":false,"delete_gigs":false,"work_gigs":false}` || scopesW != `["gigs:read","gigs:write","gigs:work"]` || scopesR != `["gigs:read"]` {
 		t.Fatalf("rules and keys: %s %s %s", overrides, scopesW, scopesR)
+	}
+	for _, c := range []struct{ where, want string }{
+		{"workspace_id = " + strconv.FormatInt(ws, 10), `viewer {"comment":true}`},
+		{"workspace_id = " + strconv.FormatInt(ws2, 10), `member {"recurring_gigs":true,"edit_gigs":false}`},
+		{"workspace_id IS NULL", `manager {"recurring_gigs":false}`},
+	} {
+		var preset, ov string
+		must(t, s.R.QueryRowContext(ctx, `SELECT preset, overrides FROM access_rules WHERE group_id = 90 AND `+c.where).Scan(&preset, &ov))
+		if preset+" "+ov != c.want {
+			t.Fatalf("group rule %s: %s %s, want %s", c.where, preset, ov, c.want)
+		}
+	}
+	var scopesA string
+	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'a'`).Scan(&scopesA))
+	if scopesA != `["gigs:read"]` {
+		t.Fatalf("artifacts:write left: %s", scopesA)
 	}
 	g, err := GetGig(ctx, s.R, open)
 	must(t, err)

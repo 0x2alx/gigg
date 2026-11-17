@@ -567,7 +567,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/recurrences", q, nil))
 			})
 	}
-	if has("gigs:write") && p.AllowedAnywhere("schedules") {
+	if has("gigs:write") && p.AllowedAnywhere("recurring_gigs") {
 		mcp.AddTool(s, &mcp.Tool{Name: "create_recurring", Description: "Create a recurring gig: a template (template_id, or the gig content given here, saved as a new template) on a schedule (schedule_id, or the timing given here; an identical schedule is reused, else one is made). Every day/week/month gigg creates a gig whose start is the window opening and whose due/not_after is the window closing. Untouched gigs are marked missed when the window closes; claim never hands one out outside its window.", Annotations: rw("Create recurring gig", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in recArgs) (*mcp.CallToolResult, any, error) {
 				return toolResult(call("POST", fmt.Sprintf("/projects/%d/recurrences", in.Project), nil, in.merge(map[string]any{})))

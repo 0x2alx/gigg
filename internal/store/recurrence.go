@@ -792,7 +792,7 @@ func schedulerMayRun(ctx context.Context, q Q, r *Recurrence) bool {
 	if err != nil || u.Disabled {
 		return false
 	}
-	return g.Has(r.WorkspaceID, "schedules") && g.Has(r.WorkspaceID, "create_gigs") && g.Has(r.WorkspaceID, "edit_gigs") &&
+	return g.Has(r.WorkspaceID, "recurring_gigs") && g.Has(r.WorkspaceID, "create_gigs") && g.Has(r.WorkspaceID, "edit_gigs") &&
 		(!r.AlwaysRun || g.Has(r.WorkspaceID, "always_run")) && (len(r.AllowedTools) == 0 || g.Has(r.WorkspaceID, "allowed_tools"))
 }
 

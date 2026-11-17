@@ -35,7 +35,7 @@ func TestRecurringAPI(t *testing.T) {
 		return r
 	}
 	// scout may run schedules, not edit templates
-	code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"schedules":true}}`, ws), ada)
+	code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"recurring_gigs":true}}`, ws), ada)
 	e.ok(code, out, 200)
 
 	if code, _, _ := e.req("POST", recs, `{"freq":"daily"}`, scout); code != 422 {

@@ -56,12 +56,12 @@ type Principal struct {
 	Req       Request
 }
 
-// Permissions a route asks for, named after the presets that first include them.
+// The permissions routes ask for most.
 const (
 	Viewer    = "view"
 	Commenter = "comment"
-	Worker    = "work_gigs" // consumer: status moves, ticks, claims, runs
-	Member    = "edit_gigs" // producer: field edits
+	Worker    = "work_gigs" // a consumer's: status moves, ticks, claims, runs
+	Editor    = "edit_gigs" // a producer's: what a gig says and how it runs
 	Manager   = "manage_workspace"
 )
 

@@ -19,7 +19,7 @@ func TestMatrix(t *testing.T) {
 	bobs := grants(&store.AccessRule{WorkspaceID: ptr(10), Preset: "member"}, &store.AccessRule{WorkspaceID: ptr(11), Preset: "viewer"})
 
 	session := &Principal{User: bob, Grants: bobs}
-	if !session.Can(10, Member, "gigs:write") || session.Can(11, Member, "gigs:write") || session.Can(12, Viewer, "gigs:read") {
+	if !session.Can(10, Editor, "gigs:write") || session.Can(11, Editor, "gigs:write") || session.Can(12, Viewer, "gigs:read") {
 		t.Fatal("session can")
 	}
 	if !session.SeesWorkspace(11) || session.SeesWorkspace(12) || !slices.Equal(session.Workspaces(), []int64{10, 11}) {
@@ -31,7 +31,7 @@ func TestMatrix(t *testing.T) {
 	if key.SeesWorkspace(11) || !key.SeesWorkspace(10) {
 		t.Fatal("key binding")
 	}
-	if key.Can(10, Member, "gigs:write") || !key.Can(10, Viewer, "gigs:read") {
+	if key.Can(10, Editor, "gigs:write") || !key.Can(10, Viewer, "gigs:read") {
 		t.Fatal("key scopes")
 	}
 	if ws := key.Workspaces(); len(ws) != 1 || ws[0] != 10 {
@@ -63,7 +63,7 @@ func TestMatrix(t *testing.T) {
 		t.Fatal("admin's workspace key must not be instance admin")
 	}
 	adminKey := &Principal{User: admin, Grants: ag, Key: &store.APIKey{Scopes: []string{"admin:users", "gigs:read"}}}
-	if !adminKey.AdminWith("admin:users") || adminKey.AdminWith("admin:keys") || adminKey.Can(5, Member, "gigs:write") {
+	if !adminKey.AdminWith("admin:users") || adminKey.AdminWith("admin:keys") || adminKey.Can(5, Editor, "gigs:write") {
 		t.Fatal("admin key scopes")
 	}
 	// an unbound key of a non-admin (or of a demoted admin) acts like the user's session
@@ -71,7 +71,7 @@ func TestMatrix(t *testing.T) {
 	if demoted.IsInstanceAdmin() || demoted.AdminWith("admin:users") {
 		t.Fatal("demoted admin key is still an admin")
 	}
-	if !demoted.Allowed(10, Member) || demoted.Allowed(11, Member) || demoted.SeesWorkspace(99) || len(demoted.Workspaces()) != 2 {
+	if !demoted.Allowed(10, Editor) || demoted.Allowed(11, Editor) || demoted.SeesWorkspace(99) || len(demoted.Workspaces()) != 2 {
 		t.Fatalf("unbound key reach: %v", demoted.Workspaces())
 	}
 }
@@ -94,16 +94,16 @@ func TestRuleOrder(t *testing.T) {
 		{"preset elsewhere", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "member"}}, 11, "view", false, "default"},
 		{"override beats preset", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "member", Overrides: map[string]bool{"create_gigs": false}}}, 10, "create_gigs", false, "user"},
 		{"all workspaces covers others", []*store.AccessRule{{Preset: "viewer"}}, 12, "view", true, "user_all"},
-		{"workspace beats all", []*store.AccessRule{{Preset: "manager"}, {WorkspaceID: ptr(10), Overrides: map[string]bool{"schedules": false}}}, 10, "schedules", false, "user"},
-		{"preset gap inherits from all", []*store.AccessRule{{Overrides: map[string]bool{"schedules": true}}, {WorkspaceID: ptr(10), Preset: "member"}}, 10, "schedules", true, "user_all"},
+		{"workspace beats all", []*store.AccessRule{{Preset: "manager"}, {WorkspaceID: ptr(10), Overrides: map[string]bool{"recurring_gigs": false}}}, 10, "recurring_gigs", false, "user"},
+		{"preset gap inherits from all", []*store.AccessRule{{Overrides: map[string]bool{"recurring_gigs": true}}, {WorkspaceID: ptr(10), Preset: "member"}}, 10, "recurring_gigs", true, "user_all"},
 		{"user beats group", []*store.AccessRule{{GroupID: g1, WorkspaceID: ptr(10), Preset: "manager"}, {Overrides: map[string]bool{"templates": false}}}, 10, "templates", false, "user_all"},
 		{"group gives", []*store.AccessRule{{GroupID: g1, WorkspaceID: ptr(10), Preset: "member"}}, 10, "edit_gigs", true, "group"},
-		{"group allow beats group deny", []*store.AccessRule{{GroupID: g1, WorkspaceID: ptr(10), Preset: "member", Overrides: map[string]bool{"relations": false}},
-			{GroupID: g2, WorkspaceID: ptr(10), Preset: "member"}}, 10, "relations", true, "group"},
+		{"group allow beats group deny", []*store.AccessRule{{GroupID: g1, WorkspaceID: ptr(10), Preset: "member", Overrides: map[string]bool{"templates": false}},
+			{GroupID: g2, WorkspaceID: ptr(10), Preset: "manager"}}, 10, "templates", true, "group"},
 		{"group ws beats group all", []*store.AccessRule{{GroupID: g1, Preset: "manager"}, {GroupID: g2, WorkspaceID: ptr(10), Preset: "viewer", Overrides: map[string]bool{"comment": false}}}, 10, "comment", false, "group"},
-		{"group all", []*store.AccessRule{{GroupID: g1, Preset: "commenter"}}, 11, "comment", true, "group_all"},
+		{"group all", []*store.AccessRule{{GroupID: g1, Preset: "consumer"}}, 11, "comment", true, "group_all"},
 		{"needs view", []*store.AccessRule{{Overrides: map[string]bool{"create_gigs": true}}}, 10, "create_gigs", false, "needs_view"},
-		{"always_run is never in a preset", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "manager"}}, 10, "always_run", false, "default"},
+		{"errand_unsandboxed is never in a preset", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "manager"}}, 10, "errand_unsandboxed", false, "default"},
 	}
 	for _, c := range cases {
 		d := store.NewGrants(false, c.rules, wsAll).Decide(c.ws, c.perm)

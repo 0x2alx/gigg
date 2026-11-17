@@ -150,7 +150,7 @@ func TestErrandsAPI(t *testing.T) {
 	}
 	code, out, _ = e.req("POST", fmt.Sprintf("/errands/%d/resume", tts.ID), "{}", ada)
 	e.ok(code, out, 200)
-	code, out, _ = e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"errands":true,"schedules":true}}`, ws), ada)
+	code, out, _ = e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"errands":true,"recurring_gigs":true}}`, ws), ada)
 	e.ok(code, out, 200)
 	code, out, _ = e.req("PUT", fmt.Sprintf("/schedules/%d", tts.ScheduleID), `{"freq":"daily","window_start":"04:00","tz":"America/New_York"}`, scout)
 	if code != 403 || !strings.Contains(string(out), "No-sandbox") {

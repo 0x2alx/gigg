@@ -13,7 +13,7 @@ func TestSharedAPI(t *testing.T) {
 	e := newEnv(t)
 	ada, scout := e.ada(), e.key("scout")
 	ws, pid := e.ids["scout.ws"], e.ids["scout.p"]
-	code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"schedules":true,"templates":true,"errands":true}}`, ws), ada)
+	code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"recurring_gigs":true,"templates":true,"errands":true}}`, ws), ada)
 	e.ok(code, out, 200)
 	id := func(out []byte) int64 {
 		var x struct {

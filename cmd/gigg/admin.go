@@ -27,7 +27,7 @@ const adminUsage = `gigg admin: first setup and recovery, working directly on th
   gigg admin workspace-add <slug> <name>       the owner defaults to the user named <slug>, if any
   gigg admin workspace-owner <workspace> <username|none>   whose picture marks the workspace's chips
   gigg admin color user|workspace <username|workspace> <#RRGGBB|none>   its colour on chips, badges, avatars
-  gigg admin member <workspace> <username> <viewer|commenter|member|manager|none>
+  gigg admin member <workspace> <username> <viewer|consumer|member|manager|none>
   gigg admin access <username> <workspace|all> <preset|none> [permission=allow|deny ...]
                                                set the user's access rule there (replaces it)
   gigg admin allow|deny <username> <workspace|all|each> <permission> [...]

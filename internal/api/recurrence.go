@@ -160,10 +160,10 @@ func (a *API) registerRecurrence() {
 			if err != nil {
 				return nil, err
 			}
-			if err := require(p, pr.WorkspaceID, access.Member, "gigs:write"); err != nil {
+			if err := require(p, pr.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 				return nil, err
 			}
-			if err := allowed(p, pr.WorkspaceID, "schedules"); err != nil {
+			if err := allowed(p, pr.WorkspaceID, "recurring_gigs"); err != nil {
 				return nil, err
 			}
 			r := &store.Recurrence{ProjectID: pr.ID}
@@ -245,10 +245,10 @@ func (a *API) registerRecurrence() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Member, "gigs:write"); err != nil {
+		if err := require(p, r.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 			return nil, err
 		}
-		if err := allowed(p, r.WorkspaceID, "schedules"); err != nil {
+		if err := allowed(p, r.WorkspaceID, "recurring_gigs"); err != nil {
 			return nil, err
 		}
 		// an edit makes the editor its owner, whose permissions the scheduler then creates gigs with
@@ -362,10 +362,10 @@ func (a *API) registerRecurrence() {
 			if err != nil {
 				return nil, err
 			}
-			if err := require(p, r.WorkspaceID, access.Member, "gigs:write"); err != nil {
+			if err := require(p, r.WorkspaceID, access.Editor, "gigs:write"); err != nil {
 				return nil, err
 			}
-			if err := allowed(p, r.WorkspaceID, "schedules"); err != nil {
+			if err := allowed(p, r.WorkspaceID, "recurring_gigs"); err != nil {
 				return nil, err
 			}
 			var tpl *store.Template

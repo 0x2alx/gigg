@@ -15,7 +15,7 @@ func TestAgentCreatesNothing(t *testing.T) {
 	e := newEnv(t)
 	ada, scout := e.ada(), e.key("scout")
 	ws, pid := e.ids["scout.ws"], e.ids["scout.p"]
-	deny := `{"create_gigs":false,"schedules":false,"templates":false,"errands":false,"errand_unsandboxed":false,"allowed_tools":false,"always_run":false}`
+	deny := `{"create_gigs":false,"recurring_gigs":false,"templates":false,"errands":false,"errand_unsandboxed":false,"allowed_tools":false,"always_run":false}`
 	code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"manager","overrides":%s}`, ws, deny), ada)
 	e.ok(code, out, 200)
 
