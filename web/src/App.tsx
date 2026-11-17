@@ -5,7 +5,7 @@ import { api, ApiError, SIGNED_OUT, type Me, type Project, type ThemeState, type
 import { NotificationsPage, TopBell } from "./Bell";
 import { badgeCount } from "./notifications";
 import { BoardPage } from "./Board";
-import { CronsPage } from "./Crons";
+import { ErrandsPage } from "./Errands";
 import { DashboardPage } from "./Dashboard";
 import { InboxPage } from "./Inbox";
 import { countsChange, onActivity, treeChange, useLive, type LiveState } from "./live";
@@ -14,7 +14,7 @@ import { ThemesPage } from "./Themes";
 import { AdminRoutes } from "./admin/AdminRoutes";
 import { ADMIN_TABS } from "./admin/common";
 import { CommandPalette } from "./views/CommandPalette";
-import { MyTasks } from "./views/MyTasks";
+import { MyGigs } from "./views/MyGigs";
 import { TableView } from "./views/TableView";
 import { savedViewsApi, viewHref, type SavedFilter } from "./views/savedViews";
 import { BUILTINS, CATEGORY_COLOR, PRIORITY_COLOR, applyTheme, findTheme, initialTheme, rememberTheme, sane, type Theme } from "./theme";
@@ -390,8 +390,8 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
           <SidePanel as="nav" label="Pages" hover={!narrow}>
             <NavLink href="/board" prefix icon={<Icon name="board" />} label="Board" className="nav-primary" />
             <NavLink href="/dashboard" icon={<Icon name="dashboard" />} label="Dashboard" />
-            <NavLink href="/my" icon={<Icon name="check" />} label="My tasks" />
-            <NavLink href="/crons" prefix icon={<Icon name="clock" />} label="Crons" />
+            <NavLink href="/my" icon={<Icon name="check" />} label="My gigs" />
+            <NavLink href="/errands" prefix icon={<Icon name="clock" />} label="Errands" />
             {savedViews.length > 0 && (
               <div className="nav-sub" role="group" aria-label="Saved views">
                 {savedViews.map((v) => (
@@ -448,7 +448,7 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
               </Link>
             )}
           </header>
-          {/* a page change fades the new page in (keyed by the section, so a task opening on the board or a
+          {/* a page change fades the new page in (keyed by the section, so a gig opening on the board or a
               tab inside Admin doesn't replay it) */}
           <div className="page-anim" key={loc.split("/")[1] ?? ""}>
           <Switch>
@@ -458,8 +458,8 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             <Route path="/inbox">
               <InboxPage />
             </Route>
-            {/* one route, so opening a cron's panel keeps the page (and its filters) mounted */}
-            <Route path="/crons/:id?">{(params) => <CronsPage open={Number(params.id) || undefined} />}</Route>
+            {/* one route, so opening an errand's panel keeps the page (and its filters) mounted */}
+            <Route path="/errands/:id?">{(params) => <ErrandsPage open={Number(params.id) || undefined} />}</Route>
             <Route path="/notifications">
               <NotificationsPage />
             </Route>
@@ -473,19 +473,22 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
               <AdminRoutes />
             </Route>
             <Route path="/my">
-              <MyTasks />
+              <MyGigs />
             </Route>
             <Route path="/w/:ws/p/:pid/table">{(params) => <TableView ws={params.ws} pid={Number(params.pid)} />}</Route>
             <Route path="/w/:ws/table">{(params) => <TableView ws={params.ws} />}</Route>
             <Route path="/table">
               <TableView />
             </Route>
-            <Route path="/board/p/:pid/t/:key">{(params) => <BoardPage taskPid={Number(params.pid)} taskKey={params.key} />}</Route>
+            <Route path="/board/p/:pid/g/:key">{(params) => <BoardPage gigPid={Number(params.pid)} gigKey={params.key} />}</Route>
+            {/* links from before gigs and errands (tasks: /t/, crons: /crons) */}
+            <Route path="/board/p/:pid/t/:key">{(params) => <Redirect replace to={`/board/p/${params.pid}/g/${params.key}`} />}</Route>
+            <Route path="/crons/:id?">{(params) => <Redirect replace to={params.id ? `/errands/${params.id}` : "/errands"} />}</Route>
             <Route path="/board">
               <BoardPage />
             </Route>
             {/* the per-project boards of before: their links still work */}
-            <Route path="/w/:ws/p/:pid/t/:key">{(params) => <Redirect replace to={`/board/p/${params.pid}/t/${params.key}`} />}</Route>
+            <Route path="/w/:ws/p/:pid/t/:key">{(params) => <Redirect replace to={`/board/p/${params.pid}/g/${params.key}`} />}</Route>
             <Route path="/w/:ws/p/:pid">{(params) => <Redirect replace to={`/board?p=${params.pid}`} />}</Route>
             <Route>{first ? <Redirect to="/board" /> : <Redirect to="/inbox" />}</Route>
           </Switch>
@@ -537,7 +540,7 @@ function NavLink({ href, children, prefix, icon, label, title, className }: {
   );
 }
 
-// InboxLink: the top bar's envelope, to the inbox (tasks waiting for a human) with their count.
+// InboxLink: the top bar's envelope, to the inbox (gigs waiting for a human) with their count.
 function InboxLink({ count }: { count: number }) {
   const [loc] = useLocation();
   const label = count ? `Inbox, ${count} waiting` : "Inbox";
@@ -612,7 +615,7 @@ function SidePanel({ as: Tag, label, hover, className, children }: { as: "nav" |
         },
         onKeyDown: (e: ReactKeyboardEvent<HTMLElement>) => {
           if (e.key === "Escape" && open) {
-            e.preventDefault(); // the task panel closes on an Esc nobody else handled
+            e.preventDefault(); // the gig panel closes on an Esc nobody else handled
             e.stopPropagation();
             clearTimeout(timer.current);
             setOpen(false);

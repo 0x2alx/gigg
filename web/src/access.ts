@@ -97,7 +97,7 @@ export function withPreset(rule: AccessRule | undefined, ws: number | null, pres
   return { workspace_id: ws, preset, overrides: { ...(rule?.overrides ?? {}) } };
 }
 
-// ruleSummary: a rule in a few words ("Member, +Recurring tasks, -Delete tasks").
+// ruleSummary: a rule in a few words ("Member, +Recurring gigs, -Delete gigs").
 export function ruleSummary(rule: AccessRule | undefined, perms: Permission[]): string {
   if (!rule) return "no rule";
   const label = (n: string) => perms.find((p) => p.name === n)?.label ?? n;

@@ -1,8 +1,8 @@
 // Every schedule in reach, across the workspaces (an optional workspace filter): named timing (rule,
-// window, create-early) that recurring tasks pair with templates. List, new, edit (every recurring task
-// on it moves), delete when unused. Minutes/hours timings belong to crons and are left out (the Crons page has them).
+// window, create-early) that recurring gigs pair with templates. List, new, edit (every recurring gig
+// on it moves), delete when unused. Minutes/hours timings belong to errands and are left out (the Errands page has them).
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { api, ApiError, hasCap, isTaskSchedule, type TaskSchedule as Schedule } from "./api";
+import { api, ApiError, hasCap, isGigSchedule, type GigSchedule as Schedule } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { optionOf, PlaceFilter, placeMatch, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
@@ -35,7 +35,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
       if (seq !== loadSeq.current) return; // a newer load is on its way
       const all: Schedule[] = [];
       const bad: string[] = [];
-      res.forEach((r, i) => (r.status === "fulfilled" ? all.push(...r.value.items.filter(isTaskSchedule)) : bad.push(tree[i]!.name)));
+      res.forEach((r, i) => (r.status === "fulfilled" ? all.push(...r.value.items.filter(isGigSchedule)) : bad.push(tree[i]!.name)));
       setItems(all.sort((a, b) => a.name.localeCompare(b.name)));
       setErr(bad.length ? `Couldn't load the schedules of ${bad.join(", ")}.` : "");
     });
@@ -75,8 +75,8 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
   }
   const tz = localTZ();
   return (
-    <Modal title="Schedules" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring tasks" />}>
-      <p className="muted small">When recurring tasks happen. Pair one with a template in ⟳ Recurring (or with Repeat in a new task); changing a schedule moves every recurring task on it.</p>
+    <Modal title="Schedules" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring gigs" />}>
+      <p className="muted small">When recurring gigs happen. Pair one with a template in ⟳ Recurring (or with Repeat in a new gig); changing a schedule moves every recurring gig on it.</p>
       {err && (
         <p className="danger" role="alert">
           {err}
@@ -110,11 +110,11 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
               )}
               <div className="chips">
                 <span className={"pill " + (s.uses > 0 ? "pill-accent" : "pill-muted")}>
-                  ⟳ {s.uses} recurring task{s.uses === 1 ? "" : "s"}
+                  ⟳ {s.uses} recurring gig{s.uses === 1 ? "" : "s"}
                 </span>
-                {!!s.cron_uses && (
-                  <span className="pill pill-accent" data-tip="Crons run on this schedule too: changing it moves them">
-                    <Icon name="clock" /> {s.cron_uses} cron{s.cron_uses === 1 ? "" : "s"}
+                {!!s.errand_uses && (
+                  <span className="pill pill-accent" data-tip="Errands run on this schedule too: changing it moves them">
+                    <Icon name="clock" /> {s.errand_uses} errand{s.errand_uses === 1 ? "" : "s"}
                   </span>
                 )}
               </div>
@@ -139,8 +139,8 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                         type="button"
                         className="button danger-button small"
                         onClick={() => setConfirm(s.id)}
-                        disabled={s.uses > 0 || !!s.cron_uses}
-                        title={s.uses > 0 || s.cron_uses ? "Recurring tasks or crons use this schedule: delete them or give them another schedule first" : undefined}
+                        disabled={s.uses > 0 || !!s.errand_uses}
+                        title={s.uses > 0 || s.errand_uses ? "Recurring gigs or errands use this schedule: delete them or give them another schedule first" : undefined}
                         aria-label={`Delete ${s.name}`}
                       >
                         <Icon name="trash" /> Delete
@@ -192,7 +192,7 @@ function ScheduleModal({ ws: ws0, choices, schedule, onClose, onSaved }: { ws: W
       <form className="form-grid" onSubmit={submit} aria-label={schedule ? "Edit schedule" : "New schedule"}>
         {schedule && schedule.uses > 0 && (
           <p className="span2 small muted sched-tpl" role="note">
-            ⟳ {schedule.uses} recurring task{schedule.uses === 1 ? " runs" : "s run"} on this schedule: changing the timing moves {schedule.uses === 1 ? "it" : "them all"}.
+            ⟳ {schedule.uses} recurring gig{schedule.uses === 1 ? " runs" : "s run"} on this schedule: changing the timing moves {schedule.uses === 1 ? "it" : "them all"}.
           </p>
         )}
         {choices && choices.length > 1 && (

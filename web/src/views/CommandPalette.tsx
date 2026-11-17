@@ -1,13 +1,13 @@
-// Command palette (Ctrl+K / Cmd+K): jump to a task by key, to a project or workspace, run a
-// navigation command, or search task text across every workspace.
+// Command palette (Ctrl+K / Cmd+K): jump to a gig by key, to a project or workspace, run a
+// navigation command, or search gig text across every workspace.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { api, type Task } from "../api";
+import { api, type Gig } from "../api";
 import { useApp, type WorkspaceTree } from "../App";
 import { colorFor } from "../theme";
 import { Pill, PriorityBadge, StatusBadge } from "../ui";
 import { summary, viewHref } from "./savedViews";
-import { errMsg, fromHere, fuzzy, taskHref, tasksAcross } from "./viewsApi";
+import { errMsg, fromHere, fuzzy, gigHref, gigsAcross } from "./viewsApi";
 import "./views.css";
 
 interface Item {
@@ -54,7 +54,7 @@ function Palette({ onClose }: { onClose: () => void }) {
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [results, setResults] = useState<{ q: string; tasks: Task[]; failed: string[] } | null>(null);
+  const [results, setResults] = useState<{ q: string; gigs: Gig[]; failed: string[] } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -81,12 +81,12 @@ function Palette({ onClose }: { onClose: () => void }) {
     const boardHref = here && pid ? `/w/${here.slug}/p/${pid}` : here?.projects[0] ? `/w/${here.slug}/p/${here.projects[0].id}` : firstBoard ? `/w/${firstBoard.slug}/p/${firstBoard.projects[0]!.id}` : null;
     const tableWs = here ?? tree[0];
 
-    // 1. task key
+    // 1. gig key
     if (KEY_RE.test(q)) {
       const key = q.toUpperCase();
       out.push({
         id: "key",
-        group: "Go to task",
+        group: "Go to gig",
         icon: "↪",
         label: (
           <>
@@ -98,8 +98,8 @@ function Palette({ onClose }: { onClose: () => void }) {
           setBusy("key");
           setError("");
           try {
-            const t = await api.task(key);
-            go(taskHref(tree, t), fromHere());
+            const t = await api.gig(key);
+            go(gigHref(tree, t), fromHere());
           } catch (e) {
             setError(`${key}: ${errMsg(e)}`);
           } finally {
@@ -111,11 +111,11 @@ function Palette({ onClose }: { onClose: () => void }) {
 
     // 2. search results (shown while they still match the query)
     if (results && results.q === q) {
-      for (const t of results.tasks) {
+      for (const t of results.gigs) {
         const w = tree.find((x) => x.id === t.workspace_id);
         out.push({
-          id: `task-${t.id}`,
-          group: `Tasks matching “${results.q}”`,
+          id: `gig-${t.id}`,
+          group: `Gigs matching “${results.q}”`,
           icon: <span className="pill pill-key">{t.key}</span>,
           label: t.title,
           hint: (
@@ -125,7 +125,7 @@ function Palette({ onClose }: { onClose: () => void }) {
               <PriorityBadge priority={t.priority} />
             </>
           ),
-          run: () => go(taskHref(tree, t), fromHere()),
+          run: () => go(gigHref(tree, t), fromHere()),
         });
       }
     }
@@ -166,8 +166,8 @@ function Palette({ onClose }: { onClose: () => void }) {
 
     // 4. commands
     const cmds: Item[] = [];
-    if (boardHref) cmds.push({ id: "c-new", group: "Commands", icon: "+", label: "New task", hint: <Kbd>board</Kbd>, run: () => go(`${boardHref}?new=1`) });
-    cmds.push({ id: "c-my", group: "Commands", icon: "☑", label: "My tasks", run: () => go("/my") });
+    if (boardHref) cmds.push({ id: "c-new", group: "Commands", icon: "+", label: "New gig", hint: <Kbd>board</Kbd>, run: () => go(`${boardHref}?new=1`) });
+    cmds.push({ id: "c-my", group: "Commands", icon: "☑", label: "My gigs", run: () => go("/my") });
     cmds.push({ id: "c-inbox", group: "Commands", icon: "✉", label: "Inbox", run: () => go("/inbox") });
     cmds.push({ id: "c-notif", group: "Commands", icon: "🔔", label: "Notifications", run: () => go("/notifications") });
     if (tableWs)
@@ -227,7 +227,7 @@ function Palette({ onClose }: { onClose: () => void }) {
         icon: "⌕",
         label: (
           <>
-            Search tasks for <strong>“{q}”</strong>
+            Search gigs for <strong>“{q}”</strong>
           </>
         ),
         hint: tree.length > 1 ? <span className="muted small">all workspaces</span> : undefined,
@@ -236,11 +236,11 @@ function Palette({ onClose }: { onClose: () => void }) {
           setBusy("search");
           setError("");
           try {
-            const r = await tasksAcross(tree, { q, limit: 15, sort: "-updated" });
+            const r = await gigsAcross(tree, { q, limit: 15, sort: "-updated" });
             r.items.sort((a, b) => b.updated_at - a.updated_at);
-            setResults({ q, tasks: r.items.slice(0, 30), failed: r.failed });
+            setResults({ q, gigs: r.items.slice(0, 30), failed: r.failed });
             setActive(0);
-            if (r.items.length === 0) setError(`No tasks match “${q}”.`);
+            if (r.items.length === 0) setError(`No gigs match “${q}”.`);
           } catch (e) {
             setError(errMsg(e));
           } finally {
@@ -310,7 +310,7 @@ function Palette({ onClose }: { onClose: () => void }) {
               setError("");
             }}
             onKeyDown={onKeyDown}
-            placeholder="Type a command, a project, a task key like GIG-12, or text to search…"
+            placeholder="Type a command, a project, a gig key like GIG-12, or text to search…"
             role="combobox"
             aria-expanded="true"
             aria-controls="cp-list"
@@ -358,7 +358,7 @@ function Palette({ onClose }: { onClose: () => void }) {
               </li>
             );
           })}
-          {items.length === 0 && <li className="cp-none">No matches. Type at least two characters to search task text.</li>}
+          {items.length === 0 && <li className="cp-none">No matches. Type at least two characters to search gig text.</li>}
         </ul>
         <div className="cp-foot muted small">
           <span>

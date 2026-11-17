@@ -8,22 +8,22 @@ import (
 )
 
 // Runner limits and the pause switch, per workspace (migration 0006). They are enforced in
-// ClaimTask, so an agent calling the API directly gets no more than its runner would.
+// ClaimGig, so an agent calling the API directly gets no more than its runner would.
 
 // RunnerSettings is a workspace's limits and pause state.
 type RunnerSettings struct {
-	WorkspaceID   int64  `json:"workspace_id"`
-	DailyCap      int64  `json:"daily_cap" doc:"Distinct tasks per rolling 24 hours, of any kind"`
-	NightCap      int64  `json:"night_cap" doc:"Of those, tasks that aren't always-run (budget-dependent)"`
-	PausedUntil   *int64 `json:"paused_until" doc:"Unix ms; null = not paused (see paused_open)"`
-	PausedOpen    bool   `json:"paused_open" doc:"Paused until someone resumes it"`
-	PausedBy      *int64 `json:"paused_by"`
-	PausedAt      *int64 `json:"paused_at"`
-	Paused        bool   `json:"paused" doc:"Paused right now"`
-	CronsPaused   bool   `json:"crons_paused" doc:"Cron runs are paused (until resumed)"`
-	CronsPausedAt *int64 `json:"crons_paused_at"`
-	CronsPausedBy *int64 `json:"crons_paused_by"`
-	Version       int64  `json:"version"`
+	WorkspaceID     int64  `json:"workspace_id"`
+	DailyCap        int64  `json:"daily_cap" doc:"Distinct gigs per rolling 24 hours, of any kind"`
+	NightCap        int64  `json:"night_cap" doc:"Of those, gigs that aren't always-run (budget-dependent)"`
+	PausedUntil     *int64 `json:"paused_until" doc:"Unix ms; null = not paused (see paused_open)"`
+	PausedOpen      bool   `json:"paused_open" doc:"Paused until someone resumes it"`
+	PausedBy        *int64 `json:"paused_by"`
+	PausedAt        *int64 `json:"paused_at"`
+	Paused          bool   `json:"paused" doc:"Paused right now"`
+	ErrandsPaused   bool   `json:"errands_paused" doc:"Errand runs are paused (until resumed)"`
+	ErrandsPausedAt *int64 `json:"errands_paused_at"`
+	ErrandsPausedBy *int64 `json:"errands_paused_by"`
+	Version         int64  `json:"version"`
 }
 
 // Runner defaults when a workspace has no row.
@@ -41,13 +41,13 @@ func (r *RunnerSettings) IsPaused(now int64) bool {
 func GetRunnerSettings(ctx context.Context, q Q, ws int64) (*RunnerSettings, error) {
 	r := &RunnerSettings{WorkspaceID: ws, DailyCap: DefaultDailyCap, NightCap: DefaultNightCap}
 	var until, by, at, cat, cby sql.NullInt64
-	err := q.QueryRowContext(ctx, `SELECT daily_cap, night_cap, paused_until, paused_open, paused_by, paused_at, crons_paused_at, crons_paused_by, version
+	err := q.QueryRowContext(ctx, `SELECT daily_cap, night_cap, paused_until, paused_open, paused_by, paused_at, errands_paused_at, errands_paused_by, version
 		FROM runner_settings WHERE workspace_id = ?`, ws).Scan(&r.DailyCap, &r.NightCap, &until, &r.PausedOpen, &by, &at, &cat, &cby, &r.Version)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 	r.PausedUntil, r.PausedBy, r.PausedAt = ptrInt(until), ptrInt(by), ptrInt(at)
-	r.CronsPausedAt, r.CronsPausedBy, r.CronsPaused = ptrInt(cat), ptrInt(cby), cat.Valid
+	r.ErrandsPausedAt, r.ErrandsPausedBy, r.ErrandsPaused = ptrInt(cat), ptrInt(cby), cat.Valid
 	r.Paused = r.IsPaused(Now())
 	return r, nil
 }
@@ -85,7 +85,7 @@ func SetRunnerCaps(ctx context.Context, q Q, a Actor, ws int64, daily, night *in
 	return GetRunnerSettings(ctx, q, ws)
 }
 
-// PauseRunner pauses a workspace's task runs: until a time, or (until nil) until resumed. Pausing
+// PauseRunner pauses a workspace's gig runs: until a time, or (until nil) until resumed. Pausing
 // again replaces the previous pause.
 func PauseRunner(ctx context.Context, q Q, a Actor, ws int64, until *int64) error {
 	if until != nil && *until <= Now() {
@@ -119,9 +119,9 @@ func ResumeRunner(ctx context.Context, q Q, a Actor, ws int64) error {
 
 // RunnerUsage counts a workspace's agent work.
 type RunnerUsage struct {
-	Tasks24h     int64    `json:"tasks_24h" doc:"Distinct tasks with a run started in the last 24 hours"`
-	Always24h    int64    `json:"always_24h" doc:"Of those, always-run tasks"`
-	Optional24h  int64    `json:"optional_24h" doc:"Of those, budget-dependent tasks"`
+	Gigs24h      int64    `json:"gigs_24h" doc:"Distinct gigs with a run started in the last 24 hours"`
+	Always24h    int64    `json:"always_24h" doc:"Of those, always-run gigs"`
+	Optional24h  int64    `json:"optional_24h" doc:"Of those, budget-dependent gigs"`
 	Runs24h      int64    `json:"runs_24h"`
 	UsagePct24h  float64  `json:"usage_pct_24h" doc:"Points of the account's weekly usage meter measured on those runs (shared meter: approximate)"`
 	UsagePct7d   float64  `json:"usage_pct_7d"`
@@ -137,12 +137,12 @@ func RunnerUsageOf(ctx context.Context, q Q, ws, now int64) (*RunnerUsage, error
 	day := now - int64(24*time.Hour/time.Millisecond)
 	week := now - int64(7*24*time.Hour/time.Millisecond)
 	u.Window = [2]int64{day, now}
-	err := q.QueryRowContext(ctx, `SELECT count(DISTINCT r.task_id),
-		count(DISTINCT CASE WHEN t.always_run = 1 THEN r.task_id END),
-		count(DISTINCT CASE WHEN t.always_run = 0 THEN r.task_id END),
+	err := q.QueryRowContext(ctx, `SELECT count(DISTINCT r.gig_id),
+		count(DISTINCT CASE WHEN t.always_run = 1 THEN r.gig_id END),
+		count(DISTINCT CASE WHEN t.always_run = 0 THEN r.gig_id END),
 		count(*), COALESCE(sum(r.usage_pct), 0)
-		FROM runs r JOIN tasks t ON t.id = r.task_id WHERE r.workspace_id = ? AND r.started_at > ?`, ws, day).
-		Scan(&u.Tasks24h, &u.Always24h, &u.Optional24h, &u.Runs24h, &u.UsagePct24h)
+		FROM runs r JOIN gigs t ON t.id = r.gig_id WHERE r.workspace_id = ? AND r.started_at > ?`, ws, day).
+		Scan(&u.Gigs24h, &u.Always24h, &u.Optional24h, &u.Runs24h, &u.UsagePct24h)
 	if err != nil {
 		return nil, err
 	}
@@ -167,12 +167,12 @@ func claimLimits(ctx context.Context, q Q, ws int64, alwaysOnly bool) (where []s
 	if err != nil {
 		return nil, nil, err
 	}
-	counted := "t.id IN (SELECT task_id FROM runs WHERE workspace_id = ? AND started_at > ?)"
+	counted := "t.id IN (SELECT gig_id FROM runs WHERE workspace_id = ? AND started_at > ?)"
 	day := u.Window[0]
-	if u.Runs24h >= RunCap(st) { // resumes, parks and retries of counted tasks have a ceiling too
+	if u.Runs24h >= RunCap(st) { // resumes, parks and retries of counted gigs have a ceiling too
 		return []string{"1 = 0"}, nil, nil
 	}
-	if u.Tasks24h >= st.DailyCap { // a task already counted may go on (a resume, a parked job's check)
+	if u.Gigs24h >= st.DailyCap { // a gig already counted may go on (a resume, a parked job's check)
 		where, args = append(where, counted), append(args, ws, day)
 	}
 	switch {
@@ -184,13 +184,13 @@ func claimLimits(ctx context.Context, q Q, ws int64, alwaysOnly bool) (where []s
 	return where, args, nil
 }
 
-// RunCap is the most runs (of any task) a workspace may start in 24 hours: four per task of the
+// RunCap is the most runs (of any gig) a workspace may start in 24 hours: four per gig of the
 // daily cap, enough for resumes, parks and retries, not for an endless loop.
 func RunCap(st *RunnerSettings) int64 { return 4 * st.DailyCap }
 
 // CheckRunStart applies the same limits when a run is recorded, so a worker that skips the claim
 // (or claims without recording) still can't go past them.
-func CheckRunStart(ctx context.Context, q Q, t *Task) error {
+func CheckRunStart(ctx context.Context, q Q, t *Gig) error {
 	now := Now()
 	st, err := GetRunnerSettings(ctx, q, t.WorkspaceID)
 	if err != nil {
@@ -207,20 +207,20 @@ func CheckRunStart(ctx context.Context, q Q, t *Task) error {
 		return Conflict("the workspace started %d runs in the last 24 hours (limit %d)", u.Runs24h, RunCap(st))
 	}
 	var counted int
-	if err := q.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE task_id = ? AND started_at > ?`, t.ID, u.Window[0]).Scan(&counted); err != nil {
+	if err := q.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE gig_id = ? AND started_at > ?`, t.ID, u.Window[0]).Scan(&counted); err != nil {
 		return err
 	}
 	if counted > 0 {
 		return nil
 	}
-	if u.Tasks24h >= st.DailyCap {
-		return Conflict("the workspace's daily task cap is reached (%d)", st.DailyCap)
+	if u.Gigs24h >= st.DailyCap {
+		return Conflict("the workspace's daily gig cap is reached (%d)", st.DailyCap)
 	}
 	if !t.AlwaysRun && u.Optional24h >= st.NightCap {
-		return Conflict("the workspace's cap for budget-dependent tasks is reached (%d)", st.NightCap)
+		return Conflict("the workspace's cap for budget-dependent gigs is reached (%d)", st.NightCap)
 	}
 	return nil
 }
 
-// ErrPaused: the workspace's task runs are paused.
-var ErrPaused = errors.New("task runs are paused for this workspace")
+// ErrPaused: the workspace's gig runs are paused.
+var ErrPaused = errors.New("gig runs are paused for this workspace")

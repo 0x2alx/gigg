@@ -8,7 +8,7 @@ import { ActionPill, AdminPage, Empty, ErrorLine, TimeAgo } from "./common";
 import { Icon } from "../icons";
 
 const PAGE = 100;
-const PREFIXES = ["task", "comment", "run", "key", "user", "member", "workspace", "project", "auth"];
+const PREFIXES = ["gig", "comment", "run", "key", "user", "member", "workspace", "project", "auth"];
 
 export function AuditPage() {
   const [items, setItems] = useState<AuditItem[]>([]);

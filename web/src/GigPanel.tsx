@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { api, ApiError, fmtTime, hasCap, resumeCommand, type Comment, type CustomField, type Recurrence, type Run, type Status, type Tag, type Task, type User } from "./api";
+import { api, ApiError, fmtTime, hasCap, resumeCommand, type Comment, type CustomField, type Recurrence, type Run, type Status, type Tag, type Gig, type User } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { assignable } from "./fields";
 import { Markdown, setMentionUsers } from "./markdown";
 import { MarkdownEditor } from "./MarkdownEditor";
-import { ChecklistSection, CustomFieldsSection, DependenciesSection, Row, Section, SubtasksSection } from "./TaskSections";
-import { TaskEditor } from "./TaskEditor";
+import { ChecklistSection, CustomFieldsSection, DependenciesSection, Row, Section, SubgigsSection } from "./GigSections";
+import { GigEditor } from "./GigEditor";
 import { Clamp } from "./Clamp";
-import { HistorySection } from "./TaskHistory";
+import { HistorySection } from "./GigHistory";
 import { describeRule } from "./recurrence";
 import { CATEGORY_COLOR } from "./theme";
-import { Avatar, EXIT_MS, Pill, PriorityBadge, StatusBadge, TaskBadges, UserBadge, reducedMotion } from "./ui";
+import { Avatar, EXIT_MS, Pill, PriorityBadge, StatusBadge, GigBadges, UserBadge, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { Icon } from "./icons";
 
@@ -28,20 +28,20 @@ const runColor: Record<string, string> = {
 
 const FULL_KEY = "gigg.panel.full";
 
-export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, onChanged, onMoved, onOpenSchedule }: {
-  taskKey: string;
+export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onChanged, onMoved, onOpenSchedule }: {
+  gigKey: string;
   ws: WorkspaceTree;
   statuses: Status[];
   labels: Tag[];
   canWrite: boolean;
   onClose: () => void;
   onChanged: () => void;
-  onMoved: (t: Task) => void;
+  onMoved: (t: Gig) => void;
   onOpenSchedule?: (id: number) => void;
 }) {
   const { users, members, me } = useApp();
   setMentionUsers(users);
-  const [task, setTask] = useState<Task | null>(null);
+  const [gig, setGig] = useState<Gig | null>(null);
   const [fields, setFields] = useState<CustomField[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
@@ -65,15 +65,15 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       return !f;
     });
 
-  const shownId = useRef<number | null>(null); // the task on screen, so a new one never shows the last one's runs
-  // the task asked for now: a slow answer for the previous one (after a quick switch) is dropped
-  const keyRef = useRef(taskKey);
-  keyRef.current = taskKey;
+  const shownId = useRef<number | null>(null); // the gig on screen, so a new one never shows the last one's runs
+  // the gig asked for now: a slow answer for the previous one (after a quick switch) is dropped
+  const keyRef = useRef(gigKey);
+  keyRef.current = gigKey;
   // keepErr: a reload after a failed save keeps that save's message on screen
   const load = useCallback((keepErr?: boolean) => {
-    const asked = taskKey;
+    const asked = gigKey;
     api
-      .task(taskKey)
+      .gig(gigKey)
       .then((t) => {
         if (keyRef.current !== asked) return;
         if (shownId.current !== t.id) {
@@ -81,7 +81,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           setComments([]);
           setRuns([]);
         }
-        setTask(t);
+        setGig(t);
         if (keepErr !== true) setErr("");
         return Promise.all([api.comments(t.id), api.runs(t.id)]).then(([c, r]) => {
           if (keyRef.current !== asked) return;
@@ -89,8 +89,8 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           setRuns(r.items);
         });
       })
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't load the task."));
-  }, [taskKey]);
+      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't load the gig."));
+  }, [gigKey]);
   useEffect(load, [load]);
 
   useEffect(() => {
@@ -101,32 +101,32 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     };
   }, [ws.id]);
 
-  // Live refresh: another client changed this task (or something on it), reload it (debounced).
-  const taskId = task?.id ?? null;
+  // Live refresh: another client changed this gig (or something on it), reload it (debounced).
+  const gigId = gig?.id ?? null;
   const loadRef = useRef(load);
   loadRef.current = load;
   useEffect(() => {
-    if (taskId === null) return;
+    if (gigId === null) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const on = (e: Event) => {
       const d = (e as CustomEvent<{ workspaceId?: number; item?: { action?: string; entity_type?: string; entity_id?: number | null; data?: unknown } }>).detail;
       const it = d?.item;
       if (!it) return;
-      const data = (it.data ?? {}) as { task_id?: unknown };
-      const hit = (it.entity_id === taskId && (!it.entity_type || it.entity_type === "task")) || data.task_id === taskId;
+      const data = (it.data ?? {}) as { gig_id?: unknown };
+      const hit = (it.entity_id === gigId && (!it.entity_type || it.entity_type === "gig")) || data.gig_id === gigId;
       if (!hit) return;
       if (timer) clearTimeout(timer);
-      // a progress note changes the runs only; anything else reloads the task, its comments and runs
-      timer = setTimeout(() => (it.action === "run.progress" ? api.runs(taskId).then((r) => setRuns(r.items), () => undefined) : loadRef.current(true)), 400);
+      // a progress note changes the runs only; anything else reloads the gig, its comments and runs
+      timer = setTimeout(() => (it.action === "run.progress" ? api.runs(gigId).then((r) => setRuns(r.items), () => undefined) : loadRef.current(true)), 400);
     };
     window.addEventListener("gigg:activity", on);
     return () => {
       window.removeEventListener("gigg:activity", on);
       if (timer) clearTimeout(timer);
     };
-  }, [taskId]);
+  }, [gigId]);
 
-  const recurrenceId = task?.recurrence_id ?? null;
+  const recurrenceId = gig?.recurrence_id ?? null;
   useEffect(() => {
     setSchedule(null);
     if (!recurrenceId) return;
@@ -165,10 +165,10 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   flashDirtyRef.current = flashDirty;
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  // closing slides the panel out first; opening another task meanwhile cancels it
-  // (the closing state names the task being closed, so a newly opened task never renders as closing)
+  // closing slides the panel out first; opening another gig meanwhile cancels it
+  // (the closing state names the gig being closed, so a newly opened gig never renders as closing)
   const [closingKey, setClosingKey] = useState<string | null>(null);
-  const closing = closingKey === taskKey;
+  const closing = closingKey === gigKey;
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const close = useCallback(() => {
     if (reducedMotion()) return closeRef.current();
@@ -183,7 +183,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     clearTimeout(closeTimer.current);
     closeTimer.current = undefined;
     setClosingKey(null);
-  }, [taskKey]);
+  }, [gigKey]);
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
   // Esc closes (not over a modal; an open inline editor closes first; unsaved text is flashed).
@@ -192,7 +192,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"], .modal-backdrop')) return;
       if (flashDirty()) return;
       // an open title/description editor (no changes, else flashed above) closes first
-      const cancel = panelRef.current?.querySelector<HTMLButtonElement>('form[aria-label="Edit task"] [data-cancel]');
+      const cancel = panelRef.current?.querySelector<HTMLButtonElement>('form[aria-label="Edit gig"] [data-cancel]');
       if (cancel) cancel.click();
       else close();
     };
@@ -202,14 +202,14 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
 
   // A click on the board outside the panel closes it, like ✕. Not when the press started inside
   // (drag-select), not in modals, popovers or menus, not when the click opened something else (the
-  // URL changed: another task, another page; or a table row, which opens another task in place),
+  // URL changed: another gig, another page; or a table row, which opens another gig in place),
   // and not while a field holds unsaved text.
   useEffect(() => {
     let down: string | null = null;
     const outside = (t: EventTarget | null) => {
       const panel = panelRef.current;
       if (!panel || !(t instanceof Element) || !t.isConnected || panel.contains(t)) return false;
-      return !t.closest('.modal-backdrop, [role="dialog"], [aria-modal="true"], .bell-pop, .menu, .mention-list, .toast, .sidebar, [data-opens-task]');
+      return !t.closest('.modal-backdrop, [role="dialog"], [aria-modal="true"], .bell-pop, .menu, .mention-list, .toast, .sidebar, [data-opens-gig]');
     };
     const onDown = (e: PointerEvent) => {
       down = e.button === 0 && !document.querySelector('[aria-modal="true"]') && outside(e.target) ? window.location.pathname : null;
@@ -229,7 +229,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     };
   }, [flashDirty, close]);
 
-  // Focus: the panel takes focus when it opens or shows another task (keyboard users land in it);
+  // Focus: the panel takes focus when it opens or shows another gig (keyboard users land in it);
   // on close, focus goes back to what had it before (the card), if that is still on the page.
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -242,18 +242,18 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   useEffect(() => {
     const panel = panelRef.current;
     if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
-  }, [taskKey]);
+  }, [gigKey]);
 
   // act: saves a change; resolves to whether it worked (the error shows at the top)
-  const act = (p: Promise<Task>, after?: (t: Task) => void): Promise<boolean> => {
-    const asked = taskKey;
+  const act = (p: Promise<Gig>, after?: (t: Gig) => void): Promise<boolean> => {
+    const asked = gigKey;
     return p
       .then((t) => {
         if (keyRef.current !== asked) {
-          onChanged(); // saved, but another task is on screen now: only the board refreshes
+          onChanged(); // saved, but another gig is on screen now: only the board refreshes
           return true;
         }
-        setTask(t);
+        setGig(t);
         setErr("");
         onChanged();
         after?.(t);
@@ -262,10 +262,10 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
       })
       .catch((e: unknown) => {
         lastErr.current = e;
-        if (keyRef.current !== asked) return false; // not this task's error
+        if (keyRef.current !== asked) return false; // not this gig's error
         setErr(
           e instanceof ApiError && e.status === 412
-            ? "This task changed while you were editing. Save again to replace it with your text, or Cancel to see the new version."
+            ? "This gig changed while you were editing. Save again to replace it with your text, or Cancel to see the new version."
             : e instanceof ApiError
               ? e.message
               : "That didn't work.",
@@ -279,12 +279,12 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
 
   // labels and assignees save on each click: show the change at once and send the saves one at a
   // time, each with the latest list (two quick clicks never undo each other)
-  const [liveLabels, setLiveLabels] = useLiveList(task?.id ?? 0, task ? task.labels.map((l) => l.name) : [], (v) => act(api.patchTask(task!.id, { labels: v })));
-  const [liveAssignees, setLiveAssignees] = useLiveList(task?.id ?? 0, task?.assignees ?? [], (v) => act(api.patchTask(task!.id, { assignees: v })));
+  const [liveLabels, setLiveLabels] = useLiveList(gig?.id ?? 0, gig ? gig.labels.map((l) => l.name) : [], (v) => act(api.patchGig(gig!.id, { labels: v })));
+  const [liveAssignees, setLiveAssignees] = useLiveList(gig?.id ?? 0, gig?.assignees ?? [], (v) => act(api.patchGig(gig!.id, { assignees: v })));
 
-  if (!task) {
+  if (!gig) {
     return (
-      <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "") + (closing ? " closing" : "")} inert={closing || undefined} aria-label="Task">
+      <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "") + (closing ? " closing" : "")} inert={closing || undefined} aria-label="Gig">
         <button type="button" className="icon-button close" onClick={close} aria-label="Close">
           <Icon name="x" />
         </button>
@@ -293,42 +293,42 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
     );
   }
 
-  const cmd = resumeCommand(task.session_id);
+  const cmd = resumeCommand(gig.session_id);
   const lastRun = runs[0];
   // the agent is waiting for an answer: the Agent session (where the answer box is) opens, also when
   // this happens while the panel is open; the id makes each new question open it again
-  const waitingRun = task.last_run?.status === "needs_human" ? task.last_run.id : 0;
-  // the newest question of a waiting task is never folded: it's the thing to answer
-  const openQuestion = task.status_category === "waiting" ? [...comments].reverse().find((c) => c.kind === "question" && !c.deleted)?.id : undefined;
-  const creator = users.get(task.created_by);
+  const waitingRun = gig.last_run?.status === "needs_human" ? gig.last_run.id : 0;
+  // the newest question of a waiting gig is never folded: it's the thing to answer
+  const openQuestion = gig.status_category === "waiting" ? [...comments].reverse().find((c) => c.kind === "question" && !c.deleted)?.id : undefined;
+  const creator = users.get(gig.created_by);
   const candidates = assignable(users, members.get(ws.id) ?? []);
-  const status = statuses.find((s) => s.id === task.status_id);
-  const overdue = task.due_at !== null && task.due_at < Date.now() && task.status_category !== "done";
-  const can = (cap: string) => canWrite && hasCap(me, cap, task.workspace_id);
-  const onTask = (t: Task) => {
-    setTask(t);
+  const status = statuses.find((s) => s.id === gig.status_id);
+  const overdue = gig.due_at !== null && gig.due_at < Date.now() && gig.status_category !== "done";
+  const can = (cap: string) => canWrite && hasCap(me, cap, gig.workspace_id);
+  const onGig = (t: Gig) => {
+    setGig(t);
     setErr("");
     onChanged();
   };
 
   return (
-    <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "") + (closing ? " closing" : "")} inert={closing || undefined} aria-label={`Task ${task.key}`} style={task.color ? ({ "--panel-c": task.color } as CSSProperties) : undefined}>
+    <aside ref={panelRef} tabIndex={-1} className={"panel" + (full ? " panel-full" : "") + (closing ? " closing" : "")} inert={closing || undefined} aria-label={`Gig ${gig.key}`} style={gig.color ? ({ "--panel-c": gig.color } as CSSProperties) : undefined}>
       <div className="tp-top">
         <WorkspaceBadge ws={ws} />
-        <span className="pill pill-key tp-key" title={`Task key ${task.key}`}>
-          {task.key}
+        <span className="pill pill-key tp-key" title={`Gig key ${gig.key}`}>
+          {gig.key}
         </span>
         <div className="tp-badges">
-          <StatusBadge name={task.status_name} category={task.status_category} color={status?.color} />
-          <PriorityBadge priority={task.priority} />
-          <TaskBadges task={task} />
-          {!!task.blocked_by && (
+          <StatusBadge name={gig.status_name} category={gig.status_category} color={status?.color} />
+          <PriorityBadge priority={gig.priority} />
+          <GigBadges gig={gig} />
+          {!!gig.blocked_by && (
             <span className="pill pill-danger" title="Agents won't pick it up until its blockers are done">
-              <Icon name="lock" /> Blocked by {task.blocked_by} open
+              <Icon name="lock" /> Blocked by {gig.blocked_by} open
             </span>
           )}
-          {!!task.archived_at && <span className="pill pill-muted"><Icon name="archive" /> archived</span>}
-          {task.deleted && <span className="pill pill-danger">in trash</span>}
+          {!!gig.archived_at && <span className="pill pill-muted"><Icon name="archive" /> archived</span>}
+          {gig.deleted && <span className="pill pill-danger">in trash</span>}
         </div>
         <button
           type="button"
@@ -349,55 +349,55 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
           {err}
         </p>
       )}
-      {!!task.archived_at && (
+      {!!gig.archived_at && (
         <div className="banner banner-muted" role="status">
-          <Icon name="archive" /> Archived {fmtTime(task.archived_at)}: hidden from the board and lists.
-          {can("archive_tasks") && (
-            <button type="button" className="button secondary small" onClick={() => act(api.unarchiveTask(task.id))}>
+          <Icon name="archive" /> Archived {fmtTime(gig.archived_at)}: hidden from the board and lists.
+          {can("archive_gigs") && (
+            <button type="button" className="button secondary small" onClick={() => act(api.unarchiveGig(gig.id))}>
               <Icon name="undo" /> Unarchive
             </button>
           )}
         </div>
       )}
-      {!!task.blocked_by && (
+      {!!gig.blocked_by && (
         <div className="banner banner-danger" role="status">
-          <Icon name="lock" /> Blocked by {task.blocked_by} open task{task.blocked_by === 1 ? "" : "s"}
-          {task.blocked_by_subtasks ? ` (${task.blocked_by_subtasks === task.blocked_by ? (task.blocked_by === 1 ? "its subtask" : "its subtasks") : `${task.blocked_by_subtasks} of them its subtask${task.blocked_by_subtasks === 1 ? "" : "s"}`})` : ""}: agents won't pick it up until {task.blocked_by === 1 ? "it is" : "they are"} done.
+          <Icon name="lock" /> Blocked by {gig.blocked_by} open gig{gig.blocked_by === 1 ? "" : "s"}
+          {gig.blocked_by_subgigs ? ` (${gig.blocked_by_subgigs === gig.blocked_by ? (gig.blocked_by === 1 ? "its subgig" : "its subgigs") : `${gig.blocked_by_subgigs} of them its subgig${gig.blocked_by_subgigs === 1 ? "" : "s"}`})` : ""}: agents won't pick it up until {gig.blocked_by === 1 ? "it is" : "they are"} done.
         </div>
       )}
 
-      <TaskEditor
-        key={task.id}
-        mode="task"
+      <GigEditor
+        key={gig.id}
+        mode="gig"
         v={{
-          title: task.title,
-          description_md: task.description_md,
-          priority: task.priority,
+          title: gig.title,
+          description_md: gig.description_md,
+          priority: gig.priority,
           labels: liveLabels,
           assignees: liveAssignees,
-          color: task.color,
-          start_at: task.start_at,
-          due_at: task.due_at,
-          not_after: task.not_after ?? null,
-          project: task.project_id,
-          status: task.status_id,
-          run: { model: task.model ?? "", effort: task.effort ?? "", always_run: !!task.always_run, allowed_tools: task.allowed_tools ?? [] },
+          color: gig.color,
+          start_at: gig.start_at,
+          due_at: gig.due_at,
+          not_after: gig.not_after ?? null,
+          project: gig.project_id,
+          status: gig.status_id,
+          run: { model: gig.model ?? "", effort: gig.effort ?? "", always_run: !!gig.always_run, allowed_tools: gig.allowed_tools ?? [] },
         }}
         set={(c) => {
-          if (c.project !== undefined) act(api.moveTask(task.id, { project: c.project }), (t) => onMoved(t));
-          else if (c.status !== undefined) act(api.moveTask(task.id, { status: c.status }));
+          if (c.project !== undefined) act(api.moveGig(gig.id, { project: c.project }), (t) => onMoved(t));
+          else if (c.status !== undefined) act(api.moveGig(gig.id, { status: c.status }));
           else if (c.labels) setLiveLabels(c.labels);
           else if (c.assignees) setLiveAssignees(c.assignees);
-          else act(api.patchTask(task.id, c));
+          else act(api.patchGig(gig.id, c));
         }}
-        setRun={(c) => act(api.patchTask(task.id, c))}
-        textVersion={task.version}
+        setRun={(c) => act(api.patchGig(gig.id, c))}
+        textVersion={gig.version}
         saveText={(changes, version) => {
           // only what the editor changed, onto the version it opened on: a title fix never puts back a
           // description someone (or an agent) rewrote meanwhile, and a rewrite of the same text is refused
           if (Object.keys(changes).length === 0) return Promise.resolve(true);
           lastErr.current = null;
-          return act(api.patchTask(task.id, changes, version)).then((ok) => {
+          return act(api.patchGig(gig.id, changes, version)).then((ok) => {
             if (ok) return true;
             load(true);
             return lastErr.current instanceof ApiError && lastErr.current.status === 412 ? "conflict" : false;
@@ -406,28 +406,28 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
         canWrite={canWrite}
         ws={ws}
         statuses={statuses}
-        currentStatus={{ name: task.status_name, category: task.status_category }}
-        labelTags={task.labels}
+        currentStatus={{ name: gig.status_name, category: gig.status_category }}
+        labelTags={gig.labels}
         dates
         knownLabels={labels}
         candidates={candidates}
         alwaysLocked={!can("always_run")}
         canTools={can("allowed_tools")}
         overdue={overdue}
-        aliases={task.aliases}
+        aliases={gig.aliases}
         people={
           <>
-          {(creator || task.assignees.length > 0) && (
+          {(creator || gig.assignees.length > 0) && (
               <div className="tp-people" aria-label="People">
                 {creator && <Avatar user={creator} size="l" />}
-                {task.assignees.length > 0 && <span className="arrow" aria-hidden="true"><Icon name="arrow-right" /></span>}
-                {task.assignees.map((id) => {
+                {gig.assignees.length > 0 && <span className="arrow" aria-hidden="true"><Icon name="arrow-right" /></span>}
+                {gig.assignees.map((id) => {
                   const u = users.get(id);
                   return u ? <Avatar key={id} user={u} size="l" /> : null;
                 })}
                 <span className="muted small">
                   {creator ? `${creator.display_name || creator.username}` : ""}
-                  {task.assignees.length > 0 ? ` → ${task.assignees.map((id) => users.get(id)?.display_name || users.get(id)?.username || "#" + id).join(", ")}` : ""}
+                  {gig.assignees.length > 0 ? ` → ${gig.assignees.map((id) => users.get(id)?.display_name || users.get(id)?.username || "#" + id).join(", ")}` : ""}
                 </span>
               </div>
             )}
@@ -435,8 +435,8 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
         }
         leftSecs={
           <>
-            <ChecklistSection task={task} canEdit={can("checklists")} onTask={onTask} />
-            <SubtasksSection task={task} wsId={ws.id} canCreate={can("create_tasks") && !task.deleted} canEdit={can("relations") && !task.deleted} assignable={candidates.map((u) => u.id)} onOpen={onMoved} onTask={onTask} onChanged={onChanged} />
+            <ChecklistSection gig={gig} canEdit={can("checklists")} onGig={onGig} />
+            <SubgigsSection gig={gig} wsId={ws.id} canCreate={can("create_gigs") && !gig.deleted} canEdit={can("relations") && !gig.deleted} assignable={candidates.map((u) => u.id)} onOpen={onMoved} onGig={onGig} onChanged={onChanged} />
           </>
         }
         mainEnd={
@@ -467,28 +467,28 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                 </article>
               );
             })}
-            {ws.role !== "viewer" && <AddComment taskId={task.id} users={candidates} onDone={load} />}
+            {ws.role !== "viewer" && <AddComment gigId={gig.id} users={candidates} onDone={load} />}
           </section>
         }
         whenEnd={
           <>
-              {!!task.missed_at && (
+              {!!gig.missed_at && (
                 <Row tip="Its window closed before anyone started it" label="Missed" wide className="missed-row">
-                  <span className="pill pill-danger">missed {fmtTime(task.missed_at)}</span>
+                  <span className="pill pill-danger">missed {fmtTime(gig.missed_at)}</span>
                   {canWrite && (
                     <>
-                      <button type="button" className="button secondary small" onClick={() => act(api.patchTask(task.id, { not_after: Date.now() + 3_600_000 }))}>
+                      <button type="button" className="button secondary small" onClick={() => act(api.patchGig(gig.id, { not_after: Date.now() + 3_600_000 }))}>
                         ↻ Reopen window 1 h
                       </button>
-                      <button type="button" className="button secondary small" onClick={() => act(api.patchTask(task.id, { not_after: Date.now() + 86_400_000 }))}>
+                      <button type="button" className="button secondary small" onClick={() => act(api.patchGig(gig.id, { not_after: Date.now() + 86_400_000 }))}>
                         ↻ 1 day
                       </button>
                     </>
                   )}
                 </Row>
               )}
-              {!!task.recurrence_id && (
-                <Row tip="Made by a recurring task: open it to see its template and schedule" label="Repeats" wide className="schedule-ref">
+              {!!gig.recurrence_id && (
+                <Row tip="Made by a recurring gig: open it to see its template and schedule" label="Repeats" wide className="schedule-ref">
                   {schedule === "gone" ? (
                     <span className="muted">from a deleted schedule</span>
                   ) : schedule ? (
@@ -502,7 +502,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                   ) : (
                     <span className="muted">…</span>
                   )}
-                  {!!task.occurrence_at && <span className="pill pill-muted">occurrence {fmtTime(task.occurrence_at)}</span>}
+                  {!!gig.occurrence_at && <span className="pill pill-muted">occurrence {fmtTime(gig.occurrence_at)}</span>}
                 </Row>
               )}
           </>
@@ -510,17 +510,17 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
         detailsEnd={
           <>
               <Row label="Created by" wide className="created">
-                <UserBadge user={creator} /> <span className="muted small">{fmtTime(task.created_at)}</span>
+                <UserBadge user={creator} /> <span className="muted small">{fmtTime(gig.created_at)}</span>
               </Row>
               <Row label="Updated" wide className="muted small">
-                {fmtTime(task.updated_at)}
+                {fmtTime(gig.updated_at)}
               </Row>
           </>
         }
         sideMid={
           <>
           {(cmd || runs.length > 0) && (
-            <div className="tsecs" key={"agent-" + task.id}>
+            <div className="tsecs" key={"agent-" + gig.id}>
               <Section
                 label="Agent session"
                 title="Agent session"
@@ -535,7 +535,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                       <Pill color={runColor[lastRun.status] ?? "#8B8D98"}>{lastRun.status.replace("_", " ")}</Pill>
                       {runs.length > 0 && (
                         <span className="tsec-count">
-                          {runs.length} run{runs.length === 1 ? "" : "s"} · ${task.cost_usd_total.toFixed(2)}
+                          {runs.length} run{runs.length === 1 ? "" : "s"} · ${gig.cost_usd_total.toFixed(2)}
                         </span>
                       )}
                     </>
@@ -575,7 +575,7 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                     <code className="path">{lastRun.transcript_path}</code>
                   </p>
                 )}
-                {canWrite && task.session_id && <Resume task={task} onDone={(t) => act(Promise.resolve(t))} />}
+                {canWrite && gig.session_id && <Resume gig={gig} onDone={(t) => act(Promise.resolve(t))} />}
               </Section>
             </div>
           )}
@@ -583,9 +583,9 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
         }
         rightSecs={
           <>
-            <DependenciesSection task={task} wsId={ws.id} canEdit={can("relations")} onTask={onTask} onOpen={onMoved} />
-            <CustomFieldsSection task={task} fields={fields} canEdit={canWrite} onTask={onTask} />
-            <HistorySection task={task} />
+            <DependenciesSection gig={gig} wsId={ws.id} canEdit={can("relations")} onGig={onGig} onOpen={onMoved} />
+            <CustomFieldsSection gig={gig} fields={fields} canEdit={canWrite} onGig={onGig} />
+            <HistorySection gig={gig} />
           </>
         }
         sideEnd={
@@ -599,28 +599,28 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
                 onClick={() => {
                   if (cloning) return;
                   setCloning(true); // a double click makes one copy
-                  void act(api.cloneTask(task.id), (t) => onMoved(t)).finally(() => setCloning(false));
+                  void act(api.cloneGig(gig.id), (t) => onMoved(t)).finally(() => setCloning(false));
                 }}
               >
                 <Icon name="copy" /> Clone
               </button>
-              {can("archive_tasks") &&
-                !task.deleted &&
-                (task.archived_at ? (
-                  <button type="button" className="button secondary" onClick={() => act(api.unarchiveTask(task.id))}>
+              {can("archive_gigs") &&
+                !gig.deleted &&
+                (gig.archived_at ? (
+                  <button type="button" className="button secondary" onClick={() => act(api.unarchiveGig(gig.id))}>
                     <Icon name="undo" /> Unarchive
                   </button>
                 ) : (
-                  <button type="button" className="button secondary" onClick={() => act(api.archiveTask(task.id))}>
+                  <button type="button" className="button secondary" onClick={() => act(api.archiveGig(gig.id))}>
                     <Icon name="archive" /> Archive
                   </button>
                 ))}
-              {task.deleted ? (
-                <button type="button" className="button secondary" onClick={() => act(api.restoreTask(task.id))}>
+              {gig.deleted ? (
+                <button type="button" className="button secondary" onClick={() => act(api.restoreGig(gig.id))}>
                   <Icon name="undo" /> Restore
                 </button>
               ) : (
-                <button type="button" className="button danger-button" onClick={() => act(api.deleteTask(task.id))}>
+                <button type="button" className="button danger-button" onClick={() => act(api.deleteGig(gig.id))}>
                   <Icon name="trash" /> Delete
                 </button>
               )}
@@ -633,10 +633,10 @@ export function TaskPanel({ taskKey, ws, statuses, labels, canWrite, onClose, on
   );
 }
 
-function Resume({ task, onDone }: { task: Task; onDone: (t: Task) => void }) {
+function Resume({ gig, onDone }: { gig: Gig; onDone: (t: Gig) => void }) {
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
-  const queued = task.resume_requested_at !== null && task.status_category === "todo";
+  const queued = gig.resume_requested_at !== null && gig.status_category === "todo";
   const [busy, setBusy] = useState(false);
   const sending = useRef(false); // a double click (before the re-render disables the button) sends once
   const submit = (e: FormEvent) => {
@@ -645,7 +645,7 @@ function Resume({ task, onDone }: { task: Task; onDone: (t: Task) => void }) {
     sending.current = true;
     setBusy(true);
     api
-      .resumeTask(task.id, text)
+      .resumeGig(gig.id, text)
       .then((t) => {
         setText("");
         onDone(t);
@@ -664,12 +664,12 @@ function Resume({ task, onDone }: { task: Task; onDone: (t: Task) => void }) {
       <button type="submit" className="button" disabled={busy}>
         ▶ Resume
       </button>
-      <p className="muted small">gigg records the request and moves the task back to To-Do; the runner continues the same session.</p>
+      <p className="muted small">gigg records the request and moves the gig back to To-Do; the runner continues the same session.</p>
     </form>
   );
 }
 
-function AddComment({ taskId, users, onDone }: { taskId: number; users: User[]; onDone: () => void }) {
+function AddComment({ gigId, users, onDone }: { gigId: number; users: User[]; onDone: () => void }) {
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -680,7 +680,7 @@ function AddComment({ taskId, users, onDone }: { taskId: number; users: User[]; 
     sending.current = true;
     setBusy(true);
     api
-      .addComment(taskId, text)
+      .addComment(gigId, text)
       .then(() => {
         setText("");
         onDone();
@@ -719,7 +719,7 @@ function AddComment({ taskId, users, onDone }: { taskId: number; users: User[]; 
 
 // useLiveList: a list that saves on each change. The new value shows at once; saves go one at a time,
 // each sending the latest value, and the server's value shows again once they're done. key: the
-// task (another task starts clean).
+// gig (another gig starts clean).
 function useLiveList<T>(key: number, server: T[], save: (v: T[]) => Promise<unknown>): [T[], (v: T[]) => void] {
   const [local, setLocal] = useState<T[] | null>(null);
   const saveRef = useRef(save);

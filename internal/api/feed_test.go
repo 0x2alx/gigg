@@ -55,7 +55,7 @@ func (e *env) allChanges(ws string, c cred, limit int) []ActivityItem {
 func TestFeedOrderingPagingAndParity(t *testing.T) {
 	e := newEnv(t)
 	for i := 0; i < 3; i++ {
-		code, out, _ := e.req("POST", fmt.Sprintf("/tasks/%d/comments", e.ids["scout.task"]), `{"body_md":"c`+strconv.Itoa(i)+`"}`, e.key("scout"))
+		code, out, _ := e.req("POST", fmt.Sprintf("/gigs/%d/comments", e.ids["scout.gig"]), `{"body_md":"c`+strconv.Itoa(i)+`"}`, e.key("scout"))
 		e.ok(code, out, 201)
 	}
 	all := e.allChanges("current", e.key("scout"), 2)
@@ -100,7 +100,7 @@ func TestFeedOrderingPagingAndParity(t *testing.T) {
 	if len(f.Items) != 0 || f.NextAfterID != all[len(all)-1].ID {
 		t.Fatalf("latest: %+v (last %d)", f, all[len(all)-1].ID)
 	}
-	code, out, _ = e.req("POST", fmt.Sprintf("/tasks/%d/comments", e.ids["scout.task"]), `{"body_md":"new"}`, e.key("scout"))
+	code, out, _ = e.req("POST", fmt.Sprintf("/gigs/%d/comments", e.ids["scout.gig"]), `{"body_md":"new"}`, e.key("scout"))
 	e.ok(code, out, 201)
 	f = e.feed(fmt.Sprintf("/workspaces/current/changes?after_id=%d", f.NextAfterID), e.key("scout"))
 	if len(f.Items) != 1 || f.Items[0].Action != "comment.created" || f.More {
@@ -122,7 +122,7 @@ func TestFeedPermissions(t *testing.T) {
 		}
 	}
 	// a key without comments:read is refused
-	body := fmt.Sprintf(`{"name":"nocomments","user_id":%d,"workspace":"scout","scopes":["workspace:read","tasks:read"]}`, e.ids["scout.user"])
+	body := fmt.Sprintf(`{"name":"nocomments","user_id":%d,"workspace":"scout","scopes":["workspace:read","gigs:read"]}`, e.ids["scout.user"])
 	code, out, _ := e.req("POST", "/keys", body, e.ada())
 	e.ok(code, out, 201)
 	var kc KeyCreated
@@ -131,13 +131,13 @@ func TestFeedPermissions(t *testing.T) {
 		t.Fatalf("without comments:read: %d %s", code, out)
 	}
 	// a project-narrowed key sees only its project
-	body = fmt.Sprintf(`{"name":"narrow","user_id":%d,"workspace":"scout","project_ids":[%d],"scopes":["workspace:read","tasks:read","tasks:write","comments:read"]}`,
+	body = fmt.Sprintf(`{"name":"narrow","user_id":%d,"workspace":"scout","project_ids":[%d],"scopes":["workspace:read","gigs:read","gigs:write","comments:read"]}`,
 		e.ids["scout.user"], e.ids["scout.p2"])
 	code, out, _ = e.req("POST", "/keys", body, e.ada())
 	e.ok(code, out, 201)
 	_ = json.Unmarshal(out, &kc)
 	narrow := cred{token: kc.Token, listener: "main"}
-	code, out, _ = e.req("POST", fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p2"]), `{"title":"side task"}`, e.ada())
+	code, out, _ = e.req("POST", fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p2"]), `{"title":"side gig"}`, e.ada())
 	e.ok(code, out, 201)
 	got := e.allChanges("current", narrow, 100)
 	if len(got) == 0 {
@@ -149,7 +149,7 @@ func TestFeedPermissions(t *testing.T) {
 		}
 	}
 	// redaction: the text of a deleted comment is gone for non-admins, kept for the admin
-	code, out, _ = e.req("POST", fmt.Sprintf("/tasks/%d/comments", e.ids["scout.task"]), `{"body_md":"soon gone"}`, e.key("scout"))
+	code, out, _ = e.req("POST", fmt.Sprintf("/gigs/%d/comments", e.ids["scout.gig"]), `{"body_md":"soon gone"}`, e.key("scout"))
 	e.ok(code, out, 201)
 	var c struct{ ID int64 }
 	_ = json.Unmarshal(out, &c)
@@ -294,7 +294,7 @@ func TestEventsStreamAndResume(t *testing.T) {
 	srv := e.sseServer(t)
 	comment := func(text string) {
 		t.Helper()
-		code, out, _ := e.req("POST", fmt.Sprintf("/tasks/%d/comments", e.ids["scout.task"]), `{"body_md":"`+text+`"}`, e.key("scout"))
+		code, out, _ := e.req("POST", fmt.Sprintf("/gigs/%d/comments", e.ids["scout.gig"]), `{"body_md":"`+text+`"}`, e.key("scout"))
 		e.ok(code, out, 201)
 	}
 	latest := e.feed("/workspaces/current/changes?after_id=latest", e.key("scout")).NextAfterID
@@ -370,9 +370,9 @@ func TestEventsPermissionsAndCap(t *testing.T) {
 	}
 	// scout's stream never carries atlas's activity
 	c, _ := e.sseOpen(t, srv, "/workspaces/current/events?after_id=0", bearer(e.keys["scout"]))
-	code, out, _ := e.req("POST", fmt.Sprintf("/tasks/%d/comments", e.ids["atlas.task"]), `{"body_md":"atlas secret again"}`, e.key("atlas"))
+	code, out, _ := e.req("POST", fmt.Sprintf("/gigs/%d/comments", e.ids["atlas.gig"]), `{"body_md":"atlas secret again"}`, e.key("atlas"))
 	e.ok(code, out, 201)
-	code, out, _ = e.req("POST", fmt.Sprintf("/tasks/%d/comments", e.ids["scout.task"]), `{"body_md":"marker"}`, e.key("scout"))
+	code, out, _ = e.req("POST", fmt.Sprintf("/gigs/%d/comments", e.ids["scout.gig"]), `{"body_md":"marker"}`, e.key("scout"))
 	e.ok(code, out, 201)
 	var markerID int64
 	_ = json.Unmarshal(out, &struct{ ID *int64 }{&markerID})
@@ -447,7 +447,7 @@ func TestEventsHTTP2DeadlineCleared(t *testing.T) {
 // can skip the echoes of its own writes without learning anything about anyone else's.
 func TestFeedOwnRequestID(t *testing.T) {
 	e := newEnv(t)
-	path := fmt.Sprintf("/tasks/%d/comments", e.ids["scout.task"])
+	path := fmt.Sprintf("/gigs/%d/comments", e.ids["scout.gig"])
 	code, out, _ := e.req("POST", path, `{"body_md":"mine"}`, e.ada())
 	e.ok(code, out, 201)
 	// another principal writes through the API too, so its entry has a request id to leak

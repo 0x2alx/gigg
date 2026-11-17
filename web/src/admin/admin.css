@@ -38,7 +38,7 @@
 .admin-dim { opacity: 0.6; }
 
 /* tables */
-/* tables: 36px rows, small uppercase headers, a hover tint (the same as the task table) */
+/* tables: 36px rows, small uppercase headers, a hover tint (the same as the gig table) */
 .admin-table-card { padding: 0; overflow-x: auto; }
 .admin-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 .admin-table th {

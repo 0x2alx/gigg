@@ -459,7 +459,7 @@ function Members({ ws, users }: { ws: AdminWorkspace; users: AdminUser[] }) {
                 <ConfirmButton
                   label="Remove"
                   title={`Remove ${u?.username ?? "this member"}?`}
-                  message={`Their own rule for ${ws.name} goes; access from groups or all-workspace rules stays. Tasks they can no longer see are unassigned.`}
+                  message={`Their own rule for ${ws.name} goes; access from groups or all-workspace rules stays. Gigs they can no longer see are unassigned.`}
                   confirmLabel="Remove"
                   onConfirm={() =>
                     adminApi.removeMember(ws.id, m.user_id).then(() => {
@@ -550,7 +550,7 @@ function Projects({ ws }: { ws: AdminWorkspace }) {
     <section className="card" aria-label="Projects">
       <div className="admin-section-head">
         <h2>Projects</h2>
-        <span className="muted small">Task keys look like KEY-12.</span>
+        <span className="muted small">Gig keys look like KEY-12.</span>
       </div>
       <ErrorLine error={error} />
       {items && items.length === 0 && <Empty>No projects yet.</Empty>}
@@ -590,7 +590,7 @@ function Projects({ ws }: { ws: AdminWorkspace }) {
               <ConfirmButton
                 label="Delete"
                 title={`Delete ${p.name}?`}
-                message="Only an empty project can be deleted: move or delete its tasks first."
+                message="Only an empty project can be deleted: move or delete its gigs first."
                 confirmLabel="Delete"
                 onConfirm={() => adminApi.deleteProject(p.id).then(changed)}
               />
@@ -674,7 +674,7 @@ function EditProject({ project, onClose, onDone }: { project: AdminProject; onCl
           Description <span className="muted small">Markdown</span>
           <textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} />
         </label>
-        <p className="muted small span2">The slug ({project.slug}) and key ({project.key}) are fixed once tasks exist.</p>
+        <p className="muted small span2">The slug ({project.slug}) and key ({project.key}) are fixed once gigs exist.</p>
         <div className="span2">
           <ErrorLine error={error} />
         </div>
@@ -762,7 +762,7 @@ function Statuses({ project }: { project: AdminProject }) {
               <span className="admin-name">{s.name}</span>
               <CategoryPill category={s.category} />
               {s.is_default && (
-                <span className="pill pill-accent" title={`New ${s.category} tasks land here`}>
+                <span className="pill pill-accent" title={`New ${s.category} gigs land here`}>
                   default
                 </span>
               )}

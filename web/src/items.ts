@@ -1,5 +1,5 @@
-// Pure helpers for the task-level features: @mentions, checklist ordering, custom field values.
-import type { CustomField, Task, Template, TemplateSubtask } from "./api";
+// Pure helpers for the gig-level features: @mentions, checklist ordering, custom field values.
+import type { CustomField, Gig, Template, TemplateSubgig } from "./api";
 import type { RunSettings } from "./runsettings";
 import { fromDateInput, toDateInput } from "./fields";
 
@@ -146,12 +146,12 @@ export function fromInput(f: Pick<CustomField, "kind">, s: string): unknown {
 }
 
 // cardChips: at most `max` select/checkbox values to show on a card, in field order.
-export function cardChips(task: Pick<Task, "custom">, fields: CustomField[], max = 2): { field: CustomField; text: string }[] {
+export function cardChips(gig: Pick<Gig, "custom">, fields: CustomField[], max = 2): { field: CustomField; text: string }[] {
   const out: { field: CustomField; text: string }[] = [];
   for (const f of fields) {
     if (out.length >= max) break;
     if (f.kind !== "select" && f.kind !== "checkbox") continue;
-    const v = task.custom?.[String(f.id)];
+    const v = gig.custom?.[String(f.id)];
     if (f.kind === "checkbox" && v === true) out.push({ field: f, text: `✓ ${f.name}` });
     else if (f.kind === "select" && typeof v === "string" && v) out.push({ field: f, text: v });
   }
@@ -165,15 +165,15 @@ export function cleanCustom(v: Record<string, unknown>): Record<string, unknown>
   return Object.keys(out).length ? out : undefined;
 }
 
-// normSubs: subtasks as the server stores them (blocks_parent always present), for comparing.
-export function normSubs(xs: TemplateSubtask[]): TemplateSubtask[] {
+// normSubs: subgigs as the server stores them (blocks_parent always present), for comparing.
+export function normSubs(xs: TemplateSubgig[]): TemplateSubgig[] {
   return xs.map((s) => ({ title: s.title.trim(), blocks_parent: !!s.blocks_parent }));
 }
 
 // sameAsTemplate: the form still holds exactly the template's content.
 export function sameAsTemplate(
   t: Template,
-  f: { title: string; description: string; priority: number; taskLabels: string[]; assignees: number[]; color: string | null; run: RunSettings; checklist: string[]; subtasks: TemplateSubtask[]; custom: Record<string, unknown> },
+  f: { title: string; description: string; priority: number; gigLabels: string[]; assignees: number[]; color: string | null; run: RunSettings; checklist: string[]; subgigs: TemplateSubgig[]; custom: Record<string, unknown> },
 ): boolean {
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const sorted = (xs: number[]) => [...xs].sort((a, b) => a - b);
@@ -181,7 +181,7 @@ export function sameAsTemplate(
     t.title === f.title &&
     t.description_md === f.description &&
     t.priority === f.priority &&
-    same(t.labels ?? [], f.taskLabels) &&
+    same(t.labels ?? [], f.gigLabels) &&
     same(sorted(t.assignees ?? []), sorted(f.assignees)) &&
     (t.color ?? null) === (f.color ?? null) &&
     (t.model ?? "") === f.run.model &&
@@ -189,7 +189,7 @@ export function sameAsTemplate(
     !!t.always_run === f.run.always_run &&
     same(t.allowed_tools ?? [], f.run.allowed_tools) &&
     same(t.checklist ?? [], f.checklist) &&
-    same(normSubs(t.subtasks ?? []), normSubs(f.subtasks)) &&
+    same(normSubs(t.subgigs ?? []), normSubs(f.subgigs)) &&
     same(cleanCustom(t.custom ?? {}) ?? {}, cleanCustom(f.custom) ?? {})
   );
 }

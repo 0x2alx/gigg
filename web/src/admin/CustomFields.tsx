@@ -94,7 +94,7 @@ export function CustomFields({ ws }: { ws: AdminWorkspace }) {
     <section className="card" aria-label="Custom fields">
       <div className="admin-section-head">
         <h2>Custom fields</h2>
-        <span className="muted small">Extra properties on every task of {ws.name}.</span>
+        <span className="muted small">Extra properties on every gig of {ws.name}.</span>
         {!allowed && <span className="pill pill-muted">you can't change these</span>}
       </div>
       <ErrorLine error={error} />
@@ -129,7 +129,7 @@ export function CustomFields({ ws }: { ws: AdminWorkspace }) {
                   <ConfirmButton
                     label="Delete"
                     title={`Delete field ${f.name}?`}
-                    message="Its value is removed from every task. This can't be undone."
+                    message="Its value is removed from every gig. This can't be undone."
                     confirmLabel="Delete field"
                     onConfirm={() => fieldsApi.remove(f.id).then(load)}
                   />
@@ -208,7 +208,7 @@ function EditField({ field, onClose, onDone }: { field: CustomField; onClose: ()
         {field.kind === "select" && (
           <div className="span2">
             <OptionsEditor value={options} onChange={setOptions} />
-            {removed.length > 0 && <p className="muted small">Tasks set to {removed.map((r) => `“${r}”`).join(", ")} keep that value until edited.</p>}
+            {removed.length > 0 && <p className="muted small">Gigs set to {removed.map((r) => `“${r}”`).join(", ")} keep that value until edited.</p>}
           </div>
         )}
         <div className="span2">

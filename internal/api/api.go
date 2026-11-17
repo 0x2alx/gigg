@@ -53,7 +53,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger) *API {
 	}
 	mux := http.NewServeMux()
 	hc := huma.DefaultConfig("gigg", version.Version)
-	hc.Info.Description = "gigg task board API. Bearer keys or a browser session. Errors are RFC 9457 problem+json with a stable `code`. POSTs may carry `Idempotency-Key` (1-200 printable chars): a repeat within 24 h replays the first response (`Idempotent-Replayed: true`)."
+	hc.Info.Description = "gigg gig board API. Bearer keys or a browser session. Errors are RFC 9457 problem+json with a stable `code`. POSTs may carry `Idempotency-Key` (1-200 printable chars): a repeat within 24 h replays the first response (`Idempotent-Replayed: true`)."
 	hc.OpenAPIPath = "/openapi"
 	hc.DocsPath = ""
 	hc.SchemasPath = ""
@@ -69,7 +69,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger) *API {
 	a.registerAuth()
 	a.registerUsers()
 	a.registerWorkspaces()
-	a.registerTasks()
+	a.registerGigs()
 	a.registerRuns()
 	a.registerProfile()
 	a.registerRecurrence()
@@ -78,7 +78,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger) *API {
 	a.registerItems()
 	a.registerFeed()
 	a.registerRunner()
-	a.registerCrons()
+	a.registerErrands()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		p := fail(404, "not_found", "No such API endpoint.")
 		writeProblem(w, p)
@@ -178,7 +178,7 @@ func storeErr(err error) error {
 	case errors.Is(err, store.ErrDenied):
 		return fail(403, "forbidden", strings.TrimPrefix(err.Error(), "forbidden: "))
 	case errors.Is(err, store.ErrPaused):
-		return fail(423, "paused", "Task runs are paused for this workspace; an admin resumes them from the dashboard.")
+		return fail(423, "paused", "Gig runs are paused for this workspace; an admin resumes them from the dashboard.")
 	}
 	var p *Problem
 	if errors.As(err, &p) {
@@ -609,7 +609,7 @@ func alwaysRunChange(p *access.Principal, ws int64, old, new bool) error {
 	return allowed(p, ws, "always_run")
 }
 
-// alwaysRunGuard: changing what an always-run task (or schedule, template) does, or reopening it,
+// alwaysRunGuard: changing what an always-run gig (or schedule, template) does, or reopening it,
 // needs the always_run permission too; otherwise anyone who may edit could rewrite a cron job.
 func alwaysRunGuard(p *access.Principal, ws int64, alwaysRun bool) error {
 	if !alwaysRun {
@@ -636,7 +636,7 @@ func userTZ(p *access.Principal) string {
 	return prefs.Timezone
 }
 
-// toolsChange: giving a task (template, recurring task) a tool allowlist, changing it or clearing it
+// toolsChange: giving a gig (template, recurring gig) a tool allowlist, changing it or clearing it
 // needs the allowed_tools permission: the list decides what the runner lets the agent do.
 func toolsChange(p *access.Principal, ws int64, old, new []string) error {
 	if n, err := store.NormTools(new); err == nil && store.SameTools(n, old) {
@@ -648,7 +648,7 @@ func toolsChange(p *access.Principal, ws int64, old, new []string) error {
 	return allowed(p, ws, "allowed_tools")
 }
 
-// toolsGuard: changing what a task with a tool allowlist (or its template, recurring task) does, or
+// toolsGuard: changing what a gig with a tool allowlist (or its template, recurring gig) does, or
 // reopening it, needs the allowed_tools permission too; otherwise anyone who may edit could point the
 // granted tools at other work.
 func toolsGuard(p *access.Principal, ws int64, hasTools bool) error {

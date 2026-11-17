@@ -32,11 +32,11 @@ func TestRebuildMigrationKeepsReferences(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		task, err := CreateTask(ctx, tx, a, NewTask{ProjectID: p.ID, Title: "t"})
+		gig, err := CreateGig(ctx, tx, a, NewGig{ProjectID: p.ID, Title: "t"})
 		if err != nil {
 			return err
 		}
-		r, err := StartRun(ctx, tx, a, task, nil, "new", 1, nil)
+		r, err := StartRun(ctx, tx, a, gig, nil, "new", 1, nil)
 		if err != nil {
 			return err
 		}

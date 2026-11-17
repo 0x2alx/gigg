@@ -216,7 +216,7 @@ function Picture() {
   );
 }
 
-// TimeZoneField: the zone new recurring tasks and schedules start in (each schedule keeps its own),
+// TimeZoneField: the zone new recurring gigs and schedules start in (each schedule keeps its own),
 // saved at once as a preference; empty = this browser's zone.
 function TimeZoneField() {
   const { prefs, setPref } = useApp();
@@ -231,7 +231,7 @@ function TimeZoneField() {
   const base = zones.includes("UTC") ? zones : ["UTC", ...zones];
   const list = current && !base.includes(current) ? [current, ...base] : base;
   return (
-    <label className="span2" data-tip="Recurring tasks and schedules you create start in this zone (each keeps its own afterwards), and their times are shown in it.">
+    <label className="span2" data-tip="Recurring gigs and schedules you create start in this zone (each keeps its own afterwards), and their times are shown in it.">
       <span>
         Time zone <span className="muted small">saved as soon as you pick it</span>
       </span>

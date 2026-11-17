@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { compareTasks } from "./tableSort";
+import { compareGigs } from "./tableSort";
 
 const t = (id: number, key: string, o: Partial<{ title: string; priority: number; due_at: number | null; updated_at: number; created_at: number }> = {}) => ({
   id, key, title: o.title ?? key, priority: o.priority ?? 0, due_at: o.due_at ?? null, updated_at: o.updated_at ?? 0, created_at: o.created_at ?? 0,
 });
-const order = (rows: ReturnType<typeof t>[], key: Parameters<typeof compareTasks>[2]["key"], desc = false) => [...rows].sort((a, b) => compareTasks(a, b, { key, desc })).map((r) => r.key);
+const order = (rows: ReturnType<typeof t>[], key: Parameters<typeof compareGigs>[2]["key"], desc = false) => [...rows].sort((a, b) => compareGigs(a, b, { key, desc })).map((r) => r.key);
 
-describe("compareTasks", () => {
+describe("compareGigs", () => {
   it("sorts keys by project, then number (not as text)", () => {
     expect(order([t(1, "GIG-10"), t(2, "DOC-3"), t(3, "GIG-9")], "number")).toEqual(["DOC-3", "GIG-9", "GIG-10"]);
   });
-  it("puts tasks without a due date last in both directions", () => {
+  it("puts gigs without a due date last in both directions", () => {
     const rows = [t(1, "A-1", { due_at: 200 }), t(2, "A-2"), t(3, "A-3", { due_at: 100 })];
     expect(order(rows, "due")).toEqual(["A-3", "A-1", "A-2"]);
     expect(order(rows, "due", true)).toEqual(["A-1", "A-3", "A-2"]);

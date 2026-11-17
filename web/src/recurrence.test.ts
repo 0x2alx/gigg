@@ -110,7 +110,7 @@ describe("windowBadge", () => {
     expect(windowBadge(t, at(10))).toEqual({ text: "closes 11:00", state: "open" });
     expect(windowBadge(t, at(12))).toEqual({ text: "window closed", state: "closed" });
   });
-  it("hides when there's no window or the task was missed", () => {
+  it("hides when there's no window or the gig was missed", () => {
     expect(windowBadge({ start_at: at(9), not_after: null }, at(8))).toBeNull();
     expect(windowBadge({ start_at: at(9), not_after: at(11), missed_at: at(11) }, at(12))).toBeNull();
   });

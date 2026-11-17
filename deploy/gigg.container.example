@@ -2,7 +2,7 @@
 # adjust. HTTPS on the main listener from certificate files; an extra plain-HTTP listener on
 # loopback for local API/MCP clients (optional).
 [Unit]
-Description=gigg task board
+Description=gigg gig board
 
 [Container]
 Image=localhost/gigg:latest

@@ -37,8 +37,8 @@ export function TriState({ value, onChange, inheritWord = "Inherit", label, disa
   );
 }
 
-// these only take effect together with Edit tasks (the server checks that first)
-export const NEEDS_EDIT = new Set(["create_tasks", "delete_tasks", "archive_tasks", "relations", "checklists", "templates", "schedules"]);
+// these only take effect together with Edit gigs (the server checks that first)
+export const NEEDS_EDIT = new Set(["create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "templates", "schedules"]);
 
 export function Effective({ allowed, blocked }: { allowed: boolean; blocked?: string }) {
   if (allowed && blocked)
@@ -117,7 +117,7 @@ function RuleEditor({ info, rule, ws, decisions, busy, onSet, who }: {
                     {p.label}
                     <span className="muted small perm-desc">{p.description}</span>
                   </span>
-                  {d && <Effective allowed={d.allowed} blocked={NEEDS_EDIT.has(p.name) && dec.get("edit_tasks")?.allowed === false ? "Edit tasks" : undefined} />}
+                  {d && <Effective allowed={d.allowed} blocked={NEEDS_EDIT.has(p.name) && dec.get("edit_gigs")?.allowed === false ? "Edit gigs" : undefined} />}
                   {d && <span className={"pill perm-src perm-src-" + d.source}>{sourceText(d)}</span>}
                   <span className="grow" />
                   <TriState

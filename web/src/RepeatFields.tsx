@@ -1,4 +1,4 @@
-// The "Repeat" block of the task modal: frequency, days, the time window, lead time, end, and a live
+// The "Repeat" block of the gig modal: frequency, days, the time window, lead time, end, and a live
 // preview of the next occurrences (computed client-side, same rules as the server).
 import { useMemo, type ReactNode } from "react";
 import { WEEKDAYS, fmtWallWindow, localTZ, ordinal, previewOccurrences, repeatProblem, ruleOf, windowMinutes, type Freq, type RepeatState } from "./recurrence";
@@ -15,7 +15,7 @@ const int = (v: string, min: number) => {
   return Number.isFinite(n) ? Math.max(min, n) : min;
 };
 
-// timingOnly: just a schedule's timing (no end, overlap or pause: those belong to a recurring task).
+// timingOnly: just a schedule's timing (no end, overlap or pause: those belong to a recurring gig).
 export function RepeatFields({ value: s, onChange, allowNever = true, showPaused, timingOnly, children }: {
   value: RepeatState; onChange: (s: RepeatState) => void; allowNever?: boolean; showPaused?: boolean; timingOnly?: boolean; children?: ReactNode;
 }) {

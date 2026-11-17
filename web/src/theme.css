@@ -190,7 +190,7 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   display: flex;
   flex-direction: column;
   min-height: 0;
-  position: relative; z-index: 40; /* an open panel lies over the page and the task panel (30), under popovers (45) */
+  position: relative; z-index: 40; /* an open panel lies over the page and the gig panel (30), under popovers (45) */
 }
 .brand {
   display: inline-flex; align-items: center; gap: 0.45rem; min-width: 0;
@@ -261,7 +261,7 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted);
   font-family: var(--mono); font-size: var(--fs-xs); font-weight: var(--weight-body); line-height: 1.55; font-variant-numeric: tabular-nums;
 }
-/* the column's tools (new task, collapse) show on hover and keyboard focus, and always on touch screens */
+/* the column's tools (new gig, collapse) show on hover and keyboard focus, and always on touch screens */
 /* a narrow column (five on a tablet) keeps its name readable: the stage icon goes, the tools get compact */
 .column { container: col / inline-size; }
 @container col (max-width: 13rem) {
@@ -311,8 +311,8 @@ a.pulse-item:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .pulse-dot { animation: none; } }
 .empty { color: var(--muted); font-size: var(--fs-sm); padding: 0.3rem 0.2rem; }
 
-/* a card: hairline border, a coloured stripe only when the task has a colour, a shadow only while dragged */
-.task-card {
+/* a card: hairline border, a coloured stripe only when the gig has a colour, a shadow only while dragged */
+.gig-card {
   position: relative;
   background: var(--surface);
   border: max(1px, var(--border-w)) solid var(--edge); /* at least 1px: blocked, missed and archived show on it */
@@ -320,8 +320,8 @@ a.pulse-item:hover { color: var(--text); }
   box-shadow: inset 3px 0 0 var(--card-c, transparent);
   transition: border-color var(--dur-1) ease-out, background-color var(--dur-1) ease-out, box-shadow var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
 }
-.task-card:hover, .task-card:focus-within { border-color: var(--edge-hover); background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
-.task-card.dragging { box-shadow: var(--shadow-pop), inset 3px 0 0 var(--card-c, transparent); }
+.gig-card:hover, .gig-card:focus-within { border-color: var(--edge-hover); background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
+.gig-card.dragging { box-shadow: var(--shadow-pop), inset 3px 0 0 var(--card-c, transparent); }
 .card-open {
   display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit;
   padding: 0.6rem 0.7rem 0.6rem 0.8rem; cursor: pointer; border-radius: var(--radius-m);
@@ -330,11 +330,11 @@ a.pulse-item:hover { color: var(--text); }
 .key { font-size: var(--fs-sm); color: var(--muted); font-weight: var(--weight-body); font-variant-numeric: tabular-nums; }
 /* the key sits top right, small and monospaced; the card's ⋯ takes its place on hover */
 .card-key { margin-left: auto; font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.01em; }
-.task-card:has(> .card-menu):hover .card-key, .task-card:has(> .card-menu):focus-within .card-key { visibility: hidden; }
+.gig-card:has(> .card-menu):hover .card-key, .gig-card:has(> .card-menu):focus-within .card-key { visibility: hidden; }
 /* touch screens: the ⋯ is always there, so the key moves left of it instead */
 @media (hover: none) {
-  .task-card:has(> .card-menu) .card-top { padding-right: 1.6rem; }
-  .task-card:has(> .card-menu):hover .card-key, .task-card:has(> .card-menu):focus-within .card-key { visibility: visible; }
+  .gig-card:has(> .card-menu) .card-top { padding-right: 1.6rem; }
+  .gig-card:has(> .card-menu):hover .card-key, .gig-card:has(> .card-menu):focus-within .card-key { visibility: visible; }
 }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 /* the agent state of a card: a small uppercase badge in the state's colour */
@@ -383,7 +383,7 @@ a.pulse-item:hover { color: var(--text); }
 .card-fail-text .ico { color: var(--danger); margin-top: 0.15em; }
 .card-fail-text > span { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .card-fail .button { flex: none; }
-.task-card.state-running { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
+.gig-card.state-running { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
 .card-ws, .card-status { display: inline-flex; align-items: center; gap: 0.3rem; font-size: var(--fs-sm); color: var(--muted); min-width: 0; max-width: 100%; }
 .card-ws { max-width: 9rem; overflow: hidden; white-space: nowrap; }
 .card-title {
@@ -393,7 +393,7 @@ a.pulse-item:hover { color: var(--text); }
 .prio-icon { display: inline-flex; flex: none; font-size: 1rem; color: var(--muted); }
 .prio-icon-3, .prio-icon-4 { color: color-mix(in srgb, var(--c) var(--badge-mix), var(--text)); }
 .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.25rem 0; }
-.task-card .chips { margin: 0; align-items: center; }
+.gig-card .chips { margin: 0; align-items: center; }
 .chip-more { font-size: var(--fs-xs); color: var(--muted); padding: 0 0.2rem; font-variant-numeric: tabular-nums; }
 .chip {
   font-size: 0.72rem; font-weight: 400; background: var(--surface-variant); border-radius: var(--radius-s);
@@ -401,11 +401,11 @@ a.pulse-item:hover { color: var(--text); }
 }
 .card-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: var(--sp-3); }
 .card-foot:has(> .meta:empty):not(:has(> .people)) { display: none; }
-/* who: 20px avatars stacked with a ring of the card colour; a person handing a task to an agent shows
+/* who: 20px avatars stacked with a ring of the card colour; a person handing a gig to an agent shows
    as creator, a small arrow, then the assignees */
 .people { display: inline-flex; align-items: center; margin-left: auto; flex: none; }
 .people .avatar { border-color: var(--surface); }
-.task-card:hover .people .avatar, .task-card:focus-within .people .avatar { border-color: color-mix(in srgb, var(--text) 3%, var(--surface)); }
+.gig-card:hover .people .avatar, .gig-card:focus-within .people .avatar { border-color: color-mix(in srgb, var(--text) 3%, var(--surface)); }
 .people .avatar + .avatar { margin-left: -0.3rem; }
 .people .creator { display: inline-flex; align-items: center; gap: 0.1rem; margin-right: 0.1rem; color: var(--muted); font-size: 0.8rem; }
 /* quiet facts: icon and number in muted text, no box */
@@ -417,8 +417,8 @@ a.pulse-item:hover { color: var(--text); }
 .card-menu { position: absolute; top: 0.25rem; right: 0.25rem; transition: opacity 0.12s ease-out; }
 .card-menu > .icon-button { width: 1.6rem; height: 1.6rem; padding: 0; }
 /* the card's menu button shows on hover and keyboard focus (it stays in the tab order), and always on touch screens */
-.task-card:not(:hover):not(:focus-within) .card-menu:not(:has(.menu)) { opacity: 0; }
-@media (hover: none) { .task-card .card-menu { opacity: 1 !important; } }
+.gig-card:not(:hover):not(:focus-within) .card-menu:not(:has(.menu)) { opacity: 0; }
+@media (hover: none) { .gig-card .card-menu { opacity: 1 !important; } }
 .menu {
   position: absolute; right: 0; top: calc(100% + 0.25rem); z-index: 20; min-width: 11rem;
   background: var(--high); border: 1px solid var(--line-strong); border-radius: var(--radius-m);
@@ -431,14 +431,14 @@ a.pulse-item:hover { color: var(--text); }
 .menu button:hover, .menu button:focus-visible { background: color-mix(in srgb, var(--text) 10%, var(--high)); }
 .menu-label { font-size: var(--fs-xs); text-transform: uppercase; color: var(--muted); padding: 0.3rem 0.5rem 0.1rem; }
 
-.new-task { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; }
+.new-gig { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; }
 .row { display: flex; gap: 0.6rem; align-items: flex-end; }
 .row.wrap { flex-wrap: wrap; margin: 0.75rem 0; }
 .row.end { justify-content: flex-end; }
 .grow { flex: 1; }
 
-/* Task panel: a side panel over the board. */
-/* the one surface with a side shadow: a hairline edge, the task's colour as a 3px inner stripe */
+/* Gig panel: a side panel over the board. */
+/* the one surface with a side shadow: a hairline edge, the gig's colour as a 3px inner stripe */
 .panel {
   position: fixed; top: 0; right: 0; bottom: 0; width: min(40rem, 100vw); z-index: 30;
   background: var(--surface); border-left: 1px solid var(--line-strong);
@@ -544,7 +544,7 @@ a.pulse-item:hover { color: var(--text); }
 }
 .chip-x { background: none; border: 0; cursor: pointer; font: inherit; color: inherit; padding: 0 0 0 0.15rem; line-height: 1; }
 /* Avatars (outer size, the 1.5px ring included): xs 23px (20px visible) for cards and dense rows,
-   s 25px for lists, l 32px for comments and the task header, m 48px for profiles. Initials stay at
+   s 25px for lists, l 32px for comments and the gig header, m 48px for profiles. Initials stay at
    least 9.5px and tightly tracked so two letters read at the smallest size. */
 .avatar {
   position: relative; display: inline-grid; place-items: center; flex: none;
@@ -728,7 +728,7 @@ a.pulse-item:hover { color: var(--text); }
 .avatar-img img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
 @media (max-width: 720px) { .editor-row { grid-template-columns: 1fr; } }
 
-/* ---- recurring tasks: repeat fields, schedules list, window badges ---- */
+/* ---- recurring gigs: repeat fields, schedules list, window badges ---- */
 .repeat {
   display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0;
   background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-m); padding: var(--sp-5);
@@ -790,12 +790,12 @@ label.check input { width: auto; accent-color: var(--accent); }
 .window { display: flex; flex-direction: column; gap: 0.4rem; }
 .window .dates input, .dates input { max-width: 100%; min-width: 0; }
 .missed-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
-.task-card.missed { border-color: var(--danger); }
+.gig-card.missed { border-color: var(--danger); }
 .card-top .pill { max-width: 100%; }
 
 /* drag and drop */
-.task-card[draggable="true"] { cursor: grab; }
-.task-card.dragging > :not(.card-menu) { opacity: 0.4; }
+.gig-card[draggable="true"] { cursor: grab; }
+.gig-card.dragging > :not(.card-menu) { opacity: 0.4; }
 .column.drag-over { background: var(--high); border-color: var(--accent); }
 /* the line sits in the gap between cards, so showing it never shifts the cards under the pointer */
 .drop-line { height: 3px; border-radius: 999px; background: var(--accent); pointer-events: none; }
@@ -840,9 +840,9 @@ label.check input { width: auto; accent-color: var(--accent); }
   .modal-backdrop { padding: 3vh 0.5rem 1rem; }
 }
 
-/* ---- task items: checklist, subtasks, dependencies, custom fields, templates, mentions ---- */
+/* ---- gig items: checklist, subgigs, dependencies, custom fields, templates, mentions ---- */
 .pill-done { --c: var(--accent); }
-/* checklist, subtasks, dependencies, fields: flat sections under a hairline, a small uppercase header
+/* checklist, subgigs, dependencies, fields: flat sections under a hairline, a small uppercase header
    row (chevron, title, quiet count) that folds them */
 .tsecs { display: contents; }
 .history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
@@ -936,9 +936,9 @@ label.check input { width: auto; accent-color: var(--accent); }
 .archive-row input { width: auto; flex: none; accent-color: var(--accent); }
 .archive-all { border-style: dashed; font-weight: var(--weight-strong); }
 .button.on { outline: 2px solid var(--accent); outline-offset: 1px; }
-.task-card.archived { border-style: dashed; }
-.task-card.archived > :not(.card-menu) { opacity: 0.55; }
-.task-card.blocked { border-color: var(--danger); }
+.gig-card.archived { border-style: dashed; }
+.gig-card.archived > :not(.card-menu) { opacity: 0.55; }
+.gig-card.blocked { border-color: var(--danger); }
 .card-top .pill-danger, .card-top .pill-done { flex: none; }
 
 /* ---- bell, notifications, live indicator, saved views in the sidebar ---- */
@@ -946,7 +946,7 @@ button.nav-item { background: none; border: 0; font: inherit; font-size: var(--f
 button.nav-item:not(.selected) { color: var(--muted); }
 button.nav-item:hover { color: var(--text); }
 button.nav-item.selected, button.nav-item.selected:hover { color: var(--on-accent); }
-/* The bell popover lives in <body> (portal). Layers: sticky bars 5, card menus 20, task panel 30,
+/* The bell popover lives in <body> (portal). Layers: sticky bars 5, card menus 20, gig panel 30,
    this 45, modals 50, palette/toasts 60. The background is solid even if a theme colour has alpha. */
 .bell-pop {
   position: fixed; z-index: 45; width: min(380px, calc(100vw - 16px));
@@ -1048,7 +1048,7 @@ button.nav-item.selected, button.nav-item.selected:hover { color: var(--on-accen
   .tg-match { flex-basis: 100%; }
 }
 
-/* ---- task panel layout: sticky header, grouped property grid, description, actions ---- */
+/* ---- gig panel layout: sticky header, grouped property grid, description, actions ---- */
 .panel { width: min(760px, 100vw); container: tpanel / inline-size; padding-top: 0; }
 .panel:focus { outline: none; }
 .panel > .close:first-child { margin-top: 0.75rem; width: 1.94rem; height: 1.94rem; padding: 0; display: inline-grid; place-items: center; font-size: 1rem; }
@@ -1220,7 +1220,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   .narrow .admin-table td:first-child { flex: 1 1 100%; }
   .narrow .admin-table td.admin-actions { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: flex-start; }
   .narrow .admin-table td.admin-actions > * { margin-left: 0; }
-  /* task panel folding boxes: the phone padding of the other boxes (further down) */
+  /* gig panel folding boxes: the phone padding of the other boxes (further down) */
   .tsec-head { padding: var(--sp-3) var(--sp-5); }
   .tsec-body { padding: var(--sp-2) var(--sp-5) var(--sp-5); }
   .narrow .admin-table td[data-label]::before, .narrow .vw-table td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: 0.8rem; }
@@ -1493,7 +1493,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 @keyframes g-fade { from { opacity: 0; } }
 @keyframes g-rise { from { opacity: 0; transform: translateY(8px); } }
 /* pages rise with `top`, not a transform: a transform would make the page the frame of its fixed
-   children (the task panel, dialogs) while it runs */
+   children (the gig panel, dialogs) while it runs */
 @keyframes g-page { from { opacity: 0; top: 10px; } }
 @keyframes g-pop { from { opacity: 0; transform: translateY(6px) scale(0.97); } }
 @keyframes g-pop-out { to { opacity: 0; transform: translateY(6px) scale(0.97); } }
@@ -1598,14 +1598,14 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
   }
 }
 
-/* ---- the task form (TaskModal): titled sections on soft panels, fields in grids; full page in two columns.
-   In the dialog the sections run in reading order (task, where, when, people, checklist, agent run); the
-   two column wrappers only take effect on the full page (main: task and checklist; side: the rest). ---- */
+/* ---- the gig form (GigModal): titled sections on soft panels, fields in grids; full page in two columns.
+   In the dialog the sections run in reading order (gig, where, when, people, checklist, agent run); the
+   two column wrappers only take effect on the full page (main: gig and checklist; side: the rest). ---- */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .modal-head > h2 { flex: 1; min-width: 0; }
 .modal-head > .modal-expand { width: 1.94rem; height: 1.94rem; padding: 0; display: inline-grid; place-items: center; font-size: 0.95rem; flex: none; color: var(--muted); }
 .modal-head > .modal-expand:hover { color: var(--text); }
-/* the task form is laid out like the task panel (its boxes, rows and two columns when wide): the
+/* the gig form is laid out like the gig panel (its boxes, rows and two columns when wide): the
    form is a tpanel container too */
 .tm-form { display: flex; flex-direction: column; container: tpanel / inline-size; }
 .tm-form > .tp-body { margin-top: 0; }
@@ -1614,9 +1614,9 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
   background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-l);
   padding: var(--sp-5) var(--sp-6) var(--sp-6); min-width: 0;
 }
-/* the form's task box: the template rows, then the title and description as the panel edits them */
-.tp-task > .te-head { margin-bottom: var(--sp-4); }
-.tp-task .tpl-pick select { width: auto; flex: 0 1 auto; max-width: 100%; }
+/* the form's gig box: the template rows, then the title and description as the panel edits them */
+.tp-gig > .te-head { margin-bottom: var(--sp-4); }
+.tp-gig .tpl-pick select { width: auto; flex: 0 1 auto; max-width: 100%; }
 .tsec-note { margin: 0; }
 /* Repeat inside a When group: its rows join the group's label | value columns */
 .tp-grid > .repeat, .tp-grid > .repeat > .rf { display: contents; }
@@ -1629,7 +1629,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
   .tp-grid .rf-l, .tp-grid .rf-c { grid-column: 1; }
   .tp-grid .rf-l { min-height: 0; margin-top: 0.4rem; }
 }
-/* a subtask's "blocks parent" switch */
+/* a subgig's "blocks parent" switch */
 .sub-gate { flex: none; display: inline-flex; font-size: var(--fs-sm); white-space: nowrap; cursor: pointer; }
 .sub-gate .ico { font-size: 0.8rem; }
 .sub-gate:has(input:checked) { color: var(--danger); }
@@ -1658,7 +1658,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
   .modal.modal-full { height: 100dvh; max-height: 100dvh; border-radius: 0; }
 }
 
-/* the lists that span every workspace (recurring tasks, templates, schedules): a filter bar on top */
+/* the lists that span every workspace (recurring gigs, templates, schedules): a filter bar on top */
 .list-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-4); margin: 0 0 var(--sp-5); min-height: var(--ctl-h); }
 .place-filter {
   min-height: var(--ctl-h); background: var(--surface-variant); border: 1px solid transparent; border-radius: var(--ctl-r);
@@ -1672,102 +1672,102 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .place-filter:has(select.active) { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 .tm-foot .save-tpl .link { font-size: var(--fs-sm); }
 
-/* the task panel starts under the top bar on wide screens, so the inbox and the bell stay in reach */
+/* the gig panel starts under the top bar on wide screens, so the inbox and the bell stay in reach */
 @media (min-width: 721px) {
   .panel { top: var(--topbar-h); border-top: 1px solid var(--line-strong); border-top-left-radius: var(--radius-l); }
 }
 @media (max-width: 720px) {
   :root { --topbar-h: calc(2.4rem + 0.9rem + 1px); }
 }
-/* subtask titles wrap next to their "blocks parent" switch instead of being cut off */
+/* subgig titles wrap next to their "blocks parent" switch instead of being cut off */
 .sub-list .rel-title { white-space: normal; overflow-wrap: anywhere; }
 
-/* ---- Crons page: a table (cards on a phone), the side panel with runs and output, the editor ---- */
-.crons { width: 100%; min-width: 0; }
-.crons .page-head p { margin: var(--sp-2) 0 0; max-width: 46rem; font-size: var(--fs-base); }
-.cron-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-5); }
-.cron-search { width: min(18rem, 100%); }
+/* ---- Errands page: a table (cards on a phone), the side panel with runs and output, the editor ---- */
+.errands { width: 100%; min-width: 0; }
+.errands .page-head p { margin: var(--sp-2) 0 0; max-width: 46rem; font-size: var(--fs-base); }
+.errand-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-5); }
+.errand-search { width: min(18rem, 100%); }
 .admin-seg-count.danger { color: var(--danger); font-weight: var(--weight-strong); }
-.cron-empty { padding: var(--sp-6); max-width: 46rem; }
-.cron-empty p { margin: 0 0 var(--sp-3); }
-.cron-table-card { padding: 0; overflow-x: auto; }
-.cron-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
-.cron-table th { text-align: left; font-size: var(--fs-sm); font-weight: var(--weight-strong); color: var(--muted); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); white-space: nowrap; }
-.cron-table td { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); vertical-align: middle; }
-.cron-table th:first-child, .cron-table td:first-child { padding-left: var(--sp-5); }
-.cron-table tbody tr:last-child td { border-bottom: 0; }
-.cron-row { cursor: pointer; }
-.cron-row:hover, .cron-row.on { background: var(--hover); }
-.cron-row.cron-failing td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
-.cron-row.cron-paused { color: var(--muted); }
-.cron-name-cell { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); min-width: 14rem; }
-.cron-name { font-weight: var(--weight-strong); color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
-.cron-name:hover { text-decoration: underline; }
-.cron-state { display: inline-flex; align-items: center; gap: 0.35rem; font-size: var(--fs-sm); color: var(--c); font-weight: var(--weight-strong); white-space: nowrap; }
-.cron-state .dot { background: var(--c); }
-.cron-name-cell .cron-state { width: 4.6rem; }
-.cron-sched { white-space: nowrap; }
-.cron-worker { white-space: nowrap; }
-.cron-worker, .cron-worker-name { display: inline-flex; align-items: center; gap: var(--sp-2); }
-.cron-last { white-space: nowrap; }
-.cron-last-v > * + * { margin-left: var(--sp-3); }
-.cron-run-status { font-size: var(--fs-sm); font-weight: var(--weight-strong); white-space: nowrap; }
-.cron-run-ok { color: color-mix(in srgb, var(--ok) 75%, var(--text)); }
-.cron-run-bad { color: var(--danger); }
-.cron-run-muted { color: var(--muted); }
-.cron-run-running { color: var(--accent); }
-.cron-exit { font-family: var(--mono); font-weight: normal; }
+.errand-empty { padding: var(--sp-6); max-width: 46rem; }
+.errand-empty p { margin: 0 0 var(--sp-3); }
+.errand-table-card { padding: 0; overflow-x: auto; }
+.errand-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
+.errand-table th { text-align: left; font-size: var(--fs-sm); font-weight: var(--weight-strong); color: var(--muted); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.errand-table td { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); vertical-align: middle; }
+.errand-table th:first-child, .errand-table td:first-child { padding-left: var(--sp-5); }
+.errand-table tbody tr:last-child td { border-bottom: 0; }
+.errand-row { cursor: pointer; }
+.errand-row:hover, .errand-row.on { background: var(--hover); }
+.errand-row.errand-failing td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+.errand-row.errand-paused { color: var(--muted); }
+.errand-name-cell { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); min-width: 14rem; }
+.errand-name { font-weight: var(--weight-strong); color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.errand-name:hover { text-decoration: underline; }
+.errand-state { display: inline-flex; align-items: center; gap: 0.35rem; font-size: var(--fs-sm); color: var(--c); font-weight: var(--weight-strong); white-space: nowrap; }
+.errand-state .dot { background: var(--c); }
+.errand-name-cell .errand-state { width: 4.6rem; }
+.errand-sched { white-space: nowrap; }
+.errand-worker { white-space: nowrap; }
+.errand-worker, .errand-worker-name { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.errand-last { white-space: nowrap; }
+.errand-last-v > * + * { margin-left: var(--sp-3); }
+.errand-run-status { font-size: var(--fs-sm); font-weight: var(--weight-strong); white-space: nowrap; }
+.errand-run-ok { color: color-mix(in srgb, var(--ok) 75%, var(--text)); }
+.errand-run-bad { color: var(--danger); }
+.errand-run-muted { color: var(--muted); }
+.errand-run-running { color: var(--accent); }
+.errand-exit { font-family: var(--mono); font-weight: normal; }
 @media (max-width: 720px) {
-  .cron-table thead { display: none; }
-  .cron-table, .cron-table tbody, .cron-table tr, .cron-table td { display: block; }
-  .cron-table tr { padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--line); }
-  .cron-table tbody tr:last-child { border-bottom: 0; }
-  .cron-table td, .cron-table td:first-child { padding: 0; border: 0; }
-  .cron-table td + td { margin-top: var(--sp-2); }
-  .cron-table td[data-label] { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); }
-  .cron-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: var(--fs-sm); }
-  .cron-table td[data-label] > * { grid-column: 2; }
-  .cron-table td.cron-name-cell { display: flex; min-width: 0; margin-bottom: var(--sp-2); }
-  .cron-sched { white-space: normal; }
-  .cron-row.cron-failing td:first-child { box-shadow: none; }
-  .cron-row.cron-failing { box-shadow: inset 3px 0 0 var(--danger); }
+  .errand-table thead { display: none; }
+  .errand-table, .errand-table tbody, .errand-table tr, .errand-table td { display: block; }
+  .errand-table tr { padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--line); }
+  .errand-table tbody tr:last-child { border-bottom: 0; }
+  .errand-table td, .errand-table td:first-child { padding: 0; border: 0; }
+  .errand-table td + td { margin-top: var(--sp-2); }
+  .errand-table td[data-label] { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); }
+  .errand-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: var(--fs-sm); }
+  .errand-table td[data-label] > * { grid-column: 2; }
+  .errand-table td.errand-name-cell { display: flex; min-width: 0; margin-bottom: var(--sp-2); }
+  .errand-sched { white-space: normal; }
+  .errand-row.errand-failing td:first-child { box-shadow: none; }
+  .errand-row.errand-failing { box-shadow: inset 3px 0 0 var(--danger); }
 }
-.cron-panel .panel-title { margin-top: var(--sp-4); }
-.cron-actions { margin: 0 0 var(--sp-5); gap: var(--sp-3); align-items: center; }
-.cron-props { margin-top: var(--sp-4); }
-.cron-h { font-size: var(--fs-base); margin: var(--sp-6) 0 var(--sp-3); }
-.cron-cmd, .cron-out {
+.errand-panel .panel-title { margin-top: var(--sp-4); }
+.errand-actions { margin: 0 0 var(--sp-5); gap: var(--sp-3); align-items: center; }
+.errand-props { margin-top: var(--sp-4); }
+.errand-h { font-size: var(--fs-base); margin: var(--sp-6) 0 var(--sp-3); }
+.errand-cmd, .errand-out {
   margin: 0; padding: var(--sp-4); background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-m);
   font-family: var(--mono); font-size: var(--fs-sm); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto;
 }
-.cron-desc { white-space: pre-wrap; margin: var(--sp-4) 0 0; }
-.cron-runs { list-style: none; margin: 0 0 var(--sp-4); padding: 0; border: 1px solid var(--line); border-radius: var(--radius-m); }
-.cron-run + .cron-run { border-top: 1px solid var(--line); }
-.cron-run-head {
+.errand-desc { white-space: pre-wrap; margin: var(--sp-4) 0 0; }
+.errand-runs { list-style: none; margin: 0 0 var(--sp-4); padding: 0; border: 1px solid var(--line); border-radius: var(--radius-m); }
+.errand-run + .errand-run { border-top: 1px solid var(--line); }
+.errand-run-head {
   display: flex; align-items: center; gap: var(--sp-4); width: 100%; padding: var(--sp-3) var(--sp-4);
   background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
-.cron-run-head:disabled { cursor: default; opacity: 1; }
-.cron-run-head:not(:disabled):hover { background: var(--hover); }
-.cron-run-head .cron-run-status { width: 6.5rem; flex: none; }
-.cron-run-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.cron-run-meta { margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.cron-run-chev { flex: none; color: var(--muted); }
-.cron-run-body { padding: 0 var(--sp-4) var(--sp-4); }
-.cron-run-body p { margin: 0 0 var(--sp-3); }
+.errand-run-head:disabled { cursor: default; opacity: 1; }
+.errand-run-head:not(:disabled):hover { background: var(--hover); }
+.errand-run-head .errand-run-status { width: 6.5rem; flex: none; }
+.errand-run-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.errand-run-meta { margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.errand-run-chev { flex: none; color: var(--muted); }
+.errand-run-body { padding: 0 var(--sp-4) var(--sp-4); }
+.errand-run-body p { margin: 0 0 var(--sp-3); }
 @media (max-width: 720px) {
-  .cron-run-head { flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
-  .cron-run-meta { margin-left: 0; flex-basis: 100%; }
-  .cron-run-chev { position: absolute; right: var(--sp-5); }
-  .cron-run-head { position: relative; padding-right: var(--sp-8); }
+  .errand-run-head { flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
+  .errand-run-meta { margin-left: 0; flex-basis: 100%; }
+  .errand-run-chev { position: absolute; right: var(--sp-5); }
+  .errand-run-head { position: relative; padding-right: var(--sp-8); }
 }
-.cron-cmd-input { font-family: var(--mono); font-size: var(--fs-sm); }
-.cron-tz { width: 14rem; max-width: 100%; }
-.cron-preview { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-3) 0 0; color: var(--muted); }
-.cron-opts { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
-.cron-unsandbox .banner { margin-bottom: 0; }
+.errand-cmd-input { font-family: var(--mono); font-size: var(--fs-sm); }
+.errand-tz { width: 14rem; max-width: 100%; }
+.errand-preview { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-3) 0 0; color: var(--muted); }
+.errand-opts { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.errand-unsandbox .banner { margin-bottom: 0; }
 .banner.small { font-size: var(--fs-sm); }
-.banner.cron-note { flex-wrap: nowrap; align-items: flex-start; }
-.banner.cron-note > svg { margin-top: 0.15em; }
-.cron-props { align-items: center; }
+.banner.errand-note { flex-wrap: nowrap; align-items: flex-start; }
+.banner.errand-note > svg { margin-top: 0.15em; }
+.errand-props { align-items: center; }
 .banner > .icon, .banner > svg { flex: none; }

@@ -7,7 +7,7 @@ import (
 )
 
 func TestNormTools(t *testing.T) {
-	got, err := NormTools([]string{" Read", "Bash(git log --oneline *)", "", "Read", "mcp__gigg__list_tasks", "Edit(//data/x/**)", "WebFetch(domain:example.com)", `Bash(curl -s "api.example.com/v1/forecast?city=Paris,FR")`})
+	got, err := NormTools([]string{" Read", "Bash(git log --oneline *)", "", "Read", "mcp__gigg__list_gigs", "Edit(//data/x/**)", "WebFetch(domain:example.com)", `Bash(curl -s "api.example.com/v1/forecast?city=Paris,FR")`})
 	if err != nil || len(got) != 6 || got[0] != "Read" || got[1] != "Bash(git log --oneline *)" {
 		t.Fatalf("%v %v", got, err)
 	}
@@ -28,7 +28,7 @@ func TestNormTools(t *testing.T) {
 	}
 }
 
-// TestSchedulerNeedsToolsPermission: a recurring task whose template has a tool allowlist makes tasks
+// TestSchedulerNeedsToolsPermission: a recurring gig whose template has a tool allowlist makes gigs
 // only while its creator still holds allowed_tools there.
 func TestSchedulerNeedsToolsPermission(t *testing.T) {
 	ctx := context.Background()
@@ -54,7 +54,7 @@ func TestSchedulerNeedsToolsPermission(t *testing.T) {
 		t.Fatal("ran without allowed_tools")
 	}
 	if r.AllowedTools = nil; !schedulerMayRun(ctx, s.R, r) {
-		t.Fatal("a plain recurring task should run for a manager")
+		t.Fatal("a plain recurring gig should run for a manager")
 	}
 	if err := SetRule(ctx, s.W, a, "user", u.ID, &w.ID, "manager", map[string]bool{"allowed_tools": true}); err != nil {
 		t.Fatal(err)
@@ -68,11 +68,11 @@ func TestSchedulerNeedsToolsPermission(t *testing.T) {
 // a fresh one is left alone.
 func TestStaleRuns(t *testing.T) {
 	f := newFixture(t)
-	var tk *Task
+	var tk *Gig
 	var old, fresh *Run
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
 		var err error
-		if tk, err = CreateTask(f.ctx, tx, f.a, NewTask{ProjectID: f.p1.ID, Title: "long job"}); err != nil {
+		if tk, err = CreateGig(f.ctx, tx, f.a, NewGig{ProjectID: f.p1.ID, Title: "long job"}); err != nil {
 			return err
 		}
 		if old, err = StartRun(f.ctx, tx, Actor{UserID: f.agent.ID}, tk, nil, "new", 1, nil); err != nil {

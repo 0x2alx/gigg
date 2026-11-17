@@ -13,11 +13,11 @@ describe("live helpers", () => {
     expect(combine(["off", "live", "connecting"])).toBe("live");
   });
   it("classifies actions", () => {
-    expect(countsChange("task.moved")).toBe(true);
+    expect(countsChange("gig.moved")).toBe(true);
     expect(countsChange("comment.created")).toBe(true);
     expect(countsChange("label.created")).toBe(false);
     expect(treeChange("project.created")).toBe(true);
     expect(treeChange("member.set")).toBe(true);
-    expect(treeChange("task.created")).toBe(false);
+    expect(treeChange("gig.created")).toBe(false);
   });
 });

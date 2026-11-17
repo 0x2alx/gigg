@@ -11,52 +11,52 @@ import (
 	"github.com/0x2alx/gigg/internal/store"
 )
 
-// RecurrenceOut is a recurring task with its next occurrences (window starts, unix ms).
+// RecurrenceOut is a recurring gig with its next occurrences (window starts, unix ms).
 type RecurrenceOut struct {
 	*store.Recurrence
 	Upcoming []int64 `json:"upcoming"`
 }
 
-// RecurrenceBody creates or replaces a recurring task: a template (template_id, or the task content
+// RecurrenceBody creates or replaces a recurring gig: a template (template_id, or the gig content
 // here) paired with a schedule (schedule_id, or the timing here), plus its own settings.
 type RecurrenceBody struct {
-	TemplateID    *int64                  `json:"template_id,omitempty" doc:"Make each task from this template (same workspace; for this project or any); the content fields are then ignored. On update, another id switches to that template; without it, content changes are written to the current template (every recurring task using it follows)."`
-	ScheduleID    *int64                  `json:"schedule_id,omitempty" doc:"Use this schedule (same workspace); the timing fields are then ignored. On update, another id switches to it; without it, timing changes are written to the current schedule (every recurring task on it moves). On create without it, a schedule with exactly this timing is reused or made."`
-	Title         string                  `json:"title,omitempty" maxLength:"250" doc:"Task title (required unless template_id is given)"`
-	Checklist     []string                `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items each task gets; omit to keep the template's, [] clears"`
-	Subtasks      []store.TemplateSubtask `json:"subtasks,omitempty" maxItems:"50" doc:"Subtasks each task gets (title; blocks_parent = the task waits for it); omit to keep the template's, [] clears"`
-	Custom        map[string]any          `json:"custom,omitempty" doc:"Custom field values (field id -> value) each task gets; omit to keep the template's, {} clears"`
-	DescriptionMD string                  `json:"description_md,omitempty" maxLength:"65536"`
-	Priority      int64                   `json:"priority,omitempty" minimum:"0" maximum:"4"`
-	Color         *string                 `json:"color,omitempty"`
-	Labels        []string                `json:"labels,omitempty" maxItems:"20"`
-	Assignees     []int64                 `json:"assignees,omitempty" maxItems:"50"`
-	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
-	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
-	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Its tasks run whatever the usage budget (needs the always_run permission)"`
-	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its tasks get for the runner (permission rules); omit to keep the template's, [] clears. Needs the allowed_tools permission"`
-	Freq          string                  `json:"freq,omitempty" enum:"daily,weekly,monthly," doc:"Required unless schedule_id is given"`
-	Interval      int64                   `json:"interval,omitempty" minimum:"0" maximum:"365" doc:"Every N days/weeks/months (default 1)"`
-	Weekdays      []int                   `json:"weekdays,omitempty" doc:"Weekly: 1=Mon .. 7=Sun"`
-	MonthDay      *int64                  `json:"month_day,omitempty" doc:"Monthly: 1-31, -1 = last day (short months use their last day)"`
-	TZ            string                  `json:"tz,omitempty" doc:"IANA time zone (default: the user's time zone preference, else the instance default GIGG_DEFAULT_TZ)"`
-	WindowStart   string                  `json:"window_start,omitempty" pattern:"^[0-2][0-9]:[0-5][0-9]$" doc:"When the window opens, local HH:MM (default 00:00)"`
-	WindowMinutes int64                   `json:"window_minutes,omitempty" minimum:"0" maximum:"44640" doc:"How long the window stays open (default 1440)"`
-	LeadMinutes   int64                   `json:"lead_minutes,omitempty" minimum:"0" maximum:"10080" doc:"Create the task this long before the window opens"`
-	StartsOn      int64                   `json:"starts_on,omitempty" doc:"Unix ms (default now)"`
-	EndsOn        *int64                  `json:"ends_on,omitempty" doc:"Unix ms"`
-	MaxCount      *int64                  `json:"max_count,omitempty" minimum:"1"`
-	Overlap       string                  `json:"overlap,omitempty" enum:"skip,create," doc:"When the previous occurrence is still open: skip (default) or create anyway"`
-	Paused        bool                    `json:"paused,omitempty"`
+	TemplateID    *int64                 `json:"template_id,omitempty" doc:"Make each gig from this template (same workspace; for this project or any); the content fields are then ignored. On update, another id switches to that template; without it, content changes are written to the current template (every recurring gig using it follows)."`
+	ScheduleID    *int64                 `json:"schedule_id,omitempty" doc:"Use this schedule (same workspace); the timing fields are then ignored. On update, another id switches to it; without it, timing changes are written to the current schedule (every recurring gig on it moves). On create without it, a schedule with exactly this timing is reused or made."`
+	Title         string                 `json:"title,omitempty" maxLength:"250" doc:"Gig title (required unless template_id is given)"`
+	Checklist     []string               `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items each gig gets; omit to keep the template's, [] clears"`
+	Subgigs       []store.TemplateSubgig `json:"subgigs,omitempty" maxItems:"50" doc:"Subgigs each gig gets (title; blocks_parent = the gig waits for it); omit to keep the template's, [] clears"`
+	Custom        map[string]any         `json:"custom,omitempty" doc:"Custom field values (field id -> value) each gig gets; omit to keep the template's, {} clears"`
+	DescriptionMD string                 `json:"description_md,omitempty" maxLength:"65536"`
+	Priority      int64                  `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	Color         *string                `json:"color,omitempty"`
+	Labels        []string               `json:"labels,omitempty" maxItems:"20"`
+	Assignees     []int64                `json:"assignees,omitempty" maxItems:"50"`
+	Model         string                 `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
+	Effort        string                 `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
+	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Its gigs run whatever the usage budget (needs the always_run permission)"`
+	AllowedTools  []string               `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its gigs get for the runner (permission rules); omit to keep the template's, [] clears. Needs the allowed_tools permission"`
+	Freq          string                 `json:"freq,omitempty" enum:"daily,weekly,monthly," doc:"Required unless schedule_id is given"`
+	Interval      int64                  `json:"interval,omitempty" minimum:"0" maximum:"365" doc:"Every N days/weeks/months (default 1)"`
+	Weekdays      []int                  `json:"weekdays,omitempty" doc:"Weekly: 1=Mon .. 7=Sun"`
+	MonthDay      *int64                 `json:"month_day,omitempty" doc:"Monthly: 1-31, -1 = last day (short months use their last day)"`
+	TZ            string                 `json:"tz,omitempty" doc:"IANA time zone (default: the user's time zone preference, else the instance default GIGG_DEFAULT_TZ)"`
+	WindowStart   string                 `json:"window_start,omitempty" pattern:"^[0-2][0-9]:[0-5][0-9]$" doc:"When the window opens, local HH:MM (default 00:00)"`
+	WindowMinutes int64                  `json:"window_minutes,omitempty" minimum:"0" maximum:"44640" doc:"How long the window stays open (default 1440)"`
+	LeadMinutes   int64                  `json:"lead_minutes,omitempty" minimum:"0" maximum:"10080" doc:"Create the gig this long before the window opens"`
+	StartsOn      int64                  `json:"starts_on,omitempty" doc:"Unix ms (default now)"`
+	EndsOn        *int64                 `json:"ends_on,omitempty" doc:"Unix ms"`
+	MaxCount      *int64                 `json:"max_count,omitempty" minimum:"1"`
+	Overlap       string                 `json:"overlap,omitempty" enum:"skip,create," doc:"When the previous occurrence is still open: skip (default) or create anyway"`
+	Paused        bool                   `json:"paused,omitempty"`
 }
 
 // apply copies the body: content unless a template is named, timing unless a schedule is named, and
-// always the recurring task's own settings.
+// always the recurring gig's own settings.
 func (b RecurrenceBody) apply(r *store.Recurrence) {
 	if b.TemplateID == nil {
 		r.Title, r.DescriptionMD, r.Priority, r.Color = b.Title, b.DescriptionMD, b.Priority, b.Color
 		r.Labels, r.Assignees, r.Model, r.Effort, r.AlwaysRun = b.Labels, b.Assignees, b.Model, b.Effort, b.AlwaysRun
-		r.Checklist, r.Custom, r.Subtasks = b.Checklist, b.Custom, b.Subtasks
+		r.Checklist, r.Custom, r.Subgigs = b.Checklist, b.Custom, b.Subgigs
 		if b.AllowedTools != nil {
 			r.AllowedTools = b.AllowedTools
 		}
@@ -90,7 +90,7 @@ func (a *API) recurrence(ctx context.Context, p *access.Principal, id int64) (*s
 
 func (a *API) registerRecurrence() {
 	huma.Register(a.h, huma.Operation{OperationID: "list-recurrences", Method: "GET", Path: "/workspaces/{ws}/recurrences", Tags: []string{"recurrence"},
-		Summary: "Recurring tasks in a workspace (each pairs a template with a schedule)"}, func(ctx context.Context, in *struct {
+		Summary: "Recurring gigs in a workspace (each pairs a template with a schedule)"}, func(ctx context.Context, in *struct {
 		WS      string `path:"ws"`
 		Project int64  `query:"project"`
 	}) (*struct {
@@ -106,7 +106,7 @@ func (a *API) registerRecurrence() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		projects := p.ProjectFilter()
@@ -132,7 +132,7 @@ func (a *API) registerRecurrence() {
 		return out, nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "create-recurrence", Method: "POST", Path: "/projects/{p}/recurrences", Tags: []string{"recurrence"},
-		Summary: "Create a recurring task: a template (or content) on a schedule (or timing); gigg creates a task per occurrence, with its time window", DefaultStatus: 201},
+		Summary: "Create a recurring gig: a template (or content) on a schedule (or timing); gigg creates a gig per occurrence, with its time window", DefaultStatus: 201},
 		func(ctx context.Context, in *struct {
 			P    int64 `path:"p"`
 			Body RecurrenceBody
@@ -145,7 +145,7 @@ func (a *API) registerRecurrence() {
 			if err != nil {
 				return nil, err
 			}
-			if err := require(p, pr.WorkspaceID, access.Member, "tasks:write"); err != nil {
+			if err := require(p, pr.WorkspaceID, access.Member, "gigs:write"); err != nil {
 				return nil, err
 			}
 			if err := allowed(p, pr.WorkspaceID, "schedules"); err != nil {
@@ -164,12 +164,12 @@ func (a *API) registerRecurrence() {
 				}
 				r.TemplateID, always, tools = tpl.ID, tpl.AlwaysRun, tpl.AllowedTools
 			} else if strings.TrimSpace(in.Body.Title) == "" {
-				return nil, fail(422, "invalid", "A recurring task needs a title (or a template_id).")
+				return nil, fail(422, "invalid", "A recurring gig needs a title (or a template_id).")
 			}
 			if in.Body.ScheduleID != nil {
 				r.ScheduleID = *in.Body.ScheduleID
 			} else if in.Body.Freq == "" {
-				return nil, fail(422, "invalid", "A recurring task needs freq (or a schedule_id).")
+				return nil, fail(422, "invalid", "A recurring gig needs freq (or a schedule_id).")
 			}
 			if err := alwaysRunChange(p, pr.WorkspaceID, false, always); err != nil {
 				return nil, err
@@ -199,7 +199,7 @@ func (a *API) registerRecurrence() {
 			return a.recurrenceOut(r), nil
 		})
 	huma.Register(a.h, huma.Operation{OperationID: "get-recurrence", Method: "GET", Path: "/recurrences/{id}", Tags: []string{"recurrence"},
-		Summary: "A recurring task with its next five occurrences"}, func(ctx context.Context, in *idPath) (*recurrenceOut, error) {
+		Summary: "A recurring gig with its next five occurrences"}, func(ctx context.Context, in *idPath) (*recurrenceOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -208,13 +208,13 @@ func (a *API) registerRecurrence() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, r.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		return a.recurrenceOut(r), nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "update-recurrence", Method: "PUT", Path: "/recurrences/{id}", Tags: []string{"recurrence"},
-		Summary: "Replace a recurring task: its own settings, and its template and schedule (switch with template_id/schedule_id, or edit them in place); the next occurrence is recomputed from now"}, func(ctx context.Context, in *struct {
+		Summary: "Replace a recurring gig: its own settings, and its template and schedule (switch with template_id/schedule_id, or edit them in place); the next occurrence is recomputed from now"}, func(ctx context.Context, in *struct {
 		ID      int64  `path:"id"`
 		IfMatch string `header:"If-Match"`
 		Body    RecurrenceBody
@@ -227,14 +227,14 @@ func (a *API) registerRecurrence() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Member, "tasks:write"); err != nil {
+		if err := require(p, r.WorkspaceID, access.Member, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if err := allowed(p, r.WorkspaceID, "schedules"); err != nil {
 			return nil, err
 		}
-		// an edit makes the editor its owner, whose permissions the scheduler then creates tasks with
-		if err := allowed(p, r.WorkspaceID, "create_tasks"); err != nil {
+		// an edit makes the editor its owner, whose permissions the scheduler then creates gigs with
+		if err := allowed(p, r.WorkspaceID, "create_gigs"); err != nil {
 			return nil, err
 		}
 		v, err := ifMatch(in.IfMatch)
@@ -268,10 +268,10 @@ func (a *API) registerRecurrence() {
 		in.Body.apply(r)
 		if in.Body.TemplateID == nil {
 			if strings.TrimSpace(r.Title) == "" {
-				return nil, fail(422, "invalid", "A recurring task needs a title.")
+				return nil, fail(422, "invalid", "A recurring gig needs a title.")
 			}
 			if !store.SameContent(&old, r) {
-				// the content lives in a template: someone else's needs Task templates to change, and a
+				// the content lives in a template: someone else's needs Gig templates to change, and a
 				// key limited to some projects can't change one for every project
 				if old.TemplateBy != p.User.ID {
 					if err := allowed(p, r.WorkspaceID, "templates"); err != nil {
@@ -287,13 +287,13 @@ func (a *API) registerRecurrence() {
 		}
 		if in.Body.ScheduleID == nil {
 			if in.Body.Freq == "" {
-				return nil, fail(422, "invalid", "A recurring task needs freq (or a schedule_id).")
+				return nil, fail(422, "invalid", "A recurring gig needs freq (or a schedule_id).")
 			}
 			if rule := r.Rule(); rule.Validate() == nil && !rule.Same(old.Rule()) {
 				if p.Narrowed() && a.scheduleUsedOutside(ctx, p, old.ScheduleID) {
 					return nil, errForbidden("This schedule is used outside the projects this key reaches; pick or make another one.")
 				}
-				// new timing retimes the shared schedule, so every recurring task on it: the same guards as
+				// new timing retimes the shared schedule, so every recurring gig on it: the same guards as
 				// PUT /schedules/{id} (an always-run or tool-allowlist one on it needs those permissions)
 				always, tools, err := store.ScheduleGuards(ctx, a.st.R, old.ScheduleID)
 				if err != nil {
@@ -318,12 +318,12 @@ func (a *API) registerRecurrence() {
 		return a.recurrenceOut(r), nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-recurrence", Method: "DELETE", Path: "/recurrences/{id}", Tags: []string{"recurrence"},
-		Summary: "Stop a recurring task (its tasks stay; its template and schedule too, unless asked)", DefaultStatus: 204,
-		Description: "`template=true` / `schedule=true` also delete its template / schedule, refused (409, nothing deleted) when another recurring task uses it."},
+		Summary: "Stop a recurring gig (its gigs stay; its template and schedule too, unless asked)", DefaultStatus: 204,
+		Description: "`template=true` / `schedule=true` also delete its template / schedule, refused (409, nothing deleted) when another recurring gig uses it."},
 		func(ctx context.Context, in *struct {
 			ID       int64 `path:"id"`
-			Template bool  `query:"template" doc:"Also delete its template (when no other recurring task uses it)"`
-			Schedule bool  `query:"schedule" doc:"Also delete its schedule (when no other recurring task uses it)"`
+			Template bool  `query:"template" doc:"Also delete its template (when no other recurring gig uses it)"`
+			Schedule bool  `query:"schedule" doc:"Also delete its schedule (when no other recurring gig uses it)"`
 		}) (*struct{}, error) {
 			p, err := me(ctx)
 			if err != nil {
@@ -333,7 +333,7 @@ func (a *API) registerRecurrence() {
 			if err != nil {
 				return nil, err
 			}
-			if err := require(p, r.WorkspaceID, access.Member, "tasks:write"); err != nil {
+			if err := require(p, r.WorkspaceID, access.Member, "gigs:write"); err != nil {
 				return nil, err
 			}
 			if err := allowed(p, r.WorkspaceID, "schedules"); err != nil {
@@ -341,7 +341,7 @@ func (a *API) registerRecurrence() {
 			}
 			var tpl *store.Template
 			if in.Template {
-				// as for changing its content: someone else's template needs Task templates, and a key
+				// as for changing its content: someone else's template needs Gig templates, and a key
 				// limited to some projects can't delete one for every project
 				t, err := store.GetTemplate(ctx, a.st.R, r.TemplateID)
 				if err != nil {
@@ -361,7 +361,7 @@ func (a *API) registerRecurrence() {
 				if err := store.DeleteRecurrence(ctx, tx, p.Actor(), r); err != nil {
 					return err
 				}
-				// each refuses (and the whole delete rolls back) while another recurring task uses it
+				// each refuses (and the whole delete rolls back) while another recurring gig uses it
 				if tpl != nil {
 					if err := store.DeleteTemplate(ctx, tx, p.Actor(), tpl); err != nil {
 						return err

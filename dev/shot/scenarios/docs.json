@@ -48,7 +48,7 @@
    "goto": "/board"
   },
   {
-   "wait": ".board .task-card"
+   "wait": ".board .gig-card"
   },
   {
    "wait": 1800
@@ -64,7 +64,7 @@
    "full": false
   },
   {
-   "hover": ".task-card .run-badge"
+   "hover": ".gig-card .run-badge"
   },
   {
    "wait": 800
@@ -77,10 +77,10 @@
    "goto": "/board?p=1"
   },
   {
-   "wait": ".board .task-card"
+   "wait": ".board .gig-card"
   },
   {
-   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions button\")].find(x => x.textContent.includes(\"New task\")); if (!b) return false; b.click(); return true; })()",
+   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions button\")].find(x => x.textContent.includes(\"New gig\")); if (!b) return false; b.click(); return true; })()",
    "expect": true
   },
   {
@@ -96,7 +96,7 @@
    "wait": 500
   },
   {
-   "shot": "task-new-night",
+   "shot": "gig-new-night",
    "full": false
   },
   {
@@ -161,7 +161,7 @@
    "wait": 300
   },
   {
-   "shot": "my-tasks-night",
+   "shot": "my-gigs-night",
    "full": false
   },
   {
@@ -262,7 +262,7 @@
    "goto": "/board?ws=acme&pr=2"
   },
   {
-   "wait": ".board .task-card"
+   "wait": ".board .gig-card"
   },
   {
    "wait": 1800
@@ -293,7 +293,7 @@
    "wait": 300
   },
   {
-   "shot": "task-panel-day",
+   "shot": "gig-panel-day",
    "full": false
   },
   {
@@ -422,7 +422,7 @@
    "goto": "/board"
   },
   {
-   "wait": ".board .task-card"
+   "wait": ".board .gig-card"
   },
   {
    "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions .head-more > button\")].find(x => x.textContent.includes(\"\\u22ef\")); if (!b) return false; b.click(); return true; })()",

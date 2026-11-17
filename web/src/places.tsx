@@ -1,4 +1,4 @@
-// Places: the workspace / project filter of the lists that span every workspace (recurring tasks,
+// Places: the workspace / project filter of the lists that span every workspace (recurring gigs,
 // templates, schedules). The value is "" (everything), "w:<id>" (a workspace) or "p:<id>" (a project).
 import type { WorkspaceTree } from "./App";
 

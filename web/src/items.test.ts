@@ -91,20 +91,20 @@ describe("custom fields", () => {
 describe("sameAsTemplate", () => {
   const t: Template = {
     id: 1, workspace_id: 1, project_id: null, name: "Brief", title: "Daily brief", description_md: "News", priority: 2, color: null,
-    labels: ["ops"], assignees: [3, 2], checklist: ["news", "weather"], subtasks: [{ title: "gather", blocks_parent: true }], custom: { "4": "x", "5": false }, version: 1, model: "sonnet", effort: "", always_run: true, allowed_tools: ["Read"],
+    labels: ["ops"], assignees: [3, 2], checklist: ["news", "weather"], subgigs: [{ title: "gather", blocks_parent: true }], custom: { "4": "x", "5": false }, version: 1, model: "sonnet", effort: "", always_run: true, allowed_tools: ["Read"],
   };
   const form = {
-    title: "Daily brief", description: "News", priority: 2, taskLabels: ["ops"], assignees: [2, 3], color: null,
-    run: { model: "sonnet", effort: "", always_run: true, allowed_tools: ["Read"] }, checklist: ["news", "weather"], subtasks: [{ title: "gather ", blocks_parent: true }], custom: { "4": "x" } as Record<string, unknown>,
+    title: "Daily brief", description: "News", priority: 2, gigLabels: ["ops"], assignees: [2, 3], color: null,
+    run: { model: "sonnet", effort: "", always_run: true, allowed_tools: ["Read"] }, checklist: ["news", "weather"], subgigs: [{ title: "gather ", blocks_parent: true }], custom: { "4": "x" } as Record<string, unknown>,
   };
-  it("matches the template as filled in (assignee order, spaces around subtask titles and empty custom values don't count)", () => {
+  it("matches the template as filled in (assignee order, spaces around subgig titles and empty custom values don't count)", () => {
     expect(sameAsTemplate(t, form)).toBe(true);
   });
   it("any change gives the schedule its own copy", () => {
     expect(sameAsTemplate(t, { ...form, title: "Brief" })).toBe(false);
     expect(sameAsTemplate(t, { ...form, checklist: ["news"] })).toBe(false);
-    expect(sameAsTemplate(t, { ...form, subtasks: [{ title: "gather" }] })).toBe(false);
-    expect(sameAsTemplate(t, { ...form, subtasks: [] })).toBe(false);
+    expect(sameAsTemplate(t, { ...form, subgigs: [{ title: "gather" }] })).toBe(false);
+    expect(sameAsTemplate(t, { ...form, subgigs: [] })).toBe(false);
     expect(sameAsTemplate(t, { ...form, run: { ...form.run, always_run: false } })).toBe(false);
     expect(sameAsTemplate(t, { ...form, run: { ...form.run, allowed_tools: [] } })).toBe(false);
     expect(sameAsTemplate(t, { ...form, custom: { "4": "y" } })).toBe(false);

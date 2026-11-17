@@ -60,7 +60,7 @@ type Principal struct {
 const (
 	Viewer    = "view"
 	Commenter = "comment"
-	Member    = "edit_tasks"
+	Member    = "edit_gigs"
 	Manager   = "manage_workspace"
 )
 

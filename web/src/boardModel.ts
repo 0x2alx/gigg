@@ -1,7 +1,7 @@
 // The board as pure functions: the filter (kept in the URL), which projects it covers, and its columns.
 // One project in view: that project's own status columns in its manual order. Several: one column per
-// status category, tasks from every project merged and ordered by priority, then due date.
-import type { Board, Category, Project, Task } from "./api";
+// status category, gigs from every project merged and ordered by priority, then due date.
+import type { Board, Category, Project, Gig } from "./api";
 import type { WorkspaceTree } from "./App";
 
 export const BOARD_CATEGORIES: Category[] = ["backlog", "todo", "doing", "waiting", "done"];
@@ -21,7 +21,7 @@ export interface BoardFilter {
   l: string; // label name ("" any)
   pr: number; // minimum priority (0 = any)
   q: string; // text in the key, title or description
-  arch: boolean; // archived tasks shown too
+  arch: boolean; // archived gigs shown too
 }
 
 export const EMPTY_FILTER: BoardFilter = { ws: [], p: [], a: "", l: "", pr: 0, q: "", arch: false };
@@ -103,8 +103,8 @@ export function scope(tree: WorkspaceTree[], f: BoardFilter): ScopedProject[] {
   return picked.length ? picked : all;
 }
 
-// matches: the task passes the filter's task conditions (scope is handled by scope()).
-export function matches(t: Task, f: BoardFilter, me: number): boolean {
+// matches: the gig passes the filter's gig conditions (scope is handled by scope()).
+export function matches(t: Gig, f: BoardFilter, me: number): boolean {
   if (f.a === "me" && !t.assignees.includes(me)) return false;
   if (f.a === "none" && t.assignees.length > 0) return false;
   if (/^\d+$/.test(f.a) && !t.assignees.includes(Number(f.a))) return false;
@@ -124,24 +124,24 @@ export interface BoardColumn {
   color: string | null; // null = the category colour
   category: Category;
   statusId?: number; // one project: the status this column is
-  tasks: Task[];
+  gigs: Gig[];
 }
 
 // statusColumns: one project's board, its own statuses (cancelled hidden), its manual order.
 export function statusColumns(board: Board, f: BoardFilter, me: number): BoardColumn[] {
   return board.statuses
     .filter((s) => s.category !== "cancelled")
-    .map((s) => ({ key: "s" + s.id, id: s.id, name: s.name, color: s.color, category: s.category, statusId: s.id, tasks: s.tasks.filter((t) => matches(t, f, me)) }));
+    .map((s) => ({ key: "s" + s.id, id: s.id, name: s.name, color: s.color, category: s.category, statusId: s.id, gigs: s.gigs.filter((t) => matches(t, f, me)) }));
 }
 
 // categoryColumns: several boards merged by category. A column takes the status name (and colour)
-// when every project in view calls it the same, otherwise the category's name. Tasks: priority first,
+// when every project in view calls it the same, otherwise the category's name. Gigs: priority first,
 // then the earliest due date, then the boards' own order.
 export function categoryColumns(boards: Board[], f: BoardFilter, me: number): BoardColumn[] {
   const rank = new Map<number, number>();
   let n = 0;
-  for (const b of boards) for (const s of b.statuses) for (const t of s.tasks) rank.set(t.id, n++);
-  const order = (a: Task, b: Task) =>
+  for (const b of boards) for (const s of b.statuses) for (const t of s.gigs) rank.set(t.id, n++);
+  const order = (a: Gig, b: Gig) =>
     b.priority - a.priority || (a.due_at ?? Infinity) - (b.due_at ?? Infinity) || (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0);
   return BOARD_CATEGORIES.map((category, i) => {
     const statuses = boards.flatMap((b) => b.statuses.filter((s) => s.category === category));
@@ -153,26 +153,26 @@ export function categoryColumns(boards: Board[], f: BoardFilter, me: number): Bo
       name: names.length === 1 ? names[0]! : CATEGORY_LABEL[category],
       color: colors.length === 1 ? (colors[0] ?? null) : null,
       category,
-      tasks: statuses.flatMap((s) => s.tasks).filter((t) => matches(t, f, me)).sort(order),
+      gigs: statuses.flatMap((s) => s.gigs).filter((t) => matches(t, f, me)).sort(order),
     };
   });
 }
 
-// moveToCategory: the boards after a task moves to the first status of `category` in its project
+// moveToCategory: the boards after a gig moves to the first status of `category` in its project
 // (what the server does for {category}), or null when it can't (no such status) or nothing changes.
-export function moveToCategory(boards: Map<number, Board>, taskId: number, category: Category): Map<number, Board> | null {
+export function moveToCategory(boards: Map<number, Board>, gigId: number, category: Category): Map<number, Board> | null {
   for (const [pid, b] of boards) {
-    const task = b.statuses.flatMap((s) => s.tasks).find((t) => t.id === taskId);
-    if (!task) continue;
+    const gig = b.statuses.flatMap((s) => s.gigs).find((t) => t.id === gigId);
+    if (!gig) continue;
     const target = b.statuses.find((s) => s.category === category);
-    if (!target || task.status_category === category) return null;
-    const moved: Task = { ...task, status_id: target.id, status_name: target.name, status_category: target.category };
+    if (!target || gig.status_category === category) return null;
+    const moved: Gig = { ...gig, status_id: target.id, status_name: target.name, status_category: target.category };
     const next = new Map(boards);
     next.set(pid, {
       ...b,
       statuses: b.statuses.map((s) => ({
         ...s,
-        tasks: s.id === target.id ? [...s.tasks.filter((t) => t.id !== taskId), moved] : s.tasks.filter((t) => t.id !== taskId),
+        gigs: s.id === target.id ? [...s.gigs.filter((t) => t.id !== gigId), moved] : s.gigs.filter((t) => t.id !== gigId),
       })),
     });
     return next;

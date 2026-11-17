@@ -9,18 +9,18 @@ import (
 	"github.com/0x2alx/gigg/internal/store"
 )
 
-// TestArchiveDoneCategory: archive-done takes done and cancelled tasks by default, and only one of
+// TestArchiveDoneCategory: archive-done takes done and cancelled gigs by default, and only one of
 // them when `category` names it (the board's Done and Cancelled columns each archive their own).
 func TestArchiveDoneCategory(t *testing.T) {
 	e := newEnv(t)
-	tasks := fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"])
-	mk := func(title, cat string) store.Task {
+	gigs := fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"])
+	mk := func(title, cat string) store.Gig {
 		t.Helper()
-		code, out, _ := e.req("POST", tasks, `{"title":"`+title+`"}`, e.ada())
+		code, out, _ := e.req("POST", gigs, `{"title":"`+title+`"}`, e.ada())
 		e.ok(code, out, 201)
-		var tk store.Task
+		var tk store.Gig
 		_ = json.Unmarshal(out, &tk)
-		code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/move", `{"category":"`+cat+`"}`, e.ada())
+		code, out, _ = e.req("POST", "/gigs/"+tk.Key+"/move", `{"category":"`+cat+`"}`, e.ada())
 		e.ok(code, out, 200)
 		return tk
 	}

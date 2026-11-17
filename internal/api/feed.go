@@ -20,7 +20,7 @@ import (
 
 // The change feed (GET /workspaces/{ws}/changes) and live updates (GET /workspaces/{ws}/events,
 // Server-Sent Events) read the activity log in ascending id order, with exactly the visibility of
-// workspace-activity: role viewer, scopes workspace:read + tasks:read + comments:read, no key/member
+// workspace-activity: role viewer, scopes workspace:read + gigs:read + comments:read, no key/member
 // actions for non-admins, project-narrowed keys see only their projects, deleted comment text redacted.
 
 // Tunables (tests shorten them).
@@ -112,7 +112,7 @@ func (a *API) feedScope(ctx context.Context, p *access.Principal, ref string) (s
 	if err := require(p, w.ID, access.Viewer, "workspace:read"); err != nil {
 		return "", nil, err
 	}
-	if err := need(p, "tasks:read"); err != nil {
+	if err := need(p, "gigs:read"); err != nil {
 		return "", nil, err
 	}
 	if err := need(p, "comments:read"); err != nil {
@@ -350,7 +350,7 @@ type changesArgs struct {
 	Limit     int    `json:"limit,omitempty" jsonschema:"Default 100, max 500"`
 }
 
-// addChangesTool registers the `changes` MCP tool (the caller checks tasks:read).
+// addChangesTool registers the `changes` MCP tool (the caller checks gigs:read).
 func addChangesTool(s *mcp.Server, call apiCall, ws func(string) string) {
 	mcp.AddTool(s, &mcp.Tool{Name: "changes", Description: "What changed in a workspace since an activity id, oldest first. Pass next_after_id back as after_id to keep up; after_id \"latest\" starts from now.", Annotations: ro("Changes")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in changesArgs) (*mcp.CallToolResult, any, error) {

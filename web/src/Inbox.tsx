@@ -31,7 +31,7 @@ export function InboxPage() {
             {items && items.length > 0 && <span className="count count-alert big">{items.length}</span>}
             <HelpButton topic="inbox" label="Help: inbox and notifications" />
           </h1>
-          <p className="muted small">Tasks waiting for you, oldest question first.</p>
+          <p className="muted small">Gigs waiting for you, oldest question first.</p>
         </div>
       </header>
       {err && <p className="danger">{err}</p>}
@@ -39,17 +39,17 @@ export function InboxPage() {
       {items?.map((it) => {
         const asker = it.question ? users.get(it.question.author_id) : undefined;
         return (
-          <article key={it.task.id} className="card inbox-item">
+          <article key={it.gig.id} className="card inbox-item">
             <div className="inbox-head">
-              <Link href={`/board/p/${it.task.project_id}/t/${it.task.key}`} state={fromHere().state} className="inbox-title">
-                <span className="inbox-key">{it.task.key}</span> {it.task.title}
+              <Link href={`/board/p/${it.gig.project_id}/g/${it.gig.key}`} state={fromHere().state} className="inbox-title">
+                <span className="inbox-key">{it.gig.key}</span> {it.gig.title}
               </Link>
               <div className="chips">
                 <span className="pill pill-ws">{it.workspace}</span>
                 <span className="pill pill-muted">{it.project}</span>
-                <StatusBadge name={it.task.status_name} category={it.task.status_category} />
-                <PriorityBadge priority={it.task.priority} />
-                <span className="muted small">{fmtTime(it.task.updated_at)}</span>
+                <StatusBadge name={it.gig.status_name} category={it.gig.status_category} />
+                <PriorityBadge priority={it.gig.priority} />
+                <span className="muted small">{fmtTime(it.gig.updated_at)}</span>
               </div>
             </div>
             {it.question && !it.question.deleted && (

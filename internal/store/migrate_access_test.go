@@ -108,7 +108,7 @@ func TestAccessMigrationKeepsAbilities(t *testing.T) {
 		return SetMembership(ctx, tx, Actor{UserID: 1}, 4, 4, "member")
 	}))
 	_, g, _ := UserGrants(ctx, s.R, 4)
-	got := fmt.Sprint(g.Has(4, "schedules"), g.Has(4, "templates"), g.Has(4, "archive_tasks"), g.Has(4, "create_tasks"), g.Has(4, "manage_workspace"))
+	got := fmt.Sprint(g.Has(4, "schedules"), g.Has(4, "templates"), g.Has(4, "archive_gigs"), g.Has(4, "create_gigs"), g.Has(4, "manage_workspace"))
 	if got != "true true true true false" {
 		t.Errorf("new workspace for scout: schedules templates archive create manage = %s", got)
 	}

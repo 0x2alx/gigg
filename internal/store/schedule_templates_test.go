@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-// TestRecurringLinks: a recurring task pairs a template and a schedule. From the task form both are
+// TestRecurringLinks: a recurring gig pairs a template and a schedule. From the gig form both are
 // made (an identical schedule is reused); templates and schedules are shared freely, a pair once per
-// project; edits to either move every recurring task on it; neither can be deleted while used, and
-// deleting a recurring task leaves both.
+// project; edits to either move every recurring gig on it; neither can be deleted while used, and
+// deleting a recurring gig leaves both.
 func TestRecurringLinks(t *testing.T) {
 	f := newFixture(t)
 	start := ny(t, "2026-11-12 00:00")
@@ -35,17 +35,17 @@ func TestRecurringLinks(t *testing.T) {
 	if tpl.ProjectID == nil || *tpl.ProjectID != f.p1.ID || tpl.Recurring != 1 || tpl.Model != "sonnet" {
 		t.Fatalf("template: %+v", tpl)
 	}
-	// each task gets the checklist
+	// each gig gets the checklist
 	res, err := f.s.Housekeeping(f.ctx, ny(t, "2026-11-12 09:05"))
 	must(t, err)
 	if res.Created != 1 {
 		t.Fatalf("housekeeping: %+v", res)
 	}
 	r1, _ = GetRecurrence(f.ctx, f.s.R, r1.ID)
-	items, err := Checklist(f.ctx, f.s.R, *r1.LastTaskID)
+	items, err := Checklist(f.ctx, f.s.R, *r1.LastGigID)
 	must(t, err)
 	if len(items) != 2 || items[0].Text != "news" {
-		t.Fatalf("checklist on the task: %+v", items)
+		t.Fatalf("checklist on the gig: %+v", items)
 	}
 
 	// the same template on another schedule
@@ -70,7 +70,7 @@ func TestRecurringLinks(t *testing.T) {
 		t.Fatalf("identical timing should reuse the schedule: %+v", r3)
 	}
 
-	// editing the schedule moves both recurring tasks on it
+	// editing the schedule moves both recurring gigs on it
 	s1, err := GetSchedule(f.ctx, f.s.R, r1.ScheduleID)
 	must(t, err)
 	s1.WindowStart = "10:00"
@@ -78,7 +78,7 @@ func TestRecurringLinks(t *testing.T) {
 	for _, id := range []int64{r1.ID, r3.ID} {
 		r, _ := GetRecurrence(f.ctx, f.s.R, id)
 		if r.WindowStart != "10:00" || r.NextAt == nil || fmtNY(*r.NextAt)[15:] != "10:00 EST" {
-			t.Fatalf("recurring task %d after the schedule edit: %+v %v", id, r, r.NextAt)
+			t.Fatalf("recurring gig %d after the schedule edit: %+v %v", id, r, r.NextAt)
 		}
 	}
 	// in use: no delete, either object
@@ -91,7 +91,7 @@ func TestRecurringLinks(t *testing.T) {
 		t.Fatalf("delete a template in use: %v", err)
 	}
 
-	// content edits through a recurring task write its template (the other one follows; the name
+	// content edits through a recurring gig write its template (the other one follows; the name
 	// follows the title while it is the title)
 	r1, _ = GetRecurrence(f.ctx, f.s.R, r1.ID)
 	upd := *r1
@@ -128,7 +128,7 @@ func TestRecurringLinks(t *testing.T) {
 	if r2.ScheduleID != s3.ID || r2.ScheduleName != "Mondays" || r2.TZ != DefaultTZ {
 		t.Fatalf("switched schedule: %+v", r2)
 	}
-	// timing edits through a recurring task write its schedule (r3 shares it and moves too)
+	// timing edits through a recurring gig write its schedule (r3 shares it and moves too)
 	r1, _ = GetRecurrence(f.ctx, f.s.R, r1.ID)
 	upd = *r1
 	upd.WindowStart = "08:00"
@@ -138,10 +138,10 @@ func TestRecurringLinks(t *testing.T) {
 	})
 	r3, _ = GetRecurrence(f.ctx, f.s.R, r3.ID)
 	if r3.WindowStart != "08:00" || r3.ScheduleName != "Every day 08:00–10:00 (America/New_York)" {
-		t.Fatalf("shared schedule edit through a recurring task: %+v", r3)
+		t.Fatalf("shared schedule edit through a recurring gig: %+v", r3)
 	}
 
-	// deleting a recurring task leaves its template and schedule
+	// deleting a recurring gig leaves its template and schedule
 	r1, _ = GetRecurrence(f.ctx, f.s.R, r1.ID)
 	tx(func(tx *sql.Tx) error { return DeleteRecurrence(f.ctx, tx, f.a, r1) })
 	if _, err := GetTemplate(f.ctx, f.s.R, r1.TemplateID); err != nil {
@@ -193,7 +193,7 @@ func TestScheduleTemplateMigration(t *testing.T) {
 		t.Fatalf("migrated schedule: %+v", r)
 	}
 	var n int
-	_ = s.R.QueryRowContext(ctx, `SELECT count(*) FROM task_templates`).Scan(&n)
+	_ = s.R.QueryRowContext(ctx, `SELECT count(*) FROM gig_templates`).Scan(&n)
 	if n != 1 {
 		t.Fatalf("templates: %d (deleted schedules get none)", n)
 	}
@@ -247,5 +247,55 @@ func TestWorkspaceOwnerMigration(t *testing.T) {
 	}
 	if w, err := PatchWorkspace(ctx, s.W, a, w3.ID, 0, WorkspacePatch{OwnerID: &none}); err != nil || w.OwnerID != nil {
 		t.Fatalf("clear: %v %v", w, err)
+	}
+}
+
+// TestGigRenameMigration: 0013 renames tasks to gigs, in the schema and in the names stored in data
+// user text stays as it was.
+func TestGigRenameMigration(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	migrateLimit = 12
+	s, err := Open(ctx, dir, quiet)
+	migrateLimit = 0
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO users (id, username, kind, created_at) VALUES (1, 'scout', 'agent', 1)`,
+		`INSERT INTO workspaces (id, slug, name, status_template, created_at) VALUES (1, 'scout', 'Scout', '[]', 1)`,
+		`INSERT INTO api_keys (id, name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at)
+			VALUES (1, 'runner', 'abcdefgh', x'00', 1, 1, '["workspace:read","tasks:read","tasks:write","runs:write"]', 9999999999999, 1)`,
+		`INSERT INTO access_rules (user_id, workspace_id, preset, overrides, created_at) VALUES (1, 1, 'member', '{"create_tasks":false,"always_run":true}', 1)`,
+		`INSERT INTO activity (at, workspace_id, action, entity_type, entity_id, data)
+			VALUES (1, 1, 'task.created', 'task', 7, '{"title":"a task_id: in my text","task_key":"MRV-1","subtasks":[]}')`,
+	} {
+		if _, err := s.W.ExecContext(ctx, q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	s.Close()
+	if s, err = Open(ctx, dir, quiet); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	var scopes, overrides, action, entity, data string
+	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE id = 1`).Scan(&scopes))
+	must(t, s.R.QueryRowContext(ctx, `SELECT overrides FROM access_rules`).Scan(&overrides))
+	must(t, s.R.QueryRowContext(ctx, `SELECT action, entity_type, data FROM activity`).Scan(&action, &entity, &data))
+	if scopes != `["workspace:read","gigs:read","gigs:write","runs:write"]` || overrides != `{"create_gigs":false,"always_run":true}` {
+		t.Fatalf("scopes %s overrides %s", scopes, overrides)
+	}
+	if action != "gig.created" || entity != "gig" || data != `{"title":"a task_id: in my text","gig_key":"MRV-1","subgigs":[]}` {
+		t.Fatalf("activity: %s %s %s", action, entity, data)
+	}
+	// still append-only
+	if _, err := s.W.ExecContext(ctx, `UPDATE activity SET action = 'x'`); err == nil {
+		t.Fatal("activity writable after the migration")
+	}
+	var n int
+	must(t, s.R.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE name LIKE '%task%' OR (sql LIKE '%task%' AND type != 'table')`).Scan(&n))
+	if n != 0 {
+		t.Fatalf("%d schema objects still named after tasks", n)
 	}
 }

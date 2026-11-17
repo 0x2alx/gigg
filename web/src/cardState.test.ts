@@ -15,14 +15,14 @@ describe("cardState", () => {
     expect(cardState({ status_category: "todo", resume_requested_at: 5, last_run: run("error") })?.kind).toBe("queued");
     expect(cardState({ status_category: "doing", resume_requested_at: 5 })).toBeNull();
   });
-  it("a waiting task with a question needs an answer", () => {
+  it("a waiting gig with a question needs an answer", () => {
     expect(cardState({ status_category: "waiting", resume_requested_at: null, last_run: run("needs_human"), question: q })?.label).toBe("Needs answer");
     expect(cardState({ status_category: "waiting", resume_requested_at: null })).toBeNull();
   });
-  it("archived tasks show no state", () => {
+  it("archived gigs show no state", () => {
     expect(cardState({ status_category: "doing", resume_requested_at: null, last_run: run("error"), archived_at: 5 })).toBeNull();
   });
-  it("a failed last run shows until the task is closed", () => {
+  it("a failed last run shows until the gig is closed", () => {
     expect(cardState({ status_category: "doing", resume_requested_at: null, last_run: run("timeout") })?.label).toBe("Timed out");
     expect(cardState({ status_category: "done", resume_requested_at: null, last_run: run("error") })).toBeNull();
     expect(cardState({ status_category: "doing", resume_requested_at: null, last_run: run("done") })).toBeNull();

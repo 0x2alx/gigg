@@ -2,17 +2,17 @@ import { describe, expect, it } from "vitest";
 import { badgeCount, kindInfo, notificationText, placeBelow } from "./notifications";
 
 describe("notificationText", () => {
-  it("names the actor and the task", () => {
-    expect(notificationText({ kind: "mention", task_key: "GIG-12" }, "Ada")).toBe("Ada mentioned you on GIG-12");
-    expect(notificationText({ kind: "assigned", task_key: "GIG-3" }, "Bot")).toBe("Bot assigned you to GIG-3");
-    expect(notificationText({ kind: "question", task_key: "GIG-4" }, null)).toBe("Someone asked a question on GIG-4");
-    expect(notificationText({ kind: "comment", task_key: null }, "Ada")).toBe("Ada commented on a task");
+  it("names the actor and the gig", () => {
+    expect(notificationText({ kind: "mention", gig_key: "GIG-12" }, "Ada")).toBe("Ada mentioned you on GIG-12");
+    expect(notificationText({ kind: "assigned", gig_key: "GIG-3" }, "Bot")).toBe("Bot assigned you to GIG-3");
+    expect(notificationText({ kind: "question", gig_key: "GIG-4" }, null)).toBe("Someone asked a question on GIG-4");
+    expect(notificationText({ kind: "comment", gig_key: null }, "Ada")).toBe("Ada commented on a gig");
   });
   it("has no actor for a missed window", () => {
-    expect(notificationText({ kind: "missed", task_key: "GIG-7" }, "Ada")).toBe("GIG-7: the window closed unclaimed");
+    expect(notificationText({ kind: "missed", gig_key: "GIG-7" }, "Ada")).toBe("GIG-7: the window closed unclaimed");
   });
   it("copes with an unknown kind", () => {
-    expect(notificationText({ kind: "weird", task_key: "X-1" }, "Ada")).toBe("Ada updated X-1");
+    expect(notificationText({ kind: "weird", gig_key: "X-1" }, "Ada")).toBe("Ada updated X-1");
     expect(kindInfo("weird").label).toBe("weird");
   });
   it("gives each kind its own colour", () => {

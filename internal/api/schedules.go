@@ -10,20 +10,20 @@ import (
 	"github.com/0x2alx/gigg/internal/store"
 )
 
-// Schedules: named timing (rule, window, create-early) of a workspace. Recurring tasks pair one
-// with a template. Reading needs view; changing needs the Recurring tasks permission.
+// Schedules: named timing (rule, window, create-early) of a workspace. Recurring gigs pair one
+// with a template. Reading needs view; changing needs the Recurring gigs permission.
 
 // ScheduleBody creates or replaces a schedule.
 type ScheduleBody struct {
 	Name          string `json:"name,omitempty" maxLength:"80" doc:"Default: described from the rule"`
-	Freq          string `json:"freq" enum:"minutes,hours,daily,weekly,monthly" doc:"minutes and hours: for crons only"`
+	Freq          string `json:"freq" enum:"minutes,hours,daily,weekly,monthly" doc:"minutes and hours: for errands only"`
 	Interval      int64  `json:"interval,omitempty" minimum:"0" maximum:"365" doc:"Every N minutes (1-360), hours (1-24), days, weeks or months (default 1)"`
 	Weekdays      []int  `json:"weekdays,omitempty" doc:"Weekly: 1=Mon .. 7=Sun; minutes/hours: only on these days (empty: every day)"`
 	MonthDay      *int64 `json:"month_day,omitempty" doc:"Monthly: 1-31, -1 = last day"`
 	TZ            string `json:"tz,omitempty" doc:"IANA time zone (default: the user's time zone preference, else the instance default GIGG_DEFAULT_TZ)"`
 	WindowStart   string `json:"window_start,omitempty" pattern:"^[0-2][0-9]:[0-5][0-9]$" doc:"When the window opens, local HH:MM (default 00:00)"`
 	WindowMinutes int64  `json:"window_minutes,omitempty" minimum:"0" maximum:"44640" doc:"How long the window stays open (default 1440)"`
-	LeadMinutes   int64  `json:"lead_minutes,omitempty" minimum:"0" maximum:"10080" doc:"Create the task this long before the window opens"`
+	LeadMinutes   int64  `json:"lead_minutes,omitempty" minimum:"0" maximum:"10080" doc:"Create the gig this long before the window opens"`
 }
 
 func (b ScheduleBody) apply(s *store.Schedule) {
@@ -45,7 +45,7 @@ func (a *API) schedule(ctx context.Context, p *access.Principal, id int64) (*sto
 	return s, nil
 }
 
-// scheduleUsedOutside: a live recurring task outside the projects a narrowed key reaches uses it.
+// scheduleUsedOutside: a live recurring gig outside the projects a narrowed key reaches uses it.
 func (a *API) scheduleUsedOutside(ctx context.Context, p *access.Principal, id int64) bool {
 	if !p.Narrowed() {
 		return false
@@ -73,7 +73,7 @@ func (a *API) scheduleUsedOutside(ctx context.Context, p *access.Principal, id i
 
 func (a *API) registerSchedules() {
 	huma.Register(a.h, huma.Operation{OperationID: "list-schedules", Method: "GET", Path: "/workspaces/{ws}/schedules", Tags: []string{"recurrence"},
-		Summary: "A workspace's schedules (named timing that recurring tasks pair with templates)"}, func(ctx context.Context, in *wsPath) (*struct {
+		Summary: "A workspace's schedules (named timing that recurring gigs pair with templates)"}, func(ctx context.Context, in *wsPath) (*struct {
 		Body struct {
 			Items []*store.Schedule `json:"items"`
 		}
@@ -86,7 +86,7 @@ func (a *API) registerSchedules() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		ss, err := store.ListSchedules(ctx, a.st.R, w.ID)
@@ -111,7 +111,7 @@ func (a *API) registerSchedules() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, "schedules", "tasks:write"); err != nil {
+		if err := require(p, w.ID, "schedules", "gigs:write"); err != nil {
 			return nil, err
 		}
 		s := &store.Schedule{WorkspaceID: w.ID}
@@ -138,13 +138,13 @@ func (a *API) registerSchedules() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, s.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, s.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		return &scheduleOut{ETag: etag(s.Version), Body: s}, nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "update-schedule", Method: "PUT", Path: "/schedules/{id}", Tags: []string{"recurrence"},
-		Summary: "Replace a schedule (every recurring task on it moves to the new timing)"}, func(ctx context.Context, in *struct {
+		Summary: "Replace a schedule (every recurring gig on it moves to the new timing)"}, func(ctx context.Context, in *struct {
 		ID      int64  `path:"id"`
 		IfMatch string `header:"If-Match"`
 		Body    ScheduleBody
@@ -157,14 +157,14 @@ func (a *API) registerSchedules() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, s.WorkspaceID, "schedules", "tasks:write"); err != nil {
+		if err := require(p, s.WorkspaceID, "schedules", "gigs:write"); err != nil {
 			return nil, err
 		}
 		if a.scheduleUsedOutside(ctx, p, s.ID) {
 			return nil, errForbidden("This schedule is used outside the projects this key reaches.")
 		}
-		// retiming a schedule retimes every recurring task on it: an always-run one (or one with a tool
-		// allowlist) needs those permissions, as editing that recurring task would
+		// retiming a schedule retimes every recurring gig on it: an always-run one (or one with a tool
+		// allowlist) needs those permissions, as editing that recurring gig would
 		always, tools, err := store.ScheduleGuards(ctx, a.st.R, s.ID)
 		if err != nil {
 			return nil, err
@@ -175,16 +175,16 @@ func (a *API) registerSchedules() {
 		if err := toolsGuard(p, s.WorkspaceID, tools); err != nil {
 			return nil, err
 		}
-		if s.CronUses > 0 { // retiming a schedule retimes its crons too
-			if err := require(p, s.WorkspaceID, "crons", "crons:write"); err != nil {
+		if s.ErrandUses > 0 { // retiming a schedule retimes its errands too
+			if err := require(p, s.WorkspaceID, "errands", "errands:write"); err != nil {
 				return nil, err
 			}
-			// ... and when a no-sandbox cron uses it, that's deciding when a no-sandbox command runs
-			if n, err := store.UnsandboxedCronUses(ctx, a.st.R, s.ID); err != nil {
+			// ... and when a no-sandbox errand uses it, that's deciding when a no-sandbox command runs
+			if n, err := store.UnsandboxedErrandUses(ctx, a.st.R, s.ID); err != nil {
 				return nil, err
 			} else if n > 0 {
-				if err := require(p, s.WorkspaceID, "cron_unsandboxed", "crons:write"); err != nil {
-					return nil, errForbidden("A cron without the sandbox uses this schedule: changing it needs No-sandbox crons.")
+				if err := require(p, s.WorkspaceID, "errand_unsandboxed", "errands:write"); err != nil {
+					return nil, errForbidden("An errand without the sandbox uses this schedule: changing it needs No-sandbox errands.")
 				}
 			}
 		}
@@ -206,7 +206,7 @@ func (a *API) registerSchedules() {
 		return &scheduleOut{ETag: etag(s.Version), Body: s}, nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-schedule", Method: "DELETE", Path: "/schedules/{id}", Tags: []string{"recurrence"},
-		Summary: "Delete a schedule no recurring task uses", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
+		Summary: "Delete a schedule no recurring gig uses", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -215,7 +215,7 @@ func (a *API) registerSchedules() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, s.WorkspaceID, "schedules", "tasks:write"); err != nil {
+		if err := require(p, s.WorkspaceID, "schedules", "gigs:write"); err != nil {
 			return nil, err
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteSchedule(ctx, tx, p.Actor(), s) })

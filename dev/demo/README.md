@@ -30,4 +30,4 @@ the `ui-shot` image and a TLS certificate in `scratch/`).
 5. Copy `out/docs/*.png` to `docs/images/`.
 
 The scenario signs in as `dana`, switches themes through the API between shots, and names each file
-after its page and theme (`board-all-night.png`, `task-panel-day.png`, ...), the names the guide uses.
+after its page and theme (`board-all-night.png`, `gig-panel-day.png`, ...), the names the guide uses.

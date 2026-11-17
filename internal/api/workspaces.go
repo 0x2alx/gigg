@@ -150,7 +150,7 @@ type projectCreateIn struct {
 	Body struct {
 		Slug     string                 `json:"slug" pattern:"^[a-z][a-z0-9-]{1,31}$"`
 		Name     string                 `json:"name" minLength:"1" maxLength:"64"`
-		Key      string                 `json:"key" pattern:"^[A-Z][A-Z0-9]{1,4}$" doc:"Task key prefix, e.g. GIG"`
+		Key      string                 `json:"key" pattern:"^[A-Z][A-Z0-9]{1,4}$" doc:"Gig key prefix, e.g. GIG"`
 		Statuses []store.StatusTemplate `json:"statuses,omitempty" doc:"Default: the workspace's status template"`
 	}
 }
@@ -214,22 +214,22 @@ type reorderIn struct {
 	}
 }
 
-// Board is a project with its statuses and tasks.
+// Board is a project with its statuses and gigs.
 type Board struct {
 	Project  *store.Project `json:"project"`
 	Statuses []*BoardColumn `json:"statuses"`
 	Labels   []*store.Label `json:"labels"`
-	// Truncated: the project has more unarchived tasks than a board shows (boardMax); the rest are in lists
+	// Truncated: the project has more unarchived gigs than a board shows (boardMax); the rest are in lists
 	Truncated bool `json:"truncated,omitempty"`
 }
 
 // boardMax bounds one board answer; past it the board says so (Truncated) instead of dropping cards silently.
 const boardMax = 5000
 
-// BoardColumn is a status with its tasks.
+// BoardColumn is a status with its gigs.
 type BoardColumn struct {
 	*store.Status
-	Tasks []*store.Task `json:"tasks"`
+	Gigs []*store.Gig `json:"gigs"`
 }
 
 func (a *API) registerWorkspaces() {
@@ -464,7 +464,7 @@ func (a *API) registerWorkspaces() {
 		return &labelOut{ETag: etag(l.Version), Body: l}, nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-label", Method: "DELETE", Path: "/labels/{id}", Tags: []string{"labels"},
-		Summary: "Delete a label (managers; removes it from every task)", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
+		Summary: "Delete a label (managers; removes it from every gig)", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -588,7 +588,7 @@ func (a *API) registerWorkspaces() {
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteProject(ctx, tx, p.Actor(), pr) })
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "get-board", Method: "GET", Path: "/projects/{p}/board", Tags: []string{"projects"},
-		Summary: "A project's board: statuses with their tasks, and the workspace's labels"}, func(ctx context.Context, in *projectPath) (*struct{ Body *Board }, error) {
+		Summary: "A project's board: statuses with their gigs, and the workspace's labels"}, func(ctx context.Context, in *projectPath) (*struct{ Body *Board }, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -597,19 +597,19 @@ func (a *API) registerWorkspaces() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, pr.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		sts, err := store.Statuses(ctx, a.st.R, pr.ID)
 		if err != nil {
 			return nil, err
 		}
-		var ts []*store.Task
-		seen := map[int64]bool{} // pages are separate reads: a task that moved between them comes once
+		var ts []*store.Gig
+		seen := map[int64]bool{} // pages are separate reads: a gig that moved between them comes once
 		more, offset := true, 0
 		for more && len(ts) < boardMax {
-			var page []*store.Task
-			page, more, err = store.ListTasks(ctx, a.st.R, store.TaskFilter{WorkspaceID: pr.WorkspaceID, Projects: []int64{pr.ID}, Limit: 500, Offset: offset})
+			var page []*store.Gig
+			page, more, err = store.ListGigs(ctx, a.st.R, store.GigFilter{WorkspaceID: pr.WorkspaceID, Projects: []int64{pr.ID}, Limit: 500, Offset: offset})
 			if err != nil {
 				return nil, err
 			}
@@ -630,13 +630,13 @@ func (a *API) registerWorkspaces() {
 		b := &Board{Project: pr, Truncated: more}
 		by := map[int64]*BoardColumn{}
 		for _, s := range sts {
-			c := &BoardColumn{Status: s, Tasks: []*store.Task{}}
+			c := &BoardColumn{Status: s, Gigs: []*store.Gig{}}
 			by[s.ID] = c
 			b.Statuses = append(b.Statuses, c)
 		}
 		for _, t := range ts {
 			if c := by[t.StatusID]; c != nil {
-				c.Tasks = append(c.Tasks, t)
+				c.Gigs = append(c.Gigs, t)
 			}
 		}
 		if b.Labels, err = store.Labels(ctx, a.st.R, pr.WorkspaceID); err != nil {

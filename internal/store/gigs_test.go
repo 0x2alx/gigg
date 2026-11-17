@@ -58,12 +58,12 @@ func must(t *testing.T, err error) {
 	}
 }
 
-func (f *fixture) task(t *testing.T, n NewTask) *Task {
+func (f *fixture) gig(t *testing.T, n NewGig) *Gig {
 	t.Helper()
-	var out *Task
+	var out *Gig
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
 		var err error
-		out, err = CreateTask(f.ctx, tx, f.a, n)
+		out, err = CreateGig(f.ctx, tx, f.a, n)
 		return err
 	}))
 	return out
@@ -74,10 +74,10 @@ func (f *fixture) tx(t *testing.T, fn func(tx *sql.Tx) error) {
 	must(t, f.s.Tx(f.ctx, fn))
 }
 
-func TestCreateTaskDefaults(t *testing.T) {
+func TestCreateGigDefaults(t *testing.T) {
 	f := newFixture(t)
-	a := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "first", Labels: []string{"bug", "Bug", "ui"}})
-	b := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "second"})
+	a := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "first", Labels: []string{"bug", "Bug", "ui"}})
+	b := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "second"})
 	if a.Key != "GIG-1" || b.Key != "GIG-2" || a.StatusCategory != "todo" || a.StatusName != "To-Do" {
 		t.Fatalf("keys/status: %s %s %s", a.Key, b.Key, a.StatusName)
 	}
@@ -92,31 +92,31 @@ func TestCreateTaskDefaults(t *testing.T) {
 
 func TestMoveBetweenProjectsKeepsAlias(t *testing.T) {
 	f := newFixture(t)
-	a := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "moving"})
-	var moved *Task
+	a := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "moving"})
+	var moved *Gig
 	f.tx(t, func(tx *sql.Tx) error {
 		var err error
-		moved, err = MoveTask(f.ctx, tx, f.a, a, a.Version, Move{ProjectID: &f.p2.ID})
+		moved, err = MoveGig(f.ctx, tx, f.a, a, a.Version, Move{ProjectID: &f.p2.ID})
 		return err
 	})
 	if moved.Key != "OPS-1" || moved.ProjectID != f.p2.ID || moved.StatusCategory != "todo" || len(moved.Aliases) != 1 || moved.Aliases[0] != "GIG-1" {
 		t.Fatalf("moved %+v", moved)
 	}
 	for _, k := range []string{"GIG-1", "OPS-1"} {
-		ids, err := TaskIDsByKey(f.ctx, f.s.R, k, nil)
+		ids, err := GigIDsByKey(f.ctx, f.s.R, k, nil)
 		if err != nil || len(ids) != 1 || ids[0] != a.ID {
 			t.Fatalf("%s -> %v %v", k, ids, err)
 		}
 	}
 	// a stale version is refused
 	f.tx(t, func(tx *sql.Tx) error {
-		if _, err := MoveTask(f.ctx, tx, f.a, moved, a.Version, Move{Category: "done"}); !errors.Is(err, ErrVersion) {
+		if _, err := MoveGig(f.ctx, tx, f.a, moved, a.Version, Move{Category: "done"}); !errors.Is(err, ErrVersion) {
 			t.Fatalf("stale version: %v", err)
 		}
 		return nil
 	})
 	// GIG numbering continues after the move; the old number is not reused
-	b := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "next"})
+	b := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "next"})
 	if b.Key != "GIG-2" {
 		t.Fatalf("number reused: %s", b.Key)
 	}
@@ -124,38 +124,38 @@ func TestMoveBetweenProjectsKeepsAlias(t *testing.T) {
 
 func TestDoneAtAndPositions(t *testing.T) {
 	f := newFixture(t)
-	a := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "a"})
-	b := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "b"})
-	c := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "c"})
+	a := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "a"})
+	b := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "b"})
+	c := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "c"})
 	f.tx(t, func(tx *sql.Tx) error {
 		// put c between a and b, many times over (forces renumbering eventually)
 		for i := 0; i < 60; i++ {
-			cur, _ := GetTask(f.ctx, tx, c.ID)
-			if _, err := MoveTask(f.ctx, tx, f.a, cur, 0, Move{Place: Place{Where: "after", TaskID: a.ID}}); err != nil {
+			cur, _ := GetGig(f.ctx, tx, c.ID)
+			if _, err := MoveGig(f.ctx, tx, f.a, cur, 0, Move{Place: Place{Where: "after", GigID: a.ID}}); err != nil {
 				return err
 			}
-			cur, _ = GetTask(f.ctx, tx, b.ID)
-			if _, err := MoveTask(f.ctx, tx, f.a, cur, 0, Move{Place: Place{Where: "after", TaskID: a.ID}}); err != nil {
+			cur, _ = GetGig(f.ctx, tx, b.ID)
+			if _, err := MoveGig(f.ctx, tx, f.a, cur, 0, Move{Place: Place{Where: "after", GigID: a.ID}}); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
-	ts, _, _ := ListTasks(f.ctx, f.s.R, TaskFilter{WorkspaceID: f.ws.ID, Projects: []int64{f.p1.ID}})
+	ts, _, _ := ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID, Projects: []int64{f.p1.ID}})
 	if len(ts) != 3 || ts[0].ID != a.ID || ts[1].ID != b.ID || ts[2].ID != c.ID {
 		t.Fatalf("order %v %v %v", ts[0].Title, ts[1].Title, ts[2].Title)
 	}
-	var done *Task
+	var done *Gig
 	f.tx(t, func(tx *sql.Tx) error {
 		var err error
-		cur, _ := GetTask(f.ctx, tx, a.ID)
-		if done, err = MoveTask(f.ctx, tx, f.a, cur, 0, Move{Category: "done"}); err != nil {
+		cur, _ := GetGig(f.ctx, tx, a.ID)
+		if done, err = MoveGig(f.ctx, tx, f.a, cur, 0, Move{Category: "done"}); err != nil {
 			return err
 		}
 		if done.DoneAt == nil {
 			t.Fatal("done_at not set")
 		}
-		back, err := MoveTask(f.ctx, tx, f.a, done, 0, Move{Category: "todo"})
+		back, err := MoveGig(f.ctx, tx, f.a, done, 0, Move{Category: "todo"})
 		if err == nil && back.DoneAt != nil {
 			t.Fatal("done_at not cleared")
 		}
@@ -165,27 +165,27 @@ func TestDoneAtAndPositions(t *testing.T) {
 
 func TestClaimFinishResume(t *testing.T) {
 	f := newFixture(t)
-	low := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "low", Priority: 1})
-	high := f.task(t, NewTask{ProjectID: f.p2.ID, Title: "high", Priority: 4})
+	low := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "low", Priority: 1})
+	high := f.gig(t, NewGig{ProjectID: f.p2.ID, Title: "high", Priority: 4})
 	future := int64(1) << 50
-	f.task(t, NewTask{ProjectID: f.p1.ID, Title: "later", Priority: 4, StartAt: &future})
+	f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "later", Priority: 4, StartAt: &future})
 	agent := Actor{UserID: f.agent.ID}
-	var got *Task
+	var got *Gig
 	f.tx(t, func(tx *sql.Tx) error {
 		var err error
-		if got, err = ClaimTask(f.ctx, tx, agent, f.ws.ID, Claim{StartDue: true, DryRun: true}); err != nil {
+		if got, err = ClaimGig(f.ctx, tx, agent, f.ws.ID, Claim{StartDue: true, DryRun: true}); err != nil {
 			return err
 		}
 		if got.ID != high.ID || got.StatusCategory != "todo" {
 			t.Fatalf("dry run picked %s (%s)", got.Title, got.StatusCategory)
 		}
-		if got, err = ClaimTask(f.ctx, tx, agent, f.ws.ID, Claim{StartDue: true, Projects: []int64{f.p1.ID}, CreatedBy: []int64{f.admin.ID}}); err != nil {
+		if got, err = ClaimGig(f.ctx, tx, agent, f.ws.ID, Claim{StartDue: true, Projects: []int64{f.p1.ID}, CreatedBy: []int64{f.admin.ID}}); err != nil {
 			return err
 		}
 		if got.ID != low.ID || got.StatusCategory != "doing" {
 			t.Fatalf("claim picked %s (%s)", got.Title, got.StatusCategory)
 		}
-		if _, err := ClaimTask(f.ctx, tx, agent, f.ws.ID, Claim{StartDue: true, CreatedBy: []int64{f.agent.ID}}); !errors.Is(err, ErrNotFound) {
+		if _, err := ClaimGig(f.ctx, tx, agent, f.ws.ID, Claim{StartDue: true, CreatedBy: []int64{f.agent.ID}}); !errors.Is(err, ErrNotFound) {
 			t.Fatalf("filter by creator: %v", err)
 		}
 		return nil
@@ -201,26 +201,26 @@ func TestClaimFinishResume(t *testing.T) {
 			return err
 		}
 		cost := 0.44
-		r, task, err := FinishRun(f.ctx, tx, agent, r, Finish{Status: "needs_human", ReportMD: "Siren or chime?", CommentKind: "question",
+		r, gig, err := FinishRun(f.ctx, tx, agent, r, Finish{Status: "needs_human", ReportMD: "Siren or chime?", CommentKind: "question",
 			MoveToCategory: "waiting", CostUSD: &cost})
 		if err != nil {
 			return err
 		}
-		if r.Status != "needs_human" || r.ReportCommentID == nil || task.StatusCategory != "waiting" || task.CostUSDTotal != 0.44 ||
-			task.SessionID == nil || *task.SessionID != sid || task.CommentCount != 1 {
-			t.Fatalf("finish: run %+v task %+v", r, task)
+		if r.Status != "needs_human" || r.ReportCommentID == nil || gig.StatusCategory != "waiting" || gig.CostUSDTotal != 0.44 ||
+			gig.SessionID == nil || *gig.SessionID != sid || gig.CommentCount != 1 {
+			t.Fatalf("finish: run %+v gig %+v", r, gig)
 		}
 		if _, _, err := FinishRun(f.ctx, tx, agent, r, Finish{Status: "done"}); !errors.Is(err, ErrConflict) {
 			t.Fatalf("finishing twice: %v", err)
 		}
-		task, err = ResumeTask(f.ctx, tx, f.a, task, "chime please")
+		gig, err = ResumeGig(f.ctx, tx, f.a, gig, "chime please")
 		if err != nil {
 			return err
 		}
-		if task.StatusCategory != "todo" || task.ResumeRequestedAt == nil {
-			t.Fatalf("resume: %+v", task)
+		if gig.StatusCategory != "todo" || gig.ResumeRequestedAt == nil {
+			t.Fatalf("resume: %+v", gig)
 		}
-		cs, _ := Comments(f.ctx, tx, task.ID, *r.ReportCommentID, 0)
+		cs, _ := Comments(f.ctx, tx, gig.ID, *r.ReportCommentID, 0)
 		if len(cs) != 1 || cs[0].Kind != "resume_request" || !cs[0].AuthorIsAdmin {
 			t.Fatalf("resume comment %+v", cs)
 		}
@@ -230,17 +230,17 @@ func TestClaimFinishResume(t *testing.T) {
 		}
 		return nil
 	})
-	// a parked run: the task goes back to todo with its start moved to check_at, and a claim skips
+	// a parked run: the gig goes back to todo with its start moved to check_at, and a claim skips
 	// it until then; the run history says parked, not timeout
 	f.tx(t, func(tx *sql.Tx) error {
-		task, err := GetTask(f.ctx, tx, got.ID)
+		gig, err := GetGig(f.ctx, tx, got.ID)
 		if err != nil {
 			return err
 		}
-		if task, err = MoveTask(f.ctx, tx, f.a, task, 0, Move{Category: "doing"}); err != nil {
+		if gig, err = MoveGig(f.ctx, tx, f.a, gig, 0, Move{Category: "doing"}); err != nil {
 			return err
 		}
-		r, err := StartRun(f.ctx, tx, agent, task, &sid, "resume", 1, nil)
+		r, err := StartRun(f.ctx, tx, agent, gig, &sid, "resume", 1, nil)
 		if err != nil {
 			return err
 		}
@@ -252,16 +252,16 @@ func TestClaimFinishResume(t *testing.T) {
 		if _, _, err := FinishRun(f.ctx, tx, agent, r, Finish{Status: "done", CheckAt: &at}); !errors.Is(err, ErrInvalid) {
 			t.Fatalf("check_at without parked: %v", err)
 		}
-		r, task, err = FinishRun(f.ctx, tx, agent, r, Finish{Status: "parked", ReportMD: "Started the long test; checking back.", CommentKind: "comment",
+		r, gig, err = FinishRun(f.ctx, tx, agent, r, Finish{Status: "parked", ReportMD: "Started the long test; checking back.", CommentKind: "comment",
 			MoveToCategory: "todo", CheckAt: &at})
 		if err != nil {
 			return err
 		}
-		if r.Status != "parked" || task.StatusCategory != "todo" || task.StartAt == nil || *task.StartAt != at {
-			t.Fatalf("parked: run %+v task %+v", r, task)
+		if r.Status != "parked" || gig.StatusCategory != "todo" || gig.StartAt == nil || *gig.StartAt != at {
+			t.Fatalf("parked: run %+v gig %+v", r, gig)
 		}
-		if c, err := ClaimTask(f.ctx, tx, agent, f.ws.ID, Claim{StartDue: true, CreatedBy: []int64{f.admin.ID}}); err == nil && c.ID == task.ID {
-			t.Fatal("a parked task was claimed before check_at")
+		if c, err := ClaimGig(f.ctx, tx, agent, f.ws.ID, Claim{StartDue: true, CreatedBy: []int64{f.admin.ID}}); err == nil && c.ID == gig.ID {
+			t.Fatal("a parked gig was claimed before check_at")
 		}
 		return nil
 	})
@@ -308,44 +308,44 @@ func TestStatusRules(t *testing.T) {
 	})
 }
 
-func TestTaskOrder(t *testing.T) {
+func TestGigOrder(t *testing.T) {
 	for in, want := range map[string]string{
 		"due":             "t.due_at IS NULL, t.due_at, t.id",
 		"-due":            "t.due_at IS NULL, t.due_at DESC, t.id",
 		"-number":         "p.key DESC, t.number DESC, t.id",
 		"title,-priority": "t.title COLLATE NOCASE, t.priority DESC, t.id",
 	} {
-		got, err := taskOrder(in)
+		got, err := gigOrder(in)
 		if err != nil || got != want {
-			t.Errorf("taskOrder(%q) = %q, %v; want %q", in, got, err, want)
+			t.Errorf("gigOrder(%q) = %q, %v; want %q", in, got, err, want)
 		}
 	}
-	if _, err := taskOrder("bogus"); err == nil {
-		t.Error("taskOrder(bogus): want an error")
+	if _, err := gigOrder("bogus"); err == nil {
+		t.Error("gigOrder(bogus): want an error")
 	}
 }
 
 func TestSearchByKey(t *testing.T) {
 	f := newFixture(t)
-	a := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "first"})
-	f.task(t, NewTask{ProjectID: f.p1.ID, Title: "second"})
+	a := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "first"})
+	f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "second"})
 	for _, q := range []string{a.Key, strings.ToLower(a.Key), " " + a.Key} {
-		ts, _, err := ListTasks(f.ctx, f.s.R, TaskFilter{WorkspaceID: f.ws.ID, Q: q, SearchComments: true})
+		ts, _, err := ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID, Q: q, SearchComments: true})
 		if err != nil || len(ts) != 1 || ts[0].ID != a.ID {
-			t.Errorf("q=%q: got %d tasks, %v; want %s", q, len(ts), err, a.Key)
+			t.Errorf("q=%q: got %d gigs, %v; want %s", q, len(ts), err, a.Key)
 		}
 	}
-	if ts, _, _ := ListTasks(f.ctx, f.s.R, TaskFilter{WorkspaceID: f.ws.ID, Q: "sec"}); len(ts) != 1 {
-		t.Errorf("text search: got %d tasks, want 1", len(ts))
+	if ts, _, _ := ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID, Q: "sec"}); len(ts) != 1 {
+		t.Errorf("text search: got %d gigs, want 1", len(ts))
 	}
 	// moved to another project: its old key still finds it
 	old := a.Key
 	f.tx(t, func(tx *sql.Tx) error {
-		_, err := MoveTask(f.ctx, tx, f.a, a, a.Version, Move{ProjectID: &f.p2.ID})
+		_, err := MoveGig(f.ctx, tx, f.a, a, a.Version, Move{ProjectID: &f.p2.ID})
 		return err
 	})
-	ts, _, err := ListTasks(f.ctx, f.s.R, TaskFilter{WorkspaceID: f.ws.ID, Q: old})
+	ts, _, err := ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID, Q: old})
 	if err != nil || len(ts) != 1 || ts[0].ID != a.ID {
-		t.Errorf("old key %s: got %d tasks, %v", old, len(ts), err)
+		t.Errorf("old key %s: got %d gigs, %v", old, len(ts), err)
 	}
 }

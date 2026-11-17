@@ -1,6 +1,6 @@
-// What a board card says about the agent side of a task: the badge at its top left and the block
+// What a board card says about the agent side of a gig: the badge at its top left and the block
 // under its title (a running run, a question waiting for an answer, a run that failed).
-import type { Task } from "./api";
+import type { Gig } from "./api";
 
 export type CardStateKind = "running" | "queued" | "answer" | "failed";
 
@@ -12,9 +12,9 @@ export interface CardState {
 
 const FAILED: Record<string, string> = { error: "Failed", timeout: "Timed out", interrupted: "Interrupted" };
 
-type CardTask = Pick<Task, "status_category" | "resume_requested_at" | "last_run" | "question" | "archived_at">;
+type CardGig = Pick<Gig, "status_category" | "resume_requested_at" | "last_run" | "question" | "archived_at">;
 
-export function cardState(t: CardTask): CardState | null {
+export function cardState(t: CardGig): CardState | null {
   if (t.archived_at) return null; // archived: out of the agents' way, nothing to act on
   const r = t.last_run;
   const closed = t.status_category === "done" || t.status_category === "cancelled";

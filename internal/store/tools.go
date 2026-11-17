@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// MaxToolRules and MaxToolRule bound a task's tool allowlist.
+// MaxToolRules and MaxToolRule bound a gig's tool allowlist.
 const (
 	MaxToolRules = 64
 	MaxToolRule  = 500

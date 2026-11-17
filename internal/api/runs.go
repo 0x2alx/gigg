@@ -52,9 +52,9 @@ type runProgressIn struct {
 // RunFinish is what a worker reports at the end of a run.
 type RunFinish struct {
 	Status         string   `json:"status" enum:"done,needs_human,error,timeout,interrupted,parked"`
-	ReportMD       string   `json:"report_md,omitempty" maxLength:"65536" doc:"Stored as a comment on the task"`
+	ReportMD       string   `json:"report_md,omitempty" maxLength:"65536" doc:"Stored as a comment on the gig"`
 	CommentKind    string   `json:"comment_kind,omitempty" enum:"report,question,comment," doc:"Default: report"`
-	MoveToCategory string   `json:"move_to_category,omitempty" enum:"backlog,todo,doing,waiting,done,cancelled," doc:"Where the task goes; empty = stays"`
+	MoveToCategory string   `json:"move_to_category,omitempty" enum:"backlog,todo,doing,waiting,done,cancelled," doc:"Where the gig goes; empty = stays"`
 	CostUSD        *float64 `json:"cost_usd,omitempty"`
 	NumTurns       *int64   `json:"num_turns,omitempty"`
 	DurationMS     *int64   `json:"duration_ms,omitempty"`
@@ -68,7 +68,7 @@ type RunFinish struct {
 	LogPath        *string  `json:"log_path,omitempty" maxLength:"1024"`
 	ExitCode       *int64   `json:"exit_code,omitempty"`
 	ErrorReason    *string  `json:"error_reason,omitempty" maxLength:"1024"`
-	CheckAt        *int64   `json:"check_at,omitempty" doc:"Only with status parked: the task's start (ms) moves here, so a claim skips it until then (at most 7 days ahead)"`
+	CheckAt        *int64   `json:"check_at,omitempty" doc:"Only with status parked: the gig's start (ms) moves here, so a claim skips it until then (at most 7 days ahead)"`
 }
 
 type runFinishIn struct {
@@ -76,27 +76,27 @@ type runFinishIn struct {
 	Body RunFinish
 }
 
-// FinishResult is the closed run and the task after the move.
+// FinishResult is the closed run and the gig after the move.
 type FinishResult struct {
-	Run  *store.Run  `json:"run"`
-	Task *store.Task `json:"task"`
+	Run *store.Run `json:"run"`
+	Gig *store.Gig `json:"gig"`
 }
 
-// ClaimBody selects and moves the next task.
+// ClaimBody selects and moves the next gig.
 type ClaimBody struct {
 	FromCategory string   `json:"from_category,omitempty" enum:"backlog,todo,doing,waiting,done,cancelled," doc:"Default: todo"`
 	ToCategory   string   `json:"to_category,omitempty" enum:"backlog,todo,doing,waiting,done,cancelled," doc:"Default: doing"`
 	Projects     []int64  `json:"projects,omitempty"`
-	CreatedBy    []string `json:"created_by,omitempty" doc:"Only tasks created by these users (ids or usernames)"`
-	StartDue     bool     `json:"start_due,omitempty" doc:"Skip tasks whose start date is in the future"`
-	AlwaysOnly   bool     `json:"always_only,omitempty" doc:"Only always-run tasks (runners send it by day, or when the usage budget says no)"`
+	CreatedBy    []string `json:"created_by,omitempty" doc:"Only gigs created by these users (ids or usernames)"`
+	StartDue     bool     `json:"start_due,omitempty" doc:"Skip gigs whose start date is in the future"`
+	AlwaysOnly   bool     `json:"always_only,omitempty" doc:"Only always-run gigs (runners send it by day, or when the usage budget says no)"`
 	DryRun       bool     `json:"dry_run,omitempty"`
 }
 
 type claimOut struct {
 	Status int
 	ETag   string `header:"ETag"`
-	Body   *store.Task
+	Body   *store.Gig
 }
 
 type claimIn struct {
@@ -132,9 +132,9 @@ type auditIn struct {
 	Limit    int   `query:"limit" minimum:"0" maximum:"500"`
 }
 
-// InboxItem is a task waiting for a human, with the question.
+// InboxItem is a gig waiting for a human, with the question.
 type InboxItem struct {
-	Task      *store.Task    `json:"task"`
+	Gig       *store.Gig     `json:"gig"`
 	Question  *store.Comment `json:"question"`
 	Project   string         `json:"project"`
 	Workspace string         `json:"workspace"`
@@ -144,33 +144,33 @@ type InboxItem struct {
 var progressEventEvery = 15 * time.Second
 
 func (a *API) registerRuns() {
-	huma.Register(a.h, huma.Operation{OperationID: "list-task-runs", Method: "GET", Path: "/tasks/{id}/runs", Tags: []string{"runs"},
-		Summary: "A task's runs, newest first"}, func(ctx context.Context, in *taskPath) (*runsOut, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "list-gig-runs", Method: "GET", Path: "/gigs/{id}/runs", Tags: []string{"runs"},
+		Summary: "A gig's runs, newest first"}, func(ctx context.Context, in *gigPath) (*runsOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		t, err := a.task(ctx, p, in.ID)
+		t, err := a.gig(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		out := &runsOut{}
-		out.Body.Items, err = store.ListRuns(ctx, a.st.R, store.RunFilter{TaskID: &t.ID})
+		out.Body.Items, err = store.ListRuns(ctx, a.st.R, store.RunFilter{GigID: &t.ID})
 		if out.Body.Items == nil {
 			out.Body.Items = []*store.Run{}
 		}
 		return out, storeErr(err)
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "start-run", Method: "POST", Path: "/tasks/{id}/runs", Tags: []string{"runs"},
-		Summary: "Record that a worker started on the task (gigg runs nothing)", DefaultStatus: 201}, func(ctx context.Context, in *runStartIn) (*runOut, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "start-run", Method: "POST", Path: "/gigs/{id}/runs", Tags: []string{"runs"},
+		Summary: "Record that a worker started on the gig (gigg runs nothing)", DefaultStatus: 201}, func(ctx context.Context, in *runStartIn) (*runOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		t, err := a.task(ctx, p, in.ID)
+		t, err := a.gig(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -200,7 +200,7 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, r.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, r.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		ev, err := store.RunEvents(ctx, a.st.R, r.ID)
@@ -231,7 +231,7 @@ func (a *API) registerRuns() {
 		return &runOut{Body: &RunDetail{Run: r, Events: []store.RunEvent{}}}, nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "finish-run", Method: "POST", Path: "/runs/{id}/finish", Tags: []string{"runs"},
-		Summary: "Close a run with what the worker reports; store the report; move the task if asked"}, func(ctx context.Context, in *runFinishIn) (*struct{ Body *FinishResult }, error) {
+		Summary: "Close a run with what the worker reports; store the report; move the gig if asked"}, func(ctx context.Context, in *runFinishIn) (*struct{ Body *FinishResult }, error) {
 		p, r, err := a.run(ctx, in.ID)
 		if err != nil {
 			return nil, err
@@ -243,13 +243,13 @@ func (a *API) registerRuns() {
 		if b.ReportMD != "" && !p.HasScope("comments:write") {
 			return nil, errForbidden("This key lacks the comments:write scope.")
 		}
-		if b.MoveToCategory != "" && !p.HasScope("tasks:write") {
-			return nil, errForbidden("This key lacks the tasks:write scope.")
+		if b.MoveToCategory != "" && !p.HasScope("gigs:write") {
+			return nil, errForbidden("This key lacks the gigs:write scope.")
 		}
-		// moving the task back to To-Do or Doing reopens it: the same check as move-task (an always-run
-		// task, or one with a tool allowlist, only by people allowed to run those)
+		// moving the gig back to To-Do or Doing reopens it: the same check as move-gig (an always-run
+		// gig, or one with a tool allowlist, only by people allowed to run those)
 		if open := func(c string) bool { return c == "todo" || c == "doing" }; open(b.MoveToCategory) {
-			cur, err := store.GetTask(ctx, a.st.R, r.TaskID)
+			cur, err := store.GetGig(ctx, a.st.R, r.GigID)
 			if err != nil {
 				return nil, storeErr(err)
 			}
@@ -266,7 +266,7 @@ func (a *API) registerRuns() {
 			NumTurns: b.NumTurns, DurationMS: b.DurationMS, TokensIn: b.TokensIn, TokensOut: b.TokensOut, TokensCacheR: b.TokensCacheR,
 			TokensCacheW: b.TokensCacheW, Model: b.Model, SessionID: b.SessionID, TranscriptPath: b.TranscriptPath, LogPath: b.LogPath,
 			ExitCode: b.ExitCode, ErrorReason: b.ErrorReason, CheckAt: b.CheckAt}
-		var t *store.Task
+		var t *store.Gig
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			var err error
 			r, t, err = store.FinishRun(ctx, tx, p.Actor(), r, f)
@@ -275,10 +275,10 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		return &struct{ Body *FinishResult }{Body: &FinishResult{Run: r, Task: t}}, nil
+		return &struct{ Body *FinishResult }{Body: &FinishResult{Run: r, Gig: t}}, nil
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "claim-task", Method: "POST", Path: "/workspaces/{ws}/tasks/claim", Tags: []string{"runs"},
-		Summary: "Take the next matching task and move it, atomically (204 when nothing matches)"}, func(ctx context.Context, in *claimIn) (*claimOut, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "claim-gig", Method: "POST", Path: "/workspaces/{ws}/gigs/claim", Tags: []string{"runs"},
+		Summary: "Take the next matching gig and move it, atomically (204 when nothing matches)"}, func(ctx context.Context, in *claimIn) (*claimOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -287,7 +287,7 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Member, "tasks:write"); err != nil {
+		if err := require(p, w.ID, access.Member, "gigs:write"); err != nil {
 			return nil, err
 		}
 		c := store.Claim{FromCategory: in.Body.FromCategory, ToCategory: in.Body.ToCategory, StartDue: in.Body.StartDue, DryRun: in.Body.DryRun,
@@ -315,10 +315,10 @@ func (a *API) registerRuns() {
 		if in.Body.CreatedBy != nil && c.CreatedBy == nil {
 			return &claimOut{Status: 204}, nil // nobody matches: nothing to claim
 		}
-		var t *store.Task
+		var t *store.Gig
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			var err error
-			t, err = store.ClaimTask(ctx, tx, p.Actor(), w.ID, c)
+			t, err = store.ClaimGig(ctx, tx, p.Actor(), w.ID, c)
 			return err
 		})
 		var pr *Problem
@@ -340,7 +340,7 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		f := store.RunFilter{WorkspaceIDs: []int64{w.ID}, Projects: p.ProjectFilter(), Status: in.Status, Limit: in.Limit}
@@ -355,7 +355,7 @@ func (a *API) registerRuns() {
 		return out, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "workspace-stats", Method: "GET", Path: "/workspaces/{ws}/stats", Tags: []string{"runs"},
-		Summary: "Runs, cost and tasks since a time (what a runner needs for its own caps)"}, func(ctx context.Context, in *statsIn) (*struct{ Body *store.Stats }, error) {
+		Summary: "Runs, cost and gigs since a time (what a runner needs for its own caps)"}, func(ctx context.Context, in *statsIn) (*struct{ Body *store.Stats }, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -364,7 +364,7 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		since := in.Since
@@ -375,7 +375,7 @@ func (a *API) registerRuns() {
 		return &struct{ Body *store.Stats }{Body: s}, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "workspace-summary", Method: "GET", Path: "/workspaces/{ws}/summary", Tags: []string{"workspaces"},
-		Summary: "Plain-text board summary: per project, each status with up to 5 tasks"}, func(ctx context.Context, in *wsPath) (*textOut, error) {
+		Summary: "Plain-text board summary: per project, each status with up to 5 gigs"}, func(ctx context.Context, in *wsPath) (*textOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -384,7 +384,7 @@ func (a *API) registerRuns() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		ps, err := store.ListProjects(ctx, a.st.R, w.ID, p.ProjectFilter())
@@ -407,7 +407,7 @@ func (a *API) registerRuns() {
 		if err := require(p, w.ID, access.Viewer, "workspace:read"); err != nil {
 			return nil, err
 		}
-		if err := need(p, "tasks:read"); err != nil {
+		if err := need(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		if err := need(p, "comments:read"); err != nil {
@@ -443,8 +443,8 @@ func (a *API) registerRuns() {
 		out.Body.Items, err = a.activity(ctx, "1=1", nil, in.BeforeID, in.Limit)
 		return out, storeErr(err)
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "inbox", Method: "GET", Path: "/inbox", Tags: []string{"tasks"},
-		Summary: "Tasks waiting for a human across your workspaces, with the latest question"}, a.inbox)
+	huma.Register(a.h, huma.Operation{OperationID: "inbox", Method: "GET", Path: "/inbox", Tags: []string{"gigs"},
+		Summary: "Gigs waiting for a human across your workspaces, with the latest question"}, a.inbox)
 }
 
 type inboxOut struct {
@@ -465,7 +465,7 @@ func (a *API) inbox(ctx context.Context, _ *struct{}) (*inboxOut, error) {
 	out := &inboxOut{}
 	out.Body.Items = []InboxItem{}
 	for _, w := range ws {
-		if !p.Can(w.ID, access.Viewer, "tasks:read") || w.Archived {
+		if !p.Can(w.ID, access.Viewer, "gigs:read") || w.Archived {
 			continue
 		}
 		ps, err := store.ListProjects(ctx, a.st.R, w.ID, p.ProjectFilter())
@@ -476,12 +476,12 @@ func (a *API) inbox(ctx context.Context, _ *struct{}) (*inboxOut, error) {
 		for _, pr := range ps {
 			names[pr.ID] = pr.Name
 		}
-		ts, _, err := store.ListTasks(ctx, a.st.R, store.TaskFilter{WorkspaceID: w.ID, Projects: p.ProjectFilter(), Category: "waiting", Sort: "updated", Limit: 200})
+		ts, _, err := store.ListGigs(ctx, a.st.R, store.GigFilter{WorkspaceID: w.ID, Projects: p.ProjectFilter(), Category: "waiting", Sort: "updated", Limit: 200})
 		if err != nil {
 			return nil, err
 		}
 		for _, t := range ts {
-			item := InboxItem{Task: t, Project: names[t.ProjectID], Workspace: w.Name}
+			item := InboxItem{Gig: t, Project: names[t.ProjectID], Workspace: w.Name}
 			if p.HasScope("comments:read") {
 				if item.Question, err = store.LatestQuestion(ctx, a.st.R, t.ID); err != nil {
 					return nil, err
@@ -502,7 +502,7 @@ func (a *API) run(ctx context.Context, id int64) (*access.Principal, *store.Run,
 	if err != nil {
 		return nil, nil, errNotFound()
 	}
-	t, err := store.GetTask(ctx, a.st.R, r.TaskID)
+	t, err := store.GetGig(ctx, a.st.R, r.GigID)
 	if err != nil || !p.SeesProject(t.WorkspaceID, t.ProjectID) {
 		return nil, nil, errNotFound()
 	}

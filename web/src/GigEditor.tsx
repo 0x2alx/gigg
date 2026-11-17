@@ -1,6 +1,6 @@
-// TaskEditor: the one task editor. The open task's panel, New task, New/Edit recurring task and
+// GigEditor: the one gig editor. The open gig's panel, New gig, New/Edit recurring gig and
 // New/Edit template all render this component, so they have the same boxes in the same order with
-// the same controls: the task (title and description), Checklist and Subtasks on the left; Where,
+// the same controls: the gig (title and description), Checklist and Subgigs on the left; Where,
 // When, Details, Agent run, Dependencies and Fields on the right.
 // What differs is only where a change goes (`set`): the panel saves it at once, a form keeps it until
 // Create/Save. A mode hides the boxes and rows that don't apply (a template has no When) and the
@@ -13,14 +13,14 @@ import { DEFAULT_DUE_TIME, DEFAULT_START_TIME } from "./dates";
 import { Markdown } from "./markdown";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { Clamp } from "./Clamp";
-import { AgentRunGroup, PropGroup, Row } from "./TaskSections";
+import { AgentRunGroup, PropGroup, Row } from "./GigSections";
 import type { RunSettings } from "./runsettings";
 import { LabelChip, Pill, PriorityBadge, StatusBadge, UserBadge } from "./ui";
 import { Icon } from "./icons";
 
-export type EditorMode = "task" | "new" | "recurring" | "template";
+export type EditorMode = "gig" | "new" | "recurring" | "template";
 
-// EditorValue: what the editor shows. The keys are the task API's, so the panel can send a change as is.
+// EditorValue: what the editor shows. The keys are the gig API's, so the panel can send a change as is.
 export interface EditorValue {
   title: string;
   description_md: string;
@@ -37,36 +37,36 @@ export interface EditorValue {
 }
 export type EditorChange = Partial<Omit<EditorValue, "run">>;
 
-export function TaskEditor(p: {
+export function GigEditor(p: {
   mode: EditorMode;
   v: EditorValue;
   set: (c: EditorChange) => void;
   setRun: (c: Partial<RunSettings>) => void;
   onToolsError?: (bad: string | null | undefined) => void;
   // saving the title and description (the panel): only what the editor changed, onto `version` (the
-  // task version the editor opened on; none = overwrite on purpose). "conflict": the task changed meanwhile.
+  // gig version the editor opened on; none = overwrite on purpose). "conflict": the gig changed meanwhile.
   saveText?: (changes: TextChanges, version?: number) => Promise<boolean | "conflict">;
-  textVersion?: number; // the task's version now (the editor keeps the one it opened on)
+  textVersion?: number; // the gig's version now (the editor keeps the one it opened on)
   canWrite: boolean;
   ws: WorkspaceTree;
-  places?: WorkspaceTree[]; // a new task may move to these workspaces
+  places?: WorkspaceTree[]; // a new gig may move to these workspaces
   onWorkspace?: (id: number) => void;
   anyProject?: { on: boolean; set: (on: boolean) => void }; // a template may be for any project
   projectLocked?: boolean;
-  statuses?: Status[]; // the status row (none for a template or a recurring task)
+  statuses?: Status[]; // the status row (none for a template or a recurring gig)
   statusBusy?: boolean;
   currentStatus?: { name: string; category: Status["category"] }; // shown read-only when it isn't in statuses (cancelled)
-  labelTags?: Tag[]; // the task's own labels (their colours, when the workspace list is stale)
-  dates?: boolean; // Start, Due, Window closes (not for a recurring task: the schedule sets them)
+  labelTags?: Tag[]; // the gig's own labels (their colours, when the workspace list is stale)
+  dates?: boolean; // Start, Due, Window closes (not for a recurring gig: the schedule sets them)
   knownLabels: Tag[];
   candidates: User[];
   alwaysLocked: boolean;
   canTools: boolean;
   overdue?: boolean;
-  head?: ReactNode; // in the task box, above the text (template name, from template)
-  people?: ReactNode; // in the task box, below the text (who made it, who it's for)
+  head?: ReactNode; // in the gig box, above the text (template name, from template)
+  people?: ReactNode; // in the gig box, below the text (who made it, who it's for)
   aliases?: string[];
-  leftSecs: ReactNode; // Checklist, Subtasks
+  leftSecs: ReactNode; // Checklist, Subgigs
   mainEnd?: ReactNode; // the panel's comments
   whenEnd?: ReactNode; // more When rows (missed, repeats; Repeat in a form)
   detailsEnd?: ReactNode; // more Details rows (created by, updated)
@@ -81,17 +81,17 @@ export function TaskEditor(p: {
   return (
     <div className="tp-body">
       <div className="tp-main">
-        <section className="tp-box tp-task" aria-label={tpl ? "Template" : "Task"}>
+        <section className="tp-box tp-gig" aria-label={tpl ? "Template" : "Gig"}>
           {p.head}
-          <TaskText
-            key={mode === "task" ? "live" : "draft"}
+          <GigText
+            key={mode === "gig" ? "live" : "draft"}
             title={v.title}
             description={v.description_md}
-            live={mode === "task"}
+            live={mode === "gig"}
             canWrite={canWrite}
             users={p.candidates}
-            titleLabel={tpl ? "Task title" : "Title"}
-            titlePlaceholder={tpl ? "Task title: what needs doing?" : "Title: what needs doing?"}
+            titleLabel={tpl ? "Gig title" : "Title"}
+            titlePlaceholder={tpl ? "Gig title: what needs doing?" : "Title: what needs doing?"}
             aliases={p.aliases}
             onDraft={(title, description_md) => set({ title, description_md })}
             onSave={p.saveText}
@@ -165,14 +165,14 @@ export function TaskEditor(p: {
               {p.dates && (
                 <>
                   <Row wide label={v.not_after ? "Window opens" : "Start"}>
-                    <DateTimeInput value={v.start_at} defaultTime={DEFAULT_START_TIME} label={v.not_after ? "Window opens" : "Start"} disabled={!canWrite} live={mode !== "task"} onChange={(x) => set({ start_at: x })} />
+                    <DateTimeInput value={v.start_at} defaultTime={DEFAULT_START_TIME} label={v.not_after ? "Window opens" : "Start"} disabled={!canWrite} live={mode !== "gig"} onChange={(x) => set({ start_at: x })} />
                   </Row>
                   <Row wide label={<>Due {p.overdue && <Pill color="#E5484D">overdue</Pill>}</>}>
-                    <DateTimeInput value={v.due_at} defaultTime={DEFAULT_DUE_TIME} label="Due" disabled={!canWrite} live={mode !== "task"} onChange={(x) => set({ due_at: x })} />
+                    <DateTimeInput value={v.due_at} defaultTime={DEFAULT_DUE_TIME} label="Due" disabled={!canWrite} live={mode !== "gig"} onChange={(x) => set({ due_at: x })} />
                   </Row>
                   {(canWrite || !!v.not_after) && (
-                    <Row tip="After this moment the task can’t be started any more; untouched, it is marked missed" wide label="Window closes">
-                      <DateTimeInput value={v.not_after} defaultTime={DEFAULT_DUE_TIME} label="Window closes" disabled={!canWrite} live={mode !== "task"} onChange={(x) => set({ not_after: x })} />
+                    <Row tip="After this moment the gig can’t be started any more; untouched, it is marked missed" wide label="Window closes">
+                      <DateTimeInput value={v.not_after} defaultTime={DEFAULT_DUE_TIME} label="Window closes" disabled={!canWrite} live={mode !== "gig"} onChange={(x) => set({ not_after: x })} />
                     </Row>
                   )}
                 </>
@@ -197,7 +197,7 @@ export function TaskEditor(p: {
             </Row>
             <Row label="Labels" wide>
               {canWrite ? (
-                <LabelInput value={v.labels} onChange={(labels) => set({ labels })} known={p.knownLabels} autosave={mode === "task"} />
+                <LabelInput value={v.labels} onChange={(labels) => set({ labels })} known={p.knownLabels} autosave={mode === "gig"} />
               ) : (
                 <div className="chips">
                   {v.labels.map((n) => (
@@ -241,10 +241,10 @@ export function TaskEditor(p: {
   );
 }
 
-// TaskText: the title and the description, shown as the task reads (the description folded when
+// GigText: the title and the description, shown as the gig reads (the description folded when
 // long, "show more" opens it) with a pencil to edit. The panel saves the edit with Save; a form
-// keeps it as typed (an empty one, a new task, starts in the editor).
-function TaskText({ title, description, version, live, canWrite, users, titleLabel, titlePlaceholder, aliases, onDraft, onSave }: {
+// keeps it as typed (an empty one, a new gig, starts in the editor).
+function GigText({ title, description, version, live, canWrite, users, titleLabel, titlePlaceholder, aliases, onDraft, onSave }: {
   version?: number;
   title: string;
   description: string;
@@ -324,7 +324,7 @@ function TaskText({ title, description, version, live, canWrite, users, titleLab
 export type TextChanges = { title?: string; description_md?: string };
 
 // TextForm: the panel's title and description editor (its own form). The text and version it opened
-// with stay its base while it is open, even when the task reloads underneath: a save goes onto that
+// with stay its base while it is open, even when the gig reloads underneath: a save goes onto that
 // version, so a change someone made meanwhile is refused (412) rather than overwritten; after that
 // refusal the next Save overwrites on purpose.
 function TextForm({ title: t0, description: d0, version, users, onCancel, onSave }: {
@@ -353,7 +353,7 @@ function TextForm({ title: t0, description: d0, version, users, onCancel, onSave
           force ? undefined : base.current.version,
         ).then((r) => r === "conflict" && setForce(true));
       }}
-      aria-label="Edit task"
+      aria-label="Edit gig"
       data-dirty={dirty ? "" : undefined}
       onKeyDown={(e) => {
         // Esc with no changes closes the editor (not the panel); with changes the panel flashes them

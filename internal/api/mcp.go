@@ -103,12 +103,12 @@ func rw(title string, destructive bool) *mcp.ToolAnnotations {
 	return &mcp.ToolAnnotations{Title: title, DestructiveHint: &d, OpenWorldHint: &open}
 }
 
-// Tool inputs. Times are unix milliseconds; tasks are ids or keys like GIG-12.
+// Tool inputs. Times are unix milliseconds; gigs are ids or keys like GIG-12.
 type (
 	wsArg struct {
 		Workspace string `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit to use your key's workspace"`
 	}
-	listTasksArgs struct {
+	listGigsArgs struct {
 		Workspace   string `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit to use your key's workspace"`
 		Project     int64  `json:"project,omitempty" jsonschema:"Project id"`
 		Category    string `json:"category,omitempty" jsonschema:"backlog, todo, doing, waiting, done or cancelled"`
@@ -118,22 +118,22 @@ type (
 		Sort        string `json:"sort,omitempty" jsonschema:"board (default) or e.g. -priority,due"`
 		Limit       int    `json:"limit,omitempty" jsonschema:"Default 50, max 500"`
 		Cursor      string `json:"cursor,omitempty"`
-		Archived    string `json:"archived,omitempty" jsonschema:"only or include (archived tasks are hidden by default)"`
-		Parent      int64  `json:"parent,omitempty" jsonschema:"Only subtasks of this task id"`
-		Blocked     bool   `json:"blocked,omitempty" jsonschema:"Only tasks with an open blocker"`
+		Archived    string `json:"archived,omitempty" jsonschema:"only or include (archived gigs are hidden by default)"`
+		Parent      int64  `json:"parent,omitempty" jsonschema:"Only subgigs of this gig id"`
+		Blocked     bool   `json:"blocked,omitempty" jsonschema:"Only gigs with an open blocker"`
 	}
-	taskArg struct {
-		Task string `json:"task" jsonschema:"Task id or key, e.g. GIG-12"`
+	gigArg struct {
+		Gig string `json:"gig" jsonschema:"Gig id or key, e.g. GIG-12"`
 	}
-	getTaskArgs struct {
-		Task     string `json:"task" jsonschema:"Task id or key, e.g. GIG-12"`
+	getGigArgs struct {
+		Gig      string `json:"gig" jsonschema:"Gig id or key, e.g. GIG-12"`
 		Comments bool   `json:"comments,omitempty" jsonschema:"Include the comments"`
 	}
 	commentsArgs struct {
-		Task    string `json:"task" jsonschema:"Task id or key"`
+		Gig     string `json:"gig" jsonschema:"Gig id or key"`
 		SinceID int64  `json:"since_id,omitempty" jsonschema:"Only comments after this id"`
 	}
-	createTaskArgs struct {
+	createGigArgs struct {
 		Project       int64          `json:"project" jsonschema:"Project id (see list_projects)"`
 		Title         string         `json:"title"`
 		DescriptionMD string         `json:"description_md,omitempty" jsonschema:"Markdown"`
@@ -145,8 +145,8 @@ type (
 		StartAt       int64          `json:"start_at,omitempty" jsonschema:"Unix ms"`
 		DueAt         int64          `json:"due_at,omitempty" jsonschema:"Unix ms"`
 		NotAfter      int64          `json:"not_after,omitempty" jsonschema:"Unix ms: the window closes; not claimable after it, and marked missed if untouched"`
-		Parent        int64          `json:"parent_id,omitempty" jsonschema:"Make it a subtask of this task id"`
-		BlocksParent  bool           `json:"blocks_parent,omitempty" jsonschema:"With parent_id: the parent waits (isn't handed out) until this subtask is done"`
+		Parent        int64          `json:"parent_id,omitempty" jsonschema:"Make it a subgig of this gig id"`
+		BlocksParent  bool           `json:"blocks_parent,omitempty" jsonschema:"With parent_id: the parent waits (isn't handed out) until this subgig is done"`
 		Checklist     []string       `json:"checklist,omitempty" jsonschema:"Checklist items"`
 		Custom        map[string]any `json:"custom,omitempty" jsonschema:"Custom field values by field id"`
 		Model         string         `json:"model,omitempty" jsonschema:"Model a runner should ask for: an alias such as opus or sonnet, or a full id (default: the agent's)"`
@@ -154,8 +154,8 @@ type (
 		AlwaysRun     bool           `json:"always_run,omitempty" jsonschema:"Run it whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  []string       `json:"allowed_tools,omitempty" jsonschema:"The only tools a runner should allow for it: Claude Code-style permission rules, one per entry (e.g. Read, Bash(git status *)); needs the allowed_tools permission"`
 	}
-	updateTaskArgs struct {
-		Task          string   `json:"task" jsonschema:"Task id or key"`
+	updateGigArgs struct {
+		Gig           string   `json:"gig" jsonschema:"Gig id or key"`
 		Title         string   `json:"title,omitempty"`
 		DescriptionMD *string  `json:"description_md,omitempty" jsonschema:"Markdown; replaces the description"`
 		Priority      *int64   `json:"priority,omitempty" jsonschema:"0-4"`
@@ -164,34 +164,34 @@ type (
 		Color         string   `json:"color,omitempty" jsonschema:"#RRGGBB"`
 		StartAt       int64    `json:"start_at,omitempty" jsonschema:"Unix ms"`
 		DueAt         int64    `json:"due_at,omitempty" jsonschema:"Unix ms"`
-		NotAfter      int64    `json:"not_after,omitempty" jsonschema:"Unix ms: the window closes (reopening a missed task clears missed)"`
+		NotAfter      int64    `json:"not_after,omitempty" jsonschema:"Unix ms: the window closes (reopening a missed gig clears missed)"`
 		Model         *string  `json:"model,omitempty" jsonschema:"Model a runner should ask for; empty = the agent's default"`
 		Effort        *string  `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh, max; empty = the agent's default"`
 		AlwaysRun     *bool    `json:"always_run,omitempty" jsonschema:"Run it whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  []string `json:"allowed_tools,omitempty" jsonschema:"Replaces the runner tool allowlist ([] clears; needs the allowed_tools permission)"`
-		BlocksParent  *bool    `json:"blocks_parent,omitempty" jsonschema:"For a subtask: true = its parent waits until it is done"`
+		BlocksParent  *bool    `json:"blocks_parent,omitempty" jsonschema:"For a subgig: true = its parent waits until it is done"`
 		Clear         []string `json:"clear,omitempty" jsonschema:"Fields to clear: color, start_at, due_at, not_after, labels, assignees"`
 	}
-	moveTaskArgs struct {
-		Task     string `json:"task" jsonschema:"Task id or key"`
+	moveGigArgs struct {
+		Gig      string `json:"gig" jsonschema:"Gig id or key"`
 		Category string `json:"category,omitempty" jsonschema:"Target status category (first status of it)"`
 		Status   int64  `json:"status,omitempty" jsonschema:"Target status id (alternative to category)"`
-		Project  int64  `json:"project,omitempty" jsonschema:"Another project of the same workspace (the task gets a new key; the old one keeps working)"`
+		Project  int64  `json:"project,omitempty" jsonschema:"Another project of the same workspace (the gig gets a new key; the old one keeps working)"`
 		Position string `json:"position,omitempty" jsonschema:"top, bottom, before or after"`
-		Relative int64  `json:"relative_to,omitempty" jsonschema:"Task id for before/after"`
+		Relative int64  `json:"relative_to,omitempty" jsonschema:"Gig id for before/after"`
 	}
-	cloneTaskArgs struct {
-		Task    string `json:"task" jsonschema:"Task id or key"`
+	cloneGigArgs struct {
+		Gig     string `json:"gig" jsonschema:"Gig id or key"`
 		Project int64  `json:"project,omitempty" jsonschema:"Target project in the same workspace"`
 		Title   string `json:"title,omitempty"`
 	}
 	addCommentArgs struct {
-		Task   string `json:"task" jsonschema:"Task id or key"`
+		Gig    string `json:"gig" jsonschema:"Gig id or key"`
 		BodyMD string `json:"body_md" jsonschema:"Markdown"`
 		Kind   string `json:"kind,omitempty" jsonschema:"comment (default), report or question"`
 	}
 	resumeArgs struct {
-		Task      string `json:"task" jsonschema:"Task id or key"`
+		Gig       string `json:"gig" jsonschema:"Gig id or key"`
 		CommentMD string `json:"comment_md,omitempty" jsonschema:"Answer or instructions for the next run"`
 	}
 	listRecArgs struct {
@@ -199,51 +199,51 @@ type (
 		Project   int64  `json:"project,omitempty" jsonschema:"Only this project"`
 	}
 	recArg struct {
-		ID int64 `json:"id" jsonschema:"Recurring task id"`
+		ID int64 `json:"id" jsonschema:"Recurring gig id"`
 	}
 	recArgs struct {
-		ID            int64        `json:"id,omitempty" jsonschema:"update_recurring: the recurring task id"`
-		Project       int64        `json:"project,omitempty" jsonschema:"create_recurring: project id"`
-		Title         string       `json:"title,omitempty"`
-		DescriptionMD *string      `json:"description_md,omitempty" jsonschema:"Markdown, copied into each task"`
-		Priority      *int64       `json:"priority,omitempty" jsonschema:"0-4"`
-		Labels        []string     `json:"labels,omitempty"`
-		Assignees     []int64      `json:"assignees,omitempty" jsonschema:"User ids"`
-		Freq          string       `json:"freq,omitempty" jsonschema:"daily, weekly or monthly"`
-		Interval      int64        `json:"interval,omitempty" jsonschema:"Every N days/weeks/months (default 1)"`
-		Weekdays      []int        `json:"weekdays,omitempty" jsonschema:"Weekly: 1=Mon .. 7=Sun"`
-		MonthDay      *int64       `json:"month_day,omitempty" jsonschema:"Monthly: 1-31, -1 = last day"`
-		TZ            string       `json:"tz,omitempty" jsonschema:"IANA zone; default: your time zone preference, else the instance default"`
-		WindowStart   string       `json:"window_start,omitempty" jsonschema:"Local HH:MM when the window opens (default 00:00)"`
-		WindowMinutes int64        `json:"window_minutes,omitempty" jsonschema:"How long the window stays open, minutes (default 1440)"`
-		LeadMinutes   *int64       `json:"lead_minutes,omitempty" jsonschema:"Create the task this many minutes before the window opens"`
-		EndsOn        *int64       `json:"ends_on,omitempty" jsonschema:"Unix ms; 0 clears"`
-		MaxCount      *int64       `json:"max_count,omitempty" jsonschema:"Stop after this many tasks; 0 clears"`
-		Overlap       string       `json:"overlap,omitempty" jsonschema:"skip (default: no new task while the last is still open) or create"`
-		Paused        *bool        `json:"paused,omitempty"`
-		Model         *string      `json:"model,omitempty" jsonschema:"Model a runner should ask for; empty = the agent's default"`
-		Effort        *string      `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh, max; empty = the agent's default"`
-		AlwaysRun     *bool        `json:"always_run,omitempty" jsonschema:"Its tasks run whatever the usage budget (needs the always_run permission)"`
-		AllowedTools  []string     `json:"allowed_tools,omitempty" jsonschema:"Tool allowlist its tasks get for the runner (permission rules; [] clears; needs the allowed_tools permission)"`
-		TemplateID    *int64       `json:"template_id,omitempty" jsonschema:"Make each task from this template (see list_templates); content fields are then ignored. update_recurring: switches to it"`
-		Checklist     []string     `json:"checklist,omitempty" jsonschema:"Checklist items each task gets (stored in the template)"`
-		Subtasks      []subtaskArg `json:"subtasks,omitempty" jsonschema:"Subtasks each task gets (stored in the template): title, and blocks_parent when the task should wait for it; [] clears"`
-		ScheduleID    *int64       `json:"schedule_id,omitempty" jsonschema:"Use this schedule (see list_schedules); timing fields are then ignored. update_recurring: switches to it"`
+		ID            int64       `json:"id,omitempty" jsonschema:"update_recurring: the recurring gig id"`
+		Project       int64       `json:"project,omitempty" jsonschema:"create_recurring: project id"`
+		Title         string      `json:"title,omitempty"`
+		DescriptionMD *string     `json:"description_md,omitempty" jsonschema:"Markdown, copied into each gig"`
+		Priority      *int64      `json:"priority,omitempty" jsonschema:"0-4"`
+		Labels        []string    `json:"labels,omitempty"`
+		Assignees     []int64     `json:"assignees,omitempty" jsonschema:"User ids"`
+		Freq          string      `json:"freq,omitempty" jsonschema:"daily, weekly or monthly"`
+		Interval      int64       `json:"interval,omitempty" jsonschema:"Every N days/weeks/months (default 1)"`
+		Weekdays      []int       `json:"weekdays,omitempty" jsonschema:"Weekly: 1=Mon .. 7=Sun"`
+		MonthDay      *int64      `json:"month_day,omitempty" jsonschema:"Monthly: 1-31, -1 = last day"`
+		TZ            string      `json:"tz,omitempty" jsonschema:"IANA zone; default: your time zone preference, else the instance default"`
+		WindowStart   string      `json:"window_start,omitempty" jsonschema:"Local HH:MM when the window opens (default 00:00)"`
+		WindowMinutes int64       `json:"window_minutes,omitempty" jsonschema:"How long the window stays open, minutes (default 1440)"`
+		LeadMinutes   *int64      `json:"lead_minutes,omitempty" jsonschema:"Create the gig this many minutes before the window opens"`
+		EndsOn        *int64      `json:"ends_on,omitempty" jsonschema:"Unix ms; 0 clears"`
+		MaxCount      *int64      `json:"max_count,omitempty" jsonschema:"Stop after this many gigs; 0 clears"`
+		Overlap       string      `json:"overlap,omitempty" jsonschema:"skip (default: no new gig while the last is still open) or create"`
+		Paused        *bool       `json:"paused,omitempty"`
+		Model         *string     `json:"model,omitempty" jsonschema:"Model a runner should ask for; empty = the agent's default"`
+		Effort        *string     `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh, max; empty = the agent's default"`
+		AlwaysRun     *bool       `json:"always_run,omitempty" jsonschema:"Its gigs run whatever the usage budget (needs the always_run permission)"`
+		AllowedTools  []string    `json:"allowed_tools,omitempty" jsonschema:"Tool allowlist its gigs get for the runner (permission rules; [] clears; needs the allowed_tools permission)"`
+		TemplateID    *int64      `json:"template_id,omitempty" jsonschema:"Make each gig from this template (see list_templates); content fields are then ignored. update_recurring: switches to it"`
+		Checklist     []string    `json:"checklist,omitempty" jsonschema:"Checklist items each gig gets (stored in the template)"`
+		Subgigs       []subgigArg `json:"subgigs,omitempty" jsonschema:"Subgigs each gig gets (stored in the template): title, and blocks_parent when the gig should wait for it; [] clears"`
+		ScheduleID    *int64      `json:"schedule_id,omitempty" jsonschema:"Use this schedule (see list_schedules); timing fields are then ignored. update_recurring: switches to it"`
 	}
-	subtaskArg struct {
+	subgigArg struct {
 		Title        string `json:"title"`
-		BlocksParent bool   `json:"blocks_parent,omitempty" jsonschema:"The parent task waits until this subtask is done"`
+		BlocksParent bool   `json:"blocks_parent,omitempty" jsonschema:"The parent gig waits until this subgig is done"`
 	}
 	progressArgs struct {
-		Task string `json:"task" jsonschema:"Task id or key (its running run gets the update)"`
+		Gig  string `json:"gig" jsonschema:"Gig id or key (its running run gets the update)"`
 		Pct  *int64 `json:"pct,omitempty" jsonschema:"0-100"`
 		Note string `json:"note,omitempty" jsonschema:"Short progress note"`
 	}
 )
 
-// mcpUserIDs turns usernames (or numeric ids) into user ids for a task's assignees, through the API's
+// mcpUserIDs turns usernames (or numeric ids) into user ids for a gig's assignees, through the API's
 // user list (the caller's co-members, or everyone for admins: no more than the key can see). Whether
-// each may be assigned (sees the task's workspace) is the task API's check, as for the UI.
+// each may be assigned (sees the gig's workspace) is the gig API's check, as for the UI.
 func mcpUserIDs(call apiCall, names []string) ([]int64, *mcp.CallToolResult) {
 	ids := make([]int64, 0, len(names))
 	var known map[string]int64
@@ -287,7 +287,7 @@ func mcpUserIDs(call apiCall, names []string) ([]int64, *mcp.CallToolResult) {
 func (a *API) mcpServer(r *http.Request) *mcp.Server {
 	p := access.From(r.Context())
 	call := a.caller(r)
-	s := mcp.NewServer(&mcp.Implementation{Name: "gigg", Title: "gigg task board", Version: version.Version}, nil)
+	s := mcp.NewServer(&mcp.Implementation{Name: "gigg", Title: "gigg gig board", Version: version.Version}, nil)
 	ws := func(ref string) string {
 		if ref == "" {
 			return "current"
@@ -302,18 +302,18 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 			func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 				return toolResult(call("GET", "/auth/me", nil, nil))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "list_projects", Description: "Projects (boards) of a workspace, with ids and task key prefixes.", Annotations: ro("List projects")},
+		mcp.AddTool(s, &mcp.Tool{Name: "list_projects", Description: "Projects (boards) of a workspace, with ids and gig key prefixes.", Annotations: ro("List projects")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in wsArg) (*mcp.CallToolResult, any, error) {
 				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/projects", nil, nil))
 			})
 	}
-	if has("tasks:read") {
-		mcp.AddTool(s, &mcp.Tool{Name: "summary", Description: "Plain-text board summary: per project, each status with up to 5 tasks.", Annotations: ro("Board summary")},
+	if has("gigs:read") {
+		mcp.AddTool(s, &mcp.Tool{Name: "summary", Description: "Plain-text board summary: per project, each status with up to 5 gigs.", Annotations: ro("Board summary")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in wsArg) (*mcp.CallToolResult, any, error) {
 				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/summary", nil, nil))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "list_tasks", Description: "Find tasks; filters combine. Board order unless sort is given.", Annotations: ro("List tasks")},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in listTasksArgs) (*mcp.CallToolResult, any, error) {
+		mcp.AddTool(s, &mcp.Tool{Name: "list_gigs", Description: "Find gigs; filters combine. Board order unless sort is given.", Annotations: ro("List gigs")},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in listGigsArgs) (*mcp.CallToolResult, any, error) {
 				q := url.Values{}
 				if in.Parent != 0 {
 					q.Set("parent", strconv.FormatInt(in.Parent, 10))
@@ -335,38 +335,38 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				if in.Limit != 0 {
 					q.Set("limit", strconv.Itoa(in.Limit))
 				}
-				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/tasks", q, nil))
+				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/gigs", q, nil))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "get_task", Description: "One task by id or key, optionally with its comments.", Annotations: ro("Get task")},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in getTaskArgs) (*mcp.CallToolResult, any, error) {
-				code, body := call("GET", "/tasks/"+t(in.Task), nil, nil)
+		mcp.AddTool(s, &mcp.Tool{Name: "get_gig", Description: "One gig by id or key, optionally with its comments.", Annotations: ro("Get gig")},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in getGigArgs) (*mcp.CallToolResult, any, error) {
+				code, body := call("GET", "/gigs/"+t(in.Gig), nil, nil)
 				if code != 200 || !in.Comments || !has("comments:read") {
 					return toolResult(code, body)
 				}
-				cc, cb := call("GET", "/tasks/"+t(in.Task)+"/comments", nil, nil)
+				cc, cb := call("GET", "/gigs/"+t(in.Gig)+"/comments", nil, nil)
 				if cc != 200 {
 					return toolResult(cc, cb)
 				}
-				return toolResult(200, []byte(`{"task":`+string(body)+`,"comments":`+string(cb)+`}`))
+				return toolResult(200, []byte(`{"gig":`+string(body)+`,"comments":`+string(cb)+`}`))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "list_runs", Description: "A task's agent runs (sessions, status, cost), newest first.", Annotations: ro("List runs")},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in taskArg) (*mcp.CallToolResult, any, error) {
-				return toolResult(call("GET", "/tasks/"+t(in.Task)+"/runs", nil, nil))
+		mcp.AddTool(s, &mcp.Tool{Name: "list_runs", Description: "A gig's agent runs (sessions, status, cost), newest first.", Annotations: ro("List runs")},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in gigArg) (*mcp.CallToolResult, any, error) {
+				return toolResult(call("GET", "/gigs/"+t(in.Gig)+"/runs", nil, nil))
 			})
 	}
 	if has("comments:read") {
-		mcp.AddTool(s, &mcp.Tool{Name: "list_comments", Description: "A task's comments with author facts (kind, admin or not), oldest first.", Annotations: ro("List comments")},
+		mcp.AddTool(s, &mcp.Tool{Name: "list_comments", Description: "A gig's comments with author facts (kind, admin or not), oldest first.", Annotations: ro("List comments")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in commentsArgs) (*mcp.CallToolResult, any, error) {
 				q := url.Values{}
 				if in.SinceID != 0 {
 					q.Set("since_id", strconv.FormatInt(in.SinceID, 10))
 				}
-				return toolResult(call("GET", "/tasks/"+t(in.Task)+"/comments", q, nil))
+				return toolResult(call("GET", "/gigs/"+t(in.Gig)+"/comments", q, nil))
 			})
 	}
-	if has("tasks:write") {
-		mcp.AddTool(s, &mcp.Tool{Name: "create_task", Description: "Create a task in a project.", Annotations: rw("Create task", false)},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in createTaskArgs) (*mcp.CallToolResult, any, error) {
+	if has("gigs:write") {
+		mcp.AddTool(s, &mcp.Tool{Name: "create_gig", Description: "Create a gig in a project.", Annotations: rw("Create gig", false)},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in createGigArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{"title": in.Title}
 				setIf(b, "description_md", in.DescriptionMD)
 				setIf(b, "category", in.Category)
@@ -413,10 +413,10 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				if len(in.AllowedTools) > 0 {
 					b["allowed_tools"] = in.AllowedTools
 				}
-				return toolResult(call("POST", fmt.Sprintf("/projects/%d/tasks", in.Project), nil, b))
+				return toolResult(call("POST", fmt.Sprintf("/projects/%d/gigs", in.Project), nil, b))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "update_task", Description: "Change a task's title, description, priority, labels, assignees, colour, dates, or how an agent runs it (model, effort, always_run, allowed_tools).", Annotations: rw("Update task", false)},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in updateTaskArgs) (*mcp.CallToolResult, any, error) {
+		mcp.AddTool(s, &mcp.Tool{Name: "update_gig", Description: "Change a gig's title, description, priority, labels, assignees, colour, dates, or how an agent runs it (model, effort, always_run, allowed_tools).", Annotations: rw("Update gig", false)},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in updateGigArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{}
 				setIf(b, "title", in.Title)
 				setIf(b, "color", in.Color)
@@ -467,10 +467,10 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 						return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"clear accepts color, start_at, due_at, not_after, labels, assignees"}`))
 					}
 				}
-				return toolResult(call("PATCH", "/tasks/"+t(in.Task), nil, b))
+				return toolResult(call("PATCH", "/gigs/"+t(in.Gig), nil, b))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "move_task", Description: "Move a task to another status (by category or id), position, or project of the same workspace.", Annotations: rw("Move task", false)},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in moveTaskArgs) (*mcp.CallToolResult, any, error) {
+		mcp.AddTool(s, &mcp.Tool{Name: "move_gig", Description: "Move a gig to another status (by category or id), position, or project of the same workspace.", Annotations: rw("Move gig", false)},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in moveGigArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{}
 				setIf(b, "category", in.Category)
 				setIf(b, "position", in.Position)
@@ -481,46 +481,46 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 					b["project"] = in.Project
 				}
 				if in.Relative != 0 {
-					b["task"] = in.Relative
+					b["gig"] = in.Relative
 				}
-				return toolResult(call("POST", "/tasks/"+t(in.Task)+"/move", nil, b))
+				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/move", nil, b))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "clone_task", Description: "Copy a task, optionally into another project of the workspace.", Annotations: rw("Clone task", false)},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in cloneTaskArgs) (*mcp.CallToolResult, any, error) {
+		mcp.AddTool(s, &mcp.Tool{Name: "clone_gig", Description: "Copy a gig, optionally into another project of the workspace.", Annotations: rw("Clone gig", false)},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in cloneGigArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{}
 				if in.Project != 0 {
 					b["project"] = in.Project
 				}
 				setIf(b, "title", in.Title)
-				return toolResult(call("POST", "/tasks/"+t(in.Task)+"/clone", nil, b))
+				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/clone", nil, b))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "resume_task", Description: "Ask for the task's agent session to be resumed by the runner (records the request; runs nothing).", Annotations: rw("Request resume", false)},
+		mcp.AddTool(s, &mcp.Tool{Name: "resume_gig", Description: "Ask for the gig's agent session to be resumed by the runner (records the request; runs nothing).", Annotations: rw("Request resume", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in resumeArgs) (*mcp.CallToolResult, any, error) {
-				return toolResult(call("POST", "/tasks/"+t(in.Task)+"/resume", nil, map[string]any{"comment_md": in.CommentMD}))
+				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/resume", nil, map[string]any{"comment_md": in.CommentMD}))
 			})
 	}
-	if has("tasks:delete") {
-		mcp.AddTool(s, &mcp.Tool{Name: "delete_task", Description: "Move a task to the trash (restore_task undoes it).", Annotations: rw("Delete task", true)},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in taskArg) (*mcp.CallToolResult, any, error) {
-				return toolResult(call("DELETE", "/tasks/"+t(in.Task), nil, nil))
+	if has("gigs:delete") {
+		mcp.AddTool(s, &mcp.Tool{Name: "delete_gig", Description: "Move a gig to the trash (restore_gig undoes it).", Annotations: rw("Delete gig", true)},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in gigArg) (*mcp.CallToolResult, any, error) {
+				return toolResult(call("DELETE", "/gigs/"+t(in.Gig), nil, nil))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "restore_task", Description: "Restore a task from the trash.", Annotations: rw("Restore task", false)},
-			func(ctx context.Context, _ *mcp.CallToolRequest, in taskArg) (*mcp.CallToolResult, any, error) {
-				return toolResult(call("POST", "/tasks/"+t(in.Task)+"/restore", nil, nil))
+		mcp.AddTool(s, &mcp.Tool{Name: "restore_gig", Description: "Restore a gig from the trash.", Annotations: rw("Restore gig", false)},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in gigArg) (*mcp.CallToolResult, any, error) {
+				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/restore", nil, nil))
 			})
 	}
 	if has("comments:write") {
-		mcp.AddTool(s, &mcp.Tool{Name: "add_comment", Description: "Comment on a task (Markdown).", Annotations: rw("Add comment", false)},
+		mcp.AddTool(s, &mcp.Tool{Name: "add_comment", Description: "Comment on a gig (Markdown).", Annotations: rw("Add comment", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in addCommentArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{"body_md": in.BodyMD}
 				setIf(b, "kind", in.Kind)
-				return toolResult(call("POST", "/tasks/"+t(in.Task)+"/comments", nil, b))
+				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/comments", nil, b))
 			})
 	}
-	if has("runs:write") && has("tasks:read") {
-		mcp.AddTool(s, &mcp.Tool{Name: "report_progress", Description: "Report progress on the task's running run (percent and/or a short note).", Annotations: rw("Report progress", false)},
+	if has("runs:write") && has("gigs:read") {
+		mcp.AddTool(s, &mcp.Tool{Name: "report_progress", Description: "Report progress on the gig's running run (percent and/or a short note).", Annotations: rw("Report progress", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in progressArgs) (*mcp.CallToolResult, any, error) {
-				code, body := call("GET", "/tasks/"+t(in.Task)+"/runs", nil, nil)
+				code, body := call("GET", "/gigs/"+t(in.Gig)+"/runs", nil, nil)
 				if code != 200 {
 					return toolResult(code, body)
 				}
@@ -540,11 +540,11 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 						return toolResult(call("POST", fmt.Sprintf("/runs/%d/progress", r.ID), nil, b))
 					}
 				}
-				return toolResult(409, []byte(`{"status":409,"code":"conflict","detail":"The task has no running run."}`))
+				return toolResult(409, []byte(`{"status":409,"code":"conflict","detail":"The gig has no running run."}`))
 			})
 	}
-	if has("tasks:read") {
-		mcp.AddTool(s, &mcp.Tool{Name: "list_recurring", Description: "Recurring tasks: each pairs a template (what the task looks like) with a schedule (when) in a project and creates a task per occurrence, inside its time window. With upcoming occurrences.", Annotations: ro("List recurring tasks")},
+	if has("gigs:read") {
+		mcp.AddTool(s, &mcp.Tool{Name: "list_recurring", Description: "Recurring gigs: each pairs a template (what the gig looks like) with a schedule (when) in a project and creates a gig per occurrence, inside its time window. With upcoming occurrences.", Annotations: ro("List recurring gigs")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in listRecArgs) (*mcp.CallToolResult, any, error) {
 				q := url.Values{}
 				if in.Project != 0 {
@@ -553,12 +553,12 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/recurrences", q, nil))
 			})
 	}
-	if has("tasks:write") && p.AllowedAnywhere("schedules") {
-		mcp.AddTool(s, &mcp.Tool{Name: "create_recurring", Description: "Create a recurring task: a template (template_id, or the task content given here, saved as a new template) on a schedule (schedule_id, or the timing given here; an identical schedule is reused, else one is made). Every day/week/month gigg creates a task whose start is the window opening and whose due/not_after is the window closing. Untouched tasks are marked missed when the window closes; claim never hands one out outside its window.", Annotations: rw("Create recurring task", false)},
+	if has("gigs:write") && p.AllowedAnywhere("schedules") {
+		mcp.AddTool(s, &mcp.Tool{Name: "create_recurring", Description: "Create a recurring gig: a template (template_id, or the gig content given here, saved as a new template) on a schedule (schedule_id, or the timing given here; an identical schedule is reused, else one is made). Every day/week/month gigg creates a gig whose start is the window opening and whose due/not_after is the window closing. Untouched gigs are marked missed when the window closes; claim never hands one out outside its window.", Annotations: rw("Create recurring gig", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in recArgs) (*mcp.CallToolResult, any, error) {
 				return toolResult(call("POST", fmt.Sprintf("/projects/%d/recurrences", in.Project), nil, in.merge(map[string]any{})))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "update_recurring", Description: "Change a recurring task; fields you omit stay as they are. template_id / schedule_id switch to another template / schedule; content fields change its template and timing fields its schedule in place (every recurring task sharing them follows). The next occurrence is recomputed from now.", Annotations: rw("Update recurring task", false)},
+		mcp.AddTool(s, &mcp.Tool{Name: "update_recurring", Description: "Change a recurring gig; fields you omit stay as they are. template_id / schedule_id switch to another template / schedule; content fields change its template and timing fields its schedule in place (every recurring gig sharing them follows). The next occurrence is recomputed from now.", Annotations: rw("Update recurring gig", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in recArgs) (*mcp.CallToolResult, any, error) {
 				code, body := call("GET", fmt.Sprintf("/recurrences/%d", in.ID), nil, nil)
 				if code != 200 {
@@ -585,11 +585,11 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				return toolResult(call("PUT", fmt.Sprintf("/recurrences/%d", in.ID), nil, in.merge(b)))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "delete_recurring", Description: "Stop a recurring task. Tasks it already created stay; its template and schedule too, unless also_template / also_schedule (refused while another recurring task uses them).", Annotations: rw("Delete recurring task", true)},
+		mcp.AddTool(s, &mcp.Tool{Name: "delete_recurring", Description: "Stop a recurring gig. Gigs it already created stay; its template and schedule too, unless also_template / also_schedule (refused while another recurring gig uses them).", Annotations: rw("Delete recurring gig", true)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in struct {
 				ID           int64 `json:"id"`
-				AlsoTemplate bool  `json:"also_template,omitempty" jsonschema:"also delete its template (when no other recurring task uses it)"`
-				AlsoSchedule bool  `json:"also_schedule,omitempty" jsonschema:"also delete its schedule (when no other recurring task uses it)"`
+				AlsoTemplate bool  `json:"also_template,omitempty" jsonschema:"also delete its template (when no other recurring gig uses it)"`
+				AlsoSchedule bool  `json:"also_schedule,omitempty" jsonschema:"also delete its schedule (when no other recurring gig uses it)"`
 			}) (*mcp.CallToolResult, any, error) {
 				q := []string{}
 				if in.AlsoTemplate {
@@ -606,12 +606,12 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 			})
 	}
 	addScheduleTools(s, p, call, ws)
-	if has("tasks:read") {
+	if has("gigs:read") {
 		addChangesTool(s, call, ws)
 	}
 	addItemTools(s, p, call, ws)
 	addRunnerTools(s, p, call)
-	addCronTools(s, p, call, ws)
+	addErrandTools(s, p, call, ws)
 	return s
 }
 
@@ -678,8 +678,8 @@ func (in recArgs) merge(b map[string]any) map[string]any {
 	if in.Checklist != nil {
 		b["checklist"] = in.Checklist
 	}
-	if in.Subtasks != nil {
-		b["subtasks"] = in.Subtasks
+	if in.Subgigs != nil {
+		b["subgigs"] = in.Subgigs
 	}
 	if in.ScheduleID != nil {
 		b["schedule_id"] = *in.ScheduleID
@@ -687,10 +687,10 @@ func (in recArgs) merge(b map[string]any) map[string]any {
 	return b
 }
 
-// content: the call changes the task content.
+// content: the call changes the gig content.
 func (in recArgs) content() bool {
 	return in.Title != "" || in.DescriptionMD != nil || in.Priority != nil || in.Labels != nil || in.Assignees != nil || in.Model != nil ||
-		in.Effort != nil || in.AlwaysRun != nil || in.AllowedTools != nil || in.Checklist != nil || in.Subtasks != nil
+		in.Effort != nil || in.AlwaysRun != nil || in.AllowedTools != nil || in.Checklist != nil || in.Subgigs != nil
 }
 
 // timing: the call changes the timing.

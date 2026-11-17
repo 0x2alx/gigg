@@ -8,7 +8,7 @@ describe("imageSrcOK", () => {
   it("refuses other API calls, streams, other sites and odd paths", () => {
     for (const s of [
       "/api/v1/workspaces/home/events",
-      "/api/v1/tasks/1",
+      "/api/v1/gigs/1",
       "/api/v1/users/3/avatar/../../x.png",
       "//evil.example/x.png",
       "https://evil.example/x.png",

@@ -1,4 +1,4 @@
-// Command gigg is the gigg task board server.
+// Command gigg is the gigg gig board server.
 //
 //	gigg serve         run the server (configuration from GIGG_* environment variables)
 //	gigg healthcheck   exit 0 if the local server answers /healthz (for container health checks)

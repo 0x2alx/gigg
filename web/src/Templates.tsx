@@ -1,11 +1,11 @@
-// Every task template in reach, across the workspaces (narrowed by an optional workspace/project filter;
+// Every gig template in reach, across the workspaces (narrowed by an optional workspace/project filter;
 // a project shows its own and its workspace's "any project" ones): list with badges; new, edit, delete.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { api, ApiError, hasCap, type Tag, type Template } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
-import { TaskModal } from "./TaskModal";
+import { GigModal } from "./GigModal";
 import { ClearFilters, Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
@@ -66,7 +66,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
   if (editing && (editing === "new" ? start : editWs)) {
     const w = editing === "new" ? start!.ws : editWs!;
     return (
-      <TaskModal
+      <GigModal
         ws={w}
         projectId={editing === "new" ? start!.projectId : (editing.project_id ?? w.projects[0]?.id ?? 0)}
         statuses={[]}
@@ -83,7 +83,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
   }
 
   return (
-    <Modal title="Templates" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring tasks" />}>
+    <Modal title="Templates" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring gigs" />}>
       {err && (
         <p className="danger" role="alert">
           {err}
@@ -95,7 +95,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
         {items && <span className="muted small">{shown.length === items.length ? `${items.length} template${items.length === 1 ? "" : "s"}` : `${shown.length} of ${items.length}`}</span>}
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}
-      {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No templates yet. Save one from the new-task form, or make one here." : "None here. Show everything to see the others."}</p>}
+      {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No templates yet. Save one from the new-gig form, or make one here." : "None here. Show everything to see the others."}</p>}
       {shown.length > 0 && (
         <ul className="schedules" aria-label="Templates">
           {shown.map((t) => {
@@ -114,7 +114,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
               <div className="schedule-rule">{t.title}</div>
               <div className="chips">
                 {(t.recurring ?? 0) > 0 && (
-                  <span className="pill pill-accent" title="Recurring tasks that create their tasks from this template: editing it changes their future tasks">
+                  <span className="pill pill-accent" title="Recurring gigs that create their gigs from this template: editing it changes their future gigs">
                     ⟳ {t.recurring} recurring
                   </span>
                 )}
@@ -132,7 +132,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                 <div className="schedule-actions">
                   {confirm === t.id ? (
                     <>
-                      <span className="small">Delete this template? Tasks made from it stay.</span>
+                      <span className="small">Delete this template? Gigs made from it stay.</span>
                       <button type="button" className="button danger-button small" onClick={() => remove(t)}>
                         Delete
                       </button>
@@ -150,7 +150,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                         className="button danger-button small"
                         onClick={() => setConfirm(t.id)}
                         disabled={(t.recurring ?? 0) > 0}
-                        title={(t.recurring ?? 0) > 0 ? "Recurring tasks use this template: delete them or give them another template first" : undefined}
+                        title={(t.recurring ?? 0) > 0 ? "Recurring gigs use this template: delete them or give them another template first" : undefined}
                         aria-label={`Delete ${t.name}`}
                       >
                         <Icon name="trash" /> Delete

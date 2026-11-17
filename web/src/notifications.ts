@@ -7,9 +7,9 @@ export type NotificationKind = "mention" | "assigned" | "question" | "missed" | 
 export interface Notification {
   id: number;
   workspace_id: number;
-  task_id: number | null;
-  task_key: string | null;
-  task_title: string | null;
+  gig_id: number | null;
+  gig_key: string | null;
+  gig_title: string | null;
   comment_id: number | null;
   kind: NotificationKind | string;
   actor_user_id: number | null;
@@ -37,8 +37,8 @@ export function kindInfo(kind: string): { label: string; verb: string; color: st
 }
 
 // notificationText: one line, e.g. "Ada mentioned you on GIG-12" or "GIG-7: the window closed unclaimed".
-export function notificationText(n: Pick<Notification, "kind" | "task_key">, actorName: string | null): string {
-  const key = n.task_key ?? "a task";
+export function notificationText(n: Pick<Notification, "kind" | "gig_key">, actorName: string | null): string {
+  const key = n.gig_key ?? "a gig";
   if (n.kind === "missed") return `${key}: the window closed unclaimed`;
   const who = actorName ?? "Someone";
   return `${who} ${kindInfo(n.kind).verb} ${key}`;

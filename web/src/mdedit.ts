@@ -7,13 +7,13 @@ export interface Edit {
   end: number;
 }
 
-export type LineKind = "ul" | "ol" | "task" | "quote" | "heading";
+export type LineKind = "ul" | "ol" | "gig" | "quote" | "heading";
 
 const LIST_RE = /^(\s*)([-*+]\s\[[ xX]\]\s|[-*+]\s|\d+[.)]\s)/;
 const PREFIX_RE: Record<LineKind, RegExp> = {
   ul: /^(\s*)[-*+]\s(?!\[[ xX]\]\s)/,
   ol: /^(\s*)\d+[.)]\s/,
-  task: /^(\s*)[-*+]\s\[[ xX]\]\s/,
+  gig: /^(\s*)[-*+]\s\[[ xX]\]\s/,
   quote: /^(\s*)>\s?/,
   heading: /^(\s*)#{1,6}\s/,
 };
@@ -86,10 +86,10 @@ export function toggleLines(e: Edit, kind: LineKind): Edit {
     if (l.trim() === "" && lines.length > 1) return l;
     const indent = /^\s*/.exec(l)![0];
     let body = l.slice(indent.length);
-    if (kind === "ul" || kind === "ol" || kind === "task") body = body.replace(/^([-*+]\s\[[ xX]\]\s|[-*+]\s|\d+[.)]\s)/, "");
+    if (kind === "ul" || kind === "ol" || kind === "gig") body = body.replace(/^([-*+]\s\[[ xX]\]\s|[-*+]\s|\d+[.)]\s)/, "");
     else if (kind === "heading") body = body.replace(/^#{1,6}\s/, "");
     n++;
-    const prefix = kind === "ul" ? "- " : kind === "ol" ? `${n}. ` : kind === "task" ? "- [ ] " : kind === "quote" ? "> " : "## ";
+    const prefix = kind === "ul" ? "- " : kind === "ol" ? `${n}. ` : kind === "gig" ? "- [ ] " : kind === "quote" ? "> " : "## ";
     return indent + prefix + body;
   });
   const joined = out.join("\n");
@@ -126,7 +126,7 @@ export function indentList(e: Edit, outdent: boolean): Edit | null {
   return { text, start, end: e.start === e.end ? start : Math.max(start, e.end + total) };
 }
 
-// continueList: Enter at the end of a list item starts the next item (numbered lists count on, task
+// continueList: Enter at the end of a list item starts the next item (numbered lists count on, gig
 // items start unchecked); Enter on an empty item ends the list. Null when the caret is not in a list item.
 export function continueList(e: Edit): Edit | null {
   if (e.start !== e.end) return null;

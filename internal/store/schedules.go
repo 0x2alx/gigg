@@ -14,14 +14,14 @@ import (
 
 // Rule is when occurrences happen: the frequency, the days, and the time window in a zone.
 type Rule struct {
-	Freq          string `json:"freq" enum:"minutes,hours,daily,weekly,monthly" doc:"minutes and hours: crons only"`
+	Freq          string `json:"freq" enum:"minutes,hours,daily,weekly,monthly" doc:"minutes and hours: errands only"`
 	Interval      int64  `json:"interval" doc:"Every N minutes (1-360), hours (1-24), days, weeks or months"`
 	Weekdays      []int  `json:"weekdays" doc:"Weekly: 1=Mon .. 7=Sun; minutes/hours: only on these days (empty: every day)"`
 	MonthDay      *int64 `json:"month_day" doc:"Monthly: 1-31, -1 = last day (short months use their last day)"`
 	TZ            string `json:"tz" doc:"IANA time zone"`
 	WindowStart   string `json:"window_start" doc:"When the window opens, local HH:MM"`
 	WindowMinutes int64  `json:"window_minutes" doc:"How long the window stays open"`
-	LeadMinutes   int64  `json:"lead_minutes" doc:"Create the task this long before the window opens"`
+	LeadMinutes   int64  `json:"lead_minutes" doc:"Create the gig this long before the window opens"`
 }
 
 // DefaultTZ is the time zone of rules that name none (the server sets it from GIGG_DEFAULT_TZ; the API
@@ -106,7 +106,7 @@ func (r *Rule) Validate() error {
 	return nil
 }
 
-// Frequent reports a minute or hour rule (crons only).
+// Frequent reports a minute or hour rule (errands only).
 func (r Rule) Frequent() bool { return r.Freq == "minutes" || r.Freq == "hours" }
 
 func normWeekdays(in []int) ([]int, error) {
@@ -278,9 +278,9 @@ func (r Rule) Describe() string {
 	return templateName(s)
 }
 
-// DescribeCron names a rule as a cron reads it: a daily/weekly/monthly cron runs at the window's
+// DescribeErrand names a rule as an errand reads it: a daily/weekly/monthly errand runs at the window's
 // start ("Every day at 03:30"), the window and create-early don't apply.
-func (r Rule) DescribeCron() string {
+func (r Rule) DescribeErrand() string {
 	if r.Frequent() {
 		return r.Describe()
 	}
@@ -333,31 +333,31 @@ func windowText(start string, minutes int64) string {
 	return "from " + start + " for " + d
 }
 
-// Schedule is a named rule of a workspace; recurring tasks pair it with a template.
+// Schedule is a named rule of a workspace; recurring gigs pair it with a template.
 type Schedule struct {
 	ID          int64  `json:"id"`
 	WorkspaceID int64  `json:"workspace_id"`
 	Name        string `json:"name"`
 	Rule
-	CreatedBy int64 `json:"created_by"`
-	CreatedAt int64 `json:"created_at"`
-	Version   int64 `json:"version"`
-	Uses      int64 `json:"uses" doc:"Live recurring tasks using this schedule"`
-	CronUses  int64 `json:"cron_uses" doc:"Live crons using this schedule"`
+	CreatedBy  int64 `json:"created_by"`
+	CreatedAt  int64 `json:"created_at"`
+	Version    int64 `json:"version"`
+	Uses       int64 `json:"uses" doc:"Live recurring gigs using this schedule"`
+	ErrandUses int64 `json:"errand_uses" doc:"Live errands using this schedule"`
 }
 
-// schColsPre13 is the column list without the cron count (migration steps before 0013 add ", 0").
+// schColsPre13 is the column list without the errand count (migration steps before 0013 add ", 0").
 const schColsPre13 = `id, workspace_id, name, freq, interval_n, weekdays, month_day, tz, window_start, window_minutes, lead_minutes, created_by, created_at, version,
 	(SELECT count(*) FROM recurrences r WHERE r.schedule_id = schedules.id AND r.deleted_at IS NULL)`
 
-const schCols = schColsPre13 + `, (SELECT count(*) FROM crons c WHERE c.schedule_id = schedules.id AND c.deleted_at IS NULL)`
+const schCols = schColsPre13 + `, (SELECT count(*) FROM errands c WHERE c.schedule_id = schedules.id AND c.deleted_at IS NULL)`
 
 func scanSchedule(row interface{ Scan(...any) error }) (*Schedule, error) {
 	s := &Schedule{}
 	var weekdays string
 	var md sql.NullInt64
 	if err := row.Scan(&s.ID, &s.WorkspaceID, &s.Name, &s.Freq, &s.Interval, &weekdays, &md, &s.TZ, &s.WindowStart, &s.WindowMinutes, &s.LeadMinutes,
-		&s.CreatedBy, &s.CreatedAt, &s.Version, &s.Uses, &s.CronUses); err != nil {
+		&s.CreatedBy, &s.CreatedAt, &s.Version, &s.Uses, &s.ErrandUses); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -418,7 +418,7 @@ func scheduleFor(ctx context.Context, q Q, a Actor, ws int64, rule Rule) (*Sched
 	return SaveSchedule(ctx, q, a, &Schedule{WorkspaceID: ws, Name: rule.Describe(), Rule: rule}, 0)
 }
 
-// SaveSchedule creates (ID 0) or replaces a schedule. A changed rule moves every recurring task on
+// SaveSchedule creates (ID 0) or replaces a schedule. A changed rule moves every recurring gig on
 // it: their next occurrence is recomputed from now.
 func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) (*Schedule, error) {
 	if err := s.Rule.Validate(); err != nil {
@@ -457,7 +457,7 @@ func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) 
 			return nil, ErrVersion
 		}
 		if s.Rule.Frequent() && cur.Uses > 0 {
-			return nil, Invalid("recurring tasks use this schedule: minute and hour schedules are for crons only")
+			return nil, Invalid("recurring gigs use this schedule: minute and hour schedules are for errands only")
 		}
 		if s.Name == cur.Name && cur.Name == cur.Rule.Describe() {
 			s.Name = s.Rule.Describe() // a name describing the rule follows it (unless renamed)
@@ -479,7 +479,7 @@ func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) 
 	return GetSchedule(ctx, q, s.ID)
 }
 
-// rescheduleAll recomputes the next occurrence of every live recurring task on a schedule.
+// rescheduleAll recomputes the next occurrence of every live recurring gig on a schedule.
 func rescheduleAll(ctx context.Context, q Q, schedule int64) error {
 	rows, err := q.QueryContext(ctx, "SELECT "+recCols+" FROM "+recFrom+" WHERE r.schedule_id = ? AND r.deleted_at IS NULL", schedule)
 	if err != nil {
@@ -506,13 +506,13 @@ func rescheduleAll(ctx context.Context, q Q, schedule int64) error {
 			return err
 		}
 	}
-	return rescheduleCrons(ctx, q, "schedule_id", schedule)
+	return rescheduleErrands(ctx, q, "schedule_id", schedule)
 }
 
-// DeleteSchedule removes a schedule no recurring task uses.
+// DeleteSchedule removes a schedule no recurring gig uses.
 func DeleteSchedule(ctx context.Context, q Q, a Actor, s *Schedule) error {
 	var names []string
-	rows, err := q.QueryContext(ctx, `SELECT t.title FROM recurrences r JOIN task_templates t ON t.id = r.template_id
+	rows, err := q.QueryContext(ctx, `SELECT t.title FROM recurrences r JOIN gig_templates t ON t.id = r.template_id
 		WHERE r.schedule_id = ? AND r.deleted_at IS NULL ORDER BY r.id LIMIT 10`, s.ID)
 	if err != nil {
 		return err
@@ -529,10 +529,10 @@ func DeleteSchedule(ctx context.Context, q Q, a Actor, s *Schedule) error {
 	}
 	rows.Close()
 	if len(names) > 0 {
-		return Conflict("recurring tasks use this schedule: %s. Delete them or give them another schedule first", strings.Join(names, ", "))
+		return Conflict("recurring gigs use this schedule: %s. Delete them or give them another schedule first", strings.Join(names, ", "))
 	}
-	if s.CronUses > 0 {
-		return Conflict("%d cron(s) use this schedule. Delete them or give them another schedule first", s.CronUses)
+	if s.ErrandUses > 0 {
+		return Conflict("%d errand(s) use this schedule. Delete them or give them another schedule first", s.ErrandUses)
 	}
 	if _, err := q.ExecContext(ctx, `UPDATE schedules SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), s.ID); err != nil {
 		return err
@@ -541,10 +541,10 @@ func DeleteSchedule(ctx context.Context, q Q, a Actor, s *Schedule) error {
 	return err
 }
 
-// ScheduleGuards: whether a live recurring task on the schedule makes always-run tasks, or tasks with a
+// ScheduleGuards: whether a live recurring gig on the schedule makes always-run gigs, or gigs with a
 // tool allowlist (changing the schedule then needs those permissions).
 func ScheduleGuards(ctx context.Context, q Q, id int64) (alwaysRun, tools bool, err error) {
 	err = q.QueryRowContext(ctx, `SELECT COALESCE(MAX(t.always_run), 0), COALESCE(MAX(t.allowed_tools != '[]'), 0)
-		FROM recurrences r JOIN task_templates t ON t.id = r.template_id WHERE r.schedule_id = ? AND r.deleted_at IS NULL`, id).Scan(&alwaysRun, &tools)
+		FROM recurrences r JOIN gig_templates t ON t.id = r.template_id WHERE r.schedule_id = ? AND r.deleted_at IS NULL`, id).Scan(&alwaysRun, &tools)
 	return alwaysRun, tools, err
 }

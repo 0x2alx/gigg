@@ -19,7 +19,7 @@ func TestMatrix(t *testing.T) {
 	bobs := grants(&store.AccessRule{WorkspaceID: ptr(10), Preset: "member"}, &store.AccessRule{WorkspaceID: ptr(11), Preset: "viewer"})
 
 	session := &Principal{User: bob, Grants: bobs}
-	if !session.Can(10, Member, "tasks:write") || session.Can(11, Member, "tasks:write") || session.Can(12, Viewer, "tasks:read") {
+	if !session.Can(10, Member, "gigs:write") || session.Can(11, Member, "gigs:write") || session.Can(12, Viewer, "gigs:read") {
 		t.Fatal("session can")
 	}
 	if !session.SeesWorkspace(11) || session.SeesWorkspace(12) || !slices.Equal(session.Workspaces(), []int64{10, 11}) {
@@ -27,28 +27,28 @@ func TestMatrix(t *testing.T) {
 	}
 
 	// a workspace key: bound to ws 10, scopes intersected with the permissions
-	key := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{WorkspaceID: ptr(10), Scopes: []string{"tasks:read"}}}
+	key := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{WorkspaceID: ptr(10), Scopes: []string{"gigs:read"}}}
 	if key.SeesWorkspace(11) || !key.SeesWorkspace(10) {
 		t.Fatal("key binding")
 	}
-	if key.Can(10, Member, "tasks:write") || !key.Can(10, Viewer, "tasks:read") {
+	if key.Can(10, Member, "gigs:write") || !key.Can(10, Viewer, "gigs:read") {
 		t.Fatal("key scopes")
 	}
 	if ws := key.Workspaces(); len(ws) != 1 || ws[0] != 10 {
 		t.Fatalf("key workspaces %v", ws)
 	}
-	if key.AllowedAnywhere("create_tasks") != true || key.Allowed(11, "view") {
+	if key.AllowedAnywhere("create_gigs") != true || key.Allowed(11, "view") {
 		t.Fatal("key anywhere is limited to its workspace")
 	}
 
 	// narrowed key: only project 100
-	narrow := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{WorkspaceID: ptr(10), ProjectIDs: []int64{100}, Scopes: []string{"tasks:read"}}}
+	narrow := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{WorkspaceID: ptr(10), ProjectIDs: []int64{100}, Scopes: []string{"gigs:read"}}}
 	if !narrow.SeesProject(10, 100) || narrow.SeesProject(10, 101) || narrow.SeesProject(11, 100) {
 		t.Fatal("narrowing")
 	}
 
 	// a key bound to a workspace the user can't see sees nothing
-	stale := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{WorkspaceID: ptr(12), Scopes: []string{"tasks:read"}}}
+	stale := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{WorkspaceID: ptr(12), Scopes: []string{"gigs:read"}}}
 	if stale.SeesWorkspace(12) || len(stale.Workspaces()) != 0 {
 		t.Fatal("key for a workspace out of reach")
 	}
@@ -58,16 +58,16 @@ func TestMatrix(t *testing.T) {
 	if a := (&Principal{User: admin, Grants: ag}); !a.IsInstanceAdmin() || !a.Allowed(99, Manager) || a.Workspaces() != nil || !a.AdminWith("admin:users") {
 		t.Fatal("admin session")
 	}
-	wsKey := &Principal{User: admin, Grants: ag, Key: &store.APIKey{WorkspaceID: ptr(10), Scopes: []string{"tasks:write"}}}
+	wsKey := &Principal{User: admin, Grants: ag, Key: &store.APIKey{WorkspaceID: ptr(10), Scopes: []string{"gigs:write"}}}
 	if wsKey.IsInstanceAdmin() || wsKey.SeesWorkspace(11) || !wsKey.Allowed(10, Manager) || wsKey.AdminWith("admin:users") {
 		t.Fatal("admin's workspace key must not be instance admin")
 	}
-	adminKey := &Principal{User: admin, Grants: ag, Key: &store.APIKey{Scopes: []string{"admin:users", "tasks:read"}}}
-	if !adminKey.AdminWith("admin:users") || adminKey.AdminWith("admin:keys") || adminKey.Can(5, Member, "tasks:write") {
+	adminKey := &Principal{User: admin, Grants: ag, Key: &store.APIKey{Scopes: []string{"admin:users", "gigs:read"}}}
+	if !adminKey.AdminWith("admin:users") || adminKey.AdminWith("admin:keys") || adminKey.Can(5, Member, "gigs:write") {
 		t.Fatal("admin key scopes")
 	}
 	// an unbound key of a non-admin (or of a demoted admin) acts like the user's session
-	demoted := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{Scopes: []string{"admin:users", "tasks:read"}}}
+	demoted := &Principal{User: bob, Grants: bobs, Key: &store.APIKey{Scopes: []string{"admin:users", "gigs:read"}}}
 	if demoted.IsInstanceAdmin() || demoted.AdminWith("admin:users") {
 		t.Fatal("demoted admin key is still an admin")
 	}
@@ -90,19 +90,19 @@ func TestRuleOrder(t *testing.T) {
 		src   string
 	}{
 		{"nothing", nil, 10, "view", false, "default"},
-		{"preset", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "member"}}, 10, "create_tasks", true, "user"},
+		{"preset", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "member"}}, 10, "create_gigs", true, "user"},
 		{"preset elsewhere", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "member"}}, 11, "view", false, "default"},
-		{"override beats preset", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "member", Overrides: map[string]bool{"create_tasks": false}}}, 10, "create_tasks", false, "user"},
+		{"override beats preset", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "member", Overrides: map[string]bool{"create_gigs": false}}}, 10, "create_gigs", false, "user"},
 		{"all workspaces covers others", []*store.AccessRule{{Preset: "viewer"}}, 12, "view", true, "user_all"},
 		{"workspace beats all", []*store.AccessRule{{Preset: "manager"}, {WorkspaceID: ptr(10), Overrides: map[string]bool{"schedules": false}}}, 10, "schedules", false, "user"},
 		{"preset gap inherits from all", []*store.AccessRule{{Overrides: map[string]bool{"schedules": true}}, {WorkspaceID: ptr(10), Preset: "member"}}, 10, "schedules", true, "user_all"},
 		{"user beats group", []*store.AccessRule{{GroupID: g1, WorkspaceID: ptr(10), Preset: "manager"}, {Overrides: map[string]bool{"templates": false}}}, 10, "templates", false, "user_all"},
-		{"group gives", []*store.AccessRule{{GroupID: g1, WorkspaceID: ptr(10), Preset: "member"}}, 10, "edit_tasks", true, "group"},
+		{"group gives", []*store.AccessRule{{GroupID: g1, WorkspaceID: ptr(10), Preset: "member"}}, 10, "edit_gigs", true, "group"},
 		{"group allow beats group deny", []*store.AccessRule{{GroupID: g1, WorkspaceID: ptr(10), Preset: "member", Overrides: map[string]bool{"relations": false}},
 			{GroupID: g2, WorkspaceID: ptr(10), Preset: "member"}}, 10, "relations", true, "group"},
 		{"group ws beats group all", []*store.AccessRule{{GroupID: g1, Preset: "manager"}, {GroupID: g2, WorkspaceID: ptr(10), Preset: "viewer", Overrides: map[string]bool{"comment": false}}}, 10, "comment", false, "group"},
 		{"group all", []*store.AccessRule{{GroupID: g1, Preset: "commenter"}}, 11, "comment", true, "group_all"},
-		{"needs view", []*store.AccessRule{{Overrides: map[string]bool{"create_tasks": true}}}, 10, "create_tasks", false, "needs_view"},
+		{"needs view", []*store.AccessRule{{Overrides: map[string]bool{"create_gigs": true}}}, 10, "create_gigs", false, "needs_view"},
 		{"always_run is never in a preset", []*store.AccessRule{{WorkspaceID: ptr(10), Preset: "manager"}}, 10, "always_run", false, "default"},
 	}
 	for _, c := range cases {

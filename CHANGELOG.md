@@ -2,17 +2,23 @@
 
 ## Unreleased
 
-- MCP `create_task` and `update_task` take `assignees` (usernames or user ids); `update_task`
+- **Gigs and errands**: tasks are now **gigs** and crons are **errands**, everywhere: the UI, the
+  API (`/gigs`, `/errands`, `gigs:read` ...), MCP tools (`create_gig`, `list_errands` ...),
+  permissions (`create_gigs` ...), the database and the docs. Migration 0013 renames the tables and
+  the names stored in data (key scopes, permission overrides, activity, allowed tool lists). Old
+  `/board/p/<id>/t/<key>` and `/crons` links redirect. Clients using the old API paths or MCP tool
+  names need updating.
+- MCP `create_gig` and `update_gig` take `assignees` (usernames or user ids); `update_gig`
   clears them with `clear: ["assignees"]`.
-- **Crons**: shell commands an agent runs on a schedule (every N minutes or hours, optionally on
+- **Errands**: shell commands an agent runs on a schedule (every N minutes or hours, optionally on
   some weekdays between two times, or daily, weekly, monthly), in its sandbox, with a run history,
-  each run's output and no tasks. A **Crons** page lists them, failing first, with a panel for
-  runs and output and an editor. The permissions `crons` and `cron_unsandboxed`, the key scopes
-  `crons:read`, `crons:output`, `crons:write` and `crons:run`, API endpoints and MCP tools. The
+  each run's output and no gigs. An **Errands** page lists them, failing first, with a panel for
+  runs and output and an editor. The permissions `errands` and `errand_unsandboxed`, the key scopes
+  `errands:read`, `errands:output`, `errands:write` and `errands:run`, API endpoints and MCP tools. The
   executor that runs them is outside gigg (the server still never runs commands).
-- **Pause runs** has two boxes, task runs and cron runs; the Dashboard shows each workspace's crons
+- **Pause runs** has two boxes, gig runs and errand runs; the Dashboard shows each workspace's errands
   and how many are failing.
-- Schedules take `minutes` and `hours` timings (for crons only).
+- Schedules take `minutes` and `hours` timings (for errands only).
 - `gigg admin allow <user> <workspace|all> <permission>...` adds permissions to a user's rule and keeps
   the rest (`access` replaces the rule).
 

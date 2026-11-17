@@ -1,7 +1,7 @@
-// Fills a fresh demo instance (bootstrapped with dev/demo/bootstrap.txt) with believable tasks for the
+// Fills a fresh demo instance (bootstrapped with dev/demo/bootstrap.txt) with believable gigs for the
 // documentation's screenshots: workspaces with colours, labels, priorities, due dates, checklists,
 // dependencies, a custom field, agent runs with costs, a question waiting for a person, mentions and
-// recurring tasks. Generic names only.
+// recurring gigs. Generic names only.
 //
 //   node seed.mjs <base URL of the internal listener, e.g. http://gigg-demo:8080> <dir with the *.token files>
 import { readFileSync } from "node:fs";
@@ -37,16 +37,16 @@ for (const ws of ["acme", "scout", "home"]) for (const p of (await dana("GET", `
 for (const [ws, color] of [["acme", "#3E63DD"], ["scout", "#8E4EC6"], ["home", "#12A594"]]) await dana("PATCH", `/workspaces/${ws}`, { color });
 const area = await dana("POST", "/workspaces/acme/fields", { name: "Area", kind: "select", options: ["Backend", "Frontend", "Ops"] });
 
-const tasks = {};
+const gigs = {};
 async function mk(key, title, x = {}, who = dana) {
   const { area: a, checked, ...body } = x;
-  const t = await who("POST", `/projects/${projects[key]}/tasks`, { title, ...body });
-  if (a) await dana("PATCH", `/tasks/${t.id}/custom`, { values: { [area.id]: a } });
+  const t = await who("POST", `/projects/${projects[key]}/gigs`, { title, ...body });
+  if (a) await dana("PATCH", `/gigs/${t.id}/custom`, { values: { [area.id]: a } });
   if (checked) {
-    const items = (await dana("GET", `/tasks/${t.id}/checklist`)).items;
-    for (const i of items.slice(0, checked)) await dana("PATCH", `/tasks/${t.id}/checklist/${i.id}`, { done: true });
+    const items = (await dana("GET", `/gigs/${t.id}/checklist`)).items;
+    for (const i of items.slice(0, checked)) await dana("PATCH", `/gigs/${t.id}/checklist/${i.id}`, { done: true });
   }
-  tasks[title] = t;
+  gigs[title] = t;
   return t;
 }
 
@@ -66,14 +66,14 @@ await mk("PLT", "Nightly dependency audit", {
 await mk("PLT", "Add rate limiting to the public API", { category: "todo", priority: 4, labels: ["api"], assignees: [users.scout], area: "Backend" });
 await mk("PLT", "Write the incident runbook", { category: "todo", priority: 1, labels: ["docs"], assignees: [users.scout] });
 await mk("PLT", "Move CI to the new build machines", { category: "backlog", priority: 2, labels: ["ops"], area: "Ops" });
-await dana("POST", `/tasks/${tasks["Rotate the TLS certificates"].id}/relations`, { task: tasks["Move CI to the new build machines"].key, direction: "blocks" });
+await dana("POST", `/gigs/${gigs["Rotate the TLS certificates"].id}/relations`, { gig: gigs["Move CI to the new build machines"].key, direction: "blocks" });
 
 // Acme Ops / Website
 await mk("WEB", "Redesign the pricing page", { category: "doing", priority: 2, labels: ["design"], assignees: [users.sam], due_at: now + 5 * DAY, area: "Frontend" }, sam);
 await mk("WEB", "Compress the hero images", { category: "todo", priority: 1, labels: ["performance"], area: "Frontend" }, sam);
 await mk("WEB", "Broken link in the footer", { category: "todo", priority: 3, labels: ["bug"], due_at: now - DAY, assignees: [users.sam] }, sam);
 await mk("WEB", "Publish the November changelog", { category: "done", priority: 1, labels: ["docs"] }, sam);
-await sam("POST", `/tasks/${tasks["Redesign the pricing page"].id}/comments`, { body_md: "First draft is up. @dana can you check the wording of the team plan?" });
+await sam("POST", `/gigs/${gigs["Redesign the pricing page"].id}/comments`, { body_md: "First draft is up. @dana can you check the wording of the team plan?" });
 
 // Scout (an agent's own workspace) / Research
 await mk("RES", "Compare vector databases for search", { category: "doing", priority: 2, labels: ["research"], assignees: [users.scout] });
@@ -87,14 +87,14 @@ await mk("HOM", "Plan the summer trip", { category: "todo", priority: 2, checkli
 
 // Something in the trash
 await mk("WEB", "Old landing page experiment", { category: "backlog", priority: 1, labels: ["design"] }, sam);
-await dana("DELETE", `/tasks/${tasks["Old landing page experiment"].id}`);
+await dana("DELETE", `/gigs/${gigs["Old landing page experiment"].id}`);
 
 // Agent runs (as Scout): one done, one with a question for a person, one in progress, one interrupted
 async function run(title, finish, usage) {
-  const t = tasks[title];
+  const t = gigs[title];
   const sid = randomUUID();
-  await scout("POST", `/tasks/${t.id}/move`, { category: "doing" });
-  const r = await scout("POST", `/tasks/${t.id}/runs`, { session_id: sid, mode: "new", attempt: 1, model: "claude-sonnet" });
+  await scout("POST", `/gigs/${t.id}/move`, { category: "doing" });
+  const r = await scout("POST", `/gigs/${t.id}/runs`, { session_id: sid, mode: "new", attempt: 1, model: "claude-sonnet" });
   if (finish) await scout("POST", `/runs/${r.id}/finish`, { session_id: sid, model: "claude-sonnet", ...finish });
   if (usage) await scout("POST", `/runs/${r.id}/usage`, { usage_pct: usage });
   return r;
@@ -114,7 +114,7 @@ await run("Compare vector databases for search", {
   report_md: "Benchmarked three of five; the run timed out while indexing the large sample. Continuing next pass.",
 }, 2.1);
 
-// Recurring tasks: a template + a schedule each
+// Recurring gigs: a template + a schedule each
 await dana("POST", `/projects/${projects.RES}/recurrences`, {
   title: "Summarise this week's issues", freq: "weekly", weekdays: [5], tz: "UTC", window_start: "09:00", window_minutes: 180,
   always_run: true, model: "sonnet", labels: ["report"], assignees: [users.scout],
@@ -128,4 +128,4 @@ await dana("POST", `/projects/${projects.HOM}/recurrences`, {
   title: "Water the plants", freq: "weekly", weekdays: [1, 4], tz: "UTC", window_start: "08:00", window_minutes: 720, priority: 1, assignees: [users.sam],
 });
 
-console.log(`seeded ${Object.keys(tasks).length} tasks`);
+console.log(`seeded ${Object.keys(gigs).length} gigs`);

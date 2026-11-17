@@ -41,10 +41,10 @@ func (e *env) reqH(method, path, body string, c cred, hdr map[string]string) (in
 	return w.Code, w.Body.Bytes(), w.Header()
 }
 
-func (e *env) commentCount(task int64) int {
+func (e *env) commentCount(gig int64) int {
 	e.t.Helper()
 	var n int
-	if err := e.st.R.QueryRow(`SELECT COUNT(*) FROM comments WHERE task_id = ?`, task).Scan(&n); err != nil {
+	if err := e.st.R.QueryRow(`SELECT COUNT(*) FROM comments WHERE gig_id = ?`, gig).Scan(&n); err != nil {
 		e.t.Fatal(err)
 	}
 	return n
@@ -52,10 +52,10 @@ func (e *env) commentCount(task int64) int {
 
 func TestIdempotencyReplayAndMismatch(t *testing.T) {
 	e := newEnv(t)
-	task := e.ids["scout.task"]
-	path := fmt.Sprintf("/tasks/%d/comments", task)
+	gig := e.ids["scout.gig"]
+	path := fmt.Sprintf("/gigs/%d/comments", gig)
 	idem := map[string]string{"Idempotency-Key": "retry-1"}
-	before := e.commentCount(task)
+	before := e.commentCount(gig)
 
 	code, body1, h1 := e.reqH("POST", path, `{"body_md":"once"}`, e.key("scout"), idem)
 	e.ok(code, body1, 201)
@@ -70,7 +70,7 @@ func TestIdempotencyReplayAndMismatch(t *testing.T) {
 	if h2.Get("ETag") != h1.Get("ETag") || !strings.HasPrefix(h2.Get("Content-Type"), "application/json") {
 		t.Fatalf("replayed headers: etag %q/%q ct %q", h1.Get("ETag"), h2.Get("ETag"), h2.Get("Content-Type"))
 	}
-	if n := e.commentCount(task); n != before+1 {
+	if n := e.commentCount(gig); n != before+1 {
 		t.Fatalf("comments %d, want %d (replay must not run the handler)", n, before+1)
 	}
 
@@ -99,16 +99,16 @@ func TestIdempotencyReplayAndMismatch(t *testing.T) {
 			t.Fatalf("key %q: %d %s", k, code, out)
 		}
 	}
-	if n := e.commentCount(task); n != before+1 {
+	if n := e.commentCount(gig); n != before+1 {
 		t.Fatalf("comments %d, want %d", n, before+1)
 	}
 }
 
 func TestIdempotencyNoKeyAndPrincipals(t *testing.T) {
 	e := newEnv(t)
-	task := e.ids["scout.task"]
-	path := fmt.Sprintf("/tasks/%d/comments", task)
-	before := e.commentCount(task)
+	gig := e.ids["scout.gig"]
+	path := fmt.Sprintf("/gigs/%d/comments", gig)
+	before := e.commentCount(gig)
 	for i := 0; i < 2; i++ {
 		code, out, h := e.req("POST", path, `{"body_md":"plain"}`, e.key("scout"))
 		e.ok(code, out, 201)
@@ -130,15 +130,15 @@ func TestIdempotencyNoKeyAndPrincipals(t *testing.T) {
 	if code != 200 || h.Get("Idempotent-Replayed") != "" {
 		t.Fatalf("GET: %d %q", code, h.Get("Idempotent-Replayed"))
 	}
-	if n := e.commentCount(task); n != before+4 {
+	if n := e.commentCount(gig); n != before+4 {
 		t.Fatalf("comments %d, want %d", n, before+4)
 	}
 }
 
 func TestIdempotencyInProgressAndExpiry(t *testing.T) {
 	e := newEnv(t)
-	task := e.ids["scout.task"]
-	path := fmt.Sprintf("/tasks/%d/comments", task)
+	gig := e.ids["scout.gig"]
+	path := fmt.Sprintf("/gigs/%d/comments", gig)
 	lock := fmt.Sprintf("%p", e.a) + "\x00" + fmt.Sprintf("k%d", e.ids["scout.key"]) + "\x00busy"
 	idemInflight.Store(lock, struct{}{})
 	code, out, _ := e.reqH("POST", path, `{"body_md":"x"}`, e.key("scout"), map[string]string{"Idempotency-Key": "busy"})
@@ -153,10 +153,10 @@ func TestIdempotencyInProgressAndExpiry(t *testing.T) {
 	if _, err := e.st.W.Exec(`UPDATE idempotency_keys SET created_at = ? WHERE key = 'busy'`, store.Now()-25*3600*1000); err != nil {
 		t.Fatal(err)
 	}
-	before := e.commentCount(task)
+	before := e.commentCount(gig)
 	code, out, h := e.reqH("POST", path, `{"body_md":"other"}`, e.key("scout"), map[string]string{"Idempotency-Key": "busy"})
 	e.ok(code, out, 201)
-	if h.Get("Idempotent-Replayed") != "" || e.commentCount(task) != before+1 {
+	if h.Get("Idempotent-Replayed") != "" || e.commentCount(gig) != before+1 {
 		t.Fatal("expired key replayed")
 	}
 	if _, err := e.st.W.Exec(`UPDATE idempotency_keys SET created_at = ?`, store.Now()-25*3600*1000); err != nil {
@@ -179,10 +179,10 @@ func TestIdempotencyOversizeAnswerRunsOnce(t *testing.T) {
 	old := idemMaxResponse
 	idemMaxResponse = 64
 	defer func() { idemMaxResponse = old }()
-	task := e.ids["scout.task"]
-	path := fmt.Sprintf("/tasks/%d/comments", task)
+	gig := e.ids["scout.gig"]
+	path := fmt.Sprintf("/gigs/%d/comments", gig)
 	idem := map[string]string{"Idempotency-Key": "big-1"}
-	before := e.commentCount(task)
+	before := e.commentCount(gig)
 
 	code, body, _ := e.reqH("POST", path, `{"body_md":"a comment whose answer is over 64 bytes"}`, e.key("scout"), idem)
 	e.ok(code, body, 201)
@@ -190,7 +190,7 @@ func TestIdempotencyOversizeAnswerRunsOnce(t *testing.T) {
 	if code != 409 || !strings.Contains(string(out), "idempotency_unreplayable") || h.Get("Idempotent-Replayed") != "true" {
 		t.Fatalf("repeat: %d %q %s", code, h.Get("Idempotent-Replayed"), out)
 	}
-	if n := e.commentCount(task); n != before+1 {
+	if n := e.commentCount(gig); n != before+1 {
 		t.Fatalf("comments %d, want %d (the repeat must not run)", n, before+1)
 	}
 }

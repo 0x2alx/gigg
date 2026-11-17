@@ -17,20 +17,20 @@ import (
 type (
 	pauseArgs struct {
 		Workspaces []string `json:"workspaces,omitempty" jsonschema:"Workspace ids or slugs; omit for every workspace you may pause"`
-		Minutes    int64    `json:"minutes" jsonschema:"How long, in minutes (60, 300, 720, 1440...); 0 = until resumed. Crons pause until resumed"`
-		Tasks      *bool    `json:"tasks,omitempty" jsonschema:"Pause task runs (default true)"`
-		Crons      *bool    `json:"crons,omitempty" jsonschema:"Pause cron runs (default true)"`
+		Minutes    int64    `json:"minutes" jsonschema:"How long, in minutes (60, 300, 720, 1440...); 0 = until resumed. Errands pause until resumed"`
+		Gigs       *bool    `json:"gigs,omitempty" jsonschema:"Pause gig runs (default true)"`
+		Errands    *bool    `json:"errands,omitempty" jsonschema:"Pause errand runs (default true)"`
 	}
 	resumeRunsArgs struct {
 		Workspaces []string `json:"workspaces,omitempty" jsonschema:"Workspace ids or slugs; omit for every workspace you may resume"`
-		Tasks      *bool    `json:"tasks,omitempty" jsonschema:"Resume task runs (default true)"`
-		Crons      *bool    `json:"crons,omitempty" jsonschema:"Resume cron runs (default true)"`
+		Gigs       *bool    `json:"gigs,omitempty" jsonschema:"Resume gig runs (default true)"`
+		Errands    *bool    `json:"errands,omitempty" jsonschema:"Resume errand runs (default true)"`
 	}
 )
 
 func addRunnerTools(s *mcp.Server, p *access.Principal, call apiCall) {
-	if p.HasScope("tasks:read") {
-		mcp.AddTool(s, &mcp.Tool{Name: "runner_status", Description: "Per workspace in reach: the runner's task caps, whether new task runs are paused (and until when), and the last 24 hours of agent work.", Annotations: ro("Runner status")},
+	if p.HasScope("gigs:read") {
+		mcp.AddTool(s, &mcp.Tool{Name: "runner_status", Description: "Per workspace in reach: the runner's gig caps, whether new gig runs are paused (and until when), and the last 24 hours of agent work.", Annotations: ro("Runner status")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 				return toolResult(call("GET", "/runner", nil, nil))
 			})
@@ -74,7 +74,7 @@ func addRunnerTools(s *mcp.Server, p *access.Principal, call apiCall) {
 		}
 		return out, nil
 	}
-	mcp.AddTool(s, &mcp.Tool{Name: "pause_runs", Description: "Pause new agent task runs (always-run tasks included) and cron runs in some or all workspaces, for a number of minutes or until resumed (tasks/crons: pause only one box). Runs already going finish their current step.", Annotations: rw("Pause task runs", false)},
+	mcp.AddTool(s, &mcp.Tool{Name: "pause_runs", Description: "Pause new agent gig runs (always-run gigs included) and errand runs in some or all workspaces, for a number of minutes or until resumed (gigs/errands: pause only one box). Runs already going finish their current step.", Annotations: rw("Pause gig runs", false)},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in pauseArgs) (*mcp.CallToolResult, any, error) {
 			if in.Minutes < 0 {
 				return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"minutes is 0 (until resumed) or more."}`))
@@ -83,14 +83,14 @@ func addRunnerTools(s *mcp.Server, p *access.Principal, call apiCall) {
 			if bad != nil {
 				return bad, nil, nil
 			}
-			return toolResult(call("POST", "/runner/pause", nil, PauseBody{Workspaces: ws, Minutes: in.Minutes, Tasks: in.Tasks, Crons: in.Crons}))
+			return toolResult(call("POST", "/runner/pause", nil, PauseBody{Workspaces: ws, Minutes: in.Minutes, Gigs: in.Gigs, Errands: in.Errands}))
 		})
-	mcp.AddTool(s, &mcp.Tool{Name: "resume_runs", Description: "Lift the pause on new agent task runs and cron runs in some or all workspaces (tasks/crons: resume only one box).", Annotations: rw("Resume task runs", false)},
+	mcp.AddTool(s, &mcp.Tool{Name: "resume_runs", Description: "Lift the pause on new agent gig runs and errand runs in some or all workspaces (gigs/errands: resume only one box).", Annotations: rw("Resume gig runs", false)},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in resumeRunsArgs) (*mcp.CallToolResult, any, error) {
 			ws, bad := ids(in.Workspaces)
 			if bad != nil {
 				return bad, nil, nil
 			}
-			return toolResult(call("POST", "/runner/resume", nil, PauseBody{Workspaces: ws, Tasks: in.Tasks, Crons: in.Crons}))
+			return toolResult(call("POST", "/runner/resume", nil, PauseBody{Workspaces: ws, Gigs: in.Gigs, Errands: in.Errands}))
 		})
 }

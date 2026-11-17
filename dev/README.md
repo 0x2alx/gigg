@@ -61,7 +61,7 @@ podman run --rm --user 65532 --network gigg-dev -v "$PWD/scratch":/s:ro -v "$PWD
   -v "$PWD/dev/e2e.sh":/e2e.sh:ro localhost/gigg-client sh /e2e.sh
 ```
 
-It needs a fresh data volume (it expects the first task to be `GIG-1`): rerun the bootstrap on a new
+It needs a fresh data volume (it expects the first gig to be `GIG-1`): rerun the bootstrap on a new
 volume before each run. `--user 65532`: the key file the bootstrap wrote is readable only by the
 image's user. `dev/probe.sh` checks the
 listeners the same way (TLS, headers, host checks).

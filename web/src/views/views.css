@@ -1,4 +1,4 @@
-/* Table view, My tasks and the command palette. Theme variables only; data colours come inline
+/* Table view, My gigs and the command palette. Theme variables only; data colours come inline
    from theme.ts. Prefixes: vw- (views), cp- (command palette). */
 
 .vw-page { display: flex; flex-direction: column; min-width: 0; }
@@ -79,7 +79,7 @@
 .vw-empty { color: var(--muted); padding: var(--sp-7) var(--sp-4); text-align: center; font-size: var(--fs-base); }
 .vw-more { display: flex; justify-content: center; padding: var(--sp-4) 0; border-top: 1px solid var(--line); }
 
-/* my tasks */
+/* my gigs */
 .vw-group { margin-bottom: var(--sp-7); }
 .vw-group-head { display: flex; align-items: center; gap: var(--sp-3); margin: 0 0 var(--sp-4); font-size: var(--fs-base); font-weight: var(--weight-strong); }
 .vw-group-head .count { margin-left: 0; }

@@ -12,19 +12,19 @@ import (
 	"github.com/0x2alx/gigg/internal/store"
 )
 
-// task resolves an id or a key (current or alias) within reach. Trashed tasks resolve too.
-func (a *API) task(ctx context.Context, p *access.Principal, ref string) (*store.Task, error) {
+// gig resolves an id or a key (current or alias) within reach. Trashed gigs resolve too.
+func (a *API) gig(ctx context.Context, p *access.Principal, ref string) (*store.Gig, error) {
 	var id int64
 	if n, err := strconv.ParseInt(ref, 10, 64); err == nil {
 		id = n
 	} else {
-		ids, err := store.TaskIDsByKey(ctx, a.st.R, strings.ToUpper(ref), p.Workspaces())
+		ids, err := store.GigIDsByKey(ctx, a.st.R, strings.ToUpper(ref), p.Workspaces())
 		if err != nil || len(ids) == 0 {
 			return nil, errNotFound()
 		}
 		var visible []int64
 		for _, cand := range ids {
-			if t, err := store.GetTask(ctx, a.st.R, cand); err == nil && p.SeesProject(t.WorkspaceID, t.ProjectID) {
+			if t, err := store.GetGig(ctx, a.st.R, cand); err == nil && p.SeesProject(t.WorkspaceID, t.ProjectID) {
 				visible = append(visible, cand)
 			}
 		}
@@ -32,33 +32,33 @@ func (a *API) task(ctx context.Context, p *access.Principal, ref string) (*store
 			return nil, errNotFound()
 		}
 		if len(visible) > 1 {
-			return nil, fail(409, "ambiguous_key", "That key exists in more than one of your workspaces; use the task id.")
+			return nil, fail(409, "ambiguous_key", "That key exists in more than one of your workspaces; use the gig id.")
 		}
 		id = visible[0]
 	}
-	t, err := store.GetTask(ctx, a.st.R, id)
+	t, err := store.GetGig(ctx, a.st.R, id)
 	if err != nil || !p.SeesProject(t.WorkspaceID, t.ProjectID) {
 		return nil, errNotFound()
 	}
 	return t, nil
 }
 
-type taskPath struct {
-	ID string `path:"id" doc:"Task id or key (e.g. GIG-12)"`
+type gigPath struct {
+	ID string `path:"id" doc:"Gig id or key (e.g. GIG-12)"`
 }
 
-type taskOut struct {
+type gigOut struct {
 	ETag string `header:"ETag"`
-	Body *store.Task
+	Body *store.Gig
 }
 
-// TaskList is a page of tasks.
-type TaskList struct {
-	Items      []*store.Task `json:"items"`
-	NextCursor string        `json:"next_cursor,omitempty"`
+// GigList is a page of gigs.
+type GigList struct {
+	Items      []*store.Gig `json:"items"`
+	NextCursor string       `json:"next_cursor,omitempty"`
 }
 
-type taskListIn struct {
+type gigListIn struct {
 	Status         int64  `query:"status" doc:"Status id"`
 	Category       string `query:"category" enum:"backlog,todo,doing,waiting,done,cancelled,"`
 	Label          string `query:"label" doc:"Label name"`
@@ -69,17 +69,17 @@ type taskListIn struct {
 	DueBefore      int64  `query:"due_before" doc:"Unix ms"`
 	UpdatedSince   int64  `query:"updated_since" doc:"Unix ms"`
 	IncludeDeleted bool   `query:"include_deleted"`
-	Deleted        bool   `query:"deleted" doc:"Only trashed tasks"`
+	Deleted        bool   `query:"deleted" doc:"Only trashed gigs"`
 	Sort           string `query:"sort" doc:"board (default) or a comma list of priority, due, created, updated, number, title; - for descending"`
 	Limit          int    `query:"limit" minimum:"0" maximum:"500"`
 	Cursor         string `query:"cursor"`
-	Archived       string `query:"archived" enum:"only,include," doc:"Archived tasks are hidden unless only or include"`
-	Parent         int64  `query:"parent" doc:"Only subtasks of this task id"`
-	Blocked        bool   `query:"blocked" doc:"Only tasks with an open blocker"`
+	Archived       string `query:"archived" enum:"only,include," doc:"Archived gigs are hidden unless only or include"`
+	Parent         int64  `query:"parent" doc:"Only subgigs of this gig id"`
+	Blocked        bool   `query:"blocked" doc:"Only gigs with an open blocker"`
 }
 
-func (in *taskListIn) filter(ws int64) (store.TaskFilter, error) {
-	f := store.TaskFilter{WorkspaceID: ws, Category: in.Category, Label: in.Label, Q: in.Q, IncludeDeleted: in.IncludeDeleted,
+func (in *gigListIn) filter(ws int64) (store.GigFilter, error) {
+	f := store.GigFilter{WorkspaceID: ws, Category: in.Category, Label: in.Label, Q: in.Q, IncludeDeleted: in.IncludeDeleted,
 		OnlyDeleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Archived: in.Archived, BlockedOnly: in.Blocked}
 	if in.Parent != 0 {
 		f.ParentID = &in.Parent
@@ -115,10 +115,10 @@ func (in *taskListIn) filter(ws int64) (store.TaskFilter, error) {
 	return f, nil
 }
 
-func page(ts []*store.Task, more bool, f store.TaskFilter) *TaskList {
-	l := &TaskList{Items: ts}
+func page(ts []*store.Gig, more bool, f store.GigFilter) *GigList {
+	l := &GigList{Items: ts}
 	if l.Items == nil {
-		l.Items = []*store.Task{}
+		l.Items = []*store.Gig{}
 	}
 	if more {
 		l.NextCursor = strconv.Itoa(f.Offset + len(ts))
@@ -126,7 +126,7 @@ func page(ts []*store.Task, more bool, f store.TaskFilter) *TaskList {
 	return l
 }
 
-type wsTasksIn struct {
+type wsGigsIn struct {
 	WS             string `path:"ws"`
 	Project        int64  `query:"project" doc:"Project id"`
 	Status         int64  `query:"status" doc:"Status id"`
@@ -139,16 +139,16 @@ type wsTasksIn struct {
 	DueBefore      int64  `query:"due_before" doc:"Unix ms"`
 	UpdatedSince   int64  `query:"updated_since" doc:"Unix ms"`
 	IncludeDeleted bool   `query:"include_deleted"`
-	Deleted        bool   `query:"deleted" doc:"Only trashed tasks"`
+	Deleted        bool   `query:"deleted" doc:"Only trashed gigs"`
 	Sort           string `query:"sort" doc:"board (default) or a comma list of priority, due, created, updated, number, title; - for descending"`
 	Limit          int    `query:"limit" minimum:"0" maximum:"500"`
 	Cursor         string `query:"cursor"`
-	Archived       string `query:"archived" enum:"only,include," doc:"Archived tasks are hidden unless only or include"`
-	Parent         int64  `query:"parent" doc:"Only subtasks of this task id"`
-	Blocked        bool   `query:"blocked" doc:"Only tasks with an open blocker"`
+	Archived       string `query:"archived" enum:"only,include," doc:"Archived gigs are hidden unless only or include"`
+	Parent         int64  `query:"parent" doc:"Only subgigs of this gig id"`
+	Blocked        bool   `query:"blocked" doc:"Only gigs with an open blocker"`
 }
 
-type projectTasksIn struct {
+type projectGigsIn struct {
 	P              int64  `path:"p"`
 	Status         int64  `query:"status" doc:"Status id"`
 	Category       string `query:"category" enum:"backlog,todo,doing,waiting,done,cancelled,"`
@@ -160,60 +160,60 @@ type projectTasksIn struct {
 	DueBefore      int64  `query:"due_before" doc:"Unix ms"`
 	UpdatedSince   int64  `query:"updated_since" doc:"Unix ms"`
 	IncludeDeleted bool   `query:"include_deleted"`
-	Deleted        bool   `query:"deleted" doc:"Only trashed tasks"`
+	Deleted        bool   `query:"deleted" doc:"Only trashed gigs"`
 	Sort           string `query:"sort" doc:"board (default) or a comma list of priority, due, created, updated, number, title; - for descending"`
 	Limit          int    `query:"limit" minimum:"0" maximum:"500"`
 	Cursor         string `query:"cursor"`
-	Archived       string `query:"archived" enum:"only,include," doc:"Archived tasks are hidden unless only or include"`
-	Parent         int64  `query:"parent" doc:"Only subtasks of this task id"`
-	Blocked        bool   `query:"blocked" doc:"Only tasks with an open blocker"`
+	Archived       string `query:"archived" enum:"only,include," doc:"Archived gigs are hidden unless only or include"`
+	Parent         int64  `query:"parent" doc:"Only subgigs of this gig id"`
+	Blocked        bool   `query:"blocked" doc:"Only gigs with an open blocker"`
 }
 
-func (in *wsTasksIn) list() *taskListIn {
-	return &taskListIn{Status: in.Status, Category: in.Category, Label: in.Label, PriorityMin: in.PriorityMin, Assignee: in.Assignee, CreatedBy: in.CreatedBy, Q: in.Q, DueBefore: in.DueBefore, UpdatedSince: in.UpdatedSince, IncludeDeleted: in.IncludeDeleted, Deleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Cursor: in.Cursor, Archived: in.Archived, Parent: in.Parent, Blocked: in.Blocked}
+func (in *wsGigsIn) list() *gigListIn {
+	return &gigListIn{Status: in.Status, Category: in.Category, Label: in.Label, PriorityMin: in.PriorityMin, Assignee: in.Assignee, CreatedBy: in.CreatedBy, Q: in.Q, DueBefore: in.DueBefore, UpdatedSince: in.UpdatedSince, IncludeDeleted: in.IncludeDeleted, Deleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Cursor: in.Cursor, Archived: in.Archived, Parent: in.Parent, Blocked: in.Blocked}
 }
 
-func (in *projectTasksIn) list() *taskListIn {
-	return &taskListIn{Status: in.Status, Category: in.Category, Label: in.Label, PriorityMin: in.PriorityMin, Assignee: in.Assignee, CreatedBy: in.CreatedBy, Q: in.Q, DueBefore: in.DueBefore, UpdatedSince: in.UpdatedSince, IncludeDeleted: in.IncludeDeleted, Deleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Cursor: in.Cursor, Archived: in.Archived, Parent: in.Parent, Blocked: in.Blocked}
+func (in *projectGigsIn) list() *gigListIn {
+	return &gigListIn{Status: in.Status, Category: in.Category, Label: in.Label, PriorityMin: in.PriorityMin, Assignee: in.Assignee, CreatedBy: in.CreatedBy, Q: in.Q, DueBefore: in.DueBefore, UpdatedSince: in.UpdatedSince, IncludeDeleted: in.IncludeDeleted, Deleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Cursor: in.Cursor, Archived: in.Archived, Parent: in.Parent, Blocked: in.Blocked}
 }
 
-// RelationIn is a dependency a new task starts with.
+// RelationIn is a dependency a new gig starts with.
 type RelationIn struct {
-	Task      string `json:"task" doc:"The other task, id or key"`
-	Direction string `json:"direction" enum:"blocks,blocked_by,relates" doc:"blocks: the new task blocks the other; blocked_by: the other blocks the new task"`
+	Gig       string `json:"gig" doc:"The other gig, id or key"`
+	Direction string `json:"direction" enum:"blocks,blocked_by,relates" doc:"blocks: the new gig blocks the other; blocked_by: the other blocks the new gig"`
 }
 
-// TaskCreate is the body for a new task.
-type TaskCreate struct {
-	Checklist     []string                `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items to start with"`
-	Subtasks      []store.TemplateSubtask `json:"subtasks,omitempty" maxItems:"50" doc:"Subtasks to create with it, made like it (project, priority, assignees, window, run settings); blocks_parent = it waits for that subtask"`
-	Relations     []RelationIn            `json:"relations,omitempty" maxItems:"50" doc:"Dependencies to start with (needs the relations permission)"`
-	Custom        map[string]any          `json:"custom,omitempty" doc:"Custom field values by field id"`
-	Title         string                  `json:"title" minLength:"1" maxLength:"250"`
-	DescriptionMD string                  `json:"description_md,omitempty" maxLength:"65536"`
-	Status        int64                   `json:"status,omitempty" doc:"Status id (default: the project's default status)"`
-	Category      string                  `json:"category,omitempty" enum:"backlog,todo,doing,waiting,done,cancelled," doc:"Alternative to status"`
-	Priority      int64                   `json:"priority,omitempty" minimum:"0" maximum:"4"`
-	Color         *string                 `json:"color,omitempty"`
-	StartAt       *int64                  `json:"start_at,omitempty"`
-	DueAt         *int64                  `json:"due_at,omitempty"`
-	NotAfter      *int64                  `json:"not_after,omitempty" doc:"The window closes (unix ms): not claimable after this; untouched it becomes missed"`
-	ParentID      *int64                  `json:"parent_id,omitempty"`
-	BlocksParent  bool                    `json:"blocks_parent,omitempty" doc:"A subtask that holds its parent back while it is open (needs parent_id)"`
-	Labels        []string                `json:"labels,omitempty" maxItems:"20" doc:"Label names; missing ones are created"`
-	Assignees     []int64                 `json:"assignees,omitempty" maxItems:"50"`
-	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for, e.g. opus, sonnet or a full id (default: the agent's)"`
-	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
-	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Work it whatever the usage budget, day or night (needs the always_run permission)"`
-	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"The only tools a runner should allow for it (Claude Code-style permission rules, one per entry, e.g. Read, Bash(git status *)). Needs the allowed_tools permission"`
+// GigCreate is the body for a new gig.
+type GigCreate struct {
+	Checklist     []string               `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items to start with"`
+	Subgigs       []store.TemplateSubgig `json:"subgigs,omitempty" maxItems:"50" doc:"Subgigs to create with it, made like it (project, priority, assignees, window, run settings); blocks_parent = it waits for that subgig"`
+	Relations     []RelationIn           `json:"relations,omitempty" maxItems:"50" doc:"Dependencies to start with (needs the relations permission)"`
+	Custom        map[string]any         `json:"custom,omitempty" doc:"Custom field values by field id"`
+	Title         string                 `json:"title" minLength:"1" maxLength:"250"`
+	DescriptionMD string                 `json:"description_md,omitempty" maxLength:"65536"`
+	Status        int64                  `json:"status,omitempty" doc:"Status id (default: the project's default status)"`
+	Category      string                 `json:"category,omitempty" enum:"backlog,todo,doing,waiting,done,cancelled," doc:"Alternative to status"`
+	Priority      int64                  `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	Color         *string                `json:"color,omitempty"`
+	StartAt       *int64                 `json:"start_at,omitempty"`
+	DueAt         *int64                 `json:"due_at,omitempty"`
+	NotAfter      *int64                 `json:"not_after,omitempty" doc:"The window closes (unix ms): not claimable after this; untouched it becomes missed"`
+	ParentID      *int64                 `json:"parent_id,omitempty"`
+	BlocksParent  bool                   `json:"blocks_parent,omitempty" doc:"A subgig that holds its parent back while it is open (needs parent_id)"`
+	Labels        []string               `json:"labels,omitempty" maxItems:"20" doc:"Label names; missing ones are created"`
+	Assignees     []int64                `json:"assignees,omitempty" maxItems:"50"`
+	Model         string                 `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for, e.g. opus, sonnet or a full id (default: the agent's)"`
+	Effort        string                 `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
+	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Work it whatever the usage budget, day or night (needs the always_run permission)"`
+	AllowedTools  []string               `json:"allowed_tools,omitempty" maxItems:"64" doc:"The only tools a runner should allow for it (Claude Code-style permission rules, one per entry, e.g. Read, Bash(git status *)). Needs the allowed_tools permission"`
 }
 
-type taskCreateIn struct {
+type gigCreateIn struct {
 	P    int64 `path:"p"`
-	Body TaskCreate
+	Body GigCreate
 }
 
-type taskPatchIn struct {
+type gigPatchIn struct {
 	ID      string `path:"id"`
 	IfMatch string `header:"If-Match"`
 	Body    struct {
@@ -225,9 +225,9 @@ type taskPatchIn struct {
 		DueAt         Opt[int64]    `json:"due_at,omitempty"`
 		NotAfter      Opt[int64]    `json:"not_after,omitempty"`
 		ParentID      Opt[int64]    `json:"parent_id,omitempty"`
-		BlocksParent  Opt[bool]     `json:"blocks_parent,omitempty" doc:"A subtask that holds its parent back while it is open"`
-		Labels        Opt[[]string] `json:"labels,omitempty" doc:"Replaces the task's labels (names)"`
-		Assignees     Opt[[]int64]  `json:"assignees,omitempty" doc:"Replaces the task's assignees (user ids)"`
+		BlocksParent  Opt[bool]     `json:"blocks_parent,omitempty" doc:"A subgig that holds its parent back while it is open"`
+		Labels        Opt[[]string] `json:"labels,omitempty" doc:"Replaces the gig's labels (names)"`
+		Assignees     Opt[[]int64]  `json:"assignees,omitempty" doc:"Replaces the gig's assignees (user ids)"`
 		Model         Opt[string]   `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for; null or empty = the agent's default"`
 		Effort        Opt[string]   `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for; null or empty = the agent's default"`
 		AlwaysRun     Opt[bool]     `json:"always_run,omitempty" doc:"Work it whatever the usage budget (needs the always_run permission)"`
@@ -235,7 +235,7 @@ type taskPatchIn struct {
 	}
 }
 
-type taskMoveIn struct {
+type gigMoveIn struct {
 	ID      string `path:"id"`
 	IfMatch string `header:"If-Match"`
 	Body    struct {
@@ -243,11 +243,11 @@ type taskMoveIn struct {
 		Category string `json:"category,omitempty" enum:"backlog,todo,doing,waiting,done,cancelled," doc:"Alternative: first status of this category"`
 		Project  int64  `json:"project,omitempty" doc:"Another project of the same workspace (gets a new key; the old one stays an alias)"`
 		Position string `json:"position,omitempty" enum:"top,bottom,before,after," doc:"Default: bottom (keep when the status doesn't change)"`
-		Task     int64  `json:"task,omitempty" doc:"Reference task for before/after"`
+		Gig      int64  `json:"gig,omitempty" doc:"Reference gig for before/after"`
 	}
 }
 
-type taskCloneIn struct {
+type gigCloneIn struct {
 	ID   string `path:"id"`
 	Body struct {
 		Project int64   `json:"project,omitempty" doc:"Target project in the same workspace (default: the same)"`
@@ -319,9 +319,9 @@ type activityOut struct {
 	}
 }
 
-func (a *API) registerTasks() {
-	huma.Register(a.h, huma.Operation{OperationID: "list-workspace-tasks", Method: "GET", Path: "/workspaces/{ws}/tasks", Tags: []string{"tasks"},
-		Summary: "Tasks across a workspace's projects (filters combine)"}, func(ctx context.Context, in *wsTasksIn) (*struct{ Body *TaskList }, error) {
+func (a *API) registerGigs() {
+	huma.Register(a.h, huma.Operation{OperationID: "list-workspace-gigs", Method: "GET", Path: "/workspaces/{ws}/gigs", Tags: []string{"gigs"},
+		Summary: "Gigs across a workspace's projects (filters combine)"}, func(ctx context.Context, in *wsGigsIn) (*struct{ Body *GigList }, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -330,7 +330,7 @@ func (a *API) registerTasks() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		f, err := in.list().filter(w.ID)
@@ -345,17 +345,17 @@ func (a *API) registerTasks() {
 			}
 			f.Projects = []int64{in.Project}
 		}
-		ts, more, err := store.ListTasks(ctx, a.st.R, f)
+		ts, more, err := store.ListGigs(ctx, a.st.R, f)
 		if err == nil && p.HasScope("comments:read") {
 			err = store.AttachQuestions(ctx, a.st.R, ts)
 		}
 		if err != nil {
 			return nil, storeErr(err)
 		}
-		return &struct{ Body *TaskList }{Body: page(ts, more, f)}, nil
+		return &struct{ Body *GigList }{Body: page(ts, more, f)}, nil
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "list-project-tasks", Method: "GET", Path: "/projects/{p}/tasks", Tags: []string{"tasks"},
-		Summary: "A project's tasks (filters combine)"}, func(ctx context.Context, in *projectTasksIn) (*struct{ Body *TaskList }, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "list-project-gigs", Method: "GET", Path: "/projects/{p}/gigs", Tags: []string{"gigs"},
+		Summary: "A project's gigs (filters combine)"}, func(ctx context.Context, in *projectGigsIn) (*struct{ Body *GigList }, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -364,7 +364,7 @@ func (a *API) registerTasks() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, pr.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		f, err := in.list().filter(pr.WorkspaceID)
@@ -373,17 +373,17 @@ func (a *API) registerTasks() {
 		}
 		f.Projects = []int64{pr.ID}
 		f.SearchComments = p.HasScope("comments:read")
-		ts, more, err := store.ListTasks(ctx, a.st.R, f)
+		ts, more, err := store.ListGigs(ctx, a.st.R, f)
 		if err == nil && p.HasScope("comments:read") {
 			err = store.AttachQuestions(ctx, a.st.R, ts)
 		}
 		if err != nil {
 			return nil, storeErr(err)
 		}
-		return &struct{ Body *TaskList }{Body: page(ts, more, f)}, nil
+		return &struct{ Body *GigList }{Body: page(ts, more, f)}, nil
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "create-task", Method: "POST", Path: "/projects/{p}/tasks", Tags: []string{"tasks"},
-		Summary: "Create a task", DefaultStatus: 201}, func(ctx context.Context, in *taskCreateIn) (*taskOut, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "create-gig", Method: "POST", Path: "/projects/{p}/gigs", Tags: []string{"gigs"},
+		Summary: "Create a gig", DefaultStatus: 201}, func(ctx context.Context, in *gigCreateIn) (*gigOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -392,10 +392,10 @@ func (a *API) registerTasks() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Member, "tasks:write"); err != nil {
+		if err := require(p, pr.WorkspaceID, access.Member, "gigs:write"); err != nil {
 			return nil, err
 		}
-		if err := allowed(p, pr.WorkspaceID, "create_tasks"); err != nil {
+		if err := allowed(p, pr.WorkspaceID, "create_gigs"); err != nil {
 			return nil, err
 		}
 		if len(in.Body.Checklist) > 0 {
@@ -403,8 +403,8 @@ func (a *API) registerTasks() {
 				return nil, err
 			}
 		}
-		// a subtask that blocks its parent holds another task back, like a dependency
-		if len(in.Body.Relations) > 0 || in.Body.BlocksParent || anyGate(in.Body.Subtasks) {
+		// a subgig that blocks its parent holds another gig back, like a dependency
+		if len(in.Body.Relations) > 0 || in.Body.BlocksParent || anyGate(in.Body.Subgigs) {
 			if err := allowed(p, pr.WorkspaceID, "relations"); err != nil {
 				return nil, err
 			}
@@ -416,13 +416,13 @@ func (a *API) registerTasks() {
 		if err := toolsChange(p, pr.WorkspaceID, nil, b.AllowedTools); err != nil {
 			return nil, err
 		}
-		n := store.NewTask{ProjectID: pr.ID, Title: b.Title, DescriptionMD: b.DescriptionMD, Priority: b.Priority, Color: b.Color,
+		n := store.NewGig{ProjectID: pr.ID, Title: b.Title, DescriptionMD: b.DescriptionMD, Priority: b.Priority, Color: b.Color,
 			StartAt: b.StartAt, DueAt: b.DueAt, NotAfter: b.NotAfter, ParentID: b.ParentID, Labels: b.Labels, Assignees: b.Assignees,
 			Model: strings.TrimSpace(b.Model), Effort: b.Effort, AlwaysRun: b.AlwaysRun, AllowedTools: b.AllowedTools, BlocksParent: b.BlocksParent}
 		if p.Key != nil {
 			n.CreatedViaKey = &p.Key.ID
 		}
-		var t *store.Task
+		var t *store.Gig
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			if b.Status != 0 {
 				n.StatusID = &b.Status
@@ -434,12 +434,12 @@ func (a *API) registerTasks() {
 				n.StatusID = &s.ID
 			}
 			if b.ParentID != nil {
-				if par, err := store.GetTask(ctx, tx, *b.ParentID); err != nil || !p.SeesProject(par.WorkspaceID, par.ProjectID) {
-					return store.Invalid("no such parent task")
+				if par, err := store.GetGig(ctx, tx, *b.ParentID); err != nil || !p.SeesProject(par.WorkspaceID, par.ProjectID) {
+					return store.Invalid("no such parent gig")
 				}
 			}
 			var err error
-			if t, err = store.CreateTask(ctx, tx, p.Actor(), n); err != nil {
+			if t, err = store.CreateGig(ctx, tx, p.Actor(), n); err != nil {
 				return err
 			}
 			if len(b.Checklist) > 0 {
@@ -452,13 +452,13 @@ func (a *API) registerTasks() {
 					return err
 				}
 			}
-			if err := store.AddSubtasks(ctx, tx, p.Actor(), t, b.Subtasks); err != nil {
+			if err := store.AddSubgigs(ctx, tx, p.Actor(), t, b.Subgigs); err != nil {
 				return err
 			}
 			for _, r := range b.Relations {
-				o, err := a.task(ctx, p, r.Task)
+				o, err := a.gig(ctx, p, r.Gig)
 				if err != nil {
-					return store.Invalid("no such task %q", r.Task)
+					return store.Invalid("no such gig %q", r.Gig)
 				}
 				from, to, kind := t, o, "blocks"
 				switch r.Direction {
@@ -474,34 +474,34 @@ func (a *API) registerTasks() {
 					return err
 				}
 			}
-			if len(b.Checklist)+len(b.Custom)+len(b.Subtasks)+len(b.Relations) > 0 {
-				t, err = store.GetTask(ctx, tx, t.ID)
+			if len(b.Checklist)+len(b.Custom)+len(b.Subgigs)+len(b.Relations) > 0 {
+				t, err = store.GetGig(ctx, tx, t.ID)
 			}
 			return err
 		})
 		if err != nil {
 			return nil, err
 		}
-		return &taskOut{ETag: etag(t.Version), Body: t}, nil
+		return &gigOut{ETag: etag(t.Version), Body: t}, nil
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "get-task", Method: "GET", Path: "/tasks/{id}", Tags: []string{"tasks"},
-		Summary: "A task, by id or key"}, func(ctx context.Context, in *taskPath) (*taskOut, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "get-gig", Method: "GET", Path: "/gigs/{id}", Tags: []string{"gigs"},
+		Summary: "A gig, by id or key"}, func(ctx context.Context, in *gigPath) (*gigOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		t, err := a.task(ctx, p, in.ID)
+		t, err := a.gig(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
-		return &taskOut{ETag: etag(t.Version), Body: t}, nil
+		return &gigOut{ETag: etag(t.Version), Body: t}, nil
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "patch-task", Method: "PATCH", Path: "/tasks/{id}", Tags: []string{"tasks"},
-		Summary: "Change a task's fields (null clears)"}, func(ctx context.Context, in *taskPatchIn) (*taskOut, error) {
-		return a.withTask(ctx, in.ID, in.IfMatch, access.Member, "tasks:write", func(tx *sql.Tx, p *access.Principal, t *store.Task, v int64) (*store.Task, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "patch-gig", Method: "PATCH", Path: "/gigs/{id}", Tags: []string{"gigs"},
+		Summary: "Change a gig's fields (null clears)"}, func(ctx context.Context, in *gigPatchIn) (*gigOut, error) {
+		return a.withGig(ctx, in.ID, in.IfMatch, access.Member, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {
 			b := in.Body
 			if err := alwaysRunGuard(p, t.WorkspaceID, t.AlwaysRun); err != nil {
 				return nil, err
@@ -510,11 +510,11 @@ func (a *API) registerTasks() {
 				return nil, err
 			}
 			if pid := b.ParentID.Val(); pid != nil {
-				if par, err := store.GetTask(ctx, tx, *pid); err != nil || !p.SeesProject(par.WorkspaceID, par.ProjectID) {
-					return nil, store.Invalid("no such parent task")
+				if par, err := store.GetGig(ctx, tx, *pid); err != nil || !p.SeesProject(par.WorkspaceID, par.ProjectID) {
+					return nil, store.Invalid("no such parent gig")
 				}
 			}
-			patch := store.TaskPatch{Title: b.Title.Val(), DescriptionMD: b.DescriptionMD.Val(), Priority: b.Priority.Val(), Color: b.Color.Ptr(),
+			patch := store.GigPatch{Title: b.Title.Val(), DescriptionMD: b.DescriptionMD.Val(), Priority: b.Priority.Val(), Color: b.Color.Ptr(),
 				StartAt: b.StartAt.Ptr(), DueAt: b.DueAt.Ptr(), NotAfter: b.NotAfter.Ptr(), ParentID: b.ParentID.Ptr()}
 			if b.BlocksParent.Set {
 				on := false
@@ -523,7 +523,7 @@ func (a *API) registerTasks() {
 				}
 				patch.BlocksParent = &on
 			}
-			// switching a subtask's hold on its parent, or moving a holding subtask under another
+			// switching a subgig's hold on its parent, or moving a holding subgig under another
 			// parent, is a dependency change
 			if (patch.BlocksParent != nil && *patch.BlocksParent != t.BlocksParent) || (b.ParentID.Set && t.BlocksParent) {
 				if err := allowed(p, t.WorkspaceID, "relations"); err != nil {
@@ -580,14 +580,14 @@ func (a *API) registerTasks() {
 			} else if b.Assignees.Null {
 				patch.Assignees = []int64{}
 			}
-			return store.PatchTask(ctx, tx, p.Actor(), t, v, patch)
+			return store.PatchGig(ctx, tx, p.Actor(), t, v, patch)
 		})
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "move-task", Method: "POST", Path: "/tasks/{id}/move", Tags: []string{"tasks"},
-		Summary: "Move a task: status, position, or another project of the workspace"}, func(ctx context.Context, in *taskMoveIn) (*taskOut, error) {
-		return a.withTask(ctx, in.ID, in.IfMatch, access.Member, "tasks:write", func(tx *sql.Tx, p *access.Principal, t *store.Task, v int64) (*store.Task, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "move-gig", Method: "POST", Path: "/gigs/{id}/move", Tags: []string{"gigs"},
+		Summary: "Move a gig: status, position, or another project of the workspace"}, func(ctx context.Context, in *gigMoveIn) (*gigOut, error) {
+		return a.withGig(ctx, in.ID, in.IfMatch, access.Member, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {
 			b := in.Body
-			m := store.Move{Category: b.Category, Place: store.Place{Where: b.Position, TaskID: b.Task}}
+			m := store.Move{Category: b.Category, Place: store.Place{Where: b.Position, GigID: b.Gig}}
 			if b.Status != 0 {
 				m.StatusID = &b.Status
 			}
@@ -597,27 +597,27 @@ func (a *API) registerTasks() {
 				}
 				m.ProjectID = &b.Project
 			}
-			if (b.Position == "before" || b.Position == "after") && b.Task == 0 {
-				return nil, store.Invalid("before/after need a reference task")
+			if (b.Position == "before" || b.Position == "after") && b.Gig == 0 {
+				return nil, store.Invalid("before/after need a reference gig")
 			}
-			moved, err := store.MoveTask(ctx, tx, p.Actor(), t, v, m)
+			moved, err := store.MoveGig(ctx, tx, p.Actor(), t, v, m)
 			if err != nil {
 				return nil, err
 			}
-			// reopening an always-run task (or one with tools) runs it again: judged on where it actually
+			// reopening an always-run gig (or one with tools) runs it again: judged on where it actually
 			// landed (a move to another project can fall back to that project's default status)
 			if open := func(c string) bool { return c == "todo" || c == "doing" }; open(moved.StatusCategory) && !open(t.StatusCategory) {
-				if err := guardTask(p, t); err != nil {
+				if err := guardGig(p, t); err != nil {
 					return nil, err // the transaction rolls back
 				}
 			}
 			return moved, nil
 		})
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "clone-task", Method: "POST", Path: "/tasks/{id}/clone", Tags: []string{"tasks"},
-		Summary: "Copy a task (optionally into another project of the workspace)", DefaultStatus: 201}, func(ctx context.Context, in *taskCloneIn) (*taskOut, error) {
-		return a.withTask(ctx, in.ID, "", access.Member, "tasks:write", func(tx *sql.Tx, p *access.Principal, t *store.Task, _ int64) (*store.Task, error) {
-			if err := allowed(p, t.WorkspaceID, "create_tasks"); err != nil {
+	huma.Register(a.h, huma.Operation{OperationID: "clone-gig", Method: "POST", Path: "/gigs/{id}/clone", Tags: []string{"gigs"},
+		Summary: "Copy a gig (optionally into another project of the workspace)", DefaultStatus: 201}, func(ctx context.Context, in *gigCloneIn) (*gigOut, error) {
+		return a.withGig(ctx, in.ID, "", access.Member, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+			if err := allowed(p, t.WorkspaceID, "create_gigs"); err != nil {
 				return nil, err
 			}
 			var proj *int64
@@ -631,32 +631,32 @@ func (a *API) registerTasks() {
 			if p.Key != nil {
 				via = &p.Key.ID
 			}
-			// the checklist comes along when the caller may add one (as when creating a task)
-			return store.CloneTask(ctx, tx, p.Actor(), t, proj, in.Body.Title, via, p.Allowed(t.WorkspaceID, "checklists"))
+			// the checklist comes along when the caller may add one (as when creating a gig)
+			return store.CloneGig(ctx, tx, p.Actor(), t, proj, in.Body.Title, via, p.Allowed(t.WorkspaceID, "checklists"))
 		})
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "delete-task", Method: "DELETE", Path: "/tasks/{id}", Tags: []string{"tasks"},
-		Summary: "Move a task to the trash (restore with /restore)"}, func(ctx context.Context, in *taskPath) (*taskOut, error) {
-		return a.withTaskOp(ctx, in.ID, "", access.Member, "tasks:delete", opTrashed, func(tx *sql.Tx, p *access.Principal, t *store.Task, _ int64) (*store.Task, error) {
-			if err := allowed(p, t.WorkspaceID, "delete_tasks"); err != nil {
+	huma.Register(a.h, huma.Operation{OperationID: "delete-gig", Method: "DELETE", Path: "/gigs/{id}", Tags: []string{"gigs"},
+		Summary: "Move a gig to the trash (restore with /restore)"}, func(ctx context.Context, in *gigPath) (*gigOut, error) {
+		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:delete", opTrashed, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+			if err := allowed(p, t.WorkspaceID, "delete_gigs"); err != nil {
 				return nil, err
 			}
-			return store.TrashTask(ctx, tx, p.Actor(), t, false)
+			return store.TrashGig(ctx, tx, p.Actor(), t, false)
 		})
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "restore-task", Method: "POST", Path: "/tasks/{id}/restore", Tags: []string{"tasks"},
-		Summary: "Restore a task from the trash"}, func(ctx context.Context, in *taskPath) (*taskOut, error) {
-		return a.withTaskOp(ctx, in.ID, "", access.Member, "tasks:delete", opTrashed|opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Task, _ int64) (*store.Task, error) {
-			if err := allowed(p, t.WorkspaceID, "delete_tasks"); err != nil {
+	huma.Register(a.h, huma.Operation{OperationID: "restore-gig", Method: "POST", Path: "/gigs/{id}/restore", Tags: []string{"gigs"},
+		Summary: "Restore a gig from the trash"}, func(ctx context.Context, in *gigPath) (*gigOut, error) {
+		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:delete", opTrashed|opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+			if err := allowed(p, t.WorkspaceID, "delete_gigs"); err != nil {
 				return nil, err
 			}
-			return store.TrashTask(ctx, tx, p.Actor(), t, true)
+			return store.TrashGig(ctx, tx, p.Actor(), t, true)
 		})
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "resume-task", Method: "POST", Path: "/tasks/{id}/resume", Tags: []string{"tasks"},
-		Summary: "Ask for the task's agent session to be resumed: records the request and moves it to todo (gigg runs nothing)"},
-		func(ctx context.Context, in *resumeIn) (*taskOut, error) {
-			return a.withTask(ctx, in.ID, "", access.Member, "tasks:write", func(tx *sql.Tx, p *access.Principal, t *store.Task, _ int64) (*store.Task, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "resume-gig", Method: "POST", Path: "/gigs/{id}/resume", Tags: []string{"gigs"},
+		Summary: "Ask for the gig's agent session to be resumed: records the request and moves it to todo (gigg runs nothing)"},
+		func(ctx context.Context, in *resumeIn) (*gigOut, error) {
+			return a.withGig(ctx, in.ID, "", access.Member, "gigs:write", func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 				if in.Body.CommentMD != "" && !p.HasScope("comments:write") {
 					return nil, errForbidden("This key lacks the comments:write scope.")
 				}
@@ -666,26 +666,26 @@ func (a *API) registerTasks() {
 				if err := toolsGuard(p, t.WorkspaceID, len(t.AllowedTools) > 0); err != nil {
 					return nil, err
 				}
-				return store.ResumeTask(ctx, tx, p.Actor(), t, in.Body.CommentMD)
+				return store.ResumeGig(ctx, tx, p.Actor(), t, in.Body.CommentMD)
 			})
 		})
-	huma.Register(a.h, huma.Operation{OperationID: "task-activity", Method: "GET", Path: "/tasks/{id}/activity", Tags: []string{"tasks"},
-		Summary: "A task's history (old values included)"}, func(ctx context.Context, in *taskPath) (*activityOut, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "gig-activity", Method: "GET", Path: "/gigs/{id}/activity", Tags: []string{"gigs"},
+		Summary: "A gig's history (old values included)"}, func(ctx context.Context, in *gigPath) (*activityOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		t, err := a.task(ctx, p, in.ID)
+		t, err := a.gig(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		if err := need(p, "comments:read"); err != nil {
 			return nil, err
 		}
-		items, err := a.activity(ctx, `(entity_type = 'task' AND entity_id = ?) OR (entity_type IN ('comment','run') AND action != 'run.progress' AND json_extract(data, '$.task_id') = ?)`, []any{t.ID, t.ID}, 0, 500)
+		items, err := a.activity(ctx, `(entity_type = 'gig' AND entity_id = ?) OR (entity_type IN ('comment','run') AND action != 'run.progress' AND json_extract(data, '$.gig_id') = ?)`, []any{t.ID, t.ID}, 0, 500)
 		if !p.IsInstanceAdmin() {
 			redactDeleted(items)
 		}
@@ -694,13 +694,13 @@ func (a *API) registerTasks() {
 		return out, storeErr(err)
 	})
 
-	huma.Register(a.h, huma.Operation{OperationID: "list-comments", Method: "GET", Path: "/tasks/{id}/comments", Tags: []string{"comments"},
-		Summary: "A task's comments, oldest first, with author facts"}, func(ctx context.Context, in *commentsIn) (*commentsOut, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "list-comments", Method: "GET", Path: "/gigs/{id}/comments", Tags: []string{"comments"},
+		Summary: "A gig's comments, oldest first, with author facts"}, func(ctx context.Context, in *commentsIn) (*commentsOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		t, err := a.task(ctx, p, in.ID)
+		t, err := a.gig(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -714,13 +714,13 @@ func (a *API) registerTasks() {
 		}
 		return out, storeErr(err)
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "create-comment", Method: "POST", Path: "/tasks/{id}/comments", Tags: []string{"comments"},
-		Summary: "Comment on a task (Markdown)", DefaultStatus: 201}, func(ctx context.Context, in *commentCreateIn) (*commentOut, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "create-comment", Method: "POST", Path: "/gigs/{id}/comments", Tags: []string{"comments"},
+		Summary: "Comment on a gig (Markdown)", DefaultStatus: 201}, func(ctx context.Context, in *commentCreateIn) (*commentOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		t, err := a.task(ctx, p, in.ID)
+		t, err := a.gig(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -736,8 +736,8 @@ func (a *API) registerTasks() {
 		var c *store.Comment
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			if in.Body.RunID != nil {
-				if r, err := store.GetRun(ctx, tx, *in.Body.RunID); err != nil || r.TaskID != t.ID {
-					return store.Invalid("run %d is not a run of this task", *in.Body.RunID)
+				if r, err := store.GetRun(ctx, tx, *in.Body.RunID); err != nil || r.GigID != t.ID {
+					return store.Invalid("run %d is not a run of this gig", *in.Body.RunID)
 				}
 			}
 			var err error
@@ -801,50 +801,50 @@ func (a *API) comment(ctx context.Context, id int64) (*access.Principal, *store.
 	if err != nil {
 		return nil, nil, errNotFound()
 	}
-	t, err := store.GetTask(ctx, a.st.R, c.TaskID)
+	t, err := store.GetGig(ctx, a.st.R, c.GigID)
 	if err != nil || !p.SeesProject(t.WorkspaceID, t.ProjectID) {
 		return nil, nil, errNotFound()
 	}
 	return p, c, nil
 }
 
-// withTask resolves the task, checks role and scope, and runs fn in a transaction with the
-// freshly read task.
-// taskOp says what a change may do beyond the usual role and scope checks.
-type taskOp int
+// withGig resolves the gig, checks role and scope, and runs fn in a transaction with the
+// freshly read gig.
+// gigOp says what a change may do beyond the usual role and scope checks.
+type gigOp int
 
 const (
-	opEdit    taskOp = 0         // a live task only
-	opGuarded taskOp = 1 << iota // also needs always_run / allowed_tools when the task has them
-	opTrashed                    // allowed on a task in the trash too (delete, restore)
+	opEdit    gigOp = 0         // a live gig only
+	opGuarded gigOp = 1 << iota // also needs always_run / allowed_tools when the gig has them
+	opTrashed                   // allowed on a gig in the trash too (delete, restore)
 )
 
-// trashErr: a task in the trash can only be restored (or read).
-func trashErr(t *store.Task) error {
+// trashErr: a gig in the trash can only be restored (or read).
+func trashErr(t *store.Gig) error {
 	return fail(409, "in_trash", t.Key+" is in the trash: restore it first.")
 }
 
-// guardTask: changing what an always-run task (or one with a tool allowlist) does needs those
+// guardGig: changing what an always-run gig (or one with a tool allowlist) does needs those
 // permissions too, whichever endpoint the change comes through.
-func guardTask(p *access.Principal, t *store.Task) error {
+func guardGig(p *access.Principal, t *store.Gig) error {
 	if err := alwaysRunGuard(p, t.WorkspaceID, t.AlwaysRun); err != nil {
 		return err
 	}
 	return toolsGuard(p, t.WorkspaceID, len(t.AllowedTools) > 0)
 }
 
-func (a *API) withTask(ctx context.Context, ref, ifm string, min, scope string,
-	fn func(tx *sql.Tx, p *access.Principal, t *store.Task, v int64) (*store.Task, error)) (*taskOut, error) {
-	return a.withTaskOp(ctx, ref, ifm, min, scope, opEdit, fn)
+func (a *API) withGig(ctx context.Context, ref, ifm string, min, scope string,
+	fn func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error)) (*gigOut, error) {
+	return a.withGigOp(ctx, ref, ifm, min, scope, opEdit, fn)
 }
 
-func (a *API) withTaskOp(ctx context.Context, ref, ifm string, min, scope string, op taskOp,
-	fn func(tx *sql.Tx, p *access.Principal, t *store.Task, v int64) (*store.Task, error)) (*taskOut, error) {
+func (a *API) withGigOp(ctx context.Context, ref, ifm string, min, scope string, op gigOp,
+	fn func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error)) (*gigOut, error) {
 	p, err := me(ctx)
 	if err != nil {
 		return nil, err
 	}
-	t, err := a.task(ctx, p, ref)
+	t, err := a.gig(ctx, p, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -855,9 +855,9 @@ func (a *API) withTaskOp(ctx context.Context, ref, ifm string, min, scope string
 	if err != nil {
 		return nil, err
 	}
-	var out *store.Task
+	var out *store.Gig
 	err = a.tx(ctx, func(tx *sql.Tx) error {
-		cur, err := store.GetTask(ctx, tx, t.ID)
+		cur, err := store.GetGig(ctx, tx, t.ID)
 		if err != nil {
 			return err
 		}
@@ -865,7 +865,7 @@ func (a *API) withTaskOp(ctx context.Context, ref, ifm string, min, scope string
 			return trashErr(cur)
 		}
 		if op&opGuarded != 0 {
-			if err := guardTask(p, cur); err != nil {
+			if err := guardGig(p, cur); err != nil {
 				return err
 			}
 		}
@@ -875,11 +875,11 @@ func (a *API) withTaskOp(ctx context.Context, ref, ifm string, min, scope string
 	if err != nil {
 		return nil, err
 	}
-	return &taskOut{ETag: etag(out.Version), Body: out}, nil
+	return &gigOut{ETag: etag(out.Version), Body: out}, nil
 }
 
-// anyGate: some of these subtasks would hold their parent back (that needs the relations permission).
-func anyGate(subs []store.TemplateSubtask) bool {
+// anyGate: some of these subgigs would hold their parent back (that needs the relations permission).
+func anyGate(subs []store.TemplateSubgig) bool {
 	for _, s := range subs {
 		if s.BlocksParent {
 			return true

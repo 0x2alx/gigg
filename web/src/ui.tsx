@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNarrow } from "./narrow";
-import { avatarURL, priorityNames, type Category, type CustomField, type Tag, type Task, type User } from "./api";
+import { avatarURL, priorityNames, type Category, type CustomField, type Tag, type Gig, type User } from "./api";
 import { cardChips } from "./items";
 import { windowBadge } from "./recurrence";
 import { CATEGORY_COLOR, PRIORITY_COLOR, SCHEDULE_COLOR, WINDOW_OPEN_COLOR, colorFor, readableOn } from "./theme";
@@ -19,7 +19,7 @@ export function ClearFilters({ active, onClear, className }: { active: boolean; 
   );
 }
 
-type ItemCounts = Pick<Task, "checklist_total" | "checklist_done" | "subtask_count" | "subtask_done" | "blocked_by" | "custom">;
+type ItemCounts = Pick<Gig, "checklist_total" | "checklist_done" | "subgig_count" | "subgig_done" | "blocked_by" | "custom">;
 
 // Pill: a tinted badge. The data colour goes in --c; theme.css turns it into a 14% tint with text of
 // the same hue pulled toward the theme's text colour (so it reads on light and dark). `outline` is
@@ -105,7 +105,7 @@ export function WorkspaceChip({ ws, owner }: { ws: { slug: string; name: string;
 }
 
 // Avatar sizes (at the 16px root): xs (about 31px) for cards and dense rows, s (default, about 34px) for lists, l (about 43px) for comments, m (about 67px) for profiles
-// and the task header, m (48px) for profile pages. People are round, agents rounded squares; the agent
+// and the gig header, m (48px) for profile pages. People are round, agents rounded squares; the agent
 // mark (a small robot head on the lower right) shows from s up, the shape says it at xs.
 export function Avatar({ user, size, tip }: { user: Pick<User, "username" | "display_name" | "color" | "kind"> & { id?: number; has_avatar?: boolean; version?: number }; size?: "xs" | "s" | "l" | "m"; tip?: string }) {
   const c = colorFor(user.username, user.color);
@@ -182,7 +182,7 @@ export function trapTab(e: KeyboardEvent, box: HTMLElement | null) {
   }
 }
 
-// EXIT_MS: how long a dialog or the task panel takes to animate out before it really closes
+// EXIT_MS: how long a dialog or the gig panel takes to animate out before it really closes
 export const EXIT_MS = 150;
 
 // expandable: a button in the header grows the dialog to the whole page (and back); the choice is
@@ -289,50 +289,50 @@ function writeFull(on: boolean) {
   }
 }
 
-// TaskBadges: the schedule, time-window and missed badges (cards and the task panel). With items
-// (cards): also blocked, checklist and subtask progress, and up to two select/checkbox values. On a card
+// GigBadges: the schedule, time-window and missed badges (cards and the gig panel). With items
+// (cards): also blocked, checklist and subgig progress, and up to two select/checkbox values. On a card
 // the progress and window marks are quiet text (icon and numbers, no box); only "blocked" and "missed"
 // keep a solid badge, since they mean something is wrong.
-export function TaskBadges({ task, now = Date.now(), items, fields }: {
-  task: Pick<Task, "recurrence_id" | "missed_at" | "start_at" | "not_after"> & Partial<ItemCounts>;
+export function GigBadges({ gig, now = Date.now(), items, fields }: {
+  gig: Pick<Gig, "recurrence_id" | "missed_at" | "start_at" | "not_after"> & Partial<ItemCounts>;
   now?: number;
   items?: boolean;
   fields?: CustomField[];
 }) {
-  const w = windowBadge(task, now);
-  const ck = task.checklist_total ?? 0;
-  const st = task.subtask_count ?? 0;
+  const w = windowBadge(gig, now);
+  const ck = gig.checklist_total ?? 0;
+  const st = gig.subgig_count ?? 0;
   const quiet = (done: boolean) => "meta-item" + (done ? " meta-done" : "");
   return (
     <>
-      {items && !!task.blocked_by && (
-        <span className="pill pill-danger" title={`Blocked by ${task.blocked_by} open task${task.blocked_by === 1 ? "" : "s"}: agents won't pick it up`}>
-          <Icon name="lock" strokeWidth={2.2} /> {task.blocked_by}
+      {items && !!gig.blocked_by && (
+        <span className="pill pill-danger" title={`Blocked by ${gig.blocked_by} open gig${gig.blocked_by === 1 ? "" : "s"}: agents won't pick it up`}>
+          <Icon name="lock" strokeWidth={2.2} /> {gig.blocked_by}
         </span>
       )}
       {items && ck > 0 && (
-        <span className={quiet(task.checklist_done === ck)} title="Checklist">
-          <Icon name="checklist" /> {task.checklist_done ?? 0}/{ck}
+        <span className={quiet(gig.checklist_done === ck)} title="Checklist">
+          <Icon name="checklist" /> {gig.checklist_done ?? 0}/{ck}
         </span>
       )}
       {items && st > 0 && (
-        <span className={quiet(task.subtask_done === st)} title="Subtasks done">
-          <Icon name="subtasks" /> {task.subtask_done ?? 0}/{st}
+        <span className={quiet(gig.subgig_done === st)} title="Subgigs done">
+          <Icon name="subgigs" /> {gig.subgig_done ?? 0}/{st}
         </span>
       )}
       {items &&
         fields &&
-        cardChips(task, fields).map((c) => (
+        cardChips(gig, fields).map((c) => (
           <Pill key={c.field.id} color={colorFor(c.field.name + ":" + c.text)} title={c.field.name}>
             {c.text}
           </Pill>
         ))}
-      {!!task.recurrence_id && (
-        <Pill color={SCHEDULE_COLOR} title="Made by a recurring task">
+      {!!gig.recurrence_id && (
+        <Pill color={SCHEDULE_COLOR} title="Made by a recurring gig">
           <Icon name="refresh" />
         </Pill>
       )}
-      {!!task.missed_at && (
+      {!!gig.missed_at && (
         <span className="pill pill-danger" title="The window closed before anyone started it">
           missed
         </span>

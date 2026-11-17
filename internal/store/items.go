@@ -16,28 +16,28 @@ import (
 
 // ---------------------------------------------------------------- relations
 
-// Relation links two tasks of one workspace: From blocks To, or they relate.
+// Relation links two gigs of one workspace: From blocks To, or they relate.
 type Relation struct {
-	From      int64  `json:"from_task_id"`
+	From      int64  `json:"from_gig_id"`
 	FromKey   string `json:"from_key"`
-	To        int64  `json:"to_task_id"`
+	To        int64  `json:"to_gig_id"`
 	ToKey     string `json:"to_key"`
 	Kind      string `json:"kind"`
-	Open      bool   `json:"open" doc:"The other task is not done or cancelled"`
-	Title     string `json:"title" doc:"The other task's title"`
+	Open      bool   `json:"open" doc:"The other gig is not done or cancelled"`
+	Title     string `json:"title" doc:"The other gig's title"`
 	CreatedAt int64  `json:"created_at"`
 }
 
-// TaskRelations lists the relations touching a task (the other side's title and state included).
-func TaskRelations(ctx context.Context, q Q, task int64) ([]Relation, error) {
-	rows, err := q.QueryContext(ctx, `SELECT r.from_task_id, pf.key || '-' || f.number, r.to_task_id, pt.key || '-' || t.number, r.kind, r.created_at,
-		CASE WHEN r.from_task_id = ? THEN t.title ELSE f.title END,
-		CASE WHEN r.from_task_id = ? THEN st.category ELSE sf.category END
-		FROM task_relations r
-		JOIN tasks f ON f.id = r.from_task_id JOIN projects pf ON pf.id = f.project_id JOIN statuses sf ON sf.id = f.status_id
-		JOIN tasks t ON t.id = r.to_task_id JOIN projects pt ON pt.id = t.project_id JOIN statuses st ON st.id = t.status_id
-		WHERE (r.from_task_id = ? OR r.to_task_id = ?) AND f.deleted_at IS NULL AND t.deleted_at IS NULL
-		ORDER BY r.created_at`, task, task, task, task)
+// GigRelations lists the relations touching a gig (the other side's title and state included).
+func GigRelations(ctx context.Context, q Q, gig int64) ([]Relation, error) {
+	rows, err := q.QueryContext(ctx, `SELECT r.from_gig_id, pf.key || '-' || f.number, r.to_gig_id, pt.key || '-' || t.number, r.kind, r.created_at,
+		CASE WHEN r.from_gig_id = ? THEN t.title ELSE f.title END,
+		CASE WHEN r.from_gig_id = ? THEN st.category ELSE sf.category END
+		FROM gig_relations r
+		JOIN gigs f ON f.id = r.from_gig_id JOIN projects pf ON pf.id = f.project_id JOIN statuses sf ON sf.id = f.status_id
+		JOIN gigs t ON t.id = r.to_gig_id JOIN projects pt ON pt.id = t.project_id JOIN statuses st ON st.id = t.status_id
+		WHERE (r.from_gig_id = ? OR r.to_gig_id = ?) AND f.deleted_at IS NULL AND t.deleted_at IS NULL
+		ORDER BY r.created_at`, gig, gig, gig, gig)
 	if err != nil {
 		return nil, err
 	}
@@ -55,29 +55,29 @@ func TaskRelations(ctx context.Context, q Q, task int64) ([]Relation, error) {
 	return out, rows.Err()
 }
 
-// Blocks reports whether task `from` holds task `to` back, directly or through a chain: "blocks"
-// dependencies and subtasks marked blocks_parent (child -> parent) both count, whatever the tasks'
+// Blocks reports whether gig `from` holds gig `to` back, directly or through a chain: "blocks"
+// dependencies and subgigs marked blocks_parent (child -> parent) both count, whatever the gigs'
 // state (a trashed or archived one may come back).
 func Blocks(ctx context.Context, q Q, from, to int64) (bool, error) {
 	var n int
 	err := q.QueryRowContext(ctx, `WITH RECURSIVE
-		e(f, t) AS (SELECT from_task_id, to_task_id FROM task_relations WHERE kind = 'blocks'
-			UNION ALL SELECT id, parent_id FROM tasks WHERE blocks_parent = 1 AND parent_id IS NOT NULL),
+		e(f, t) AS (SELECT from_gig_id, to_gig_id FROM gig_relations WHERE kind = 'blocks'
+			UNION ALL SELECT id, parent_id FROM gigs WHERE blocks_parent = 1 AND parent_id IS NOT NULL),
 		down(id) AS (SELECT ? UNION SELECT e.t FROM e JOIN down ON e.f = down.id)
 		SELECT count(*) FROM down WHERE id = ?`, from, to).Scan(&n)
 	return n > 0, err
 }
 
-// AddRelation links from -> to. Both tasks must be in one workspace; blocking cycles are refused.
-func AddRelation(ctx context.Context, q Q, a Actor, from, to *Task, kind string) error {
+// AddRelation links from -> to. Both gigs must be in one workspace; blocking cycles are refused.
+func AddRelation(ctx context.Context, q Q, a Actor, from, to *Gig, kind string) error {
 	if kind != "blocks" && kind != "relates" {
 		return Invalid("kind is blocks or relates")
 	}
 	if from.ID == to.ID {
-		return Invalid("a task can't be linked to itself")
+		return Invalid("a gig can't be linked to itself")
 	}
 	if from.WorkspaceID != to.WorkspaceID {
-		return Invalid("both tasks must be in the same workspace")
+		return Invalid("both gigs must be in the same workspace")
 	}
 	if kind == "blocks" {
 		// would `to` (transitively) block `from`? then this closes a cycle
@@ -87,33 +87,33 @@ func AddRelation(ctx context.Context, q Q, a Actor, from, to *Task, kind string)
 			return Conflict("%s already depends on %s: that would be a cycle", from.Key, to.Key)
 		}
 	}
-	if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO task_relations (workspace_id, from_task_id, to_task_id, kind, created_by, created_at) VALUES (?,?,?,?,?,?)`,
+	if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_relations (workspace_id, from_gig_id, to_gig_id, kind, created_by, created_at) VALUES (?,?,?,?,?,?)`,
 		from.WorkspaceID, from.ID, to.ID, kind, a.UserID, Now()); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &from.WorkspaceID, &from.ProjectID, "relation.added", "task", from.ID, map[string]any{"to": to.Key, "kind": kind})
+	_, err := Activity(ctx, q, a, &from.WorkspaceID, &from.ProjectID, "relation.added", "gig", from.ID, map[string]any{"to": to.Key, "kind": kind})
 	return err
 }
 
 // RemoveRelation unlinks from -> to.
-func RemoveRelation(ctx context.Context, q Q, a Actor, from, to *Task, kind string) error {
-	res, err := q.ExecContext(ctx, `DELETE FROM task_relations WHERE from_task_id = ? AND to_task_id = ? AND kind = ?`, from.ID, to.ID, kind)
+func RemoveRelation(ctx context.Context, q Q, a Actor, from, to *Gig, kind string) error {
+	res, err := q.ExecContext(ctx, `DELETE FROM gig_relations WHERE from_gig_id = ? AND to_gig_id = ? AND kind = ?`, from.ID, to.ID, kind)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	_, err = Activity(ctx, q, a, &from.WorkspaceID, &from.ProjectID, "relation.removed", "task", from.ID, map[string]any{"to": to.Key, "kind": kind})
+	_, err = Activity(ctx, q, a, &from.WorkspaceID, &from.ProjectID, "relation.removed", "gig", from.ID, map[string]any{"to": to.Key, "kind": kind})
 	return err
 }
 
 // ---------------------------------------------------------------- checklists
 
-// ChecklistItem is one line of a task's checklist.
+// ChecklistItem is one line of a gig's checklist.
 type ChecklistItem struct {
 	ID        int64   `json:"id"`
-	TaskID    int64   `json:"task_id"`
+	GigID     int64   `json:"gig_id"`
 	Position  float64 `json:"position"`
 	Text      string  `json:"text"`
 	DoneAt    *int64  `json:"done_at"`
@@ -121,9 +121,9 @@ type ChecklistItem struct {
 	CreatedAt int64   `json:"created_at"`
 }
 
-// Checklist lists a task's items in order.
-func Checklist(ctx context.Context, q Q, task int64) ([]ChecklistItem, error) {
-	rows, err := q.QueryContext(ctx, `SELECT id, task_id, position, text, done_at, done_by, created_at FROM checklist_items WHERE task_id = ? ORDER BY position, id`, task)
+// Checklist lists a gig's items in order.
+func Checklist(ctx context.Context, q Q, gig int64) ([]ChecklistItem, error) {
+	rows, err := q.QueryContext(ctx, `SELECT id, gig_id, position, text, done_at, done_by, created_at FROM checklist_items WHERE gig_id = ? ORDER BY position, id`, gig)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func Checklist(ctx context.Context, q Q, task int64) ([]ChecklistItem, error) {
 	for rows.Next() {
 		var it ChecklistItem
 		var done, by sql.NullInt64
-		if err := rows.Scan(&it.ID, &it.TaskID, &it.Position, &it.Text, &done, &by, &it.CreatedAt); err != nil {
+		if err := rows.Scan(&it.ID, &it.GigID, &it.Position, &it.Text, &done, &by, &it.CreatedAt); err != nil {
 			return nil, err
 		}
 		it.DoneAt, it.DoneBy = ptrInt(done), ptrInt(by)
@@ -149,27 +149,27 @@ func validItemText(s string) (string, error) {
 	return s, nil
 }
 
-// AddChecklistItems appends items to a task's checklist.
-func AddChecklistItems(ctx context.Context, q Q, a Actor, t *Task, texts []string) error {
+// AddChecklistItems appends items to a gig's checklist.
+func AddChecklistItems(ctx context.Context, q Q, a Actor, t *Gig, texts []string) error {
 	var n int
-	_ = q.QueryRowContext(ctx, `SELECT count(*) FROM checklist_items WHERE task_id = ?`, t.ID).Scan(&n)
+	_ = q.QueryRowContext(ctx, `SELECT count(*) FROM checklist_items WHERE gig_id = ?`, t.ID).Scan(&n)
 	if n+len(texts) > 200 {
 		return Invalid("a checklist holds at most 200 items")
 	}
 	var pos float64
-	_ = q.QueryRowContext(ctx, `SELECT COALESCE(max(position), 0) FROM checklist_items WHERE task_id = ?`, t.ID).Scan(&pos)
+	_ = q.QueryRowContext(ctx, `SELECT COALESCE(max(position), 0) FROM checklist_items WHERE gig_id = ?`, t.ID).Scan(&pos)
 	for _, raw := range texts {
 		text, err := validItemText(raw)
 		if err != nil {
 			return err
 		}
 		pos += 1024
-		if _, err := q.ExecContext(ctx, `INSERT INTO checklist_items (workspace_id, task_id, position, text, created_at) VALUES (?,?,?,?,?)`,
+		if _, err := q.ExecContext(ctx, `INSERT INTO checklist_items (workspace_id, gig_id, position, text, created_at) VALUES (?,?,?,?,?)`,
 			t.WorkspaceID, t.ID, pos, text, Now()); err != nil {
 			return err
 		}
 	}
-	return touchTask(ctx, q, a, t, "checklist.added", map[string]any{"items": texts})
+	return touchGig(ctx, q, a, t, "checklist.added", map[string]any{"items": texts})
 }
 
 // ChecklistPatch changes one item.
@@ -179,10 +179,10 @@ type ChecklistPatch struct {
 	After *int64 // move after this item id (0 = to the top)
 }
 
-// PatchChecklistItem edits, ticks or moves an item of task t.
-func PatchChecklistItem(ctx context.Context, q Q, a Actor, t *Task, id int64, p ChecklistPatch) error {
+// PatchChecklistItem edits, ticks or moves an item of gig t.
+func PatchChecklistItem(ctx context.Context, q Q, a Actor, t *Gig, id int64, p ChecklistPatch) error {
 	var owner int64
-	if err := q.QueryRowContext(ctx, `SELECT task_id FROM checklist_items WHERE id = ?`, id).Scan(&owner); err != nil || owner != t.ID {
+	if err := q.QueryRowContext(ctx, `SELECT gig_id FROM checklist_items WHERE id = ?`, id).Scan(&owner); err != nil || owner != t.ID {
 		return ErrNotFound
 	}
 	data := map[string]any{"item": id}
@@ -211,13 +211,13 @@ func PatchChecklistItem(ctx context.Context, q Q, a Actor, t *Task, id int64, p 
 	if p.After != nil {
 		var lo, hi float64
 		if *p.After == 0 {
-			_ = q.QueryRowContext(ctx, `SELECT COALESCE(min(position), 1024) FROM checklist_items WHERE task_id = ?`, t.ID).Scan(&hi)
+			_ = q.QueryRowContext(ctx, `SELECT COALESCE(min(position), 1024) FROM checklist_items WHERE gig_id = ?`, t.ID).Scan(&hi)
 			lo = hi - 2048
 		} else {
-			if err := q.QueryRowContext(ctx, `SELECT position FROM checklist_items WHERE id = ? AND task_id = ?`, *p.After, t.ID).Scan(&lo); err != nil {
-				return Invalid("no item %d on this task", *p.After)
+			if err := q.QueryRowContext(ctx, `SELECT position FROM checklist_items WHERE id = ? AND gig_id = ?`, *p.After, t.ID).Scan(&lo); err != nil {
+				return Invalid("no item %d on this gig", *p.After)
 			}
-			if err := q.QueryRowContext(ctx, `SELECT COALESCE(min(position), ? + 2048) FROM checklist_items WHERE task_id = ? AND position > ? AND id != ?`,
+			if err := q.QueryRowContext(ctx, `SELECT COALESCE(min(position), ? + 2048) FROM checklist_items WHERE gig_id = ? AND position > ? AND id != ?`,
 				lo, t.ID, lo, id).Scan(&hi); err != nil {
 				return err
 			}
@@ -227,52 +227,52 @@ func PatchChecklistItem(ctx context.Context, q Q, a Actor, t *Task, id int64, p 
 		}
 		data["moved"] = true
 	}
-	return touchTask(ctx, q, a, t, "checklist.updated", data)
+	return touchGig(ctx, q, a, t, "checklist.updated", data)
 }
 
-// DeleteChecklistItem removes an item of task t.
-func DeleteChecklistItem(ctx context.Context, q Q, a Actor, t *Task, id int64) error {
-	res, err := q.ExecContext(ctx, `DELETE FROM checklist_items WHERE id = ? AND task_id = ?`, id, t.ID)
+// DeleteChecklistItem removes an item of gig t.
+func DeleteChecklistItem(ctx context.Context, q Q, a Actor, t *Gig, id int64) error {
+	res, err := q.ExecContext(ctx, `DELETE FROM checklist_items WHERE id = ? AND gig_id = ?`, id, t.ID)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	return touchTask(ctx, q, a, t, "checklist.removed", map[string]any{"item": id})
+	return touchGig(ctx, q, a, t, "checklist.removed", map[string]any{"item": id})
 }
 
-// touchTask bumps a task's version/updated time and logs the change.
-func touchTask(ctx context.Context, q Q, a Actor, t *Task, action string, data any) error {
-	if _, err := q.ExecContext(ctx, `UPDATE tasks SET updated_at = ?, version = version + 1 WHERE id = ?`, Now(), t.ID); err != nil {
+// touchGig bumps a gig's version/updated time and logs the change.
+func touchGig(ctx context.Context, q Q, a Actor, t *Gig, action string, data any) error {
+	if _, err := q.ExecContext(ctx, `UPDATE gigs SET updated_at = ?, version = version + 1 WHERE id = ?`, Now(), t.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, action, "task", t.ID, data)
+	_, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, action, "gig", t.ID, data)
 	return err
 }
 
 // ---------------------------------------------------------------- archive
 
-// ArchiveTask archives or unarchives a task.
-func ArchiveTask(ctx context.Context, q Q, a Actor, t *Task, archive bool) (*Task, error) {
+// ArchiveGig archives or unarchives a gig.
+func ArchiveGig(ctx context.Context, q Q, a Actor, t *Gig, archive bool) (*Gig, error) {
 	if t.Deleted {
-		return nil, Conflict("the task is in the trash")
+		return nil, Conflict("the gig is in the trash")
 	}
 	var v any
-	action := "task.unarchived"
+	action := "gig.unarchived"
 	if archive {
-		v, action = Now(), "task.archived"
+		v, action = Now(), "gig.archived"
 	}
-	if _, err := q.ExecContext(ctx, `UPDATE tasks SET archived_at = ?, updated_at = ?, version = version + 1 WHERE id = ?`, v, Now(), t.ID); err != nil {
+	if _, err := q.ExecContext(ctx, `UPDATE gigs SET archived_at = ?, updated_at = ?, version = version + 1 WHERE id = ?`, v, Now(), t.ID); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, action, "task", t.ID, nil); err != nil {
+	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, action, "gig", t.ID, nil); err != nil {
 		return nil, err
 	}
-	return GetTask(ctx, q, t.ID)
+	return GetGig(ctx, q, t.ID)
 }
 
-// ArchiveDone archives a project's done/cancelled tasks finished at or before `before`; returns how many.
+// ArchiveDone archives a project's done/cancelled gigs finished at or before `before`; returns how many.
 // category "done" or "cancelled" limits it to that one; "" takes both.
 func ArchiveDone(ctx context.Context, q Q, a Actor, p *Project, before int64, category string) (int, error) {
 	cats := []any{"done", "cancelled"}
@@ -283,7 +283,7 @@ func ArchiveDone(ctx context.Context, q Q, a Actor, p *Project, before int64, ca
 	default:
 		return 0, Invalid("category must be done or cancelled")
 	}
-	rows, err := q.QueryContext(ctx, `SELECT t.id FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.project_id = ? AND t.archived_at IS NULL
+	rows, err := q.QueryContext(ctx, `SELECT t.id FROM gigs t JOIN statuses s ON s.id = t.status_id WHERE t.project_id = ? AND t.archived_at IS NULL
 		AND t.deleted_at IS NULL AND s.category IN (?, ?) AND COALESCE(t.done_at, t.updated_at) <= ? LIMIT 5000`, p.ID, cats[0], cats[1], before)
 	if err != nil {
 		return 0, err
@@ -300,7 +300,7 @@ func ArchiveDone(ctx context.Context, q Q, a Actor, p *Project, before int64, ca
 	rows.Close()
 	now := Now()
 	for _, id := range ids {
-		if _, err := q.ExecContext(ctx, `UPDATE tasks SET archived_at = ?, updated_at = ?, version = version + 1 WHERE id = ?`, now, now, id); err != nil {
+		if _, err := q.ExecContext(ctx, `UPDATE gigs SET archived_at = ?, updated_at = ?, version = version + 1 WHERE id = ?`, now, now, id); err != nil {
 			return 0, err
 		}
 	}
@@ -314,7 +314,7 @@ func ArchiveDone(ctx context.Context, q Q, a Actor, p *Project, before int64, ca
 
 // ---------------------------------------------------------------- custom fields
 
-// CustomField is a workspace-defined task property.
+// CustomField is a workspace-defined gig property.
 type CustomField struct {
 	ID          int64    `json:"id"`
 	WorkspaceID int64    `json:"workspace_id"`
@@ -444,7 +444,7 @@ func DeleteCustomField(ctx context.Context, q Q, a Actor, f *CustomField) error 
 	if _, err := q.ExecContext(ctx, `UPDATE custom_fields SET deleted_at = ?, name = name || ' #' || id WHERE id = ?`, Now(), f.ID); err != nil {
 		return err
 	}
-	if _, err := q.ExecContext(ctx, `DELETE FROM task_custom_values WHERE field_id = ?`, f.ID); err != nil {
+	if _, err := q.ExecContext(ctx, `DELETE FROM gig_custom_values WHERE field_id = ?`, f.ID); err != nil {
 		return err
 	}
 	_, err := Activity(ctx, q, a, &f.WorkspaceID, nil, "field.deleted", "field", f.ID, map[string]any{"name": f.Name})
@@ -513,8 +513,8 @@ func (f *CustomField) normValue(v any) (any, error) {
 	return nil, bad("a value")
 }
 
-// SetCustomValues sets (or, with nil, clears) a task's custom values; keys are field ids.
-func SetCustomValues(ctx context.Context, q Q, a Actor, t *Task, vals map[string]any) error {
+// SetCustomValues sets (or, with nil, clears) a gig's custom values; keys are field ids.
+func SetCustomValues(ctx context.Context, q Q, a Actor, t *Gig, vals map[string]any) error {
 	changed := map[string]any{}
 	if len(vals) > 30 {
 		return Invalid("at most 30 custom values at once")
@@ -529,7 +529,7 @@ func SetCustomValues(ctx context.Context, q Q, a Actor, t *Task, vals map[string
 			return Invalid("no custom field %s in this workspace", k)
 		}
 		if v == nil {
-			if _, err := q.ExecContext(ctx, `DELETE FROM task_custom_values WHERE task_id = ? AND field_id = ?`, t.ID, id); err != nil {
+			if _, err := q.ExecContext(ctx, `DELETE FROM gig_custom_values WHERE gig_id = ? AND field_id = ?`, t.ID, id); err != nil {
 				return err
 			}
 			changed[f.Name] = nil
@@ -539,7 +539,7 @@ func SetCustomValues(ctx context.Context, q Q, a Actor, t *Task, vals map[string
 		if err != nil {
 			return err
 		}
-		if _, err := q.ExecContext(ctx, `INSERT INTO task_custom_values (task_id, field_id, value) VALUES (?,?,?)
+		if _, err := q.ExecContext(ctx, `INSERT INTO gig_custom_values (gig_id, field_id, value) VALUES (?,?,?)
 			ON CONFLICT DO UPDATE SET value = excluded.value`, t.ID, id, mustJSON(nv)); err != nil {
 			return err
 		}
@@ -548,44 +548,44 @@ func SetCustomValues(ctx context.Context, q Q, a Actor, t *Task, vals map[string
 	if len(changed) == 0 {
 		return nil
 	}
-	return touchTask(ctx, q, a, t, "task.custom", changed)
+	return touchGig(ctx, q, a, t, "gig.custom", changed)
 }
 
 // ---------------------------------------------------------------- templates
 
-// TemplateSubtask is a subtask every task made from a template gets.
-type TemplateSubtask struct {
-	Title        string `json:"title" doc:"The subtask's title"`
-	BlocksParent bool   `json:"blocks_parent,omitempty" doc:"The parent task waits (isn't handed out) until this subtask is done"`
+// TemplateSubgig is a subgig every gig made from a template gets.
+type TemplateSubgig struct {
+	Title        string `json:"title" doc:"The subgig's title"`
+	BlocksParent bool   `json:"blocks_parent,omitempty" doc:"The parent gig waits (isn't handed out) until this subgig is done"`
 }
 
-// Template is a reusable task blueprint.
+// Template is a reusable gig blueprint.
 type Template struct {
-	ID            int64             `json:"id"`
-	WorkspaceID   int64             `json:"workspace_id"`
-	ProjectID     *int64            `json:"project_id" doc:"null = usable in any project of the workspace"`
-	Name          string            `json:"name"`
-	Title         string            `json:"title"`
-	DescriptionMD string            `json:"description_md"`
-	Priority      int64             `json:"priority"`
-	Color         *string           `json:"color"`
-	Labels        []string          `json:"labels"`
-	Assignees     []int64           `json:"assignees"`
-	Checklist     []string          `json:"checklist"`
-	Subtasks      []TemplateSubtask `json:"subtasks" doc:"Subtasks each task made from it gets"`
-	Custom        map[string]any    `json:"custom"`
-	Model         string            `json:"model"`
-	Effort        string            `json:"effort"`
-	AlwaysRun     bool              `json:"always_run"`
-	AllowedTools  []string          `json:"allowed_tools" doc:"Tool allowlist for the runner (permission rules); empty = the runner's usual mode"`
-	CreatedBy     int64             `json:"created_by"`
-	CreatedAt     int64             `json:"created_at"`
-	Version       int64             `json:"version"`
-	Recurring     int64             `json:"recurring" doc:"Live recurring tasks that create their tasks from this template"`
+	ID            int64            `json:"id"`
+	WorkspaceID   int64            `json:"workspace_id"`
+	ProjectID     *int64           `json:"project_id" doc:"null = usable in any project of the workspace"`
+	Name          string           `json:"name"`
+	Title         string           `json:"title"`
+	DescriptionMD string           `json:"description_md"`
+	Priority      int64            `json:"priority"`
+	Color         *string          `json:"color"`
+	Labels        []string         `json:"labels"`
+	Assignees     []int64          `json:"assignees"`
+	Checklist     []string         `json:"checklist"`
+	Subgigs       []TemplateSubgig `json:"subgigs" doc:"Subgigs each gig made from it gets"`
+	Custom        map[string]any   `json:"custom"`
+	Model         string           `json:"model"`
+	Effort        string           `json:"effort"`
+	AlwaysRun     bool             `json:"always_run"`
+	AllowedTools  []string         `json:"allowed_tools" doc:"Tool allowlist for the runner (permission rules); empty = the runner's usual mode"`
+	CreatedBy     int64            `json:"created_by"`
+	CreatedAt     int64            `json:"created_at"`
+	Version       int64            `json:"version"`
+	Recurring     int64            `json:"recurring" doc:"Live recurring gigs that create their gigs from this template"`
 }
 
-const tplCols = `id, workspace_id, project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools, subtasks,
-	(SELECT count(*) FROM recurrences r WHERE r.template_id = task_templates.id AND r.deleted_at IS NULL)`
+const tplCols = `id, workspace_id, project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools, subgigs,
+	(SELECT count(*) FROM recurrences r WHERE r.template_id = gig_templates.id AND r.deleted_at IS NULL)`
 
 func scanTemplate(row interface{ Scan(...any) error }) (*Template, error) {
 	t := &Template{}
@@ -606,21 +606,21 @@ func scanTemplate(row interface{ Scan(...any) error }) (*Template, error) {
 	_ = json.Unmarshal([]byte(custom), &t.Custom)
 	t.AllowedTools = []string{}
 	_ = json.Unmarshal([]byte(tools), &t.AllowedTools)
-	t.Subtasks = []TemplateSubtask{}
-	_ = json.Unmarshal([]byte(subs), &t.Subtasks)
+	t.Subgigs = []TemplateSubgig{}
+	_ = json.Unmarshal([]byte(subs), &t.Subgigs)
 	return t, nil
 }
 
-// normSubtasks trims and checks a template's subtasks (nil becomes empty).
-func normSubtasks(subs []TemplateSubtask) ([]TemplateSubtask, error) {
+// normSubgigs trims and checks a template's subgigs (nil becomes empty).
+func normSubgigs(subs []TemplateSubgig) ([]TemplateSubgig, error) {
 	if len(subs) > 50 {
-		return nil, Invalid("at most 50 subtasks")
+		return nil, Invalid("at most 50 subgigs")
 	}
-	out := make([]TemplateSubtask, 0, len(subs))
+	out := make([]TemplateSubgig, 0, len(subs))
 	for _, s := range subs {
 		s.Title = strings.TrimSpace(s.Title)
-		if err := validTaskText(s.Title, ""); err != nil {
-			return nil, Invalid("subtask title: 1-250 characters")
+		if err := validGigText(s.Title, ""); err != nil {
+			return nil, Invalid("subgig title: 1-250 characters")
 		}
 		out = append(out, s)
 	}
@@ -632,7 +632,7 @@ func (t *Template) validate() error {
 	if t.Name == "" || len(t.Name) > 80 {
 		return Invalid("template name: 1-80 characters")
 	}
-	if err := validTaskText(t.Title, t.DescriptionMD); err != nil {
+	if err := validGigText(t.Title, t.DescriptionMD); err != nil {
 		return err
 	}
 	if t.Priority < 0 || t.Priority > 4 {
@@ -657,11 +657,11 @@ func (t *Template) validate() error {
 	if len(t.Checklist) > 200 {
 		return Invalid("at most 200 checklist items")
 	}
-	subs, err := normSubtasks(t.Subtasks)
+	subs, err := normSubgigs(t.Subgigs)
 	if err != nil {
 		return err
 	}
-	t.Subtasks = subs
+	t.Subgigs = subs
 	for _, c := range t.Checklist {
 		if _, err := validItemText(c); err != nil {
 			return err
@@ -692,7 +692,7 @@ func Templates(ctx context.Context, q Q, ws int64, projects []int64) ([]*Templat
 		where += " AND (project_id IS NULL OR project_id IN (" + placeholders(len(projects)) + "))"
 		args = append(args, int64Args(projects)...)
 	}
-	rows, err := q.QueryContext(ctx, "SELECT "+tplCols+" FROM task_templates WHERE "+where+" ORDER BY name", args...)
+	rows, err := q.QueryContext(ctx, "SELECT "+tplCols+" FROM gig_templates WHERE "+where+" ORDER BY name", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -710,7 +710,7 @@ func Templates(ctx context.Context, q Q, ws int64, projects []int64) ([]*Templat
 
 // GetTemplate loads a live template.
 func GetTemplate(ctx context.Context, q Q, id int64) (*Template, error) {
-	return scanTemplate(q.QueryRowContext(ctx, "SELECT "+tplCols+" FROM task_templates WHERE id = ? AND deleted_at IS NULL", id))
+	return scanTemplate(q.QueryRowContext(ctx, "SELECT "+tplCols+" FROM gig_templates WHERE id = ? AND deleted_at IS NULL", id))
 }
 
 // SaveTemplate creates (ID 0) or replaces a template.
@@ -727,11 +727,11 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			var n int
 			_ = q.QueryRowContext(ctx, `SELECT count(*) FROM recurrences WHERE template_id = ? AND deleted_at IS NULL AND project_id != ?`, t.ID, *t.ProjectID).Scan(&n)
 			if n > 0 {
-				return nil, Conflict("recurring tasks in other projects use this template; keep it for any project or for theirs")
+				return nil, Conflict("recurring gigs in other projects use this template; keep it for any project or for theirs")
 			}
 		}
 	}
-	// custom values must fit this workspace's fields (as stored on a task)
+	// custom values must fit this workspace's fields (as stored on a gig)
 	for k, v := range t.Custom {
 		id, err := strconv.ParseInt(k, 10, 64)
 		if err != nil || strconv.FormatInt(id, 10) != k {
@@ -751,16 +751,16 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 	}
 	if t.ID == 0 {
 		var n int
-		_ = q.QueryRowContext(ctx, `SELECT count(*) FROM task_templates WHERE workspace_id = ? AND deleted_at IS NULL`, t.WorkspaceID).Scan(&n)
+		_ = q.QueryRowContext(ctx, `SELECT count(*) FROM gig_templates WHERE workspace_id = ? AND deleted_at IS NULL`, t.WorkspaceID).Scan(&n)
 		if n >= 200 {
 			return nil, Invalid("a workspace has at most 200 templates")
 		}
 	}
 	action := "template.updated"
 	if t.ID == 0 {
-		res, err := q.ExecContext(ctx, `INSERT INTO task_templates (workspace_id, project_id, name, title, description_md, priority, color, labels, assignees,
-			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subtasks) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, t.WorkspaceID, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
-			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subtasks))
+		res, err := q.ExecContext(ctx, `INSERT INTO gig_templates (workspace_id, project_id, name, title, description_md, priority, color, labels, assignees,
+			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subgigs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, t.WorkspaceID, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
+			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs))
 		if err != nil {
 			return nil, err
 		}
@@ -774,9 +774,9 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 		if expect != 0 && expect != cur.Version {
 			return nil, ErrVersion
 		}
-		if _, err := q.ExecContext(ctx, `UPDATE task_templates SET project_id = ?, name = ?, title = ?, description_md = ?, priority = ?, color = ?, labels = ?,
-			assignees = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, subtasks = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
-			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subtasks), t.ID); err != nil {
+		if _, err := q.ExecContext(ctx, `UPDATE gig_templates SET project_id = ?, name = ?, title = ?, description_md = ?, priority = ?, color = ?, labels = ?,
+			assignees = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, subgigs = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
+			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), t.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -786,21 +786,21 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 	return GetTemplate(ctx, q, t.ID)
 }
 
-// DeleteTemplate removes a template (tasks made from it stay). A template recurring tasks use stays.
+// DeleteTemplate removes a template (gigs made from it stay). A template recurring gigs use stays.
 func DeleteTemplate(ctx context.Context, q Q, a Actor, t *Template) error {
 	if names := templateSchedules(ctx, q, t.ID); len(names) > 0 {
-		return Conflict("recurring tasks use this template: %s. Delete them or give them another template first", strings.Join(names, ", "))
+		return Conflict("recurring gigs use this template: %s. Delete them or give them another template first", strings.Join(names, ", "))
 	}
-	if _, err := q.ExecContext(ctx, `UPDATE task_templates SET deleted_at = ? WHERE id = ?`, Now(), t.ID); err != nil {
+	if _, err := q.ExecContext(ctx, `UPDATE gig_templates SET deleted_at = ? WHERE id = ?`, Now(), t.ID); err != nil {
 		return err
 	}
 	_, err := Activity(ctx, q, a, &t.WorkspaceID, t.ProjectID, "template.deleted", "template", t.ID, map[string]any{"name": t.Name})
 	return err
 }
 
-// templateSchedules names the live recurring tasks using a template.
+// templateSchedules names the live recurring gigs using a template.
 func templateSchedules(ctx context.Context, q Q, id int64) []string {
-	rows, err := q.QueryContext(ctx, `SELECT r.id, t.title FROM recurrences r JOIN task_templates t ON t.id = r.template_id
+	rows, err := q.QueryContext(ctx, `SELECT r.id, t.title FROM recurrences r JOIN gig_templates t ON t.id = r.template_id
 		WHERE r.template_id = ? AND r.deleted_at IS NULL ORDER BY r.id LIMIT 10`, id)
 	if err != nil {
 		return []string{"(unknown)"}
@@ -817,16 +817,16 @@ func templateSchedules(ctx context.Context, q Q, id int64) []string {
 	return out
 }
 
-// AddSubtasks creates subtasks of t, each made like t: same project, priority, assignees, window
+// AddSubgigs creates subgigs of t, each made like t: same project, priority, assignees, window
 // and run settings. The assignees aren't notified again for each one (they were for t).
-func AddSubtasks(ctx context.Context, q Q, a Actor, t *Task, subs []TemplateSubtask) error {
-	subs, err := normSubtasks(subs)
+func AddSubgigs(ctx context.Context, q Q, a Actor, t *Gig, subs []TemplateSubgig) error {
+	subs, err := normSubgigs(subs)
 	if err != nil {
 		return err
 	}
 	for _, s := range subs {
 		parent := t.ID
-		if _, err := CreateTask(ctx, q, a, NewTask{ProjectID: t.ProjectID, Title: s.Title, Priority: t.Priority, ParentID: &parent,
+		if _, err := CreateGig(ctx, q, a, NewGig{ProjectID: t.ProjectID, Title: s.Title, Priority: t.Priority, ParentID: &parent,
 			BlocksParent: s.BlocksParent, StartAt: t.StartAt, DueAt: t.DueAt, NotAfter: t.NotAfter, Assignees: t.Assignees,
 			CreatedViaKey: t.CreatedViaKeyID, Model: t.Model, Effort: t.Effort, AlwaysRun: t.AlwaysRun, AllowedTools: t.AllowedTools,
 			Quiet: true}); err != nil {
@@ -836,11 +836,11 @@ func AddSubtasks(ctx context.Context, q Q, a Actor, t *Task, subs []TemplateSubt
 	return nil
 }
 
-// templateExtras adds a template's checklist, custom values and subtasks to a task made from it
-// (custom fields deleted since the template was saved are dropped). Each subtask is made like the
-// task: same project, priority, assignees, window and run settings.
-func templateExtras(ctx context.Context, q Q, a Actor, t *Task, checklist []string, custom map[string]any, subs []TemplateSubtask) error {
-	if err := AddSubtasks(ctx, q, a, t, subs); err != nil {
+// templateExtras adds a template's checklist, custom values and subgigs to a gig made from it
+// (custom fields deleted since the template was saved are dropped). Each subgig is made like the
+// gig: same project, priority, assignees, window and run settings.
+func templateExtras(ctx context.Context, q Q, a Actor, t *Gig, checklist []string, custom map[string]any, subs []TemplateSubgig) error {
+	if err := AddSubgigs(ctx, q, a, t, subs); err != nil {
 		return err
 	}
 	if len(checklist) > 0 {
@@ -862,28 +862,28 @@ func templateExtras(ctx context.Context, q Q, a Actor, t *Task, checklist []stri
 	return SetCustomValues(ctx, q, a, t, vals)
 }
 
-// TaskFromTemplate creates a task in project p from template tpl (fields in over override the template).
-func TaskFromTemplate(ctx context.Context, q Q, a Actor, tpl *Template, p *Project, title *string, viaKey *int64) (*Task, error) {
+// GigFromTemplate creates a gig in project p from template tpl (fields in over override the template).
+func GigFromTemplate(ctx context.Context, q Q, a Actor, tpl *Template, p *Project, title *string, viaKey *int64) (*Gig, error) {
 	if tpl.WorkspaceID != p.WorkspaceID || (tpl.ProjectID != nil && *tpl.ProjectID != p.ID) {
 		return nil, Invalid("this template isn't for that project")
 	}
-	n := NewTask{ProjectID: p.ID, Title: tpl.Title, DescriptionMD: tpl.DescriptionMD, Priority: tpl.Priority, Color: tpl.Color,
+	n := NewGig{ProjectID: p.ID, Title: tpl.Title, DescriptionMD: tpl.DescriptionMD, Priority: tpl.Priority, Color: tpl.Color,
 		Model: tpl.Model, Effort: tpl.Effort, AlwaysRun: tpl.AlwaysRun, AllowedTools: tpl.AllowedTools,
 		Labels: tpl.Labels, Assignees: validAssignees(ctx, q, &Recurrence{WorkspaceID: p.WorkspaceID, Assignees: tpl.Assignees}), CreatedViaKey: viaKey}
 	if title != nil && strings.TrimSpace(*title) != "" {
 		n.Title = *title
 	}
-	t, err := CreateTask(ctx, q, a, n)
+	t, err := CreateGig(ctx, q, a, n)
 	if err != nil {
 		return nil, err
 	}
-	if err := templateExtras(ctx, q, a, t, tpl.Checklist, tpl.Custom, tpl.Subtasks); err != nil {
+	if err := templateExtras(ctx, q, a, t, tpl.Checklist, tpl.Custom, tpl.Subgigs); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "task.from_template", "task", t.ID, map[string]any{"template": tpl.ID, "name": tpl.Name}); err != nil {
+	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "gig.from_template", "gig", t.ID, map[string]any{"template": tpl.ID, "name": tpl.Name}); err != nil {
 		return nil, err
 	}
-	return GetTask(ctx, q, t.ID)
+	return GetGig(ctx, q, t.ID)
 }
 
 // ---------------------------------------------------------------- saved filters
@@ -988,9 +988,9 @@ func DeleteFilter(ctx context.Context, q Q, user, id int64) error {
 type Notification struct {
 	ID          int64   `json:"id"`
 	WorkspaceID int64   `json:"workspace_id"`
-	TaskID      *int64  `json:"task_id"`
-	TaskKey     *string `json:"task_key"`
-	TaskTitle   *string `json:"task_title"`
+	GigID       *int64  `json:"gig_id"`
+	GigKey      *string `json:"gig_key"`
+	GigTitle    *string `json:"gig_title"`
 	CommentID   *int64  `json:"comment_id"`
 	Kind        string  `json:"kind" doc:"mention, assigned, question, missed or comment"`
 	ActorID     *int64  `json:"actor_user_id"`
@@ -999,8 +999,8 @@ type Notification struct {
 }
 
 // Notify records a bell entry for each user (never for the actor themself), deduplicated per
-// (user, task, comment, kind). Users who can no longer see the workspace are skipped.
-func Notify(ctx context.Context, q Q, a Actor, t *Task, commentID *int64, kind string, users []int64) error {
+// (user, gig, comment, kind). Users who can no longer see the workspace are skipped.
+func Notify(ctx context.Context, q Q, a Actor, t *Gig, commentID *int64, kind string, users []int64) error {
 	for _, u := range users {
 		if u == a.UserID || u == 0 {
 			continue
@@ -1009,7 +1009,7 @@ func Notify(ctx context.Context, q Q, a Actor, t *Task, commentID *int64, kind s
 			continue
 		}
 		var dup int
-		_ = q.QueryRowContext(ctx, `SELECT count(*) FROM notifications WHERE user_id = ? AND task_id = ? AND kind = ? AND comment_id IS ? AND read_at IS NULL`,
+		_ = q.QueryRowContext(ctx, `SELECT count(*) FROM notifications WHERE user_id = ? AND gig_id = ? AND kind = ? AND comment_id IS ? AND read_at IS NULL`,
 			u, t.ID, kind, nullInt(commentID)).Scan(&dup)
 		if dup > 0 {
 			continue
@@ -1018,7 +1018,7 @@ func Notify(ctx context.Context, q Q, a Actor, t *Task, commentID *int64, kind s
 		if a.UserID != 0 {
 			actor = a.UserID
 		}
-		if _, err := q.ExecContext(ctx, `INSERT INTO notifications (user_id, workspace_id, task_id, comment_id, kind, actor_user_id, created_at) VALUES (?,?,?,?,?,?,?)`,
+		if _, err := q.ExecContext(ctx, `INSERT INTO notifications (user_id, workspace_id, gig_id, comment_id, kind, actor_user_id, created_at) VALUES (?,?,?,?,?,?,?)`,
 			u, t.WorkspaceID, t.ID, nullInt(commentID), kind, actor, Now()); err != nil {
 			return err
 		}
@@ -1089,8 +1089,8 @@ func Notifications(ctx context.Context, q Q, user int64, workspaces []int64, unr
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	rows, err := q.QueryContext(ctx, `SELECT n.id, n.workspace_id, n.task_id, p.key || '-' || t.number, t.title, n.comment_id, n.kind, n.actor_user_id, n.created_at, n.read_at
-		FROM notifications n LEFT JOIN tasks t ON t.id = n.task_id AND t.deleted_at IS NULL LEFT JOIN projects p ON p.id = t.project_id
+	rows, err := q.QueryContext(ctx, `SELECT n.id, n.workspace_id, n.gig_id, p.key || '-' || t.number, t.title, n.comment_id, n.kind, n.actor_user_id, n.created_at, n.read_at
+		FROM notifications n LEFT JOIN gigs t ON t.id = n.gig_id AND t.deleted_at IS NULL LEFT JOIN projects p ON p.id = t.project_id
 		WHERE `+where+` ORDER BY n.id DESC LIMIT `+strconv.Itoa(limit), args...)
 	if err != nil {
 		return nil, 0, err
@@ -1099,13 +1099,13 @@ func Notifications(ctx context.Context, q Q, user int64, workspaces []int64, unr
 	out := []*Notification{}
 	for rows.Next() {
 		n := &Notification{}
-		var task, comment, actor, read sql.NullInt64
+		var gig, comment, actor, read sql.NullInt64
 		var key, title sql.NullString
-		if err := rows.Scan(&n.ID, &n.WorkspaceID, &task, &key, &title, &comment, &n.Kind, &actor, &n.CreatedAt, &read); err != nil {
+		if err := rows.Scan(&n.ID, &n.WorkspaceID, &gig, &key, &title, &comment, &n.Kind, &actor, &n.CreatedAt, &read); err != nil {
 			return nil, 0, err
 		}
-		n.TaskID, n.CommentID, n.ActorID, n.ReadAt = ptrInt(task), ptrInt(comment), ptrInt(actor), ptrInt(read)
-		n.TaskKey, n.TaskTitle = ptrStr(key), ptrStr(title)
+		n.GigID, n.CommentID, n.ActorID, n.ReadAt = ptrInt(gig), ptrInt(comment), ptrInt(actor), ptrInt(read)
+		n.GigKey, n.GigTitle = ptrStr(key), ptrStr(title)
 		out = append(out, n)
 	}
 	return out, unread, rows.Err()

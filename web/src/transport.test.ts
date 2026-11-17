@@ -36,34 +36,34 @@ describe("shared reads", () => {
 
   it("reuses an answer for a few seconds, then asks again", async () => {
     serve(() => json({ n: 1 }));
-    await request("GET", "/tasks/9");
-    await request("GET", "/tasks/9");
+    await request("GET", "/gigs/9");
+    await request("GET", "/gigs/9");
     expect(calls).toHaveLength(1);
     vi.advanceTimersByTime(3100);
-    await request("GET", "/tasks/9");
+    await request("GET", "/gigs/9");
     expect(calls).toHaveLength(2);
   });
 
   it("forgets everything after this tab's own write", async () => {
     serve((_u, init) => (init.method === "GET" ? json({ n: 1 }) : json({}, 200, { "X-Request-Id": "r1" })));
-    await request("GET", "/tasks/9");
-    await request("PATCH", "/tasks/9", { body: { title: "x" } });
-    await request("GET", "/tasks/9");
+    await request("GET", "/gigs/9");
+    await request("PATCH", "/gigs/9", { body: { title: "x" } });
+    await request("GET", "/gigs/9");
     expect(calls.filter((c) => c.init.method === "GET")).toHaveLength(2);
   });
 
   it("keeps the cache on its own echo, drops it on anyone else's event", async () => {
     serve((_u, init) => (init.method === "GET" ? json({ n: 1 }) : json({}, 200, { "X-Request-Id": "mine" })));
-    await request("POST", "/tasks/9/move", { body: {} });
-    await request("GET", "/tasks/9");
+    await request("POST", "/gigs/9/move", { body: {} });
+    await request("GET", "/gigs/9");
     noteEvent("mine");
-    await request("GET", "/tasks/9");
+    await request("GET", "/gigs/9");
     expect(calls.filter((c) => c.init.method === "GET")).toHaveLength(1);
     noteEvent("someone-else");
-    await request("GET", "/tasks/9");
+    await request("GET", "/gigs/9");
     expect(calls.filter((c) => c.init.method === "GET")).toHaveLength(2);
     noteEvent(undefined); // an agent's change: no request id at all
-    await request("GET", "/tasks/9");
+    await request("GET", "/gigs/9");
     expect(calls.filter((c) => c.init.method === "GET")).toHaveLength(3);
   });
 
@@ -71,20 +71,20 @@ describe("shared reads", () => {
     serve((u) => (u.endsWith("/auth/me") ? json({}) : json({ detail: "no" }, 404)));
     await request("GET", "/auth/me");
     await request("GET", "/auth/me");
-    await request("GET", "/tasks/404");
-    await request("GET", "/tasks/404");
+    await request("GET", "/gigs/404");
+    await request("GET", "/gigs/404");
     expect(calls).toHaveLength(4);
   });
 
   it("doesn't cache an answer that started before a change", async () => {
     let resolve!: (r: Response) => void;
     serve(() => new Promise<Response>((r) => (resolve = r)));
-    const p = request("GET", "/tasks/9");
+    const p = request("GET", "/gigs/9");
     noteEvent("other");
     resolve(json({ n: 1 }));
     await p;
     serve(() => json({ n: 2 }));
-    const r = await request("GET", "/tasks/9");
+    const r = await request("GET", "/gigs/9");
     expect((r.data as { n: number }).n).toBe(2);
   });
 });
@@ -115,14 +115,14 @@ describe("retries", () => {
 
   it("never retries a 4xx", async () => {
     serve(() => json({ detail: "bad" }, 422));
-    expect((await request("PATCH", "/tasks/1", { body: {} })).status).toBe(422);
+    expect((await request("PATCH", "/gigs/1", { body: {} })).status).toBe(422);
     expect(calls).toHaveLength(1);
   });
 
   it("repeats a POST with the same Idempotency-Key", async () => {
     let n = 0;
     serve(() => (++n === 1 ? json({}, 502) : json({ id: 5 }, 201)));
-    const p = request("POST", "/projects/1/tasks", { body: { title: "t" } });
+    const p = request("POST", "/projects/1/gigs", { body: { title: "t" } });
     await vi.runAllTimersAsync();
     await p;
     const keys = calls.map((c) => (c.init.headers as Record<string, string>)["Idempotency-Key"]);
@@ -134,7 +134,7 @@ describe("retries", () => {
   it("waits for a slow first try instead of reporting it as an error", async () => {
     let n = 0;
     serve(() => (++n <= 6 ? json({ code: "idempotency_in_progress" }, 409) : json({ id: 5 }, 201)));
-    const p = request("POST", "/projects/1/tasks", { body: { title: "t" } });
+    const p = request("POST", "/projects/1/gigs", { body: { title: "t" } });
     await vi.runAllTimersAsync();
     expect((await p).status).toBe(201);
     expect(calls).toHaveLength(7);
@@ -153,11 +153,11 @@ describe("retries", () => {
     serve(() => {
       throw new TypeError("network");
     });
-    await expect(request("PATCH", "/tasks/1", { body: {}, headers: { "If-Match": '"3"' } })).rejects.toThrow("network");
+    await expect(request("PATCH", "/gigs/1", { body: {}, headers: { "If-Match": '"3"' } })).rejects.toThrow("network");
     expect(calls).toHaveLength(1);
     let n = 0;
     serve(() => (++n === 1 ? json({ code: "unavailable" }, 503) : json({ version: 4 })));
-    const busy = request("PATCH", "/tasks/1", { body: {}, headers: { "If-Match": '"3"' } });
+    const busy = request("PATCH", "/gigs/1", { body: {}, headers: { "If-Match": '"3"' } });
     await vi.runAllTimersAsync();
     expect((await busy).status).toBe(200);
     expect(calls).toHaveLength(2);
@@ -169,7 +169,7 @@ describe("retries", () => {
       if (++n === 1) throw new TypeError("network");
       return json({ code: "not_found" }, 404);
     });
-    const p = request("DELETE", "/tasks/3");
+    const p = request("DELETE", "/gigs/3");
     await vi.runAllTimersAsync();
     expect((await p).ok).toBe(true);
   });
@@ -181,6 +181,6 @@ describe("secretBearing", () => {
     expect(secretBearing("/keys/3/rotate")).toBe(true);
     expect(secretBearing("/users/2/password")).toBe(true);
     expect(secretBearing("/me/keys")).toBe(true);
-    expect(secretBearing("/projects/1/tasks")).toBe(false);
+    expect(secretBearing("/projects/1/gigs")).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { api, ApiError, fmtTime, hasCap, priorityNames, type Board, type Category, type CustomField, type Status, type Tag, type Task } from "./api";
+import { api, ApiError, fmtTime, hasCap, priorityNames, type Board, type Category, type CustomField, type Status, type Tag, type Gig } from "./api";
 import { fmtDue } from "./dates";
 import { useApp, type WorkspaceTree } from "./App";
 import {
@@ -25,11 +25,11 @@ import { setMentionUsers } from "./markdown";
 import { RecurringModal } from "./Recurring";
 import { SchedulesModal } from "./Schedules";
 import { TemplatesModal } from "./Templates";
-import { TaskModal, lastProject } from "./TaskModal";
-import { TaskPanel } from "./TaskPanel";
+import { GigModal, lastProject } from "./GigModal";
+import { GigPanel } from "./GigPanel";
 import { backTo, viewsApi } from "./views/viewsApi";
 import { CATEGORY_COLOR, colorFor, readableOn } from "./theme";
-import { ClearFilters, Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, TaskBadges, reducedMotion } from "./ui";
+import { ClearFilters, Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, GigBadges, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
@@ -45,7 +45,7 @@ type BoardAction = "new" | "recurring" | "templates" | "schedules" | "archive";
 // BoardPage: one board over every workspace and project in reach, narrowed by the filter in the URL
 // (/board?ws=..&p=..&a=..&l=..&pr=..&q=..&arch=1). One project in view: its own status columns and
 // manual order. Several: one column per category, ordered by priority and due date.
-export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: string }) {
+export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string }) {
   const { tree, refresh, me, users, members, prefs, setPref } = useApp();
   setMentionUsers(users);
   const search = useSearch();
@@ -90,7 +90,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const [boards, setBoards] = useState<Map<number, Board>>(new Map());
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState<string[]>([]);
-  const [archived, setArchived] = useState<Task[]>([]);
+  const [archived, setArchived] = useState<Gig[]>([]);
   const [fields, setFields] = useState<Map<number, CustomField[]>>(new Map());
   const [toast, setToast] = useState("");
   const [moveErr, setMoveErr] = useState("");
@@ -98,19 +98,19 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const [drop, setDrop] = useState<{ col: string; index: number } | null>(null);
   const [activeCol, setActiveCol] = useState<string | null>(null);
   const [adding, setAdding] = useState<number | null>(null);
-  // a column's "+": the new task starts in that column (its status, or its stage's first status in the picked project)
+  // a column's "+": the new gig starts in that column (its status, or its stage's first status in the picked project)
   const [newIn, setNewIn] = useState<{ category: Category; statusId?: number } | null>(null);
   // the lists that span every workspace (each with its own optional filter)
   const [recurring, setRecurring] = useState<{ highlight?: number } | null>(null);
   const [templates, setTemplates] = useState(false);
-  // the archive dialog: the projects ticked to start with, and which finished tasks (both when unset)
+  // the archive dialog: the projects ticked to start with, and which finished gigs (both when unset)
   const [archiveDone, setArchiveDone] = useState<{ ids: number[]; category?: "done" | "cancelled" } | null>(null);
   const [timings, setTimings] = useState(false);
   const [trash, setTrash] = useState(false);
   const narrow = useNarrow();
 
-  // the boards to load: the projects in view, plus the open task's project
-  const wantKey = [...scopeIds, ...(taskPid && !scopeIds.includes(taskPid) ? [taskPid] : [])].join(",");
+  // the boards to load: the projects in view, plus the open gig's project
+  const wantKey = [...scopeIds, ...(gigPid && !scopeIds.includes(gigPid) ? [gigPid] : [])].join(",");
   const loadSeq = useRef(0);
   const load = useCallback(() => {
     const ids = wantKey ? wantKey.split(",").map(Number) : [];
@@ -118,7 +118,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     Promise.allSettled(ids.map((id) => api.board(id))).then((res) => {
       if (seq !== loadSeq.current) return; // a newer load (another filter) is on its way
       const bad: string[] = [];
-      // a board that failed to reload keeps its last answer (dropping it would close an open task panel
+      // a board that failed to reload keeps its last answer (dropping it would close an open gig panel
       // and the text in it); one never loaded stays out
       setBoards((prev) => {
         const m = new Map<number, Board>();
@@ -136,7 +136,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     });
   }, [wantKey, projOf]);
   useEffect(load, [load]);
-  // archived tasks: the board endpoint hides them, so the toggle lists them separately
+  // archived gigs: the board endpoint hides them, so the toggle lists them separately
   const archKey = filter.arch ? scopeIds.join(",") : "";
   useEffect(() => {
     if (!archKey) {
@@ -144,7 +144,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       return;
     }
     let live = true;
-    Promise.allSettled(archKey.split(",").map((id) => api.projectTasks(Number(id), { archived: "only", limit: 500 }))).then((res) => {
+    Promise.allSettled(archKey.split(",").map((id) => api.projectGigs(Number(id), { archived: "only", limit: 500 }))).then((res) => {
       if (live) setArchived(res.flatMap((r) => (r.status === "fulfilled" ? r.value.items.filter((t) => !t.deleted) : [])));
     });
     return () => {
@@ -173,21 +173,21 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const loadRef = useRef(load);
   loadRef.current = load;
   const movesInFlight = useRef(0);
-  // patchTask: put a freshly fetched task in place on the board (same status: same column, same order)
-  const patchRef = useRef((t: Task) => {
+  // patchGig: put a freshly fetched gig in place on the board (same status: same column, same order)
+  const patchRef = useRef((t: Gig) => {
     void t;
   });
-  patchRef.current = (t: Task) =>
+  patchRef.current = (t: Gig) =>
     setBoards((cur) => {
       const b = cur.get(t.project_id);
-      if (!b || !b.statuses.some((s) => s.tasks.some((x) => x.id === t.id && x.status_id === t.status_id))) return cur;
-      const nb = { ...b, statuses: b.statuses.map((s) => ({ ...s, tasks: s.tasks.map((x) => (x.id === t.id ? t : x)) })) };
+      if (!b || !b.statuses.some((s) => s.gigs.some((x) => x.id === t.id && x.status_id === t.status_id))) return cur;
+      const nb = { ...b, statuses: b.statuses.map((s) => ({ ...s, gigs: s.gigs.map((x) => (x.id === t.id ? t : x)) })) };
       return new Map(cur).set(t.project_id, nb);
     });
   useEffect(() => {
     const ids = new Set(wsKey ? wsKey.split(",").map(Number) : []);
-    if (taskPid) {
-      const w = projOf(taskPid)?.ws.id;
+    if (gigPid) {
+      const w = projOf(gigPid)?.ws.id;
       if (w) ids.add(w);
     }
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -200,19 +200,19 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       timer = null;
       loadRef.current();
     };
-    // progress of a running agent changes one card: fetch that task alone (debounced per task)
+    // progress of a running agent changes one card: fetch that gig alone (debounced per gig)
     const progress = new Map<number, ReturnType<typeof setTimeout>>();
     const on = (e: Event) => {
       const d = (e as CustomEvent<{ workspaceId?: number; item?: { action?: string; data?: unknown } }>).detail;
       if (d?.workspaceId === undefined || !ids.has(d.workspaceId)) return;
-      const tid = (d.item?.data as { task_id?: unknown } | undefined)?.task_id;
+      const tid = (d.item?.data as { gig_id?: unknown } | undefined)?.gig_id;
       if (d.item?.action === "run.progress" && typeof tid === "number") {
         clearTimeout(progress.get(tid));
         progress.set(
           tid,
           setTimeout(() => {
             progress.delete(tid);
-            api.task(tid).then((t) => patchRef.current(t), () => undefined);
+            api.gig(tid).then((t) => patchRef.current(t), () => undefined);
           }, 400),
         );
         return;
@@ -226,7 +226,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       if (timer) clearTimeout(timer);
       progress.forEach((t) => clearTimeout(t));
     };
-  }, [wsKey, taskPid, projOf]);
+  }, [wsKey, gigPid, projOf]);
 
   useEffect(() => {
     if (!toast) return;
@@ -242,13 +242,13 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     [load, refresh],
   );
 
-  // a new task opens straight in the form, which offers every project you can add to: it starts in the
+  // a new gig opens straight in the form, which offers every project you can add to: it starts in the
   // project in view, else the one last used in view, else the first in view; with none of those
   // writable, the last used anywhere, else the first project of a workspace you can add to
-  // the projects in view you can add tasks to (the role, and the Create tasks permission)
-  const writable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "create_tasks", x.ws.id));
-  // every workspace you can add to (the form may move the task there)
-  const newChoices = tree.filter((w) => canWriteIn(w) && hasCap(me, "create_tasks", w.id) && w.projects.length > 0);
+  // the projects in view you can add gigs to (the role, and the Create gigs permission)
+  const writable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "create_gigs", x.ws.id));
+  // every workspace you can add to (the form may move the gig there)
+  const newChoices = tree.filter((w) => canWriteIn(w) && hasCap(me, "create_gigs", w.id) && w.projects.length > 0);
   const openNew = useCallback(() => {
     const last = lastProject();
     const at = (single && writable.includes(single) ? single : undefined) ?? writable.find((x) => x.project.id === last) ?? writable[0];
@@ -257,7 +257,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     const p = anywhere.find((x) => x.id === last) ?? anywhere[0];
     if (p) setAdding(p.id);
   }, [single, writable, newChoices]);
-  const archivable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "archive_tasks", x.ws.id));
+  const archivable = inScope.filter((x) => canWriteIn(x.ws) && hasCap(me, "archive_gigs", x.ws.id));
   const action = (what: BoardAction, category?: "done" | "cancelled") => {
     if (what === "archive") {
       // one dialog for any number of projects: up to three in view start ticked; more start unticked, so
@@ -271,7 +271,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       openNew();
     }
   };
-  // ?new=1 (the command palette's "New task") opens the new-task flow
+  // ?new=1 (the command palette's "New gig") opens the new-gig flow
   useEffect(() => {
     const s = new URLSearchParams(search);
     if (s.get("new") !== "1") return;
@@ -295,20 +295,20 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-col-focus="${id}"]`)?.focus());
   };
 
-  const allTasks = useMemo(() => [...boards.values()].flatMap((b) => b.statuses.flatMap((s) => s.tasks)), [boards]);
-  const taskById = (id: number) => allTasks.find((t) => t.id === id);
+  const allGigs = useMemo(() => [...boards.values()].flatMap((b) => b.statuses.flatMap((s) => s.gigs)), [boards]);
+  const gigById = (id: number) => allGigs.find((t) => t.id === id);
 
-  // moves: optimistic, then the server places the task; a failure reloads the boards (putting back the
+  // moves: optimistic, then the server places the gig; a failure reloads the boards (putting back the
   // snapshot from before this move would also undo later moves and reloads)
   const sendMove = useCallback(
-    (taskId: number, body: MoveBody, next: Map<number, Board>) => {
-      const key = allTasks.find((t) => t.id === taskId)?.key ?? "the task";
+    (gigId: number, body: MoveBody, next: Map<number, Board>) => {
+      const key = allGigs.find((t) => t.id === gigId)?.key ?? "the gig";
       setBoards(next);
       setMoveErr("");
       movesInFlight.current++;
       loadSeq.current++; // a load already on its way predates the move: drop its answer
       api
-        .moveTask(taskId, body)
+        .moveGig(gigId, body)
         .finally(() => movesInFlight.current--)
         .then(() => changed())
         .catch((e: unknown) => {
@@ -317,30 +317,30 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           load();
         });
     },
-    [allTasks, changed, load],
+    [allGigs, changed, load],
   );
-  const moveInProject = (taskId: number, statusId: number, index: number) => {
-    const t = taskById(taskId);
+  const moveInProject = (gigId: number, statusId: number, index: number) => {
+    const t = gigById(gigId);
     const b = t && boards.get(t.project_id);
     if (!t || !b) return;
-    const m = applyMove(b, taskId, statusId, index);
+    const m = applyMove(b, gigId, statusId, index);
     if (!m) return;
-    sendMove(taskId, m.body, new Map(boards).set(t.project_id, m.board));
+    sendMove(gigId, m.body, new Map(boards).set(t.project_id, m.board));
   };
-  const moveToCat = (taskId: number, category: Category) => {
-    const t = taskById(taskId);
+  const moveToCat = (gigId: number, category: Category) => {
+    const t = gigById(gigId);
     if (!t || t.status_category === category) return;
-    const next = moveToCategory(boards, taskId, category);
+    const next = moveToCategory(boards, gigId, category);
     if (!next) {
       setMoveErr(`${t.key}'s project has no ${CATEGORY_LABEL[category]} column.`);
       return;
     }
-    sendMove(taskId, { category }, next);
+    sendMove(gigId, { category }, next);
   };
 
   // cards glide to a new place (a drop, a move another user or an agent made): a card that changed column,
   // or changed position in a column whose number of cards stayed the same (a reorder), animates from where
-  // it was. Cards that only shift because another one came or went (a filter, a new task) don't move.
+  // it was. Cards that only shift because another one came or went (a filter, a new gig) don't move.
   // Positions are relative to the board (scrolling isn't a move) and re-read when the board resizes; the
   // layout is only read when the placements changed, and not while a card is being dragged.
   const boardRef = useRef<HTMLDivElement>(null);
@@ -422,18 +422,18 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   if (!loaded) return <p className="muted">Loading…</p>;
 
   const me_ = me.user.id;
-  // a manual order only makes sense on the whole column: with a task filter on, drops go last
+  // a manual order only makes sense on the whole column: with a gig filter on, drops go last
   const manual = !!single && !(filter.a || filter.l || filter.pr || filter.q);
   const columns: BoardColumn[] = single
     ? boards.get(single.project.id)
       ? statusColumns(boards.get(single.project.id)!, filter, me_)
       : []
     : categoryColumns(scopeIds.map((id) => boards.get(id)).filter((b): b is Board => !!b), filter, me_);
-  const countOpen = (cols: BoardColumn[]) => cols.filter((c) => c.category !== "done").reduce((n, c) => n + c.tasks.length, 0);
+  const countOpen = (cols: BoardColumn[]) => cols.filter((c) => c.category !== "done").reduce((n, c) => n + c.gigs.length, 0);
   const open = countOpen(columns);
-  // with a task filter (assignee, label, priority, search) on, the count says how many of all match
-  const taskFiltered = !!(filter.a || filter.l || filter.pr || filter.q);
-  const allOpen = !taskFiltered
+  // with a gig filter (assignee, label, priority, search) on, the count says how many of all match
+  const gigFiltered = !!(filter.a || filter.l || filter.pr || filter.q);
+  const allOpen = !gigFiltered
     ? open
     : countOpen(
         (() => {
@@ -449,15 +449,15 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
   const shown = narrow && active ? [active] : columns;
   // collapsed columns leave the grid and become small chips above it (wide screens; a phone shows one column)
   const openCols = narrow ? shown : shown.filter((c) => !collapsed.includes(c.id));
-  // which open column carries the "Archive done" footer: the last done-stage column that has tasks (one
+  // which open column carries the "Archive done" footer: the last done-stage column that has gigs (one
   // project can have several; one footer is enough)
   let archiveCol: string | undefined;
-  for (const c of openCols) if (c.category === "done" && c.tasks.length > 0) archiveCol = c.key;
+  for (const c of openCols) if (c.category === "done" && c.gigs.length > 0) archiveCol = c.key;
   const closedCols = narrow ? [] : shown.filter((c) => collapsed.includes(c.id));
-  // the agent side of the tasks in view, in one line above the columns
+  // the agent side of the gigs in view, in one line above the columns
   const pulse = { running: 0, answer: 0, failed: 0, queued: 0, total: 0 };
   for (const c of columns)
-    for (const t of c.tasks) {
+    for (const t of c.gigs) {
       const st = cardState(t);
       if (st) {
         pulse[st.kind]++;
@@ -473,7 +473,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     .map((id) => users.get(id))
     .filter((u): u is NonNullable<typeof u> => !!u)
     .sort((a, b) => (a.display_name || a.username).localeCompare(b.display_name || b.username));
-  const wsArchive = inScope.some((x) => canWriteIn(x.ws) && hasCap(me, "archive_tasks", x.ws.id));
+  const wsArchive = inScope.some((x) => canWriteIn(x.ws) && hasCap(me, "archive_gigs", x.ws.id));
   const wsTemplates = inScope.some((x) => hasCap(me, "templates", x.ws.id));
   // the table of what's in view: the one project, the one workspace, else every workspace
   const tableHref = single ? `/w/${single.ws.slug}/p/${single.project.id}/table` : wsInScope.length === 1 ? `/w/${wsInScope[0]!.slug}/table` : "/table";
@@ -489,7 +489,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     e.dataTransfer.dropEffect = "move";
     let index = -1;
     if (manual && !atEnd) {
-      const cards = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-task-id]")].filter((el) => Number(el.dataset.taskId) !== drag);
+      const cards = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-gig-id]")].filter((el) => Number(el.dataset.gigId) !== drag);
       index = cards.findIndex((el) => {
         const r = el.getBoundingClientRect();
         return e.clientY < r.top + r.height / 2;
@@ -502,7 +502,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     if (drag === null) return;
     e.preventDefault();
     if (c.statusId !== undefined) {
-      const all = boards.get(single!.project.id)?.statuses.find((s) => s.id === c.statusId)?.tasks ?? c.tasks; // unfiltered
+      const all = boards.get(single!.project.id)?.statuses.find((s) => s.id === c.statusId)?.gigs ?? c.gigs; // unfiltered
       const index = manual && drop?.col === c.key && drop.index >= 0 ? drop.index : all.filter((t) => t.id !== drag).length;
       moveInProject(drag, c.statusId, index);
     } else moveToCat(drag, c.category);
@@ -520,14 +520,14 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
     setNewIn({ category: c.category, statusId: c.statusId });
     openNew();
   };
-  const cardFor = (t: Task, c: BoardColumn, i: number, archivedCard: boolean) => {
+  const cardFor = (t: Gig, c: BoardColumn, i: number, archivedCard: boolean) => {
     const p = projOf(t.project_id);
     const b = boards.get(t.project_id);
     if (!p || !b) return null;
     const write = !archivedCard && canWriteIn(p.ws);
     return (
       <Card
-        task={t}
+        gig={t}
         statuses={openStatuses(b)}
         ws={p.ws}
         showWs={wsInScope.length > 1}
@@ -540,46 +540,46 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           dragTimer.current = setTimeout(() => setDrag(t.id), 0);
         }}
         onDragEnd={endDrag}
-        onReorder={(where) => c.statusId !== undefined && moveInProject(t.id, c.statusId, reorderIndex(where, i, c.tasks.length))}
+        onReorder={(where) => c.statusId !== undefined && moveInProject(t.id, c.statusId, reorderIndex(where, i, c.gigs.length))}
         first={i === 0}
-        last={i === c.tasks.length - 1}
-        onOpen={() => navigate(`/board/p/${t.project_id}/t/${t.key}${qs}`)}
+        last={i === c.gigs.length - 1}
+        onOpen={() => navigate(`/board/p/${t.project_id}/g/${t.key}${qs}`)}
         onChanged={changed}
         fields={fields.get(p.ws.id)}
       />
     );
   };
 
-  const panel = taskPid && taskKey ? projOf(taskPid) : null;
-  const panelBoard = taskPid ? boards.get(taskPid) : undefined;
-  // the new task's start project: its board when in view (statuses, labels), else the form fetches them
+  const panel = gigPid && gigKey ? projOf(gigPid) : null;
+  const panelBoard = gigPid ? boards.get(gigPid) : undefined;
+  // the new gig's start project: its board when in view (statuses, labels), else the form fetches them
   const addAt = adding === null ? null : projOf(adding);
   const addBoard = adding === null ? undefined : boards.get(adding);
 
   // the board's less frequent actions: the "⋯" menu of the page head (on a phone also the table links)
   const tools = (
     <>
-      <button type="button" role="menuitem" data-tip="Tasks that come back on a schedule (a template + a schedule)" onClick={() => action("recurring")}>
+      <button type="button" role="menuitem" data-tip="Gigs that come back on a schedule (a template + a schedule)" onClick={() => action("recurring")}>
         <Icon name="refresh" />
         Recurring
       </button>
-      <button type="button" role="menuitem" data-tip="Timings (every day 9:00, every Friday…) that recurring tasks share" onClick={() => action("schedules")}>
+      <button type="button" role="menuitem" data-tip="Timings (every day 9:00, every Friday…) that recurring gigs share" onClick={() => action("schedules")}>
         <Icon name="clock" />
         Schedules
       </button>
       {wsTemplates && (
-        <button type="button" role="menuitem" data-tip="Reusable task contents: start a task or a recurring task from one" onClick={() => action("templates")}>
+        <button type="button" role="menuitem" data-tip="Reusable gig contents: start a gig or a recurring gig from one" onClick={() => action("templates")}>
           <Icon name="template" />
           Templates
         </button>
       )}
       {wsArchive && (
-        <button type="button" role="menuitem" data-tip="Archive the tasks in Done and Cancelled: they leave the board but stay searchable" onClick={() => action("archive")}>
+        <button type="button" role="menuitem" data-tip="Archive the gigs in Done and Cancelled: they leave the board but stay searchable" onClick={() => action("archive")}>
           <Icon name="archive" />
           Archive done
         </button>
       )}
-      <button type="button" role="menuitem" data-tip="Deleted tasks of the projects in view: restore them from here" onClick={() => setTrash(true)}>
+      <button type="button" role="menuitem" data-tip="Deleted gigs of the projects in view: restore them from here" onClick={() => setTrash(true)}>
         <Icon name="trash" />
         Trash
       </button>
@@ -598,7 +598,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
             {wsInScope.length === 1 && <WorkspaceBadge ws={wsInScope[0]!} />}
             {single && <span className="key">{single.project.key}</span>}
             <span className="muted">
-              {taskFiltered ? `showing ${open} of ${allOpen} open task${allOpen === 1 ? "" : "s"}` : `${open} open task${open === 1 ? "" : "s"}`}
+              {gigFiltered ? `showing ${open} of ${allOpen} open gig${allOpen === 1 ? "" : "s"}` : `${open} open gig${open === 1 ? "" : "s"}`}
               {!single && ` · ${inScope.length} projects`}
             </span>
           </div>
@@ -630,7 +630,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                 action("new");
               }}
             >
-              <Icon name="plus" strokeWidth={2.2} /> New task
+              <Icon name="plus" strokeWidth={2.2} /> New gig
             </button>
           )}
           {!narrow && (
@@ -648,7 +648,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       )}
       {[...boards.values()].some((b) => b.truncated) && (
         <p className="muted small" role="status">
-          {[...boards.values()].filter((b) => b.truncated).map((b) => b.project.name).join(", ")}: more tasks than a board shows. Archive finished ones, or use Table to see them all.
+          {[...boards.values()].filter((b) => b.truncated).map((b) => b.project.name).join(", ")}: more gigs than a board shows. Archive finished ones, or use Table to see them all.
         </p>
       )}
       {moveErr && (
@@ -678,7 +678,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
             >
               <span className="dot" style={{ background: colColor(c) }} />
               <span className="col-tab-name">{c.name}</span>
-              <span className="count">{c.tasks.length}</span>
+              <span className="count">{c.gigs.length}</span>
             </button>
           ))}
         </div>
@@ -692,13 +692,13 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
             </span>
           )}
           {pulse.answer > 0 && (
-            <Link href="/inbox" className="pulse-item pulse-answer" data-tip="Tasks whose agent asked a question: answer them from the Inbox or the task">
+            <Link href="/inbox" className="pulse-item pulse-answer" data-tip="Gigs whose agent asked a question: answer them from the Inbox or the gig">
               <Icon name="question" />
               {pulse.answer} need{pulse.answer === 1 ? "s" : ""} an answer
             </Link>
           )}
           {pulse.failed > 0 && (
-            <span className="pulse-item pulse-failed" tabIndex={0} data-tip="Tasks whose agent's last run failed, timed out or was interrupted: Retry on the card resumes it">
+            <span className="pulse-item pulse-failed" tabIndex={0} data-tip="Gigs whose agent's last run failed, timed out or was interrupted: Retry on the card resumes it">
               <Icon name="alert" />
               {pulse.failed} failed
             </span>
@@ -723,7 +723,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
             >
               <StageIcon category={c.category} color={colColor(c)} />
               <span className="collapsed-chip-name">{c.name}</span>
-              <span className="count-pill">{c.tasks.length}</span>
+              <span className="count-pill">{c.gigs.length}</span>
             </button>
           ))}
         </div>
@@ -731,7 +731,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
       {openCols.length === 0 && closedCols.length > 0 && <p className="muted">Every column is collapsed: click one above to show it.</p>}
       <div className="board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${Math.max(1, openCols.length)}, minmax(0, 1fr))` }}>
         {openCols.map((c) => {
-          const others = c.tasks.filter((t) => t.id !== drag);
+          const others = c.gigs.filter((t) => t.id !== drag);
           const line = drop?.col === c.key ? drop.index : -1;
           let k = -1;
           const addHere = canAddIn(c);
@@ -752,13 +752,13 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                     <StageIcon category={c.category} color="currentColor" />
                     <span className="column-name">{c.name}</span>
                   </span>
-                  <span className="count-pill" aria-label={`${c.tasks.length} task${c.tasks.length === 1 ? "" : "s"}`}>
-                    {c.tasks.length}
+                  <span className="count-pill" aria-label={`${c.gigs.length} gig${c.gigs.length === 1 ? "" : "s"}`}>
+                    {c.gigs.length}
                   </span>
                 </h2>
                 <span className="column-tools">
                   {addHere && (
-                    <button type="button" className="icon-button" aria-label={`New task in ${c.name}`} onClick={() => addIn(c)}>
+                    <button type="button" className="icon-button" aria-label={`New gig in ${c.name}`} onClick={() => addIn(c)}>
                       <Icon name="plus" strokeWidth={2} />
                     </button>
                   )}
@@ -770,11 +770,11 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                 </span>
               </div>
               <div className="cards">
-                {c.tasks.map((t, i) => {
+                {c.gigs.map((t, i) => {
                   if (t.id !== drag) k++;
                   const showLine = manual && c.statusId !== undefined && t.id !== drag && k === line;
                   return (
-                    <div key={t.id} className="card-slot" data-slot={t.id} data-place={`${c.key}:${i}:${c.tasks.length}`}>
+                    <div key={t.id} className="card-slot" data-slot={t.id} data-place={`${c.key}:${i}:${c.gigs.length}`}>
                       {showLine && <div className="drop-line" aria-hidden="true" />}
                       {cardFor(t, c, i, false)}
                     </div>
@@ -786,16 +786,16 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
                   </div>
                 ))}
                 {manual && c.statusId !== undefined && line === others.length && <div className="drop-line" aria-hidden="true" />}
-                {c.tasks.length === 0 && (drag !== null || archivedIn(c).length === 0) && <div className="empty">{drag !== null ? "Drop here" : "Nothing here"}</div>}
+                {c.gigs.length === 0 && (drag !== null || archivedIn(c).length === 0) && <div className="empty">{drag !== null ? "Drop here" : "Nothing here"}</div>}
                 {addHere && c.category !== "done" && (
                   <button type="button" className="column-add" onClick={() => addIn(c)}>
-                    <Icon name="plus" strokeWidth={2} /> New task
+                    <Icon name="plus" strokeWidth={2} /> New gig
                   </button>
                 )}
                 {c.category === "done" &&
-                  // Done takes no new tasks: its footer archives the done tasks instead (once: one project can
+                  // Done takes no new gigs: its footer archives the done gigs instead (once: one project can
                   // have several done columns), or stays as an empty slot of the same height so the columns
-                  // line up. The board never shows cancelled tasks, so they have no column or footer.
+                  // line up. The board never shows cancelled gigs, so they have no column or footer.
                   (archiveCol === c.key && archivable.length > 0 ? (
                     <button type="button" className="column-add" onClick={() => action("archive", "done")}>
                       <Icon name="archive" /> Archive done
@@ -809,7 +809,7 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
         })}
       </div>
       {addAt && (
-        <TaskModal
+        <GigModal
           ws={addAt.ws}
           projectId={addAt.project.id}
           statuses={addBoard ? openStatuses(addBoard) : []}
@@ -833,26 +833,26 @@ export function BoardPage({ taskPid, taskKey }: { taskPid?: number; taskKey?: st
           initial={archiveDone.ids}
           category={archiveDone.category}
           onClose={() => setArchiveDone(null)}
-          onDone={(n) => changed(n === 0 ? "Nothing to archive" : `Archived ${n} task${n === 1 ? "" : "s"}`)}
+          onDone={(n) => changed(n === 0 ? "Nothing to archive" : `Archived ${n} gig${n === 1 ? "" : "s"}`)}
         />
       )}
       {trash && <TrashModal scope={inScope} onClose={() => setTrash(false)} onRestored={(key) => changed(`Restored ${key}`)} />}
-      {panel && taskKey && panelBoard && (
-        <TaskPanel
-          taskKey={taskKey}
+      {panel && gigKey && panelBoard && (
+        <GigPanel
+          gigKey={gigKey}
           ws={panel.ws}
           statuses={openStatuses(panelBoard)}
           labels={panelBoard.labels}
           canWrite={canWriteIn(panel.ws)}
-          // opened from the table, My tasks or the bell: closing goes back there
+          // opened from the table, My gigs or the bell: closing goes back there
           onClose={() => {
             // opened from a list (pushed from there): step back to it, so Back afterwards doesn't
-            // reopen the panel; a task moved meanwhile replaced its entry, so one step is enough
+            // reopen the panel; a gig moved meanwhile replaced its entry, so one step is enough
             if (backTo()) history.back();
             else navigate(boardURL);
           }}
           onChanged={changed}
-          onMoved={(t) => navigate(`/board/p/${t.project_id}/t/${t.key}${qs}`, backTo() ? { state: history.state, replace: true } : undefined)}
+          onMoved={(t) => navigate(`/board/p/${t.project_id}/g/${t.key}${qs}`, backTo() ? { state: history.state, replace: true } : undefined)}
           onOpenSchedule={(id) => setRecurring({ highlight: id })}
         />
       )}
@@ -962,7 +962,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
             <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
             <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          <input type="search" aria-label="Search tasks" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
+          <input type="search" aria-label="Search gigs" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
         </span>
         <label className="bf-pick">
           <span className="bf-pick-label" aria-hidden="true">Assignee</span>
@@ -1003,7 +1003,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
           type="button"
           className={"bf-toggle" + (filter.arch ? " on" : "")}
           aria-pressed={filter.arch}
-          data-tip="Show archived tasks too, greyed out, in their columns"
+          data-tip="Show archived gigs too, greyed out, in their columns"
           onClick={() => setFilter({ ...filter, arch: !filter.arch })}
         >
           <Icon name="archive" />
@@ -1080,17 +1080,17 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
   );
 }
 
-// TrashModal: the deleted tasks of the projects in view, newest first, each with Restore (for people
-// who may delete tasks there).
+// TrashModal: the deleted gigs of the projects in view, newest first, each with Restore (for people
+// who may delete gigs there).
 function TrashModal({ scope: inScope, onClose, onRestored }: { scope: { ws: WorkspaceTree; project: { id: number; key: string; name: string } }[]; onClose: () => void; onRestored: (key: string) => void }) {
   const { me } = useApp();
-  const [items, setItems] = useState<Task[] | null>(null);
+  const [items, setItems] = useState<Gig[] | null>(null);
   const [err, setErr] = useState("");
   const pids = inScope.map((x) => x.project.id).join(",");
   const load = useCallback(() => {
     const ids = new Set(pids.split(",").map(Number));
     const wss = [...new Map(inScope.map((x) => [x.ws.id, x.ws])).values()];
-    Promise.allSettled(wss.map((w) => viewsApi.tasks(w.slug, { deleted: true, limit: 500 }))).then((res) => {
+    Promise.allSettled(wss.map((w) => viewsApi.gigs(w.slug, { deleted: true, limit: 500 }))).then((res) => {
       const all = res.flatMap((r) => (r.status === "fulfilled" ? r.value.items : [])).filter((t) => ids.has(t.project_id));
       setItems(all.sort((a, b) => b.updated_at - a.updated_at));
       setErr(res.some((r) => r.status === "rejected") ? "Some workspaces couldn't be read." : "");
@@ -1098,10 +1098,10 @@ function TrashModal({ scope: inScope, onClose, onRestored }: { scope: { ws: Work
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pids]);
   useEffect(load, [load]);
-  const wsOf = (t: Task) => inScope.find((x) => x.ws.id === t.workspace_id)?.ws;
-  const restore = (t: Task) =>
+  const wsOf = (t: Gig) => inScope.find((x) => x.ws.id === t.workspace_id)?.ws;
+  const restore = (t: Gig) =>
     api
-      .restoreTask(t.id)
+      .restoreGig(t.id)
       .then(() => {
         onRestored(t.key);
         load();
@@ -1109,7 +1109,7 @@ function TrashModal({ scope: inScope, onClose, onRestored }: { scope: { ws: Work
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : `Couldn't restore ${t.key}.`));
   return (
     <Modal title="Trash" onClose={onClose} wide help={<HelpButton topic="board" label="Help: the board (archive and trash)" />}>
-      <p className="muted small">Deleted tasks of the projects in view, most recently changed first. Restoring puts a task back where it was.</p>
+      <p className="muted small">Deleted gigs of the projects in view, most recently changed first. Restoring puts a gig back where it was.</p>
       {err && (
         <p className="danger small" role="alert">
           {err}
@@ -1120,7 +1120,7 @@ function TrashModal({ scope: inScope, onClose, onRestored }: { scope: { ws: Work
       <div className="pick-list">
         {(items ?? []).map((t) => {
           const ws = wsOf(t);
-          const may = !!ws && canWriteIn(ws) && hasCap(me, "delete_tasks", ws.id);
+          const may = !!ws && canWriteIn(ws) && hasCap(me, "delete_gigs", ws.id);
           return (
             <div key={t.id} className="pick-item trash-item">
               {ws && <WorkspaceBadge ws={ws} />}
@@ -1133,7 +1133,7 @@ function TrashModal({ scope: inScope, onClose, onRestored }: { scope: { ws: Work
                 type="button"
                 className="button secondary small"
                 disabled={!may}
-                data-tip={may ? `Restore ${t.key} to its column` : "Restoring needs the Delete tasks permission here"}
+                data-tip={may ? `Restore ${t.key} to its column` : "Restoring needs the Delete gigs permission here"}
                 onClick={() => restore(t)}
               >
                 ↺ Restore
@@ -1146,7 +1146,7 @@ function TrashModal({ scope: inScope, onClose, onRestored }: { scope: { ws: Work
   );
 }
 
-// ArchiveDoneModal: archive the finished tasks (done, cancelled, or both when `category` is unset) of the
+// ArchiveDoneModal: archive the finished gigs (done, cancelled, or both when `category` is unset) of the
 // projects ticked, one call per project; a failure stops there and says which projects were done.
 function ArchiveDoneModal({ options, initial, category, onClose, onDone }: {
   options: { ws: WorkspaceTree; project: { id: number; key: string; name: string } }[];
@@ -1194,9 +1194,9 @@ function ArchiveDoneModal({ options, initial, category, onClose, onDone }: {
     onClose();
   };
   return (
-    <Modal title={`Archive ${what} tasks`} onClose={close}>
+    <Modal title={`Archive ${what} gigs`} onClose={close}>
       <p className="small">
-        Archived tasks leave the board and lists; they stay searchable and can be unarchived from the task. Every {what} task of the projects ticked is
+        Archived gigs leave the board and lists; they stay searchable and can be unarchived from the gig. Every {what} gig of the projects ticked is
         archived: the assignee, label, priority and search filters don't apply here.
       </p>
       {options.length === 0 ? (
@@ -1295,15 +1295,15 @@ function StageIcon({ category, color }: { category: Category; color: string }) {
   );
 }
 
-function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, statusLabel, dragging, first, last, onDragStart, onDragEnd, onReorder, onOpen, onChanged, fields }: {
-  task: Task;
+function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusLabel, dragging, first, last, onDragStart, onDragEnd, onReorder, onOpen, onChanged, fields }: {
+  gig: Gig;
   statuses: Status[];
   ws: WorkspaceTree;
-  showWs: boolean; // several workspaces in view: name the task's workspace
+  showWs: boolean; // several workspaces in view: name the gig's workspace
   labels: Tag[];
   canWrite: boolean;
   canReorder: boolean; // a manual order exists (one project in view)
-  statusLabel?: string; // the task's own status, when the column (a category) is named otherwise
+  statusLabel?: string; // the gig's own status, when the column (a category) is named otherwise
   dragging: boolean;
   first: boolean;
   last: boolean;
@@ -1351,7 +1351,7 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
   const move = (body: MoveBody) => {
     setMenu(false);
     api
-      .moveTask(task.id, body)
+      .moveGig(gig.id, body)
       .then(() => onChanged())
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Move failed."));
   };
@@ -1359,31 +1359,31 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
     setMenu(false);
     onReorder(where);
   };
-  const overdue = task.due_at !== null && task.due_at < Date.now() && task.status_category !== "done";
-  const creator = users.get(task.created_by);
+  const overdue = gig.due_at !== null && gig.due_at < Date.now() && gig.status_category !== "done";
+  const creator = users.get(gig.created_by);
   const labelFor = (l: Tag) => labels.find((x) => x.id === l.id) ?? l;
-  const showDue = task.due_at && task.due_at !== task.not_after; // a window's end is shown by its own badge
-  const assignees = task.assignees.map((id) => users.get(id)).filter((u): u is NonNullable<typeof u> => !!u);
+  const showDue = gig.due_at && gig.due_at !== gig.not_after; // a window's end is shown by its own badge
+  const assignees = gig.assignees.map((id) => users.get(id)).filter((u): u is NonNullable<typeof u> => !!u);
   const nameOf = (u: { username: string; display_name: string }) => u.display_name || u.username;
-  const shownLabels = task.labels.slice(0, 2);
-  const moreLabels = task.labels.slice(2);
-  // who: the assignees, stacked; the creator only when there are no assignees, or a person handed the task to an agent
+  const shownLabels = gig.labels.slice(0, 2);
+  const moreLabels = gig.labels.slice(2);
+  // who: the assignees, stacked; the creator only when there are no assignees, or a person handed the gig to an agent
   const handOff = !!creator && creator.kind !== "agent" && assignees.some((u) => u.kind === "agent");
   const createdBy = creator ? `Created by ${nameOf(creator)}` : "";
   const assigneeTip = (u: { username: string; display_name: string; kind: string }) => `Assigned to ${nameOf(u)}${u.kind === "agent" ? " (agent)" : ""}${createdBy ? `\n${createdBy}` : ""}`;
   const wsColor = colorFor(ws.slug, ws.color);
-  const state = cardState(task);
-  const run = task.last_run;
+  const state = cardState(gig);
+  const run = gig.last_run;
   const running = state?.kind === "running";
   const now = useNow(running ? 1000 : 0);
   const worker = run ? users.get(run.worker_user_id) : undefined;
-  const asker = task.question ? users.get(task.question.author_id) : undefined;
+  const asker = gig.question ? users.get(gig.question.author_id) : undefined;
   const [retrying, setRetrying] = useState(false);
   // the button's name replaces its contents for screen readers: say the agent state there too
   const cardLabel = [
-    `${task.key} ${task.title}`,
+    `${gig.key} ${gig.title}`,
     state && (running && run?.progress_note ? `${state.label}: ${run.progress_note}` : state.label), // no clock: the name would change every second
-    state?.kind === "answer" && task.question ? plainText(task.question.text) : "",
+    state?.kind === "answer" && gig.question ? plainText(gig.question.text) : "",
   ]
     .filter(Boolean)
     .join(". ");
@@ -1391,20 +1391,20 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
     setRetrying(true);
     setErr("");
     api
-      .resumeTask(task.id, "")
+      .resumeGig(gig.id, "")
       .then(() => onChanged())
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Retry failed."))
       .finally(() => setRetrying(false));
   };
   return (
     <article
-      className={"task-card" + (state ? " state-" + state.kind : "") + (dragging ? " dragging" : "") + (task.missed_at ? " missed" : "") + (task.archived_at ? " archived" : "") + (task.blocked_by ? " blocked" : "") + (task.color ? " colored" : "")}
-      style={task.color ? ({ "--card-c": task.color } as CSSProperties) : undefined}
-      data-task-id={task.id}
+      className={"gig-card" + (state ? " state-" + state.kind : "") + (dragging ? " dragging" : "") + (gig.missed_at ? " missed" : "") + (gig.archived_at ? " archived" : "") + (gig.blocked_by ? " blocked" : "") + (gig.color ? " colored" : "")}
+      style={gig.color ? ({ "--card-c": gig.color } as CSSProperties) : undefined}
+      data-gig-id={gig.id}
       draggable={canWrite}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", task.key);
+        e.dataTransfer.setData("text/plain", gig.key);
         setMenu(false);
         onDragStart();
       }}
@@ -1412,7 +1412,7 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
     >
       <button type="button" className="card-open" onClick={onOpen} aria-label={cardLabel}>
         <div className="card-top">
-          <PriorityIcon priority={task.priority} />
+          <PriorityIcon priority={gig.priority} />
           {state && (
             <span className={"run-badge run-" + state.kind} data-tip={state.tip}>
               {running ? <span className="pulse-dot" aria-hidden="true" /> : <Icon name={STATE_ICON[state.kind]} />}
@@ -1431,19 +1431,19 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
               {statusLabel}
             </span>
           )}
-          {!!task.archived_at && (
-            <span className="pill pill-muted" data-tip="Archived: hidden from the board and lists; unarchive it from the task">
+          {!!gig.archived_at && (
+            <span className="pill pill-muted" data-tip="Archived: hidden from the board and lists; unarchive it from the gig">
               <Icon name="archive" /> archived
             </span>
           )}
-          <span className="key card-key">{task.key}</span>
+          <span className="key card-key">{gig.key}</span>
         </div>
-        <div className="card-title">{task.title}</div>
-        {(task.labels.length > 0 || showDue) && (
+        <div className="card-title">{gig.title}</div>
+        {(gig.labels.length > 0 || showDue) && (
           <div className="chips">
             {showDue && (
               <span className={"fact-chip" + (overdue ? " fact-overdue" : "")} data-tip={overdue ? "Overdue" : "Due"}>
-                <Icon name="calendar" /> {fmtDue(task.due_at)}
+                <Icon name="calendar" /> {fmtDue(gig.due_at)}
               </span>
             )}
             {shownLabels.map((l) => (
@@ -1471,30 +1471,30 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
             {run.progress_note && <div className="card-run-note mono">› {run.progress_note}</div>}
           </div>
         )}
-        {state?.kind === "answer" && task.question && (
+        {state?.kind === "answer" && gig.question && (
           <div className="card-ask">
             <span className="card-ask-label">
-              <Icon name="question" /> {task.question.kind === "question" ? (asker ? `${nameOf(asker)} asks` : "Question") : asker ? `${nameOf(asker)} reports` : "Report"}
+              <Icon name="question" /> {gig.question.kind === "question" ? (asker ? `${nameOf(asker)} asks` : "Question") : asker ? `${nameOf(asker)} reports` : "Report"}
             </span>
-            <p>{plainText(task.question.text)}</p>
+            <p>{plainText(gig.question.text)}</p>
           </div>
         )}
         <div className="card-foot">
           <span className="meta">
-            <TaskBadges task={task} items fields={fields} />
-            {task.comment_count > 0 && (
-              <span className="meta-item" data-tip={`${task.comment_count} comment${task.comment_count === 1 ? "" : "s"}`}>
-                <Icon name="comment" /> {task.comment_count}
+            <GigBadges gig={gig} items fields={fields} />
+            {gig.comment_count > 0 && (
+              <span className="meta-item" data-tip={`${gig.comment_count} comment${gig.comment_count === 1 ? "" : "s"}`}>
+                <Icon name="comment" /> {gig.comment_count}
               </span>
             )}
-            {task.session_id && !running && (
-              <span className="meta-item" data-tip="An agent has worked on it: it has an agent session (see Runs in the task)">
+            {gig.session_id && !running && (
+              <span className="meta-item" data-tip="An agent has worked on it: it has an agent session (see Runs in the gig)">
                 <Icon name="bot" />
               </span>
             )}
-            {task.cost_usd_total > 0 && (
+            {gig.cost_usd_total > 0 && (
               <span className="meta-item mono" data-tip="What the agent's runs on it cost so far (API-equivalent USD, as reported by the agent)">
-                ${task.cost_usd_total.toFixed(2)}
+                ${gig.cost_usd_total.toFixed(2)}
               </span>
             )}
           </span>
@@ -1528,10 +1528,10 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
               className="button small"
               disabled={retrying}
               onClick={retry}
-              aria-label={`Retry ${task.key}`}
+              aria-label={`Retry ${gig.key}`}
               data-tip={
-                task.session_id
-                  ? "Resume the agent's session: the task goes back to To-Do and its runner continues on its next pass"
+                gig.session_id
+                  ? "Resume the agent's session: the gig goes back to To-Do and its runner continues on its next pass"
                   : "Back to To-Do: the agent's runner starts it again on its next pass"
               }
             >
@@ -1542,7 +1542,7 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
       )}
       {canWrite && (
         <div className="card-menu" ref={ref}>
-          <button type="button" className="icon-button" aria-label={`Move ${task.key}`} aria-expanded={menu} onClick={() => setMenu(!menu)}>
+          <button type="button" className="icon-button" aria-label={`Move ${gig.key}`} aria-expanded={menu} onClick={() => setMenu(!menu)}>
             ⋯
           </button>
           {menu && (
@@ -1570,15 +1570,15 @@ function Card({ task, statuses, ws, showWs, labels, canWrite, canReorder, status
               )}
               <div className="menu-label">Move to</div>
               {statuses
-                .filter((s) => s.id !== task.status_id)
+                .filter((s) => s.id !== gig.status_id)
                 .map((s) => (
                   <button key={s.id} type="button" role="menuitem" onClick={() => move({ status: s.id })}>
                     <span className="dot" style={{ background: s.color ?? CATEGORY_COLOR[s.category] }} /> {s.name}
                   </button>
                 ))}
-              {ws.projects.filter((p) => p.id !== task.project_id).length > 0 && <div className="menu-label">Move to project</div>}
+              {ws.projects.filter((p) => p.id !== gig.project_id).length > 0 && <div className="menu-label">Move to project</div>}
               {ws.projects
-                .filter((p) => p.id !== task.project_id)
+                .filter((p) => p.id !== gig.project_id)
                 .map((p) => (
                   <button key={p.id} type="button" role="menuitem" onClick={() => move({ project: p.id })}>
                     <span className="pill pill-key">{p.key}</span> {p.name}

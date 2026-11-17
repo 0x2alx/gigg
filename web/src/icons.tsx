@@ -100,7 +100,7 @@ const P: Record<string, ReactNode> = {
   "chevron-up": <path d="m18 15-6-6-6 6" />,
   "arrow-right": <path d="M5 12h14M13 6l6 6-6 6" />,
   checklist: <path d="m3 7 2 2 4-4M3 17l2 2 4-4M13 6h8M13 12h8M13 18h8" />,
-  subtasks: <path d="M21 12h-8M21 6H8M21 18h-8M3 6v4a2 2 0 0 0 2 2h3M3 10v6a2 2 0 0 0 2 2h3" />,
+  subgigs: <path d="M21 12h-8M21 6H8M21 18h-8M3 6v4a2 2 0 0 0 2 2h3M3 10v6a2 2 0 0 0 2 2h3" />,
   link: (
     <>
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />

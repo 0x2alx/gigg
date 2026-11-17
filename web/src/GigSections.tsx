@@ -1,9 +1,9 @@
-// The task editor's building blocks, shared by the task panel (each change saves straight to the
-// server and hands the updated task back through onTask) and the task form (New task, templates,
-// recurring tasks: the "draft" versions hold the values until Create or Save). Both lay a task out
+// The gig editor's building blocks, shared by the gig panel (each change saves straight to the
+// server and hands the updated gig back through onGig) and the gig form (New gig, templates,
+// recurring gigs: the "draft" versions hold the values until Create or Save). Both lay a gig out
 // the same way: the property groups (PropGroup of Rows) and the folding boxes (Section).
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, type ChecklistItem, type CustomField, type Relation, type RelationDirection, type Task, type TemplateSubtask } from "./api";
+import { api, ApiError, type ChecklistItem, type CustomField, type Relation, type RelationDirection, type Gig, type TemplateSubgig } from "./api";
 import { formatCustom, fromInput, moveAfter, progress, reorder, splitLines, toInput } from "./items";
 import { CATEGORY_COLOR } from "./theme";
 import { EffortSelect, ModelInput, ToolsInput, type RunSettings } from "./runsettings";
@@ -102,7 +102,7 @@ export function AgentRunGroup({ value, canWrite, alwaysLocked, canTools, onChang
   value: RunSettings; canWrite: boolean; alwaysLocked: boolean; canTools: boolean; onChange: (p: Partial<RunSettings>) => void; onToolsError?: (bad: string | null) => void;
 }) {
   return (
-    <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run tasks" />}>
+    <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run gigs" />}>
       <Row tip="Model for the agent’s run (an alias like opus or sonnet, or a full model id). Empty: the agent’s default" label="Model">
         <ModelInput value={value.model} disabled={!canWrite} onCommit={(model) => onChange({ model })} />
       </Row>
@@ -110,17 +110,17 @@ export function AgentRunGroup({ value, canWrite, alwaysLocked, canTools, onChang
         <EffortSelect value={value.effort} disabled={!canWrite} onChange={(effort) => onChange({ effort })} />
       </Row>
       <Row tip="Run it whatever the usage budget, day or night, like a cron job. The daily cap and pauses still apply" label="Always run" wide>
-        <label className="admin-check run-always" title={alwaysLocked ? "Changing it needs the Always-run tasks permission" : "Runs whatever the usage budget, day or night"}>
+        <label className="admin-check run-always" title={alwaysLocked ? "Changing it needs the Always-run gigs permission" : "Runs whatever the usage budget, day or night"}>
           <input type="checkbox" checked={value.always_run} disabled={!canWrite || alwaysLocked} onChange={(e) => onChange({ always_run: e.target.checked })} />
           <span className="muted small">whatever the usage budget, day or night</span>
         </label>
       </Row>
       {(canTools || value.allowed_tools.length > 0) && (
-        <Row tip="The agent gets exactly these tools for this task (Claude Code permission rules), nothing else. Empty: its usual setup" label="Allowed tools" wide>
+        <Row tip="The agent gets exactly these tools for this gig (Claude Code permission rules), nothing else. Empty: its usual setup" label="Allowed tools" wide>
           {canTools && canWrite ? (
             <ToolsInput value={value.allowed_tools} onCommit={(allowed_tools) => onChange({ allowed_tools })} onError={onToolsError} />
           ) : (
-            <span className="tools-list" title="Changing it needs the Task tool allowlists permission">
+            <span className="tools-list" title="Changing it needs the Gig tool allowlists permission">
               {value.allowed_tools.map((r) => (
                 <code key={r}>{r}</code>
               ))}
@@ -141,7 +141,7 @@ interface CheckRow {
 }
 
 // ChecklistBox: the checklist list and its add box. Draft items (checkable false) show their box
-// unticked and disabled: they can be ticked once the task exists.
+// unticked and disabled: they can be ticked once the gig exists.
 function ChecklistBox({ rows, canEdit, checkable, busy, err, onToggle, onEdit, onMove, onDelete, onAdd }: {
   rows: CheckRow[] | null; canEdit: boolean; checkable: boolean; busy: boolean; err: string;
   onToggle: (i: number) => void; onEdit: (i: number, text: string) => void; onMove: (i: number, dir: -1 | 1) => void; onDelete: (i: number) => void; onAdd: (lines: string[]) => void;
@@ -241,36 +241,36 @@ function ChecklistBox({ rows, canEdit, checkable, busy, err, onToggle, onEdit, o
 
 const focusMoved = (key: string, dir: -1 | 1) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-check="${key}"] .ck-${dir < 0 ? "up" : "down"}`)?.focus());
 
-export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdit: boolean; onTask: (t: Task) => void }) {
+export function ChecklistSection({ gig, canEdit, onGig }: { gig: Gig; canEdit: boolean; onGig: (t: Gig) => void }) {
   const [items, setItems] = useState<ChecklistItem[] | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
     api
-      .checklist(task.id)
+      .checklist(gig.id)
       .then((r) => live && setItems(r.items))
       .catch((e: unknown) => live && setErr(errText(e, "Couldn't load the checklist.")));
     return () => {
       live = false;
     };
-  }, [task.id, task.version]);
+  }, [gig.id, gig.version]);
 
-  const run = (p: Promise<Task>) => {
+  const run = (p: Promise<Gig>) => {
     setBusy(true);
     setErr("");
     return p
-      .then(onTask)
+      .then(onGig)
       .catch((e: unknown) => {
         setErr(errText(e));
-        api.checklist(task.id).then((r) => setItems(r.items), () => undefined);
+        api.checklist(gig.id).then((r) => setItems(r.items), () => undefined);
       })
       .finally(() => setBusy(false));
   };
   const at = (i: number) => items![i]!;
 
-  const total = items?.length ?? task.checklist_total ?? 0;
-  const done = items ? items.filter((x) => x.done_at).length : (task.checklist_done ?? 0);
+  const total = items?.length ?? gig.checklist_total ?? 0;
+  const done = items ? items.filter((x) => x.done_at).length : (gig.checklist_done ?? 0);
   if (!canEdit && total === 0) return null;
   return (
     <Section
@@ -298,12 +298,12 @@ export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdi
         onToggle={(i) => {
           const it = at(i);
           setItems((xs) => xs?.map((x) => (x.id === it.id ? { ...x, done_at: x.done_at ? null : Date.now() } : x)) ?? null);
-          void run(api.patchChecklist(task.id, it.id, { done: !it.done_at }));
+          void run(api.patchChecklist(gig.id, it.id, { done: !it.done_at }));
         }}
         onEdit={(i, t) => {
           const it = at(i);
           setItems((xs) => xs?.map((x) => (x.id === it.id ? { ...x, text: t } : x)) ?? null);
-          void run(api.patchChecklist(task.id, it.id, { text: t }));
+          void run(api.patchChecklist(gig.id, it.id, { text: t }));
         }}
         onMove={(i, dir) => {
           if (!items) return;
@@ -311,20 +311,20 @@ export function ChecklistSection({ task, canEdit, onTask }: { task: Task; canEdi
           if (after === null) return;
           const id = at(i).id;
           setItems(reorder(items, i, dir));
-          void run(api.patchChecklist(task.id, id, { after })).then(() => focusMoved(String(id), dir));
+          void run(api.patchChecklist(gig.id, id, { after })).then(() => focusMoved(String(id), dir));
         }}
         onDelete={(i) => {
           const it = at(i);
           setItems((xs) => xs?.filter((x) => x.id !== it.id) ?? null);
-          void run(api.deleteChecklist(task.id, it.id));
+          void run(api.deleteChecklist(gig.id, it.id));
         }}
-        onAdd={(lines) => void run(api.addChecklist(task.id, lines))}
+        onAdd={(lines) => void run(api.addChecklist(gig.id, lines))}
       />
     </Section>
   );
 }
 
-// ChecklistDraft: the checklist of a task (or template) not saved yet.
+// ChecklistDraft: the checklist of a gig (or template) not saved yet.
 export function ChecklistDraft({ items, onChange, note }: { items: string[]; onChange: (v: string[]) => void; note?: string }) {
   // stable keys for the rows, so an item being edited keeps its box while others move
   const ids = useRef<string[]>([]);
@@ -366,11 +366,11 @@ export function ChecklistDraft({ items, onChange, note }: { items: string[]; onC
   );
 }
 
-// ---- subtasks
+// ---- subgigs
 
-const GATE_TIP = "While this subtask is open, its parent waits: agents don’t pick the parent up until it is done or cancelled";
+const GATE_TIP = "While this subgig is open, its parent waits: agents don’t pick the parent up until it is done or cancelled";
 
-// GateBox: the "blocks parent" switch of one subtask.
+// GateBox: the "blocks parent" switch of one subgig.
 function GateBox({ on, disabled, onChange, title }: { on: boolean; disabled?: boolean; onChange: (v: boolean) => void; title: string }) {
   return (
     <label className="check sub-gate" title={GATE_TIP}>
@@ -380,7 +380,7 @@ function GateBox({ on, disabled, onChange, title }: { on: boolean; disabled?: bo
   );
 }
 
-function SubtaskAdd({ onAdd }: { onAdd: (title: string) => Promise<unknown> | void }) {
+function SubgigAdd({ onAdd }: { onAdd: (title: string) => Promise<unknown> | void }) {
   const [title, setTitle] = useState("");
   const add = () => {
     const t = title.trim();
@@ -394,9 +394,9 @@ function SubtaskAdd({ onAdd }: { onAdd: (title: string) => Promise<unknown> | vo
       <input
         value={title}
         data-dirty={title.trim() ? "" : undefined}
-        placeholder="Subtask title"
+        placeholder="Subgig title"
         maxLength={250}
-        aria-label="New subtask title"
+        aria-label="New subgig title"
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -406,102 +406,102 @@ function SubtaskAdd({ onAdd }: { onAdd: (title: string) => Promise<unknown> | vo
         }}
       />
       <button type="button" className="button secondary small" onClick={add} disabled={!title.trim()}>
-        + Subtask
+        + Subgig
       </button>
     </div>
   );
 }
 
-const SUB_NOTE = "Each subtask is a task of its own, made like this one (priority, assignees, dates, agent run). Tick “blocks parent” to make this task wait for it.";
+const SUB_NOTE = "Each subgig is a gig of its own, made like this one (priority, assignees, dates, agent run). Tick “blocks parent” to make this gig wait for it.";
 
 // canEdit: may switch "blocks parent" (the relations permission). assignable: who can be assigned in
-// the workspace (a new subtask gets the parent's assignees, but not former members).
-export function SubtasksSection({ task, wsId, canCreate, canEdit, assignable, onOpen, onTask, onChanged }: {
-  task: Task; wsId: number; canCreate: boolean; canEdit: boolean; assignable: number[]; onOpen: (t: Task) => void; onTask: (t: Task) => void; onChanged: () => void;
+// the workspace (a new subgig gets the parent's assignees, but not former members).
+export function SubgigsSection({ gig, wsId, canCreate, canEdit, assignable, onOpen, onGig, onChanged }: {
+  gig: Gig; wsId: number; canCreate: boolean; canEdit: boolean; assignable: number[]; onOpen: (t: Gig) => void; onGig: (t: Gig) => void; onChanged: () => void;
 }) {
-  const [subs, setSubs] = useState<Task[] | null>(null);
-  const [parent, setParent] = useState<Task | null>(null);
+  const [subs, setSubs] = useState<Gig[] | null>(null);
+  const [parent, setParent] = useState<Gig | null>(null);
   const [err, setErr] = useState("");
   const load = () =>
     api
-      .wsTasks(wsId, { parent: task.id, archived: "include", limit: 200, sort: "number" })
+      .wsGigs(wsId, { parent: gig.id, archived: "include", limit: 200, sort: "number" })
       .then((r) => setSubs(r.items))
-      .catch((e: unknown) => setErr(errText(e, "Couldn't load the subtasks.")));
+      .catch((e: unknown) => setErr(errText(e, "Couldn't load the subgigs.")));
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task.id, task.version, wsId]);
+  }, [gig.id, gig.version, wsId]);
   useEffect(() => {
     setParent(null);
-    if (task.parent_id) api.task(task.parent_id).then(setParent, () => undefined);
-  }, [task.parent_id]);
-  // the parent's blocked count changes with its subtasks: reload it after each change
+    if (gig.parent_id) api.gig(gig.parent_id).then(setParent, () => undefined);
+  }, [gig.parent_id]);
+  // the parent's blocked count changes with its subgigs: reload it after each change
   const refresh = () => {
     void load();
     onChanged();
-    api.task(task.id).then(onTask, () => undefined);
+    api.gig(gig.id).then(onGig, () => undefined);
   };
 
   const add = (title: string) => {
     setErr("");
     return api
-      .createTask(task.project_id, {
+      .createGig(gig.project_id, {
         title,
-        parent_id: task.id,
-        priority: task.priority,
-        assignees: task.assignees.filter((id) => assignable.includes(id)),
-        ...(task.start_at ? { start_at: task.start_at } : {}),
-        ...(task.due_at ? { due_at: task.due_at } : {}),
-        ...(task.not_after ? { not_after: task.not_after } : {}),
-        ...(task.model ? { model: task.model } : {}),
-        ...(task.effort ? { effort: task.effort } : {}),
+        parent_id: gig.id,
+        priority: gig.priority,
+        assignees: gig.assignees.filter((id) => assignable.includes(id)),
+        ...(gig.start_at ? { start_at: gig.start_at } : {}),
+        ...(gig.due_at ? { due_at: gig.due_at } : {}),
+        ...(gig.not_after ? { not_after: gig.not_after } : {}),
+        ...(gig.model ? { model: gig.model } : {}),
+        ...(gig.effort ? { effort: gig.effort } : {}),
       })
       .then(refresh)
       .catch((e: unknown) => {
-        setErr(errText(e, "Couldn't add the subtask."));
+        setErr(errText(e, "Couldn't add the subgig."));
         throw e;
       });
   };
-  const gate = (s: Task, on: boolean) => {
+  const gate = (s: Gig, on: boolean) => {
     setErr("");
     setSubs((xs) => xs?.map((x) => (x.id === s.id ? { ...x, blocks_parent: on } : x)) ?? null);
-    api.patchTask(s.id, { blocks_parent: on }).then(refresh, (e: unknown) => {
+    api.patchGig(s.id, { blocks_parent: on }).then(refresh, (e: unknown) => {
       setErr(errText(e));
       void load();
     });
   };
 
-  const total = subs?.length ?? task.subtask_count ?? 0;
-  const done = subs ? subs.filter((s) => s.status_category === "done" || s.status_category === "cancelled").length : (task.subtask_done ?? 0);
+  const total = subs?.length ?? gig.subgig_count ?? 0;
+  const done = subs ? subs.filter((s) => s.status_category === "done" || s.status_category === "cancelled").length : (gig.subgig_done ?? 0);
   const gates = (subs ?? []).filter((s) => s.blocks_parent && !s.archived_at && s.status_category !== "done" && s.status_category !== "cancelled").length;
-  if (!canCreate && total === 0 && !task.parent_id) return null;
+  if (!canCreate && total === 0 && !gig.parent_id) return null;
   return (
     <Section
       defaultOpen={false}
-      label="Subtasks"
-      title="Subtasks"
-      icon="subtasks"
+      label="Subgigs"
+      title="Subgigs"
+      icon="subgigs"
       badges={
         <>
           {total > 0 && (
             <>
-              <ProgressBar done={done} total={total} label="Subtask progress" />
+              <ProgressBar done={done} total={total} label="Subgig progress" />
               <span className={"tsec-count" + (done === total ? " done" : "")}>
                 {done}/{total} done
               </span>
             </>
           )}
           {gates > 0 && (
-            <span className="pill pill-danger" title="Open subtasks this task waits for">
+            <span className="pill pill-danger" title="Open subgigs this gig waits for">
               <Icon name="lock" /> {gates}
             </span>
           )}
         </>
       }
     >
-      {task.parent_id && (
+      {gig.parent_id && (
         <p className="sub-parent small">
-          <span className="muted">Subtask of </span>
+          <span className="muted">Subgig of </span>
           {parent ? (
             <button type="button" className="link" onClick={() => onOpen(parent)}>
               <span className="pill pill-key">{parent.key}</span> {parent.title}
@@ -509,7 +509,7 @@ export function SubtasksSection({ task, wsId, canCreate, canEdit, assignable, on
           ) : (
             <span className="muted">…</span>
           )}
-          <GateBox on={!!task.blocks_parent} disabled={!canEdit} title={task.title} onChange={(on) => api.patchTask(task.id, { blocks_parent: on }).then(onTask, (e: unknown) => setErr(errText(e)))} />
+          <GateBox on={!!gig.blocks_parent} disabled={!canEdit} title={gig.title} onChange={(on) => api.patchGig(gig.id, { blocks_parent: on }).then(onGig, (e: unknown) => setErr(errText(e)))} />
         </p>
       )}
       <Problem text={err} />
@@ -528,26 +528,26 @@ export function SubtasksSection({ task, wsId, canCreate, canEdit, assignable, on
           ))}
         </ul>
       )}
-      {canCreate && <SubtaskAdd onAdd={add} />}
+      {canCreate && <SubgigAdd onAdd={add} />}
     </Section>
   );
 }
 
-// SubtasksDraft: subtasks for a task (or template) not saved yet; created with it.
+// SubgigsDraft: subgigs for a gig (or template) not saved yet; created with it.
 // canGate: may tick "blocks parent" (the relations permission).
-export function SubtasksDraft({ items, onChange, canGate, note = SUB_NOTE }: { items: TemplateSubtask[]; onChange: (v: TemplateSubtask[]) => void; canGate: boolean; note?: string }) {
+export function SubgigsDraft({ items, onChange, canGate, note = SUB_NOTE }: { items: TemplateSubgig[]; onChange: (v: TemplateSubgig[]) => void; canGate: boolean; note?: string }) {
   const gates = items.filter((s) => s.blocks_parent).length;
   return (
     <Section
       defaultOpen={false}
-      label="Subtasks"
-      title="Subtasks"
-      icon="subtasks"
+      label="Subgigs"
+      title="Subgigs"
+      icon="subgigs"
       badges={
         <>
           {items.length > 0 && <span className="tsec-count">{items.length}</span>}
           {gates > 0 && (
-            <span className="pill pill-danger" title="Subtasks this task will wait for">
+            <span className="pill pill-danger" title="Subgigs this gig will wait for">
               <Icon name="lock" /> {gates}
             </span>
           )}
@@ -563,14 +563,14 @@ export function SubtasksDraft({ items, onChange, canGate, note = SUB_NOTE }: { i
                 <span className="rel-title">{s.title}</span>
               </span>
               <GateBox on={!!s.blocks_parent} disabled={!canGate && !s.blocks_parent} title={s.title} onChange={(on) => onChange(items.map((x, j) => (j === i ? { ...x, blocks_parent: on } : x)))} />
-              <button type="button" className="icon-button" onClick={() => onChange(items.filter((_, j) => j !== i))} aria-label={`Remove subtask: ${s.title}`}>
+              <button type="button" className="icon-button" onClick={() => onChange(items.filter((_, j) => j !== i))} aria-label={`Remove subgig: ${s.title}`}>
                 <Icon name="x" />
               </button>
             </li>
           ))}
         </ul>
       )}
-      {items.length < 50 ? <SubtaskAdd onAdd={(title) => onChange([...items, { title, blocks_parent: false }])} /> : <p className="muted small tsec-note">That's the most it can have (50).</p>}
+      {items.length < 50 ? <SubgigAdd onAdd={(title) => onChange([...items, { title, blocks_parent: false }])} /> : <p className="muted small tsec-note">That's the most it can have (50).</p>}
     </Section>
   );
 }
@@ -582,15 +582,15 @@ interface Dep {
   key: string;
   title: string;
   open: boolean;
-  dir: RelationDirection; // seen from this task
-  subtask?: boolean; // an open subtask that blocks its parent (not a link: untick it in Subtasks)
+  dir: RelationDirection; // seen from this gig
+  subgig?: boolean; // an open subgig that blocks its parent (not a link: untick it in Subgigs)
 }
 
-export function splitRelations(taskId: number, rels: Relation[]): Record<RelationDirection, Dep[]> {
+export function splitRelations(gigId: number, rels: Relation[]): Record<RelationDirection, Dep[]> {
   const out: Record<RelationDirection, Dep[]> = { blocked_by: [], blocks: [], relates: [] };
   for (const r of rels) {
-    const fromMe = r.from_task_id === taskId;
-    const other = fromMe ? r.to_task_id : r.from_task_id;
+    const fromMe = r.from_gig_id === gigId;
+    const other = fromMe ? r.to_gig_id : r.from_gig_id;
     const key = fromMe ? r.to_key : r.from_key;
     const dir: RelationDirection = r.kind === "relates" ? "relates" : fromMe ? "blocks" : "blocked_by";
     out[dir].push({ other, key, title: r.title, open: r.open, dir });
@@ -616,11 +616,11 @@ function DepList({ groups, canEdit, onOpen, onRemove }: { groups: Record<Relatio
                       <span className="pill pill-key">{x.key}</span>
                       {x.other < 0 ? null : x.open ? <Pill color={d === "blocked_by" ? "#E5484D" : CATEGORY_COLOR.todo!}>open</Pill> : <Pill color={CATEGORY_COLOR.done!}>done</Pill>}
                       <span className="rel-title">{x.title}</span>
-                      {x.subtask && <span className="pill pill-muted">subtask</span>}
+                      {x.subgig && <span className="pill pill-muted">subgig</span>}
                     </>
                   );
                   return (
-                    <li key={(x.subtask ? "s" : "r") + x.other + x.key}>
+                    <li key={(x.subgig ? "s" : "r") + x.other + x.key}>
                       {onOpen ? (
                         <button type="button" className="rel-open" onClick={() => onOpen(x)}>
                           {body}
@@ -628,7 +628,7 @@ function DepList({ groups, canEdit, onOpen, onRemove }: { groups: Record<Relatio
                       ) : (
                         <span className="rel-open rel-static">{body}</span>
                       )}
-                      {canEdit && !x.subtask && (
+                      {canEdit && !x.subgig && (
                         <button type="button" className="icon-button" onClick={() => onRemove(x)} aria-label={`Remove ${DIR_LABEL[d].replace(/^\S+\s/, "").toLowerCase()} ${x.key}`}>
                           <Icon name="x" />
                         </button>
@@ -644,12 +644,12 @@ function DepList({ groups, canEdit, onOpen, onRemove }: { groups: Record<Relatio
   );
 }
 
-// DepPicker: "+ Dependency", then a direction and a task search. onPick resolves when it was added.
-function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; onPick: (ref: string, dir: RelationDirection, t?: Task) => Promise<unknown> }) {
+// DepPicker: "+ Dependency", then a direction and a gig search. onPick resolves when it was added.
+function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; onPick: (ref: string, dir: RelationDirection, t?: Gig) => Promise<unknown> }) {
   const [adding, setAdding] = useState(false);
   const [dir, setDir] = useState<RelationDirection>("blocked_by");
   const [q, setQ] = useState("");
-  const [found, setFound] = useState<Task[]>([]);
+  const [found, setFound] = useState<Gig[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -660,12 +660,12 @@ function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; 
     }
     timer.current = setTimeout(() => {
       api
-        .wsTasks(wsId, { q: s, limit: 10 })
+        .wsGigs(wsId, { q: s, limit: 10 })
         .then((r) => setFound(r.items.filter((t) => t.id !== exclude)))
         .catch(() => setFound([]));
     }, 250);
   }, [q, wsId, exclude]);
-  const pick = (ref: string, t?: Task) =>
+  const pick = (ref: string, t?: Gig) =>
     onPick(ref, dir, t).then(
       () => {
         setQ("");
@@ -693,8 +693,8 @@ function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; 
           value={q}
           autoFocus
           data-dirty={q.trim() ? "" : undefined}
-          placeholder="Search tasks or type a key"
-          aria-label="Find a task"
+          placeholder="Search gigs or type a key"
+          aria-label="Find a gig"
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -709,7 +709,7 @@ function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; 
         />
       </div>
       {found.length > 0 && (
-        <ul className="rel-list search-results" aria-label="Matching tasks">
+        <ul className="rel-list search-results" aria-label="Matching gigs">
           {found.map((t) => (
             <li key={t.id}>
               <button type="button" className="rel-open" onClick={() => void pick(t.key, t)}>
@@ -730,53 +730,53 @@ function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; 
 
 const cycleText = (e: unknown) => (e instanceof ApiError && e.status === 409 ? `That would make a cycle: ${e.message}` : errText(e));
 
-export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { task: Task; wsId: number; canEdit: boolean; onTask: (t: Task) => void; onOpen: (t: Task) => void }) {
+export function DependenciesSection({ gig, wsId, canEdit, onGig, onOpen }: { gig: Gig; wsId: number; canEdit: boolean; onGig: (t: Gig) => void; onOpen: (t: Gig) => void }) {
   const [rels, setRels] = useState<Relation[] | null>(null);
-  const [gates, setGates] = useState<Task[]>([]); // open subtasks that block this task
+  const [gates, setGates] = useState<Gig[]>([]); // open subgigs that block this gig
   const [err, setErr] = useState("");
-  // a link added or removed doesn't change the task's version: reload the list after each one
+  // a link added or removed doesn't change the gig's version: reload the list after each one
   const [reload, setReload] = useState(0);
   useEffect(() => {
     let live = true;
     api
-      .relations(task.id)
+      .relations(gig.id)
       .then((r) => live && setRels(r.items))
       .catch((e: unknown) => live && setErr(errText(e, "Couldn't load the dependencies.")));
     return () => {
       live = false;
     };
-  }, [task.id, task.version, reload]);
-  const nGates = task.blocked_by_subtasks ?? 0;
+  }, [gig.id, gig.version, reload]);
+  const nGates = gig.blocked_by_subgigs ?? 0;
   useEffect(() => {
     if (!nGates) {
       setGates([]);
       return;
     }
     let live = true;
-    api.wsTasks(wsId, { parent: task.id, archived: "include", limit: 200, sort: "number" }).then(
+    api.wsGigs(wsId, { parent: gig.id, archived: "include", limit: 200, sort: "number" }).then(
       (r) => live && setGates(r.items.filter((s) => s.blocks_parent && !s.archived_at && s.status_category !== "done" && s.status_category !== "cancelled")),
       () => live && setGates([]),
     );
     return () => {
       live = false;
     };
-  }, [task.id, task.version, wsId, nGates]);
+  }, [gig.id, gig.version, wsId, nGates]);
 
   const fail = (e: unknown) => setErr(cycleText(e));
   const remove = (d: Dep) => {
     setErr("");
     api
-      .removeRelation(task.id, d.other, d.dir)
+      .removeRelation(gig.id, d.other, d.dir)
       .then((t) => {
         setReload((n) => n + 1);
-        onTask(t);
+        onGig(t);
       })
       .catch(fail);
   };
-  const open = (d: Dep) => void api.task(d.other).then(onOpen, fail);
+  const open = (d: Dep) => void api.gig(d.other).then(onOpen, fail);
 
-  const groups = splitRelations(task.id, rels ?? []);
-  groups.blocked_by.push(...gates.map((s) => ({ other: s.id, key: s.key, title: s.title, open: true, dir: "blocked_by" as const, subtask: true })));
+  const groups = splitRelations(gig.id, rels ?? []);
+  groups.blocked_by.push(...gates.map((s) => ({ other: s.id, key: s.key, title: s.title, open: true, dir: "blocked_by" as const, subgig: true })));
   const count = (rels ?? []).length + gates.length;
   if (!canEdit && count === 0) return null;
   return (
@@ -787,9 +787,9 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
       icon="link"
       badges={
         <>
-          {!!task.blocked_by && (
+          {!!gig.blocked_by && (
             <span className="pill pill-danger">
-              <Icon name="lock" /> {task.blocked_by} open
+              <Icon name="lock" /> {gig.blocked_by} open
             </span>
           )}
           {count > 0 && <span className="tsec-count">{count}</span>}
@@ -801,13 +801,13 @@ export function DependenciesSection({ task, wsId, canEdit, onTask, onOpen }: { t
       {canEdit && (
         <DepPicker
           wsId={wsId}
-          exclude={task.id}
+          exclude={gig.id}
           onPick={(ref, dir) => {
             setErr("");
-            return api.addRelation(task.id, ref, dir).then(
+            return api.addRelation(gig.id, ref, dir).then(
               (t) => {
                 setReload((n) => n + 1);
-                onTask(t);
+                onGig(t);
               },
               (e: unknown) => {
                 fail(e);
@@ -829,7 +829,7 @@ export interface DraftDep {
   dir: RelationDirection;
 }
 
-// DependenciesDraft: links a new task starts with (made when it is created).
+// DependenciesDraft: links a new gig starts with (made when it is created).
 export function DependenciesDraft({ wsId, items, onChange }: { wsId: number; items: DraftDep[]; onChange: (v: DraftDep[]) => void }) {
   const [err, setErr] = useState("");
   const groups: Record<RelationDirection, Dep[]> = { blocked_by: [], blocks: [], relates: [] };
@@ -858,7 +858,7 @@ export function DependenciesDraft({ wsId, items, onChange }: { wsId: number; ite
         wsId={wsId}
         onPick={(ref, dir, found) => {
           setErr("");
-          return (found ? Promise.resolve(found) : api.task(ref)).then(
+          return (found ? Promise.resolve(found) : api.gig(ref)).then(
             (t) => {
               if (t.workspace_id !== wsId) throw new ApiError(422, "invalid", `${t.key} is in another workspace.`);
               if (items.some((x) => x.id === t.id && x.dir === dir)) return;
@@ -866,7 +866,7 @@ export function DependenciesDraft({ wsId, items, onChange }: { wsId: number; ite
               onChange([...items, { id: t.id, key: t.key, title: t.title, open, dir }]);
             },
           ).catch((e: unknown) => {
-            setErr(e instanceof ApiError && e.status === 404 ? `No task ${ref}.` : errText(e));
+            setErr(e instanceof ApiError && e.status === 404 ? `No gig ${ref}.` : errText(e));
             throw e;
           });
         }}
@@ -891,7 +891,7 @@ function FieldsBox({ fields, values, canEdit, err, onSave }: { fields: CustomFie
   );
 }
 
-export function CustomFieldsSection({ task, fields, canEdit, onTask }: { task: Task; fields: CustomField[]; canEdit: boolean; onTask: (t: Task) => void }) {
+export function CustomFieldsSection({ gig, fields, canEdit, onGig }: { gig: Gig; fields: CustomField[]; canEdit: boolean; onGig: (t: Gig) => void }) {
   const [err, setErr] = useState("");
   if (fields.length === 0) return null;
   const save = (f: CustomField, v: unknown) => {
@@ -899,18 +899,18 @@ export function CustomFieldsSection({ task, fields, canEdit, onTask }: { task: T
       setErr(`${f.name}: not a valid ${f.kind}.`);
       return;
     }
-    const cur = task.custom?.[String(f.id)] ?? null;
+    const cur = gig.custom?.[String(f.id)] ?? null;
     if (v === cur) return;
     setErr("");
     api
-      .setCustom(task.id, { [String(f.id)]: v })
-      .then(onTask)
+      .setCustom(gig.id, { [String(f.id)]: v })
+      .then(onGig)
       .catch((e: unknown) => setErr(errText(e)));
   };
-  return <FieldsBox fields={fields} values={task.custom ?? {}} canEdit={canEdit} err={err} onSave={save} />;
+  return <FieldsBox fields={fields} values={gig.custom ?? {}} canEdit={canEdit} err={err} onSave={save} />;
 }
 
-// FieldsDraft: custom field values for a task (or template) not saved yet.
+// FieldsDraft: custom field values for a gig (or template) not saved yet.
 export function FieldsDraft({ fields, values, onChange }: { fields: CustomField[]; values: Record<string, unknown>; onChange: (v: Record<string, unknown>) => void }) {
   const [err, setErr] = useState("");
   if (fields.length === 0) return null;

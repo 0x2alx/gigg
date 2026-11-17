@@ -1,12 +1,12 @@
-// Table view: every task of all your workspaces, of one workspace or of one project, as a sortable,
+// Table view: every gig of all your workspaces, of one workspace or of one project, as a sortable,
 // filterable table with multi-select and bulk actions. Filters run on the server; one workspace is
 // sorted and paged there too, all of them are fetched per workspace and merged and sorted here.
 // "Include done" is applied here because the list API takes a single category.
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type CSSProperties } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { fmtDue } from "../dates";
-import { api, fmtTime, hasCap, priorityNames, type Board, type Category, type Tag, type Task } from "../api";
-import { TaskPanel } from "../TaskPanel";
+import { api, fmtTime, hasCap, priorityNames, type Board, type Category, type Tag, type Gig } from "../api";
+import { GigPanel } from "../GigPanel";
 import { RecurringModal } from "../Recurring";
 import { useApp, type WorkspaceTree } from "../App";
 import { assignable } from "../fields";
@@ -15,8 +15,8 @@ import { ClearFilters, Avatar, LabelChip, Modal, PriorityIcon, StatusDot } from 
 import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
 import { CATEGORY_LABEL } from "../boardModel";
-import { ALL_CATEGORIES, errMsg, isClosed, isOverdue, pool, relTime, taskHref, viewsApi, type TaskQuery } from "./viewsApi";
-import { compareTasks } from "./tableSort";
+import { ALL_CATEGORIES, errMsg, isClosed, isOverdue, pool, relTime, gigHref, viewsApi, type GigQuery } from "./viewsApi";
+import { compareGigs } from "./tableSort";
 import { PlaceFilter } from "../places";
 import { parse, PASSTHROUGH, savedViewsApi, summary, toQuery, toSearch, viewHref, type SavedFilter, type SortKey, type TableFilters } from "./savedViews";
 import "./views.css";
@@ -28,7 +28,7 @@ interface Sort {
 }
 
 const PAGE = 200;
-const MAX_PAGES = 5; // all workspaces: at most this many pages each (1000 tasks), then "+" says there are more
+const MAX_PAGES = 5; // all workspaces: at most this many pages each (1000 gigs), then "+" says there are more
 
 const writableWs = (w: WorkspaceTree) => w.role !== "viewer" && w.role !== "commenter";
 
@@ -51,9 +51,9 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const scope = useMemo(() => (ws ? [ws] : tree), [ws, tree]);
   const scopeKey = scope.map((w) => w.slug).join(",");
   const canWrite = scope.some(writableWs);
-  const wsOfTask = (t: Task) => scope.find((w) => w.id === t.workspace_id);
-  const canWriteTask = (t: Task) => {
-    const w = wsOfTask(t);
+  const wsOfGig = (t: Gig) => scope.find((w) => w.id === t.workspace_id);
+  const canWriteGig = (t: Gig) => {
+    const w = wsOfGig(t);
     return !!w && writableWs(w);
   };
 
@@ -98,41 +98,41 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     navigate(s ? `${loc}?${s}` : loc, { replace: true });
   }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [rows, setRows] = useState<Task[] | null>(null);
+  const [rows, setRows] = useState<Gig[] | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [error, setError] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
   const [capped, setCapped] = useState(false); // all workspaces: some had more than MAX_PAGES pages
   const [labels, setLabels] = useState<Tag[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  // a task opens in the panel over the table (closing it leaves the table as it was); the panel needs
+  // a gig opens in the panel over the table (closing it leaves the table as it was); the panel needs
   // its project's statuses and labels
-  const [openTask, setOpenTask] = useState<{ pid: number; key: string } | null>(null);
+  const [openGig, setOpenGig] = useState<{ pid: number; key: string } | null>(null);
   const [openBoard, setOpenBoard] = useState<Board | null>(null);
   const [recurring, setRecurring] = useState<number | null>(null);
-  // a task opens over the table when its project is in this user's tree; otherwise its link decides
-  const open = (t: Task) => (tree.some((w) => w.projects.some((p) => p.id === t.project_id)) ? setOpenTask({ pid: t.project_id, key: t.key }) : navigate(taskHref(tree, t)));
+  // a gig opens over the table when its project is in this user's tree; otherwise its link decides
+  const open = (t: Gig) => (tree.some((w) => w.projects.some((p) => p.id === t.project_id)) ? setOpenGig({ pid: t.project_id, key: t.key }) : navigate(gigHref(tree, t)));
   // an edit in the panel refreshes just that row (a reload would drop the pages loaded with Load more)
   const refreshRow = (key: string) => {
     const row = rows?.find((r) => r.key === key);
     if (!row) return;
     api
-      .task(row.id)
+      .gig(row.id)
       .then((t) => setRows((cur) => cur && cur.map((r) => (r.id === t.id ? t : r))))
       .catch(() => setRows((cur) => cur && cur.filter((r) => r.id !== row.id))); // deleted or out of reach
   };
-  const openWs = openTask ? tree.find((w) => w.projects.some((p) => p.id === openTask.pid)) : undefined;
+  const openWs = openGig ? tree.find((w) => w.projects.some((p) => p.id === openGig.pid)) : undefined;
   useEffect(() => {
-    if (!openTask) return setOpenBoard(null);
+    if (!openGig) return setOpenBoard(null);
     let live = true;
     api
-      .board(openTask.pid)
+      .board(openGig.pid)
       .then((b) => live && setOpenBoard(b))
-      .catch(() => live && navigate(`/board/p/${openTask.pid}/t/${openTask.key}`)); // the board page shows why
+      .catch(() => live && navigate(`/board/p/${openGig.pid}/g/${openGig.key}`)); // the board page shows why
     return () => {
       live = false;
     };
-  }, [openTask?.pid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [openGig?.pid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // debounce the text search
   useEffect(() => {
@@ -149,9 +149,9 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     });
   }, [scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const query = useMemo<TaskQuery>(
+  const query = useMemo<GigQuery>(
     () => ({
-      ...(extra as TaskQuery),
+      ...(extra as GigQuery),
       project: pid,
       category,
       label,
@@ -168,7 +168,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const load = useCallback(() => {
     setError("");
     const seq = ++loadSeq.current;
-    const done = (items: Task[], next: string | undefined) => {
+    const done = (items: Gig[], next: string | undefined) => {
       if (seq !== loadSeq.current) return; // a newer load (other filters) is on its way
       setRows(items);
       setCursor(next);
@@ -176,17 +176,17 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     };
     if (ws) {
       viewsApi
-        .tasks(ws.slug, query)
+        .gigs(ws.slug, query)
         .then((r) => done(r.items, r.next_cursor || undefined))
         .catch((e: unknown) => seq === loadSeq.current && setError(errMsg(e)));
       return;
     }
     // every workspace: each one's pages (up to MAX_PAGES), merged and sorted here
-    const all = async (w: WorkspaceTree): Promise<{ items: Task[]; more: boolean }> => {
-      const items: Task[] = [];
+    const all = async (w: WorkspaceTree): Promise<{ items: Gig[]; more: boolean }> => {
+      const items: Gig[] = [];
       let cur: string | undefined;
       for (let i = 0; i < MAX_PAGES; i++) {
-        const r = await viewsApi.tasks(w.slug, cur ? { ...query, cursor: cur } : query);
+        const r = await viewsApi.gigs(w.slug, cur ? { ...query, cursor: cur } : query);
         items.push(...r.items);
         cur = r.next_cursor || undefined;
         if (!cur) return { items, more: false };
@@ -194,7 +194,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
       return { items, more: true };
     };
     Promise.allSettled(scope.map(all)).then((res) => {
-      const items: Task[] = [];
+      const items: Gig[] = [];
       const bad: string[] = [];
       let more = false;
       res.forEach((r, i) => {
@@ -204,9 +204,9 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
         } else bad.push(scope[i]!.name);
       });
       if (seq !== loadSeq.current) return;
-      done(items.sort((a, b) => compareTasks(a, b, sort)), undefined);
+      done(items.sort((a, b) => compareGigs(a, b, sort)), undefined);
       setCapped(more);
-      if (bad.length) setError(`Couldn't load the tasks of ${bad.join(", ")}.`);
+      if (bad.length) setError(`Couldn't load the gigs of ${bad.join(", ")}.`);
     });
   }, [ws, scopeKey, query, sort]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(load, [load]);
@@ -216,7 +216,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     const seq = loadSeq.current; // a filter change meanwhile makes this page stale
     setLoadingMore(true);
     viewsApi
-      .tasks(ws.slug, { ...query, cursor })
+      .gigs(ws.slug, { ...query, cursor })
       .then((r) => {
         if (seq !== loadSeq.current) return;
         setRows((cur) => [...(cur ?? []), ...r.items.filter((t) => !(cur ?? []).some((c) => c.id === t.id))]);
@@ -238,7 +238,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   };
   const candidates = assignable(users, memberIds);
 
-  const selectable = visible.filter(canWriteTask);
+  const selectable = visible.filter(canWriteGig);
   const allOn = selectable.length > 0 && selectable.every((t) => selected.has(t.id));
   const toggleAll = () => setSelected(allOn ? new Set() : new Set(selectable.map((t) => t.id)));
   const toggle = (id: number) =>
@@ -263,9 +263,9 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const here = loc + (search ? "?" + search : "");
   const canSave = hasCap(me, "saved_filters");
 
-  const selectedTasks = visible.filter((t) => selected.has(t.id));
+  const selectedGigs = visible.filter((t) => selected.has(t.id));
   // bulk assign offers only people who can be assigned in every workspace of the selection
-  const selWs = [...new Set(selectedTasks.map((t) => t.workspace_id))];
+  const selWs = [...new Set(selectedGigs.map((t) => t.workspace_id))];
   const bulkCandidates = candidates.filter((u) => u.is_admin || selWs.every((id) => (members.get(id) ?? []).includes(u.id)));
   const boardHref = project ? `/board?p=${project.id}` : ws ? `/board?ws=${ws.slug}` : "/board";
   // the filter at the top moves between the tables: all, a workspace, a project (same filters kept)
@@ -285,12 +285,12 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
             {ws ? <WorkspaceBadge ws={ws} /> : <span className="pill pill-muted">All workspaces</span>}
             {project && <span className="pill pill-key">{project.key}</span>}
             <span className="muted small">
-              {rows === null ? "Loading…" : `${visible.length}${cursor || capped ? "+" : ""} tasks`}
+              {rows === null ? "Loading…" : `${visible.length}${cursor || capped ? "+" : ""} gigs`}
               {hidden > 0 && ` · ${hidden} done hidden`}
             </span>
           </div>
           <h1>
-            {project ? `${project.name} · Table` : ws ? `${ws.name} · All tasks` : "All tasks"}
+            {project ? `${project.name} · Table` : ws ? `${ws.name} · All gigs` : "All gigs"}
             <HelpButton topic="views" label="Help: tables and saved views" />
           </h1>
         </div>
@@ -302,7 +302,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
         </div>
       </header>
 
-      <div className="vw-filters" role="search" aria-label="Filter tasks">
+      <div className="vw-filters" role="search" aria-label="Filter gigs">
         <input type="search" className="vw-search" placeholder="Search titles, descriptions, comments…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search" />
         <select value={category} onChange={(e) => setCategory(e.target.value as Category | "")} aria-label="Status category">
           <option value="">Any status</option>
@@ -375,9 +375,9 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
         />
       )}
 
-      {canWrite && selectedTasks.length > 0 && (
+      {canWrite && selectedGigs.length > 0 && (
         <BulkBar
-          tasks={selectedTasks}
+          gigs={selectedGigs}
           labels={labels}
           candidates={bulkCandidates}
           onClear={() => setSelected(new Set())}
@@ -400,7 +400,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
             <tr>
               {canWrite && (
                 <th className="vw-check">
-                  <input type="checkbox" checked={allOn} onChange={toggleAll} aria-label="Select all shown tasks" disabled={selectable.length === 0} />
+                  <input type="checkbox" checked={allOn} onChange={toggleAll} aria-label="Select all shown gigs" disabled={selectable.length === 0} />
                 </th>
               )}
               <SortTh label="Key" k="number" sort={sort} onSort={clickSort} />
@@ -417,13 +417,13 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           <tbody>
             {visible.map((t) => {
               const p = projectOf(t.project_id);
-              const href = taskHref(tree, t);
+              const href = gigHref(tree, t);
               const on = selected.has(t.id);
               return (
-                <tr key={t.id} className={on ? "vw-on" : undefined} data-opens-task="" onClick={(e) => !(e.target as HTMLElement).closest("a, button, input, label") && open(t)}>
+                <tr key={t.id} className={on ? "vw-on" : undefined} data-opens-gig="" onClick={(e) => !(e.target as HTMLElement).closest("a, button, input, label") && open(t)}>
                   {canWrite && (
                     <td className="vw-check">
-                      {canWriteTask(t) && <input type="checkbox" checked={on} onChange={() => toggle(t.id)} aria-label={`Select ${t.key}`} />}
+                      {canWriteGig(t) && <input type="checkbox" checked={on} onChange={() => toggle(t.id)} aria-label={`Select ${t.key}`} />}
                     </td>
                   )}
                   <td className="vw-nowrap vw-key">{t.key}</td>
@@ -473,10 +473,10 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
             })}
           </tbody>
         </table>
-        {rows !== null && visible.length === 0 && <div className="vw-empty">{filtered ? "No tasks match these filters." : "No open tasks here."}</div>}
+        {rows !== null && visible.length === 0 && <div className="vw-empty">{filtered ? "No gigs match these filters." : "No open gigs here."}</div>}
         {capped && (
           <div className="vw-more muted small">
-            Some workspaces have more than {MAX_PAGES * PAGE} matching tasks; only their first {MAX_PAGES * PAGE} (in this order) are here. Narrow the filters, or open one workspace's table to page through all of it.
+            Some workspaces have more than {MAX_PAGES * PAGE} matching gigs; only their first {MAX_PAGES * PAGE} (in this order) are here. Narrow the filters, or open one workspace's table to page through all of it.
           </div>
         )}
         {cursor && (
@@ -487,16 +487,16 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           </div>
         )}
       </div>
-      {openTask && openWs && openBoard && (
-        <TaskPanel
-          taskKey={openTask.key}
+      {openGig && openWs && openBoard && (
+        <GigPanel
+          gigKey={openGig.key}
           ws={openWs}
           statuses={openBoard.statuses.filter((x) => x.category !== "cancelled")}
           labels={openBoard.labels}
           canWrite={writableWs(openWs)}
-          onClose={() => setOpenTask(null)}
-          onChanged={() => refreshRow(openTask.key)}
-          onMoved={(t) => setOpenTask({ pid: t.project_id, key: t.key })}
+          onClose={() => setOpenGig(null)}
+          onChanged={() => refreshRow(openGig.key)}
+          onMoved={(t) => setOpenGig({ pid: t.project_id, key: t.key })}
           onOpenSchedule={(id) => setRecurring(id)}
         />
       )}
@@ -519,7 +519,7 @@ function ViewChip({ view, href, active, onDeleted }: { view: SavedFilter; href: 
       </button>
       {confirm && (
         <Modal title={`Delete “${view.name}”?`} onClose={() => setConfirm(false)}>
-          <p>The saved view goes away; no tasks change.</p>
+          <p>The saved view goes away; no gigs change.</p>
           {error && (
             <p className="danger" role="alert">
               {error}
@@ -579,7 +579,7 @@ function SaveView({ ws, tree, query, existing, onClose, onSaved }: {
         <div className="span2 vw-chips">
           {ws ? <WorkspaceBadge ws={ws} /> : <span className="pill pill-muted">All workspaces</span>}
           {query.project && <span className="pill pill-key">{(ws ? [ws] : tree).flatMap((w) => w.projects).find((p) => String(p.id) === query.project)?.key ?? "project"}</span>}
-          {chips.length ? chips.map((c) => <span key={c} className="pill pill-muted">{c}</span>) : <span className="muted small">no filters: every open task</span>}
+          {chips.length ? chips.map((c) => <span key={c} className="pill pill-muted">{c}</span>) : <span className="muted small">no filters: every open gig</span>}
           {query.sort && <span className="pill pill-muted">sort {query.sort}</span>}
         </div>
         {same && <p className="muted small span2">Replaces your saved view “{same.name}”.</p>}
@@ -642,8 +642,8 @@ interface Progress {
   running: boolean;
 }
 
-function BulkBar({ tasks, labels, candidates, onClear, onDone }: {
-  tasks: Task[]; labels: Tag[]; candidates: ReturnType<typeof assignable>; onClear: () => void; onDone: () => void;
+function BulkBar({ gigs, labels, candidates, onClear, onDone }: {
+  gigs: Gig[]; labels: Tag[]; candidates: ReturnType<typeof assignable>; onClear: () => void; onDone: () => void;
 }) {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [labelText, setLabelText] = useState("");
@@ -652,7 +652,7 @@ function BulkBar({ tasks, labels, candidates, onClear, onDone }: {
   const busy = progress?.running ?? false;
 
   const run = (op: Op, title: string) => {
-    const batch = [...tasks];
+    const batch = [...gigs];
     setProgress({ title, total: batch.length, done: 0, errors: [], running: true });
     void pool(batch, 4, (t) => apply(t, op), (t, err) =>
       setProgress((p) => p && { ...p, done: p.done + 1, errors: err ? [...p.errors, { key: t.key, msg: err }] : p.errors }),
@@ -662,7 +662,7 @@ function BulkBar({ tasks, labels, candidates, onClear, onDone }: {
     });
   };
 
-  const n = tasks.length;
+  const n = gigs.length;
   return (
     <div className="vw-bulk" role="region" aria-label="Bulk actions">
       <span className="count big">{n}</span>
@@ -733,10 +733,10 @@ function BulkBar({ tasks, labels, candidates, onClear, onDone }: {
       {progress && <ProgressLine p={progress} onDismiss={() => setProgress(null)} />}
 
       {confirmDelete && (
-        <Modal title={`Delete ${n} task${n === 1 ? "" : "s"}?`} onClose={() => setConfirmDelete(false)}>
+        <Modal title={`Delete ${n} gig${n === 1 ? "" : "s"}?`} onClose={() => setConfirmDelete(false)}>
           <p>They move to the trash and can be restored from there.</p>
           <div className="vw-chips vw-confirm-keys">
-            {tasks.slice(0, 30).map((t) => (
+            {gigs.slice(0, 30).map((t) => (
               <span key={t.id} className="pill pill-key">
                 {t.key}
               </span>
@@ -803,28 +803,28 @@ function ProgressLine({ p, onDismiss }: { p: Progress; onDismiss: () => void }) 
   );
 }
 
-// apply runs one bulk op on one task. Label and assignee changes re-read the task first so a
+// apply runs one bulk op on one gig. Label and assignee changes re-read the gig first so a
 // concurrent edit isn't overwritten with the table's stale copy.
-async function apply(t: Task, op: Op): Promise<unknown> {
+async function apply(t: Gig, op: Op): Promise<unknown> {
   switch (op.kind) {
     case "move":
-      return t.status_category === op.category ? undefined : api.moveTask(t.id, { category: op.category });
+      return t.status_category === op.category ? undefined : api.moveGig(t.id, { category: op.category });
     case "priority":
-      return t.priority === op.priority ? undefined : api.patchTask(t.id, { priority: op.priority });
+      return t.priority === op.priority ? undefined : api.patchGig(t.id, { priority: op.priority });
     case "delete":
-      return api.deleteTask(t.id);
+      return api.deleteGig(t.id);
     case "label": {
-      const cur = await api.task(t.id);
+      const cur = await api.gig(t.id);
       const names = cur.labels.map((l) => l.name);
       if (names.some((n) => n.toLowerCase() === op.name.toLowerCase())) return undefined;
-      return api.patchTask(t.id, { labels: [...names, op.name] });
+      return api.patchGig(t.id, { labels: [...names, op.name] });
     }
     case "assign":
     case "unassign": {
-      const cur = await api.task(t.id);
+      const cur = await api.gig(t.id);
       const has = cur.assignees.includes(op.user);
       if (op.kind === "assign" ? has : !has) return undefined;
-      return api.patchTask(t.id, { assignees: op.kind === "assign" ? [...cur.assignees, op.user] : cur.assignees.filter((id) => id !== op.user) });
+      return api.patchGig(t.id, { assignees: op.kind === "assign" ? [...cur.assignees, op.user] : cur.assignees.filter((id) => id !== op.user) });
     }
   }
 }

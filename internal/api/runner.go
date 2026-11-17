@@ -11,7 +11,7 @@ import (
 	"github.com/0x2alx/gigg/internal/store"
 )
 
-// Runner controls: per-workspace task caps, the pause switch, and what agents spent. Reading is for
+// Runner controls: per-workspace gig caps, the pause switch, and what agents spent. Reading is for
 // anyone who sees the workspace (agents read their own before each pass); caps are for admins;
 // pausing for admins and holders of the pause_runs permission.
 
@@ -22,11 +22,11 @@ type RunnerState struct {
 	Name        string                `json:"name"`
 	Settings    *store.RunnerSettings `json:"settings"`
 	Usage       *store.RunnerUsage    `json:"usage"`
-	Crons       CronCounts            `json:"crons"`
+	Errands     ErrandCounts          `json:"errands"`
 }
 
-// CronCounts: a workspace's live crons and how many of them are failing.
-type CronCounts struct {
+// ErrandCounts: a workspace's live errands and how many of them are failing.
+type ErrandCounts struct {
 	Total   int64 `json:"total"`
 	Failing int64 `json:"failing"`
 }
@@ -46,19 +46,19 @@ func (a *API) runnerState(ctx context.Context, w *store.Workspace) (RunnerState,
 	if err != nil {
 		return RunnerState{}, err
 	}
-	var cc CronCounts
-	if cc.Total, cc.Failing, err = store.CountCrons(ctx, a.st.R, w.ID); err != nil {
+	var cc ErrandCounts
+	if cc.Total, cc.Failing, err = store.CountErrands(ctx, a.st.R, w.ID); err != nil {
 		return RunnerState{}, err
 	}
-	return RunnerState{WorkspaceID: w.ID, Slug: w.Slug, Name: w.Name, Settings: st, Usage: u, Crons: cc}, nil
+	return RunnerState{WorkspaceID: w.ID, Slug: w.Slug, Name: w.Name, Settings: st, Usage: u, Errands: cc}, nil
 }
 
 // PauseBody picks workspaces and a duration.
 type PauseBody struct {
 	Workspaces []int64 `json:"workspaces,omitempty" doc:"Workspace ids; omit for every workspace you may pause"`
-	Minutes    int64   `json:"minutes,omitempty" minimum:"0" maximum:"525600" doc:"How long; 0 or omitted = until resumed (task runs only: crons pause until resumed)"`
-	Tasks      *bool   `json:"tasks,omitempty" doc:"The task box (default true)"`
-	Crons      *bool   `json:"crons,omitempty" doc:"The cron box (default true)"`
+	Minutes    int64   `json:"minutes,omitempty" minimum:"0" maximum:"525600" doc:"How long; 0 or omitted = until resumed (gig runs only: errands pause until resumed)"`
+	Gigs       *bool   `json:"gigs,omitempty" doc:"The gig box (default true)"`
+	Errands    *bool   `json:"errands,omitempty" doc:"The errand box (default true)"`
 }
 
 func (a *API) registerRunner() {
@@ -68,7 +68,7 @@ func (a *API) registerRunner() {
 		if err != nil {
 			return nil, err
 		}
-		if err := need(p, "tasks:read"); err != nil {
+		if err := need(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		ws, err := store.ListWorkspaces(ctx, a.st.R, p.Workspaces())
@@ -99,18 +99,18 @@ func (a *API) registerRunner() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		s, err := a.runnerState(ctx, w)
 		return &struct{ Body RunnerState }{s}, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "set-runner-caps", Method: "PATCH", Path: "/workspaces/{ws}/runner", Tags: []string{"runs"},
-		Summary: "Change a workspace's task caps (admin)"}, func(ctx context.Context, in *struct {
+		Summary: "Change a workspace's gig caps (admin)"}, func(ctx context.Context, in *struct {
 		WS   string `path:"ws"`
 		Body struct {
-			DailyCap *int64 `json:"daily_cap,omitempty" minimum:"0" maximum:"200" doc:"Distinct tasks per rolling 24 hours, any kind"`
-			NightCap *int64 `json:"night_cap,omitempty" minimum:"0" maximum:"200" doc:"Of those, budget-dependent (not always-run) tasks"`
+			DailyCap *int64 `json:"daily_cap,omitempty" minimum:"0" maximum:"200" doc:"Distinct gigs per rolling 24 hours, any kind"`
+			NightCap *int64 `json:"night_cap,omitempty" minimum:"0" maximum:"200" doc:"Of those, budget-dependent (not always-run) gigs"`
 		}
 	}) (*struct{ Body RunnerState }, error) {
 		p, err := me(ctx)
@@ -134,7 +134,7 @@ func (a *API) registerRunner() {
 		return &struct{ Body RunnerState }{s}, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "pause-runner", Method: "POST", Path: "/runner/pause", Tags: []string{"runs"},
-		Summary: "Pause new task runs in some or all workspaces, for a time or until resumed (admins, or the pause_runs permission)"}, func(ctx context.Context, in *struct{ Body PauseBody }) (*runnerList, error) {
+		Summary: "Pause new gig runs in some or all workspaces, for a time or until resumed (admins, or the pause_runs permission)"}, func(ctx context.Context, in *struct{ Body PauseBody }) (*runnerList, error) {
 		return a.pauseOrResume(ctx, in.Body, true)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "resume-runner", Method: "POST", Path: "/runner/resume", Tags: []string{"runs"},
@@ -218,23 +218,23 @@ func (a *API) pauseOrResume(ctx context.Context, b PauseBody, pause bool) (*runn
 		until = &u
 	}
 	if err := a.tx(ctx, func(tx *sql.Tx) error {
-		tasks, crons := b.Tasks == nil || *b.Tasks, b.Crons == nil || *b.Crons
+		gigs, errands := b.Gigs == nil || *b.Gigs, b.Errands == nil || *b.Errands
 		for _, w := range chosen {
 			var err error
 			switch {
-			case pause && tasks:
+			case pause && gigs:
 				err = store.PauseRunner(ctx, tx, p.Actor(), w.ID, until)
-			case !pause && tasks:
+			case !pause && gigs:
 				err = store.ResumeRunner(ctx, tx, p.Actor(), w.ID)
 			}
 			if err != nil {
 				return err
 			}
 			switch {
-			case pause && crons:
-				err = store.PauseCrons(ctx, tx, p.Actor(), w.ID)
-			case !pause && crons:
-				err = store.ResumeCrons(ctx, tx, p.Actor(), w.ID)
+			case pause && errands:
+				err = store.PauseErrands(ctx, tx, p.Actor(), w.ID)
+			case !pause && errands:
+				err = store.ResumeErrands(ctx, tx, p.Actor(), w.ID)
 			}
 			if err != nil {
 				return err

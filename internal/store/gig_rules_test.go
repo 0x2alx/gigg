@@ -6,31 +6,31 @@ import (
 	"testing"
 )
 
-// TestParentCycleRefused: a task can't be put under its own subtask, at any depth.
+// TestParentCycleRefused: a gig can't be put under its own subgig, at any depth.
 func TestParentCycleRefused(t *testing.T) {
 	f := newFixture(t)
-	a := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "a"})
-	b := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "b", ParentID: &a.ID})
-	c := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "c", ParentID: &b.ID})
+	a := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "a"})
+	b := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "b", ParentID: &a.ID})
+	c := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "c", ParentID: &b.ID})
 	err := f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-		cur, err := GetTask(f.ctx, tx, a.ID)
+		cur, err := GetGig(f.ctx, tx, a.ID)
 		if err != nil {
 			return err
 		}
-		_, err = PatchTask(f.ctx, tx, f.a, cur, 0, TaskPatch{ParentID: ptr(&c.ID)})
+		_, err = PatchGig(f.ctx, tx, f.a, cur, 0, GigPatch{ParentID: ptr(&c.ID)})
 		return err
 	})
 	if err == nil {
-		t.Fatal("a task was put under its own sub-subtask")
+		t.Fatal("a gig was put under its own sub-subgig")
 	}
-	// moving it under an unrelated task still works
-	d := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "d"})
+	// moving it under an unrelated gig still works
+	d := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "d"})
 	f.tx(t, func(tx *sql.Tx) error {
-		cur, err := GetTask(f.ctx, tx, a.ID)
+		cur, err := GetGig(f.ctx, tx, a.ID)
 		if err != nil {
 			return err
 		}
-		_, err = PatchTask(f.ctx, tx, f.a, cur, 0, TaskPatch{ParentID: ptr(&d.ID)})
+		_, err = PatchGig(f.ctx, tx, f.a, cur, 0, GigPatch{ParentID: ptr(&d.ID)})
 		return err
 	})
 }
@@ -39,16 +39,16 @@ func TestParentCycleRefused(t *testing.T) {
 // refused, as on create; one end alone (the UI moving a window field by field) is not.
 func TestPatchWindowChecked(t *testing.T) {
 	f := newFixture(t)
-	tk := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "w", StartAt: i64(1000), NotAfter: i64(5000)})
+	tk := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "w", StartAt: i64(1000), NotAfter: i64(5000)})
 	err := f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-		_, err := PatchTask(f.ctx, tx, f.a, tk, 0, TaskPatch{StartAt: ptr(i64(6000)), NotAfter: ptr(i64(5500))})
+		_, err := PatchGig(f.ctx, tx, f.a, tk, 0, GigPatch{StartAt: ptr(i64(6000)), NotAfter: ptr(i64(5500))})
 		return err
 	})
 	if err == nil {
 		t.Fatal("window closing before it opens was accepted")
 	}
 	f.tx(t, func(tx *sql.Tx) error {
-		_, err := PatchTask(f.ctx, tx, f.a, tk, 0, TaskPatch{StartAt: ptr(i64(6000))})
+		_, err := PatchGig(f.ctx, tx, f.a, tk, 0, GigPatch{StartAt: ptr(i64(6000))})
 		return err
 	})
 }
@@ -72,21 +72,21 @@ func TestStaleVersionRefused(t *testing.T) {
 	}
 }
 
-// TestRestoreIntoDeletedProject: a task whose project was deleted can't be restored into no list.
+// TestRestoreIntoDeletedProject: a gig whose project was deleted can't be restored into no list.
 func TestRestoreIntoDeletedProject(t *testing.T) {
 	f := newFixture(t)
-	tk := f.task(t, NewTask{ProjectID: f.p2.ID, Title: "orphan"})
+	tk := f.gig(t, NewGig{ProjectID: f.p2.ID, Title: "orphan"})
 	f.tx(t, func(tx *sql.Tx) error {
-		_, err := TrashTask(f.ctx, tx, f.a, tk, false)
+		_, err := TrashGig(f.ctx, tx, f.a, tk, false)
 		return err
 	})
 	f.tx(t, func(tx *sql.Tx) error { return DeleteProject(f.ctx, tx, f.a, f.p2) })
 	err := f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-		cur, err := GetTask(f.ctx, tx, tk.ID)
+		cur, err := GetGig(f.ctx, tx, tk.ID)
 		if err != nil {
 			return err
 		}
-		_, err = TrashTask(f.ctx, tx, f.a, cur, true)
+		_, err = TrashGig(f.ctx, tx, f.a, cur, true)
 		return err
 	})
 	if err == nil {
@@ -95,7 +95,7 @@ func TestRestoreIntoDeletedProject(t *testing.T) {
 }
 
 // TestOccurrenceNotMadeTwice: next_at landing again on an occurrence already made (an edit inside the
-// lead time recomputes it from now) doesn't create a second task.
+// lead time recomputes it from now) doesn't create a second gig.
 func TestOccurrenceNotMadeTwice(t *testing.T) {
 	f := newFixture(t)
 	var r *Recurrence
@@ -117,9 +117,9 @@ func TestOccurrenceNotMadeTwice(t *testing.T) {
 	res, err = f.s.Housekeeping(f.ctx, ny(t, "2026-11-12 07:30"))
 	must(t, err)
 	var n int
-	must(t, f.s.R.QueryRow(`SELECT count(*) FROM tasks WHERE recurrence_id = ?`, r.ID).Scan(&n))
+	must(t, f.s.R.QueryRow(`SELECT count(*) FROM gigs WHERE recurrence_id = ?`, r.ID).Scan(&n))
 	if res.Created != 0 || n != 1 {
-		t.Fatalf("made twice: %+v, %d tasks", res, n)
+		t.Fatalf("made twice: %+v, %d gigs", res, n)
 	}
 	got, err := GetRecurrence(f.ctx, f.s.R, r.ID)
 	must(t, err)
@@ -128,22 +128,22 @@ func TestOccurrenceNotMadeTwice(t *testing.T) {
 	}
 }
 
-// TestArchivedBlockerFrees: an open blocker that gets archived no longer blocks (as with subtasks).
+// TestArchivedBlockerFrees: an open blocker that gets archived no longer blocks (as with subgigs).
 func TestArchivedBlockerFrees(t *testing.T) {
 	f := newFixture(t)
-	blocker := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "blocker"})
-	held := f.task(t, NewTask{ProjectID: f.p1.ID, Title: "held"})
+	blocker := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "blocker"})
+	held := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "held"})
 	f.tx(t, func(tx *sql.Tx) error { return AddRelation(f.ctx, tx, f.a, blocker, held, "blocks") })
 	got := f.get(t, held.ID)
 	if got.BlockedBy != 1 {
 		t.Fatalf("blocked_by = %d before archiving, want 1", got.BlockedBy)
 	}
 	f.tx(t, func(tx *sql.Tx) error {
-		cur, err := GetTask(f.ctx, tx, blocker.ID)
+		cur, err := GetGig(f.ctx, tx, blocker.ID)
 		if err != nil {
 			return err
 		}
-		_, err = ArchiveTask(f.ctx, tx, f.a, cur, true)
+		_, err = ArchiveGig(f.ctx, tx, f.a, cur, true)
 		return err
 	})
 	if got = f.get(t, held.ID); got.BlockedBy != 0 {
@@ -152,7 +152,7 @@ func TestArchivedBlockerFrees(t *testing.T) {
 }
 
 // TestDeletedProjectFreesNames: a deleted project's slug and key can be used again, and its key then
-// resolves to the new project's tasks only.
+// resolves to the new project's gigs only.
 func TestDeletedProjectFreesNames(t *testing.T) {
 	f := newFixture(t)
 	var old *Project
@@ -161,13 +161,13 @@ func TestDeletedProjectFreesNames(t *testing.T) {
 		old, err = CreateProject(f.ctx, tx, f.a, f.ws.ID, "infra", "Infra", "INF", nil)
 		return err
 	})
-	gone := f.task(t, NewTask{ProjectID: old.ID, Title: "old"})
+	gone := f.gig(t, NewGig{ProjectID: old.ID, Title: "old"})
 	f.tx(t, func(tx *sql.Tx) error {
-		cur, err := GetTask(f.ctx, tx, gone.ID)
+		cur, err := GetGig(f.ctx, tx, gone.ID)
 		if err != nil {
 			return err
 		}
-		if _, err = TrashTask(f.ctx, tx, f.a, cur, false); err != nil {
+		if _, err = TrashGig(f.ctx, tx, f.a, cur, false); err != nil {
 			return err
 		}
 		return DeleteProject(f.ctx, tx, f.a, old)
@@ -186,16 +186,16 @@ func TestDeletedProjectFreesNames(t *testing.T) {
 		fresh, err = CreateProject(f.ctx, tx, f.a, f.ws.ID, "infra", "Infra again", "INF", nil)
 		return err
 	})
-	now := f.task(t, NewTask{ProjectID: fresh.ID, Title: "new"})
-	ids, err := TaskIDsByKey(f.ctx, f.s.R, "INF-1", nil)
+	now := f.gig(t, NewGig{ProjectID: fresh.ID, Title: "new"})
+	ids, err := GigIDsByKey(f.ctx, f.s.R, "INF-1", nil)
 	if err != nil || len(ids) != 1 || ids[0] != now.ID {
-		t.Fatalf("INF-1 = %v (%v), want only the new project's task %d", ids, err, now.ID)
+		t.Fatalf("INF-1 = %v (%v), want only the new project's gig %d", ids, err, now.ID)
 	}
 }
 
-func (f *fixture) get(t *testing.T, id int64) *Task {
+func (f *fixture) get(t *testing.T, id int64) *Gig {
 	t.Helper()
-	tk, err := GetTask(f.ctx, f.s.R, id)
+	tk, err := GetGig(f.ctx, f.s.R, id)
 	if err != nil {
 		t.Fatal(err)
 	}

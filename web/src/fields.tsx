@@ -1,4 +1,4 @@
-// Inputs shared by the new-task modal and the task panel: labels, assignees, colour.
+// Inputs shared by the new-gig modal and the gig panel: labels, assignees, colour.
 import { useEffect, useRef, useState } from "react";
 import type { Tag, User } from "./api";
 import { fillTime, joinDateTime, splitDateTime } from "./dates";
@@ -19,7 +19,7 @@ export function withCurrent(candidates: User[], ids: number[], users: Map<number
   return extra.length ? [...candidates, ...extra] : candidates;
 }
 
-// autosave: each change saves at once (the task panel), so Backspace in the empty box doesn't remove the last label.
+// autosave: each change saves at once (the gig panel), so Backspace in the empty box doesn't remove the last label.
 export function LabelInput({ value, onChange, known, autosave }: { value: string[]; onChange: (v: string[]) => void; known: Tag[]; autosave?: boolean }) {
   const [text, setText] = useState("");
   const add = (name: string) => {
@@ -116,7 +116,7 @@ export function fromDateInput(v: string): number | null {
 
 // DateTimeInput: a local date plus a time (unix ms out). Picking only a date fills in defaultTime
 // (shown, so the user sees it). live: report every valid change (forms); otherwise commit when focus
-// leaves the pair or on Enter (the task panel, which saves each commit).
+// leaves the pair or on Enter (the gig panel, which saves each commit).
 export function DateTimeInput({ value, onChange, defaultTime, label, disabled, live }: {
   value: number | null;
   onChange: (v: number | null) => void;

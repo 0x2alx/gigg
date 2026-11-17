@@ -52,7 +52,7 @@ func TestWorkspaceOwner(t *testing.T) {
 // workspace (it reaches them all), not just the admins.
 func TestAdminKeyCoMembers(t *testing.T) {
 	e := newEnv(t)
-	code, out, _ := e.req("POST", "/keys", fmt.Sprintf(`{"name":"plain","user_id":%d,"scopes":["workspace:read","tasks:read"],"allowed_listeners":["internal"]}`, e.ids["ada"]), e.ada())
+	code, out, _ := e.req("POST", "/keys", fmt.Sprintf(`{"name":"plain","user_id":%d,"scopes":["workspace:read","gigs:read"],"allowed_listeners":["internal"]}`, e.ids["ada"]), e.ada())
 	e.ok(code, out, 201)
 	var kc KeyCreated
 	_ = json.Unmarshal(out, &kc)

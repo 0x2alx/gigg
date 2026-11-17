@@ -124,29 +124,29 @@ func TestHousekeeping(t *testing.T) {
 	if res := run("2026-11-12 08:30"); res.Created != 1 {
 		t.Fatalf("lead time: %+v", res)
 	}
-	tasks, _, err := ListTasks(f.ctx, f.s.R, TaskFilter{WorkspaceID: f.ws.ID})
+	gigs, _, err := ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID})
 	must(t, err)
-	if len(tasks) != 1 {
-		t.Fatalf("tasks: %d", len(tasks))
+	if len(gigs) != 1 {
+		t.Fatalf("gigs: %d", len(gigs))
 	}
-	tk := tasks[0]
+	tk := gigs[0]
 	if *tk.StartAt != ny(t, "2026-11-12 09:00") || *tk.NotAfter != ny(t, "2026-11-12 11:00") || *tk.DueAt != *tk.NotAfter ||
 		*tk.RecurrenceID != r.ID || len(tk.Labels) != 1 || len(tk.Assignees) != 1 {
-		t.Fatalf("occurrence task: %+v", tk)
+		t.Fatalf("occurrence gig: %+v", tk)
 	}
-	move := func(tk *Task, cat string) {
+	move := func(tk *Gig, cat string) {
 		t.Helper()
 		must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-			cur, err := GetTask(f.ctx, tx, tk.ID)
+			cur, err := GetGig(f.ctx, tx, tk.ID)
 			if err != nil {
 				return err
 			}
-			_, err = MoveTask(f.ctx, tx, f.a, cur, 0, Move{Category: cat})
+			_, err = MoveGig(f.ctx, tx, f.a, cur, 0, Move{Category: cat})
 			return err
 		}))
 	}
 	// someone is still working on the first one when the next comes up: skipped (overlap skip),
-	// and a task in progress is never marked missed
+	// and a gig in progress is never marked missed
 	move(tk, "doing")
 	if res := run("2026-11-13 08:30"); res.Created != 0 || res.Skipped != 1 || res.Missed != 0 {
 		t.Fatalf("overlap: %+v", res)
@@ -155,20 +155,20 @@ func TestHousekeeping(t *testing.T) {
 	if res := run("2026-11-14 08:30"); res.Created != 1 {
 		t.Fatalf("second: %+v", res)
 	}
-	tasks, _, _ = ListTasks(f.ctx, f.s.R, TaskFilter{WorkspaceID: f.ws.ID, Category: "todo"})
-	second := tasks[0]
+	gigs, _, _ = ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID, Category: "todo"})
+	second := gigs[0]
 	// nobody touched the second: next morning it is missed (moved to waiting, a note in local time)
 	// and no longer blocks the next occurrence
 	if res := run("2026-11-15 08:30"); res.Missed != 1 || res.Created != 1 {
 		t.Fatalf("missed: %+v", res)
 	}
-	second, err = GetTask(f.ctx, f.s.R, second.ID)
+	second, err = GetGig(f.ctx, f.s.R, second.ID)
 	must(t, err)
 	if second.MissedAt == nil || second.StatusCategory != "waiting" {
-		t.Fatalf("missed task: missed=%v status=%s", second.MissedAt, second.StatusCategory)
+		t.Fatalf("missed gig: missed=%v status=%s", second.MissedAt, second.StatusCategory)
 	}
 	var note string
-	must(t, f.s.R.QueryRow(`SELECT body_md FROM comments WHERE task_id = ? AND kind = 'system'`, second.ID).Scan(&note))
+	must(t, f.s.R.QueryRow(`SELECT body_md FROM comments WHERE gig_id = ? AND kind = 'system'`, second.ID).Scan(&note))
 	if !strings.Contains(note, "Sat 2026-11-14 11:00 EST") {
 		t.Errorf("note: %q", note)
 	}
@@ -189,25 +189,25 @@ func TestHousekeeping(t *testing.T) {
 	}
 }
 
-// TestClaimRespectsWindow: claim (real clock) never hands out a task before its window opens,
-// after it closes, or once missed; plain tasks are unaffected.
+// TestClaimRespectsWindow: claim (real clock) never hands out a gig before its window opens,
+// after it closes, or once missed; plain gigs are unaffected.
 func TestClaimRespectsWindow(t *testing.T) {
 	f := newFixture(t)
 	now := Now()
 	hour := int64(3600_000)
 	mk := func(title string, start, notAfter *int64) {
 		must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-			_, err := CreateTask(f.ctx, tx, f.a, NewTask{ProjectID: f.p1.ID, Title: title, Priority: 4, StartAt: start, NotAfter: notAfter})
+			_, err := CreateGig(f.ctx, tx, f.a, NewGig{ProjectID: f.p1.ID, Title: title, Priority: 4, StartAt: start, NotAfter: notAfter})
 			return err
 		}))
 	}
 	mk("not yet open", i64(now+hour), i64(now+2*hour))
 	mk("closed", i64(now-2*hour), i64(now-hour))
 	claim := func() string {
-		var got *Task
+		var got *Gig
 		must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
 			var err error
-			got, err = ClaimTask(f.ctx, tx, Actor{UserID: f.agent.ID}, f.ws.ID, Claim{DryRun: true})
+			got, err = ClaimGig(f.ctx, tx, Actor{UserID: f.agent.ID}, f.ws.ID, Claim{DryRun: true})
 			if err == ErrNotFound {
 				return nil
 			}

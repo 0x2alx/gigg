@@ -260,29 +260,29 @@ func PatchWorkspace(ctx context.Context, q Q, a Actor, id, expect int64, p Works
 
 // Project is a board inside a workspace.
 type Project struct {
-	ID             int64   `json:"id"`
-	WorkspaceID    int64   `json:"workspace_id"`
-	Slug           string  `json:"slug"`
-	Name           string  `json:"name"`
-	Key            string  `json:"key"`
-	Color          *string `json:"color"`
-	DescriptionMD  string  `json:"description_md"`
-	Position       float64 `json:"position"`
-	NextTaskNumber int64   `json:"-"`
-	Archived       bool    `json:"archived"`
-	Deleted        bool    `json:"deleted"`
-	CreatedAt      int64   `json:"created_at"`
-	Version        int64   `json:"version"`
+	ID            int64   `json:"id"`
+	WorkspaceID   int64   `json:"workspace_id"`
+	Slug          string  `json:"slug"`
+	Name          string  `json:"name"`
+	Key           string  `json:"key"`
+	Color         *string `json:"color"`
+	DescriptionMD string  `json:"description_md"`
+	Position      float64 `json:"position"`
+	NextGigNumber int64   `json:"-"`
+	Archived      bool    `json:"archived"`
+	Deleted       bool    `json:"deleted"`
+	CreatedAt     int64   `json:"created_at"`
+	Version       int64   `json:"version"`
 }
 
-const projCols = `id, workspace_id, slug, name, key, color, description_md, position, next_task_number,
+const projCols = `id, workspace_id, slug, name, key, color, description_md, position, next_gig_number,
 	archived_at IS NOT NULL, deleted_at IS NOT NULL, created_at, version`
 
 func scanProject(row interface{ Scan(...any) error }) (*Project, error) {
 	var p Project
 	var color sql.NullString
 	if err := row.Scan(&p.ID, &p.WorkspaceID, &p.Slug, &p.Name, &p.Key, &color, &p.DescriptionMD, &p.Position,
-		&p.NextTaskNumber, &p.Archived, &p.Deleted, &p.CreatedAt, &p.Version); err != nil {
+		&p.NextGigNumber, &p.Archived, &p.Deleted, &p.CreatedAt, &p.Version); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -325,7 +325,7 @@ func CreateProject(ctx context.Context, q Q, a Actor, ws int64, slug, name, key 
 	}
 	id, _ := res.LastInsertId()
 	if alias, _ := aliasTaken(ctx, q, ws, key); alias {
-		return nil, Conflict("key %s is still used by moved tasks' old keys in this workspace", key)
+		return nil, Conflict("key %s is still used by moved gigs' old keys in this workspace", key)
 	}
 	for i, st := range statuses {
 		def := 0
@@ -345,8 +345,8 @@ func CreateProject(ctx context.Context, q Q, a Actor, ws int64, slug, name, key 
 
 func aliasTaken(ctx context.Context, q Q, ws int64, key string) (bool, error) {
 	var n int
-	// old keys of tasks that live on (in a project that isn't deleted) keep resolving, so their key stays taken
-	err := q.QueryRowContext(ctx, `SELECT count(*) FROM task_aliases a JOIN tasks t ON t.id = a.task_id JOIN projects p ON p.id = t.project_id
+	// old keys of gigs that live on (in a project that isn't deleted) keep resolving, so their key stays taken
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM gig_aliases a JOIN gigs t ON t.id = a.gig_id JOIN projects p ON p.id = t.project_id
 		WHERE a.workspace_id = ? AND a.project_key = ? AND p.deleted_at IS NULL`, ws, key).Scan(&n)
 	return n > 0, err
 }
@@ -453,14 +453,14 @@ func PatchProject(ctx context.Context, q Q, a Actor, id, expect int64, p Project
 	return GetProject(ctx, q, id)
 }
 
-// DeleteProject soft-deletes an empty project (tasks must be moved or trashed first).
+// DeleteProject soft-deletes an empty project (gigs must be moved or trashed first).
 func DeleteProject(ctx context.Context, q Q, a Actor, p *Project) error {
 	var live int
-	if err := q.QueryRowContext(ctx, `SELECT count(*) FROM tasks WHERE project_id = ? AND deleted_at IS NULL`, p.ID).Scan(&live); err != nil {
+	if err := q.QueryRowContext(ctx, `SELECT count(*) FROM gigs WHERE project_id = ? AND deleted_at IS NULL`, p.ID).Scan(&live); err != nil {
 		return err
 	}
 	if live > 0 {
-		return Conflict("the project still has %d tasks: move or delete them first", live)
+		return Conflict("the project still has %d gigs: move or delete them first", live)
 	}
 	if _, err := q.ExecContext(ctx, `UPDATE projects SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), p.ID); err != nil {
 		return err
@@ -528,7 +528,7 @@ func FirstStatusOf(ctx context.Context, q Q, project int64, category string) (*S
 		ORDER BY is_default DESC, position, id LIMIT 1`, project, category))
 }
 
-// DefaultStatus is where new tasks go: the default status, else the first todo, else the first.
+// DefaultStatus is where new gigs go: the default status, else the first todo, else the first.
 func DefaultStatus(ctx context.Context, q Q, project int64) (*Status, error) {
 	return scanStatus(q.QueryRowContext(ctx, "SELECT "+statusCols+` FROM statuses WHERE project_id = ?
 		ORDER BY is_default DESC, category = 'todo' DESC, position LIMIT 1`, project))
@@ -654,11 +654,11 @@ func checkProjectCategories(ctx context.Context, q Q, project int64) error {
 // DeleteStatus removes an empty status.
 func DeleteStatus(ctx context.Context, q Q, a Actor, s *Status) error {
 	var n int
-	if err := q.QueryRowContext(ctx, `SELECT count(*) FROM tasks WHERE status_id = ?`, s.ID).Scan(&n); err != nil {
+	if err := q.QueryRowContext(ctx, `SELECT count(*) FROM gigs WHERE status_id = ?`, s.ID).Scan(&n); err != nil {
 		return err
 	}
 	if n > 0 {
-		return Conflict("the status still holds %d tasks (including trashed ones): move them first", n)
+		return Conflict("the status still holds %d gigs (including trashed ones): move them first", n)
 	}
 	var same int
 	if err := q.QueryRowContext(ctx, `SELECT count(*) FROM statuses WHERE project_id = ? AND category = ? AND id != ?`,
@@ -842,7 +842,7 @@ func PatchLabel(ctx context.Context, q Q, a Actor, l *Label, expect int64, p Lab
 	return GetLabel(ctx, q, l.ID)
 }
 
-// DeleteLabel removes a label from every task and deletes it.
+// DeleteLabel removes a label from every gig and deletes it.
 func DeleteLabel(ctx context.Context, q Q, a Actor, l *Label) error {
 	if _, err := q.ExecContext(ctx, `DELETE FROM labels WHERE id = ?`, l.ID); err != nil {
 		return err

@@ -33,7 +33,7 @@
    "wait": ".board"
   },
   {
-   "eval": "(async () => { const H = {'Content-Type':'application/json','X-Gigg-CSRF':'1'}; const j = async (m,u,b) => { const r = await fetch('/api/v1'+u,{method:m,headers:H,body:b?JSON.stringify(b):undefined}); return r.json().catch(()=>null); }; const ps = await j('GET','/workspaces/scout/projects'); const p = ps.items[0].id; const a = await j('POST',`/projects/${p}/tasks`,{title:'Mobile parent task with a fairly long title to wrap',priority:3,labels:['ui','mobile'],checklist:['one','two'],description_md:'Some **markdown** text.\\n\\n- a\\n- b'}); await j('POST',`/projects/${p}/tasks`,{title:'Second task',priority:1}); await j('POST',`/tasks/${a.key}/comments`,{body_md:'A comment with @scout'}); return a.key; })()"
+   "eval": "(async () => { const H = {'Content-Type':'application/json','X-Gigg-CSRF':'1'}; const j = async (m,u,b) => { const r = await fetch('/api/v1'+u,{method:m,headers:H,body:b?JSON.stringify(b):undefined}); return r.json().catch(()=>null); }; const ps = await j('GET','/workspaces/scout/projects'); const p = ps.items[0].id; const a = await j('POST',`/projects/${p}/gigs`,{title:'Mobile parent gig with a fairly long title to wrap',priority:3,labels:['ui','mobile'],checklist:['one','two'],description_md:'Some **markdown** text.\\n\\n- a\\n- b'}); await j('POST',`/projects/${p}/gigs`,{title:'Second gig',priority:1}); await j('POST',`/gigs/${a.key}/comments`,{body_md:'A comment with @scout'}); return a.key; })()"
   },
   {
    "goto": "/"
@@ -116,7 +116,7 @@
    "wait": 300
   },
   {
-   "eval": "[...document.querySelectorAll('.page-head .button')].find(b => b.textContent.includes('New task')).click(), true"
+   "eval": "[...document.querySelectorAll('.page-head .button')].find(b => b.textContent.includes('New gig')).click(), true"
   },
   {
    "wait": ".modal"
@@ -125,7 +125,7 @@
    "wait": 300
   },
   {
-   "shot": "m-new-task"
+   "shot": "m-new-gig"
   },
   {
    "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelector('.content').scrollWidth <= document.querySelector('.content').clientWidth",

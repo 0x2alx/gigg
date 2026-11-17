@@ -1,16 +1,16 @@
-# Recurring tasks, templates and schedules
+# Recurring gigs, templates and schedules
 
 Three separate objects work together:
 
-- A **template** is the content of a task: title, description, priority, labels, assignees, checklist, subtasks, custom fields and agent run settings. Every task made from it gets its subtasks, each made like the task (same window, assignees and run settings) and, when marked **blocks parent**, holding the task back until it's done. You can also start an ordinary task from a template.
-- A **schedule** is a timing: "every day 09:00–11:00", "every Friday", "the last day of every month". Several recurring tasks can share one.
-- A **recurring task** links one template to one schedule in a project. It has its own start date, end date or maximum count, an overlap rule and a pause switch. The same template can be linked to several schedules, but each template–schedule pair appears only once per project.
+- A **template** is the content of a gig: title, description, priority, labels, assignees, checklist, subgigs, custom fields and agent run settings. Every gig made from it gets its subgigs, each made like the gig (same window, assignees and run settings) and, when marked **blocks parent**, holding the gig back until it's done. You can also start an ordinary gig from a template.
+- A **schedule** is a timing: "every day 09:00–11:00", "every Friday", "the last day of every month". Several recurring gigs can share one.
+- A **recurring gig** links one template to one schedule in a project. It has its own start date, end date or maximum count, an overlap rule and a pause switch. The same template can be linked to several schedules, but each template–schedule pair appears only once per project.
 
-![Recurring tasks (Nightwalker theme)](../images/recurring-night.png)
+![Recurring gigs (Nightwalker theme)](../images/recurring-night.png)
 
-## Making a recurring task
+## Making a recurring gig
 
-The quickest way: **New task**, fill it in, then set **Repeat**. gigg saves the content as a template, reuses a schedule with exactly the same timing (or makes one) and links the two.
+The quickest way: **New gig**, fill it in, then set **Repeat**. gigg saves the content as a template, reuses a schedule with exactly the same timing (or makes one) and links the two.
 
 You can also pick an existing **template** and an existing **schedule** in the same form.
 
@@ -23,17 +23,17 @@ You can also pick an existing **template** and an existing **schedule** in the s
 
 ## Changing things later
 
-- Editing a **template** changes what every recurring task that uses it creates from then on. The same goes for a **schedule** and its timing.
-- When you edit a recurring task, the form tells you who else uses its template and schedule. You can change them in place for everyone, or switch this recurring task to another template or schedule.
-- A template or schedule that's in use can't be deleted. Deleting a recurring task leaves its template and schedule in place, unless you tick **Also delete its template** / **Also delete its schedule** in the confirmation; those are offered only when no other recurring task uses them.
-- **Pause** on a recurring task stops new occurrences; the ones already made stay.
+- Editing a **template** changes what every recurring gig that uses it creates from then on. The same goes for a **schedule** and its timing.
+- When you edit a recurring gig, the form tells you who else uses its template and schedule. You can change them in place for everyone, or switch this recurring gig to another template or schedule.
+- A template or schedule that's in use can't be deleted. Deleting a recurring gig leaves its template and schedule in place, unless you tick **Also delete its template** / **Also delete its schedule** in the confirmation; those are offered only when no other recurring gig uses them.
+- **Pause** on a recurring gig stops new occurrences; the ones already made stay.
 
 ## Templates
 
 **Recurring**, **Schedules** and **Templates** (in the board's **⋯** menu) list everything across your workspaces, each row with its workspace and project. **Show** at the top narrows the list to one workspace or one project; a project also shows its workspace's templates for every project.
 
-**Templates** lists the templates. You can create one there, edit it, or start a task from it. A template can be limited to one project or usable in all projects of its workspace.
+**Templates** lists the templates. You can create one there, edit it, or start a gig from it. A template can be limited to one project or usable in all projects of its workspace.
 
 ## Schedules
 
-**Schedules** lists the timings and how many recurring tasks use each. A new schedule asks which workspace it belongs to when you can add to several. A schedule named after its timing (the default) is renamed automatically when you change the timing.
+**Schedules** lists the timings and how many recurring gigs use each. A new schedule asks which workspace it belongs to when you can add to several. A schedule named after its timing (the default) is renamed automatically when you change the timing.

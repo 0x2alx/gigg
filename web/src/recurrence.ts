@@ -1,4 +1,4 @@
-// Pure helpers for recurring tasks: the form state <-> API body, human-readable rules, a client-side
+// Pure helpers for recurring gigs: the form state <-> API body, human-readable rules, a client-side
 // preview of the next occurrences, and the window badge on cards. No React here, so it is unit-tested.
 
 export type Freq = "daily" | "weekly" | "monthly";
@@ -380,9 +380,9 @@ export function ruleOf(s: RepeatState, now: number): Rule {
   };
 }
 
-// ---- task windows (cards and the task panel), in the browser's local time
+// ---- gig windows (cards and the gig panel), in the browser's local time
 
-export interface WindowedTask {
+export interface WindowedGig {
   start_at: number | null;
   not_after?: number | null;
   missed_at?: number | null;
@@ -400,7 +400,7 @@ export function clock(ms: number, now: number): string {
 
 export type WindowState = "upcoming" | "open" | "closed";
 
-export function windowBadge(t: WindowedTask, now: number): { text: string; state: WindowState } | null {
+export function windowBadge(t: WindowedGig, now: number): { text: string; state: WindowState } | null {
   if (!t.not_after || t.missed_at) return null;
   if (t.start_at && now < t.start_at) return { text: `opens ${clock(t.start_at, now)}`, state: "upcoming" };
   if (now < t.not_after) return { text: `closes ${clock(t.not_after, now)}`, state: "open" };

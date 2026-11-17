@@ -1,4 +1,4 @@
-// historyText: a task's activity entries as short readable phrases (the History section).
+// historyText: a gig's activity entries as short readable phrases (the History section).
 import { fmtTime, priorityNames, type User } from "./api";
 import type { ActivityItem } from "./live";
 
@@ -25,9 +25,9 @@ function names(ids: unknown, users: Map<number, User>): string {
   return ids.map((id) => users.get(Number(id))?.display_name || users.get(Number(id))?.username || "someone").join(", ");
 }
 
-// changes: the readable parts of a task.updated entry, one per field that changed.
+// changes: the readable parts of a gig.updated entry, one per field that changed.
 export function changes(d: Data, users: Map<number, User>): string[] {
-  if (!d) return ["edited the task"];
+  if (!d) return ["edited the gig"];
   const out: string[] = [];
   let runDone = false;
   for (const [k, v] of Object.entries(d)) {
@@ -40,12 +40,12 @@ export function changes(d: Data, users: Map<number, User>): string[] {
       if (!runDone) out.push("changed the agent run settings");
       runDone = true;
     } else if (k in DATE_LABEL) out.push(v ? `set the ${DATE_LABEL[k]} to ${when(v)}` : `cleared the ${DATE_LABEL[k]}`);
-    else if (k === "parent_id") out.push(v ? "set a parent task" : "removed the parent task");
+    else if (k === "parent_id") out.push(v ? "set a parent gig" : "removed the parent gig");
     else if (k === "labels") out.push(Array.isArray(v) && v.length ? `set labels to ${v.join(", ")}` : "removed the labels");
     else if (k === "assignees") out.push(Array.isArray(v) && v.length ? `assigned ${names(v, users)}` : "removed the assignees");
     else out.push(`changed ${k.replace(/_/g, " ")}`);
   }
-  return out.length ? out : ["edited the task"];
+  return out.length ? out : ["edited the gig"];
 }
 
 const RELATION: Record<string, string> = { blocks: "blocks", relates: "relates to" };
@@ -54,32 +54,32 @@ const RELATION: Record<string, string> = { blocks: "blocks", relates: "relates t
 export function describe(it: Pick<ActivityItem, "action" | "data">, users: Map<number, User>): string {
   const d = it.data as Data;
   switch (it.action) {
-    case "task.created":
-      return d?.cloned_from ? "created this task as a copy" : "created this task";
-    case "task.from_template":
+    case "gig.created":
+      return d?.cloned_from ? "created this gig as a copy" : "created this gig";
+    case "gig.from_template":
       return `filled it from the template ${quote(str(d?.name))}`;
-    case "task.updated":
+    case "gig.updated":
       return changes(d, users).join(", ");
-    case "task.moved": {
+    case "gig.moved": {
       const parts: string[] = [];
       if (d?.new_key) parts.push(`moved it to another project (now ${str(d.new_key)})`);
       if (d?.from_status !== d?.to_status && d?.to_status) parts.push(`moved it from ${str(d?.from_status)} to ${str(d.to_status)}`);
       return parts.length ? parts.join(", ") : "reordered it";
     }
-    case "task.deleted":
+    case "gig.deleted":
       return "moved it to the trash";
-    case "task.restored":
+    case "gig.restored":
       return "restored it from the trash";
-    case "task.archived":
+    case "gig.archived":
       return "archived it";
-    case "task.unarchived":
+    case "gig.unarchived":
       return "took it out of the archive";
-    case "task.custom": {
+    case "gig.custom": {
       const fields = d ? Object.keys(d) : [];
       if (fields.length === 0) return "changed custom fields";
       return fields.length === 1 && d![fields[0]!] === null ? `cleared ${fields[0]}` : `set ${fields.join(", ")}`;
     }
-    case "task.resume_requested":
+    case "gig.resume_requested":
       return "asked the agent to continue";
     case "relation.added":
       return `linked it: ${RELATION[str(d?.kind)] ?? str(d?.kind).replace(/_/g, " ")} ${str(d?.to)}`;

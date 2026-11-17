@@ -3,9 +3,9 @@ import { ruleAt, ruleSummary, sections, sourceText, triLabel, withOverride, with
 
 const perms: Permission[] = [
   { name: "view", label: "See the workspace", description: "", section: "Basics" },
-  { name: "create_tasks", label: "Create tasks", description: "", section: "Tasks" },
-  { name: "delete_tasks", label: "Delete tasks", description: "", section: "Tasks" },
-  { name: "schedules", label: "Recurring tasks", description: "", section: "Planning" },
+  { name: "create_gigs", label: "Create gigs", description: "", section: "Gigs" },
+  { name: "delete_gigs", label: "Delete gigs", description: "", section: "Gigs" },
+  { name: "schedules", label: "Recurring gigs", description: "", section: "Planning" },
 ];
 const rule = (ws: number | null, preset: string, overrides: Record<string, boolean> = {}): AccessRule => ({ id: 1, workspace_id: ws, preset, overrides });
 
@@ -18,13 +18,13 @@ describe("rules", () => {
   });
   it("sets and clears one override, keeping the preset and the rest", () => {
     const r = rule(3, "member", { schedules: true });
-    expect(withOverride(r, 3, "delete_tasks", false)).toEqual({ workspace_id: 3, preset: "member", overrides: { schedules: true, delete_tasks: false } });
+    expect(withOverride(r, 3, "delete_gigs", false)).toEqual({ workspace_id: 3, preset: "member", overrides: { schedules: true, delete_gigs: false } });
     expect(withOverride(r, 3, "schedules", null)).toEqual({ workspace_id: 3, preset: "member", overrides: {} });
     expect(withOverride(undefined, null, "view", true)).toEqual({ workspace_id: null, preset: "", overrides: { view: true } });
     expect(withPreset(r, 3, "manager")).toEqual({ workspace_id: 3, preset: "manager", overrides: { schedules: true } });
   });
   it("summarises a rule in catalogue order", () => {
-    expect(ruleSummary(rule(3, "member", { schedules: true, delete_tasks: false }), perms)).toBe("Member, −Delete tasks, +Recurring tasks");
+    expect(ruleSummary(rule(3, "member", { schedules: true, delete_gigs: false }), perms)).toBe("Member, −Delete gigs, +Recurring gigs");
     expect(ruleSummary(undefined, perms)).toBe("no rule");
     expect(ruleSummary(rule(null, ""), perms)).toBe("no rule");
   });
@@ -36,6 +36,6 @@ describe("rules", () => {
     expect(triLabel(null, "Preset ✓")).toBe("Preset ✓");
   });
   it("groups permissions by section", () => {
-    expect(sections(perms).map((s) => [s.section, s.items.length])).toEqual([["Basics", 1], ["Tasks", 2], ["Planning", 1]]);
+    expect(sections(perms).map((s) => [s.section, s.items.length])).toEqual([["Basics", 1], ["Gigs", 2], ["Planning", 1]]);
   });
 });

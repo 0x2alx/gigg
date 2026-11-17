@@ -12,7 +12,7 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChan
   onChange: (v: string) => void;
   users: User[];
   minRows?: number;
-  dirty?: boolean; // marks the editor as holding unsaved text (the task panel flashes it on close)
+  dirty?: boolean; // marks the editor as holding unsaved text (the gig panel flashes it on close)
 };
 
 type Tool = { id: string; label: string; icon: string; key?: string; run: (e: Edit) => Edit };
@@ -31,7 +31,7 @@ const TOOLS: (Tool | "|")[] = [
   "|",
   { id: "ul", label: "Bulleted list", icon: "•", run: lines("ul") },
   { id: "ol", label: "Numbered list", icon: "1.", run: lines("ol") },
-  { id: "task", label: "Checkbox list", icon: "☑", run: lines("task") },
+  { id: "gig", label: "Checkbox list", icon: "☑", run: lines("gig") },
 ];
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);

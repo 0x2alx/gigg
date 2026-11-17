@@ -1,6 +1,6 @@
-// Fetch helpers for the table, my-tasks and command-palette views: the workspace task list with its
+// Fetch helpers for the table, my-gigs and command-palette views: the workspace gig list with its
 // filters, cursor paging, cross-workspace fan-out and a small concurrency pool for bulk actions.
-import { ApiError, noteStatus, type Category, type Task } from "../api";
+import { ApiError, noteStatus, type Category, type Gig } from "../api";
 import type { WorkspaceTree } from "../App";
 import { request } from "../transport";
 
@@ -15,7 +15,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return r.data as T;
 }
 
-export interface TaskQuery {
+export interface GigQuery {
   project?: number;
   status?: number;
   category?: Category | "";
@@ -33,12 +33,12 @@ export interface TaskQuery {
   cursor?: string;
 }
 
-export interface TaskPage {
-  items: Task[];
+export interface GigPage {
+  items: Gig[];
   next_cursor?: string;
 }
 
-function qs(q: TaskQuery): string {
+function qs(q: GigQuery): string {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(q)) {
     if (v === undefined || v === null || v === "" || v === false || v === 0) continue;
@@ -49,14 +49,14 @@ function qs(q: TaskQuery): string {
 }
 
 export const viewsApi = {
-  tasks: (ws: string | number, q: TaskQuery) => call<TaskPage>("GET", `/workspaces/${ws}/tasks${qs(q)}`),
+  gigs: (ws: string | number, q: GigQuery) => call<GigPage>("GET", `/workspaces/${ws}/gigs${qs(q)}`),
 };
 
-// tasksAcross queries every workspace of the tree with the same filters and merges the pages.
+// gigsAcross queries every workspace of the tree with the same filters and merges the pages.
 // A workspace that fails is reported in `failed` instead of failing the whole call.
-export async function tasksAcross(tree: WorkspaceTree[], q: TaskQuery): Promise<{ items: Task[]; failed: string[] }> {
-  const res = await Promise.allSettled(tree.map((w) => viewsApi.tasks(w.slug, q)));
-  const items: Task[] = [];
+export async function gigsAcross(tree: WorkspaceTree[], q: GigQuery): Promise<{ items: Gig[]; failed: string[] }> {
+  const res = await Promise.allSettled(tree.map((w) => viewsApi.gigs(w.slug, q)));
+  const items: Gig[] = [];
   const failed: string[] = [];
   res.forEach((r, i) => {
     if (r.status === "fulfilled") items.push(...r.value.items);
@@ -88,27 +88,27 @@ export function errMsg(e: unknown): string {
   return "Request failed.";
 }
 
-// fromHere: navigation state that brings a task opened from a list (the table, My tasks, the bell, the
+// fromHere: navigation state that brings a gig opened from a list (the table, My gigs, the bell, the
 // palette) back to that page when its panel closes; the board's own links don't need it.
 export function fromHere(): { state: { back: string } | null } {
   const here = location.pathname + location.search;
   return { state: location.pathname.startsWith("/board") ? null : { back: here } };
 }
-// backTo: where a closing task panel goes, when it was opened by fromHere.
+// backTo: where a closing gig panel goes, when it was opened by fromHere.
 export function backTo(): string | null {
   const b = (history.state as { back?: unknown } | null)?.back;
   return typeof b === "string" && /^\/(?![/\\])/.test(b) && !b.includes("\\") ? b : null;
 }
 
-// taskHref: the board URL with the task panel open.
-export function taskHref(tree: WorkspaceTree[], t: Pick<Task, "workspace_id" | "project_id" | "key">): string {
-  return tree.some((w) => w.id === t.workspace_id) ? `/board/p/${t.project_id}/t/${t.key}` : "/";
+// gigHref: the board URL with the gig panel open.
+export function gigHref(tree: WorkspaceTree[], t: Pick<Gig, "workspace_id" | "project_id" | "key">): string {
+  return tree.some((w) => w.id === t.workspace_id) ? `/board/p/${t.project_id}/g/${t.key}` : "/";
 }
 
 export const OPEN_CATEGORIES: Category[] = ["backlog", "todo", "doing", "waiting"];
 export const ALL_CATEGORIES: Category[] = ["backlog", "todo", "doing", "waiting", "done", "cancelled"];
 export const isClosed = (c: Category) => c === "done" || c === "cancelled";
-export const isOverdue = (t: Pick<Task, "due_at" | "status_category">) => t.due_at !== null && t.due_at < Date.now() && !isClosed(t.status_category);
+export const isOverdue = (t: Pick<Gig, "due_at" | "status_category">) => t.due_at !== null && t.due_at < Date.now() && !isClosed(t.status_category);
 
 export type DueBucket = "overdue" | "today" | "week" | "later" | "none";
 export const BUCKETS: { id: DueBucket; label: string }[] = [

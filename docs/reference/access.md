@@ -5,7 +5,7 @@
 - **Users** are people (`human`) or agents (`agent`). People log in with a password; agents only use
   API keys. Any user can be disabled; a disabled user's sessions and keys stop working.
 - **Instance admins** are users with the admin flag.
-- **Workspaces** hold projects (boards), and projects hold tasks. Permissions are granted per
+- **Workspaces** hold projects (boards), and projects hold gigs. Permissions are granted per
   workspace. A workspace may name an **owner**, shown next to it in the sidebar; ownership grants
   nothing.
 - **Groups** are named sets of users that share access rules.
@@ -19,21 +19,21 @@ same workspace: without it, it counts as not held.
 
 | Permission | Section | Allows |
 |---|---|---|
-| `view` | Basics | See the workspace, its projects, tasks, comments and runs. Every other permission needs it. |
+| `view` | Basics | See the workspace, its projects, gigs, comments and runs. Every other permission needs it. |
 | `comment` | Basics | Write comments and edit or delete your own. |
-| `edit_tasks` | Tasks | Change, move and assign tasks; claim tasks and report runs (agents). |
-| `create_tasks` | Tasks | Create one-off tasks, clone tasks, and create tasks from templates (with `edit_tasks`). |
-| `delete_tasks` | Tasks | Move tasks to the trash and restore them (with `edit_tasks`). |
-| `archive_tasks` | Tasks | Archive and unarchive tasks (with `edit_tasks`). |
-| `relations` | Tasks | Add and remove blocking/related links between tasks (with `edit_tasks`). |
-| `checklists` | Tasks | Add, tick and remove checklist items (with `edit_tasks`). An override alone doesn't give a viewer these: the admin page marks it "needs Edit tasks". |
-| `always_run` | Runner | Mark tasks to run whatever the usage budget. The task caps and pauses still apply. |
-| `allowed_tools` | Runner | Give tasks (templates, recurring tasks) the list of tools the agent runner may use for them, and change tasks that have one. |
-| `pause_runs` | Runner | Pause and resume new agent task runs and cron runs; with an all-workspaces rule, in every workspace at once. Changing the caps stays with admins. |
-| `crons` | Runner | Make, change, pause, run and delete crons; an agent's executor needs it to run its crons. |
-| `cron_unsandboxed` | Runner | Let a cron run outside the agent's sandbox. A cron loses the flag when someone without this permission changes it, and its runs fail while the person who set it lacks the permission. |
-| `schedules` | Planning | Create, change, pause and stop recurring tasks and schedules (recurring tasks also need `edit_tasks`, and `create_tasks` to make their tasks). |
-| `templates` | Planning | Create, change and delete task templates, with `edit_tasks` (using one only needs `create_tasks`). |
+| `edit_gigs` | Gigs | Change, move and assign gigs; claim gigs and report runs (agents). |
+| `create_gigs` | Gigs | Create one-off gigs, clone gigs, and create gigs from templates (with `edit_gigs`). |
+| `delete_gigs` | Gigs | Move gigs to the trash and restore them (with `edit_gigs`). |
+| `archive_gigs` | Gigs | Archive and unarchive gigs (with `edit_gigs`). |
+| `relations` | Gigs | Add and remove blocking/related links between gigs (with `edit_gigs`). |
+| `checklists` | Gigs | Add, tick and remove checklist items (with `edit_gigs`). An override alone doesn't give a viewer these: the admin page marks it "needs Edit gigs". |
+| `always_run` | Runner | Mark gigs to run whatever the usage budget. The gig caps and pauses still apply. |
+| `allowed_tools` | Runner | Give gigs (templates, recurring gigs) the list of tools the agent runner may use for them, and change gigs that have one. |
+| `pause_runs` | Runner | Pause and resume new agent gig runs and errand runs; with an all-workspaces rule, in every workspace at once. Changing the caps stays with admins. |
+| `errands` | Runner | Make, change, pause, run and delete errands; an agent's executor needs it to run its errands. |
+| `errand_unsandboxed` | Runner | Let an errand run outside the agent's sandbox. An errand loses the flag when someone without this permission changes it, and its runs fail while the person who set it lacks the permission. |
+| `schedules` | Planning | Create, change, pause and stop recurring gigs and schedules (recurring gigs also need `edit_gigs`, and `create_gigs` to make their gigs). |
+| `templates` | Planning | Create, change and delete gig templates, with `edit_gigs` (using one only needs `create_gigs`). |
 | `custom_fields` | Planning | Define the workspace's custom fields. |
 | `saved_filters` | Planning | Save personal filtered views. |
 | `manage_workspace` | Admin | Projects, statuses (columns), labels, workspace settings, and other people's comments. |
@@ -42,20 +42,20 @@ same workspace: without it, it counts as not held.
 
 ### What `always_run` and `allowed_tools` guard
 
-These two decide what an unattended agent does, so they also protect existing tasks:
+These two decide what an unattended agent does, so they also protect existing gigs:
 
-- Setting or clearing `always_run` on a task, template or recurring task needs `always_run`. On a task
+- Setting or clearing `always_run` on a gig, template or recurring gig needs `always_run`. On a gig
   that has `always_run` set, these need `always_run` too: changing any field, its checklist, custom
   field values or dependencies; reopening it (moving it into `todo` or `doing` from another category,
   by hand, by a move to another project, or by finishing a run with `move_to_category`); unarchiving
   or restoring it; requesting a resume.
-- Setting, changing or clearing `allowed_tools` needs `allowed_tools`. The same rules apply to a task
+- Setting, changing or clearing `allowed_tools` needs `allowed_tools`. The same rules apply to a gig
   that has a non-empty list.
-- Changing a schedule that a recurring task with either setting uses (directly, or by giving another recurring task on it new timing) needs the matching permission,
-  as editing that recurring task would.
-- Creating a task from a template that carries either setting, and creating or changing a recurring
-  task whose content (or template) carries it, needs the matching permission.
-- Cloning a task copies neither setting.
+- Changing a schedule that a recurring gig with either setting uses (directly, or by giving another recurring gig on it new timing) needs the matching permission,
+  as editing that recurring gig would.
+- Creating a gig from a template that carries either setting, and creating or changing a recurring
+  gig whose content (or template) carries it, needs the matching permission.
+- Cloning a gig copies neither setting.
 
 ## Presets
 
@@ -65,10 +65,10 @@ A preset is a named bundle of permissions. Roles shown in the UI are presets.
 |---|:-:|:-:|:-:|:-:|
 | `view` | x | x | x | x |
 | `comment` | | x | x | x |
-| `edit_tasks` | | | x | x |
-| `create_tasks` | | | x | x |
-| `delete_tasks` | | | x | x |
-| `archive_tasks` | | | x | x |
+| `edit_gigs` | | | x | x |
+| `create_gigs` | | | x | x |
+| `delete_gigs` | | | x | x |
+| `archive_gigs` | | | x | x |
 | `relations` | | | x | x |
 | `checklists` | | | x | x |
 | `saved_filters` | | | x | x |
@@ -85,7 +85,7 @@ A preset is a named bundle of permissions. Roles shown in the UI are presets.
 
 The role displayed for a user in a workspace (`role` in `/auth/me` and member lists) is the closest
 preset to what they actually hold there: `admin`, else `manager` if they have `manage_workspace`,
-`member` if `edit_tasks`, `commenter` if `comment`, `viewer` if `view`. It is for display only.
+`member` if `edit_gigs`, `commenter` if `comment`, `viewer` if `view`. It is for display only.
 
 ## Access rules
 
@@ -117,8 +117,8 @@ So the user's own rules beat group rules, and a workspace rule beats an all-work
 deny at any level wins over every group allow below it.
 
 Example: group `agents` has `member` for all workspaces. Agent `scout` is in `agents` and has a user
-rule in `acme` with no preset and `always_run=allow, delete_tasks=deny`. In `acme`, `scout` has the
-member permissions except `delete_tasks` (the user rule denies it), plus `always_run`. In other
+rule in `acme` with no preset and `always_run=allow, delete_gigs=deny`. In `acme`, `scout` has the
+member permissions except `delete_gigs` (the user rule denies it), plus `always_run`. In other
 workspaces `scout` is a plain member.
 
 `GET /api/v1/users/{id}/access` (admin) shows a user's rules, groups and the resolved grid for every
@@ -138,7 +138,7 @@ workspace starts with.
 
 The API routes need an instance admin in a browser session (keys are refused). Group membership is
 changed with `PATCH /api/v1/groups/{id}`. When a change leaves a user unable to see a workspace, they
-are removed as assignee from its tasks.
+are removed as assignee from its gigs.
 
 ## Instance admins
 
@@ -176,10 +176,10 @@ Typical scope sets:
 
 | Use | Scopes | Permissions (in the workspace) |
 |---|---|---|
-| Read-only dashboard | `workspace:read`, `tasks:read`, `comments:read` | `viewer` |
-| Agent working tasks via MCP | `workspace:read`, `tasks:read`, `tasks:write`, `comments:read`, `comments:write`, `runs:write` | `member` |
+| Read-only dashboard | `workspace:read`, `gigs:read`, `comments:read` | `viewer` |
+| Agent working gigs via MCP | `workspace:read`, `gigs:read`, `gigs:write`, `comments:read`, `comments:write`, `runs:write` | `member` |
 | Unattended runner | the same | `member`, plus `always_run` / `allowed_tools` overrides only if the runner's agent should be able to set them |
 | Admin automation | `admin:*` as needed, plus the workspace scopes | instance admin |
 
-Work done in the background on a user's behalf (recurring tasks creating tasks, notifications,
+Work done in the background on a user's behalf (recurring gigs creating gigs, notifications,
 assignees) checks that user's permissions at that time, and the user must exist and not be disabled.

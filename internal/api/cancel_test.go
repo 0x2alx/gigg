@@ -15,7 +15,7 @@ func TestCancelledRequest(t *testing.T) {
 	for _, c := range []cred{e.ada(), e.key("scout")} {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		r := httptest.NewRequest("GET", "https://board.example"+Prefix+fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"]), nil)
+		r := httptest.NewRequest("GET", "https://board.example"+Prefix+fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"]), nil)
 		if c.token != "" {
 			r.Header.Set("Authorization", "Bearer "+c.token)
 		}

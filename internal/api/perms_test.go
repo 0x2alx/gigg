@@ -16,17 +16,17 @@ func TestAccess(t *testing.T) {
 	ws := e.ids["scout.ws"]
 	sched := fmt.Sprintf("/projects/%d/recurrences", e.ids["scout.p"])
 	body := `{"title":"Nightly","freq":"daily","window_start":"02:00","window_minutes":60}`
-	newTask := fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"])
+	newGig := fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"])
 
-	if code, out, _ := e.req("POST", newTask, `{"title":"one-off"}`, scout); code != 201 {
-		t.Fatalf("member one-off task: %d %s", code, out)
+	if code, out, _ := e.req("POST", newGig, `{"title":"one-off"}`, scout); code != 201 {
+		t.Fatalf("member one-off gig: %d %s", code, out)
 	}
 	code, out, _ := e.req("POST", sched, body, scout)
 	if code != 403 || !strings.Contains(string(out), "schedules") {
 		t.Fatalf("member schedule: %d %s", code, out)
 	}
 	code, out, _ = e.req("GET", "/auth/me", "", scout)
-	if code != 200 || strings.Contains(string(out), `"schedules"`) || !strings.Contains(string(out), `"create_tasks"`) || !strings.Contains(string(out), `"role":"member"`) {
+	if code != 200 || strings.Contains(string(out), `"schedules"`) || !strings.Contains(string(out), `"create_gigs"`) || !strings.Contains(string(out), `"role":"member"`) {
 		t.Fatalf("me permissions: %s", out)
 	}
 	code, out, _ = e.req("GET", "/permissions", "", scout)
@@ -66,23 +66,23 @@ func TestAccess(t *testing.T) {
 		t.Fatalf("workspace allow over all-workspaces deny: %d %s", code, out)
 	}
 	// a deny on one permission keeps the rest of the preset
-	e.req("PUT", uAccess, fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"create_tasks":false}}`, ws), e.ada())
-	if code, _, _ := e.req("POST", newTask, `{"title":"nope"}`, scout); code != 403 {
-		t.Fatalf("create_tasks denied: %d", code)
+	e.req("PUT", uAccess, fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"create_gigs":false}}`, ws), e.ada())
+	if code, _, _ := e.req("POST", newGig, `{"title":"nope"}`, scout); code != 403 {
+		t.Fatalf("create_gigs denied: %d", code)
 	}
-	if code, _, _ := e.req("GET", newTask, "", scout); code != 200 {
+	if code, _, _ := e.req("GET", newGig, "", scout); code != 200 {
 		t.Fatalf("still sees the project: %d", code)
 	}
 	// without their own rule for the workspace, scout can't see it, unless a group gives it
 	e.req("PUT", uAccess, fmt.Sprintf(`{"workspace_id":%d,"preset":""}`, ws), e.ada())
-	if code, _, _ := e.req("GET", newTask, "", scout); code != 404 {
+	if code, _, _ := e.req("GET", newGig, "", scout); code != 404 {
 		t.Fatalf("no rule, no workspace: %d", code)
 	}
 	e.req("PUT", gAccess, `{"workspace_id":null,"preset":"viewer","overrides":{"schedules":true}}`, e.ada())
-	if code, _, _ := e.req("GET", newTask, "", scout); code != 200 {
+	if code, _, _ := e.req("GET", newGig, "", scout); code != 200 {
 		t.Fatalf("viewer through the group: %d", code)
 	}
-	if code, _, _ := e.req("POST", newTask, `{"title":"x"}`, scout); code != 403 {
+	if code, _, _ := e.req("POST", newGig, `{"title":"x"}`, scout); code != 403 {
 		t.Fatalf("viewer can't create: %d", code)
 	}
 	code, out, _ = e.req("GET", fmt.Sprintf("/workspaces/%d/members", ws), "", e.ada())

@@ -1,15 +1,15 @@
-// The task's history: its own entries from the activity log (edits, moves, links, checklist,
+// The gig's history: its own entries from the activity log (edits, moves, links, checklist,
 // comments, agent runs), newest first, as readable lines. Only who, what and when; the admin audit
 // log keeps the rest (listener, key, IP). Loaded when the section is opened, and again when a live
-// event names this task.
+// event names this gig.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, fmtTime, type Task, type User } from "./api";
+import { ApiError, fmtTime, type Gig, type User } from "./api";
 import { describe } from "./historyText";
 import { useApp } from "./App";
 import { onActivity, type ActivityItem } from "./live";
 import { request } from "./transport";
 import { relTime } from "./views/viewsApi";
-import { Section } from "./TaskSections";
+import { Section } from "./GigSections";
 
 function actorName(it: ActivityItem, users: Map<number, User>): string {
   if (it.actor_user_id === null) return it.listener === "scheduler" ? "The scheduler" : "gigg";
@@ -19,45 +19,45 @@ function actorName(it: ActivityItem, users: Map<number, User>): string {
 
 const LIMIT = 500; // the server's page: the newest 500 entries
 
-export function HistorySection({ task }: { task: Task }) {
+export function HistorySection({ gig }: { gig: Gig }) {
   const { users } = useApp();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ActivityItem[] | null>(null);
   const [err, setErr] = useState("");
   const [all, setAll] = useState(false);
-  const taskId = useRef(task.id);
-  taskId.current = task.id;
+  const gigId = useRef(gig.id);
+  gigId.current = gig.id;
 
   const load = useCallback(() => {
-    const id = task.id;
-    request("GET", `/tasks/${id}/activity`).then(
+    const id = gig.id;
+    request("GET", `/gigs/${id}/activity`).then(
       (r) => {
-        if (taskId.current !== id) return; // the panel moved to another task meanwhile
+        if (gigId.current !== id) return; // the panel moved to another gig meanwhile
         if (!r.ok) {
           const d = (r.data ?? {}) as { detail?: string };
-          setErr(r.status === 403 ? "You can't see this task's history." : (d.detail ?? "Couldn't load the history."));
+          setErr(r.status === 403 ? "You can't see this gig's history." : (d.detail ?? "Couldn't load the history."));
           return;
         }
         setErr("");
         setItems(((r.data as { items?: ActivityItem[] }).items ?? []).filter((x) => x.action !== "run.progress"));
       },
       (e: unknown) => {
-        if (taskId.current === id) setErr(e instanceof ApiError ? e.message : "Couldn't load the history.");
+        if (gigId.current === id) setErr(e instanceof ApiError ? e.message : "Couldn't load the history.");
       },
     );
-  }, [task.id]);
+  }, [gig.id]);
 
   useEffect(() => {
     if (open) load();
-  }, [open, load, task.version]);
+  }, [open, load, gig.version]);
 
-  // live: an entry about this task (or one of its comments or runs) reloads the list
+  // live: an entry about this gig (or one of its comments or runs) reloads the list
   useEffect(() => {
     if (!open) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const off = onActivity(({ item }) => {
-      const tid = (item.data as { task_id?: unknown } | null)?.task_id;
-      if ((item.entity_type === "task" && item.entity_id === task.id) || tid === task.id) {
+      const tid = (item.data as { gig_id?: unknown } | null)?.gig_id;
+      if ((item.entity_type === "gig" && item.entity_id === gig.id) || tid === gig.id) {
         clearTimeout(timer);
         timer = setTimeout(load, 400);
       }
@@ -66,7 +66,7 @@ export function HistorySection({ task }: { task: Task }) {
       off();
       clearTimeout(timer);
     };
-  }, [open, load, task.id]);
+  }, [open, load, gig.id]);
 
   const shown = items && !all ? items.slice(0, 15) : items;
   return (

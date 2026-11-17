@@ -1,14 +1,14 @@
-// My tasks: everything assigned to me across my workspaces, grouped by when it's due.
+// My gigs: everything assigned to me across my workspaces, grouped by when it's due.
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "wouter";
-import { type Task } from "../api";
+import { type Gig } from "../api";
 import { fmtDue } from "../dates";
 import { useApp } from "../App";
 import { CATEGORY_COLOR, colorFor } from "../theme";
 import { PriorityIcon, StatusDot } from "../ui";
 import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
-import { BUCKETS, dueBucket, errMsg, fromHere, isClosed, taskHref, tasksAcross, type DueBucket } from "./viewsApi";
+import { BUCKETS, dueBucket, errMsg, fromHere, isClosed, gigHref, gigsAcross, type DueBucket } from "./viewsApi";
 import "./views.css";
 import { HelpButton } from "../help";
 
@@ -20,16 +20,16 @@ const BUCKET_COLOR: Record<DueBucket, string> = {
   none: "var(--faint)",
 };
 
-export function MyTasks() {
+export function MyGigs() {
   const { me, tree } = useApp();
-  const [items, setItems] = useState<Task[] | null>(null);
+  const [items, setItems] = useState<Gig[] | null>(null);
   const [failed, setFailed] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [includeDone, setIncludeDone] = useState(false);
 
   const load = useCallback(() => {
     setError("");
-    tasksAcross(tree, { assignee: me.user.id, sort: "due,-priority", limit: 500 })
+    gigsAcross(tree, { assignee: me.user.id, sort: "due,-priority", limit: 500 })
       .then((r) => {
         setItems(r.items);
         setFailed(r.failed);
@@ -39,7 +39,7 @@ export function MyTasks() {
   useEffect(load, [load]);
 
   const groups = useMemo(() => {
-    const g = new Map<DueBucket, Task[]>(BUCKETS.map((b) => [b.id, []]));
+    const g = new Map<DueBucket, Gig[]>(BUCKETS.map((b) => [b.id, []]));
     for (const t of items ?? []) {
       if (!includeDone && isClosed(t.status_category)) continue;
       g.get(dueBucket(t.due_at))!.push(t);
@@ -56,9 +56,9 @@ export function MyTasks() {
       <header className="page-head">
         <div>
           <div className="crumb">
-            <span className="muted small">{items === null ? "Loading…" : `${total} task${total === 1 ? "" : "s"} across ${tree.length} workspace${tree.length === 1 ? "" : "s"}`}</span>
+            <span className="muted small">{items === null ? "Loading…" : `${total} gig${total === 1 ? "" : "s"} across ${tree.length} workspace${tree.length === 1 ? "" : "s"}`}</span>
           </div>
-          <h1>My tasks<HelpButton topic="views" label="Help: my tasks, tables and saved views" /></h1>
+          <h1>My gigs<HelpButton topic="views" label="Help: my gigs, tables and saved views" /></h1>
         </div>
         <div className="row vw-head-actions">
           <label className="vw-toggle">
@@ -103,7 +103,7 @@ export function MyTasks() {
                 const late = b.id === "overdue" && !isClosed(t.status_category);
                 return (
                   <li key={t.id}>
-                    <Link href={taskHref(tree, t)} state={fromHere().state} className="vw-list-row" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
+                    <Link href={gigHref(tree, t)} state={fromHere().state} className="vw-list-row" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
                       <span className="vw-key">{t.key}</span>
                       <span className={"vw-list-title" + (isClosed(t.status_category) ? " vw-closed" : "")}>{t.title}</span>
                       <span className="vw-list-meta">

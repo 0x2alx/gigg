@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-// Task is a card on a project's board.
-type Task struct {
+// Gig is a card on a project's board.
+type Gig struct {
 	ID                int64          `json:"id"`
 	Key               string         `json:"key"` // e.g. GIG-12
 	WorkspaceID       int64          `json:"workspace_id"`
@@ -48,28 +48,28 @@ type Task struct {
 	NotAfter          *int64         `json:"not_after"` // the window closes: not claimable after this
 	MissedAt          *int64         `json:"missed_at"`
 	ArchivedAt        *int64         `json:"archived_at"`
-	SubtaskCount      int64          `json:"subtask_count"`
-	SubtaskDone       int64          `json:"subtask_done"`
+	SubgigCount       int64          `json:"subgig_count"`
+	SubgigDone        int64          `json:"subgig_done"`
 	ChecklistTotal    int64          `json:"checklist_total"`
 	ChecklistDone     int64          `json:"checklist_done"`
-	BlockedBy         int64          `json:"blocked_by" doc:"Open tasks blocking this one: its blockers (dependencies) and its open subtasks marked blocks_parent"`
-	BlockedBySubtasks int64          `json:"blocked_by_subtasks" doc:"How many of blocked_by are its own subtasks (blocks_parent)"`
-	BlocksParent      bool           `json:"blocks_parent" doc:"A subtask that holds its parent back while it is open"`
+	BlockedBy         int64          `json:"blocked_by" doc:"Open gigs blocking this one: its blockers (dependencies) and its open subgigs marked blocks_parent"`
+	BlockedBySubgigs  int64          `json:"blocked_by_subgigs" doc:"How many of blocked_by are its own subgigs (blocks_parent)"`
+	BlocksParent      bool           `json:"blocks_parent" doc:"A subgig that holds its parent back while it is open"`
 	Custom            map[string]any `json:"custom" doc:"Custom field values by field id"`
 	Deleted           bool           `json:"deleted"`
-	Labels            []TaskTag      `json:"labels"`
+	Labels            []GigTag       `json:"labels"`
 	Assignees         []int64        `json:"assignees"`
 	Aliases           []string       `json:"aliases"`
 	Model             string         `json:"model" doc:"Model a runner should ask for ('' = the agent's default)"`
 	Effort            string         `json:"effort" doc:"Effort level a runner should ask for ('' = the agent's default)"`
-	AlwaysRun         bool           `json:"always_run" doc:"Worked whatever the usage budget, day or night (within the task cap and pauses)"`
+	AlwaysRun         bool           `json:"always_run" doc:"Worked whatever the usage budget, day or night (within the gig cap and pauses)"`
 	AllowedTools      []string       `json:"allowed_tools" doc:"The only tools a runner should allow (permission rules); empty = the runner's usual mode"`
 	Version           int64          `json:"version"`
-	LastRun           *RunBrief      `json:"last_run,omitempty" doc:"The task's latest run, in brief (absent when it has none)"`
-	Question          *QuestionBrief `json:"question,omitempty" doc:"Waiting tasks in lists and on the board, with the comments:read scope: the latest question or report nobody else has answered, in brief"`
+	LastRun           *RunBrief      `json:"last_run,omitempty" doc:"The gig's latest run, in brief (absent when it has none)"`
+	Question          *QuestionBrief `json:"question,omitempty" doc:"Waiting gigs in lists and on the board, with the comments:read scope: the latest question or report nobody else has answered, in brief"`
 }
 
-// RunBrief is a task's latest run as a card shows it.
+// RunBrief is a gig's latest run as a card shows it.
 type RunBrief struct {
 	ID           int64   `json:"id"`
 	Status       string  `json:"status"`
@@ -83,7 +83,7 @@ type RunBrief struct {
 	ErrorReason  *string `json:"error_reason"`
 }
 
-// QuestionBrief is the latest question on a waiting task, cut to a card's length.
+// QuestionBrief is the latest question on a waiting gig, cut to a card's length.
 type QuestionBrief struct {
 	CommentID int64  `json:"comment_id"`
 	AuthorID  int64  `json:"author_id"`
@@ -94,45 +94,45 @@ type QuestionBrief struct {
 
 const questionBriefLen = 280
 
-// TaskTag is a label as shown on a task.
-type TaskTag struct {
+// GigTag is a label as shown on a gig.
+type GigTag struct {
 	ID    int64   `json:"id"`
 	Name  string  `json:"name"`
 	Color *string `json:"color"`
 }
 
-const taskCols = `t.id, p.key || '-' || t.number, t.workspace_id, t.project_id, t.number, t.title, t.description_md, t.status_id,
+const gigCols = `t.id, p.key || '-' || t.number, t.workspace_id, t.project_id, t.number, t.title, t.description_md, t.status_id,
 	s.name, s.category, t.position, t.priority, t.color, t.start_at, t.due_at, t.done_at, t.parent_id, t.cloned_from_id,
 	t.created_by, u.username, u.is_admin, t.created_via_key_id, t.created_at, t.updated_at, t.session_id, t.last_run_id,
 	t.resume_requested_at, t.cost_usd_total, t.comment_count, t.deleted_at IS NOT NULL, t.version,
 	t.recurrence_id, t.occurrence_at, t.not_after, t.missed_at, t.archived_at,
-	(SELECT count(*) FROM tasks c WHERE c.parent_id = t.id AND c.deleted_at IS NULL),
-	(SELECT count(*) FROM tasks c JOIN statuses cs ON cs.id = c.status_id WHERE c.parent_id = t.id AND c.deleted_at IS NULL AND cs.category IN ('done','cancelled')),
-	(SELECT count(*) FROM checklist_items ci WHERE ci.task_id = t.id),
-	(SELECT count(*) FROM checklist_items ci WHERE ci.task_id = t.id AND ci.done_at IS NOT NULL),
-	(SELECT count(*) FROM task_relations r JOIN tasks b ON b.id = r.from_task_id JOIN statuses bs ON bs.id = b.status_id
-		WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled')),
-	` + blockingSubtasks + `,
+	(SELECT count(*) FROM gigs c WHERE c.parent_id = t.id AND c.deleted_at IS NULL),
+	(SELECT count(*) FROM gigs c JOIN statuses cs ON cs.id = c.status_id WHERE c.parent_id = t.id AND c.deleted_at IS NULL AND cs.category IN ('done','cancelled')),
+	(SELECT count(*) FROM checklist_items ci WHERE ci.gig_id = t.id),
+	(SELECT count(*) FROM checklist_items ci WHERE ci.gig_id = t.id AND ci.done_at IS NOT NULL),
+	(SELECT count(*) FROM gig_relations r JOIN gigs b ON b.id = r.from_gig_id JOIN statuses bs ON bs.id = b.status_id
+		WHERE r.to_gig_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled')),
+	` + blockingSubgigs + `,
 	t.model, t.effort, t.always_run, t.allowed_tools, t.blocks_parent`
 
-// blockingSubtasks counts t's open subtasks that hold it back (blocks_parent; not archived ones,
+// blockingSubgigs counts t's open subgigs that hold it back (blocks_parent; not archived ones,
 // which agents never get either), except those that
 // also have a "blocks" link to it (already counted with the dependencies).
-const blockingSubtasks = `(SELECT count(*) FROM tasks c JOIN statuses cs ON cs.id = c.status_id
+const blockingSubgigs = `(SELECT count(*) FROM gigs c JOIN statuses cs ON cs.id = c.status_id
 		WHERE c.parent_id = t.id AND c.blocks_parent = 1 AND c.deleted_at IS NULL AND c.archived_at IS NULL AND cs.category NOT IN ('done','cancelled')
-		AND NOT EXISTS (SELECT 1 FROM task_relations r WHERE r.from_task_id = c.id AND r.to_task_id = t.id AND r.kind = 'blocks'))`
+		AND NOT EXISTS (SELECT 1 FROM gig_relations r WHERE r.from_gig_id = c.id AND r.to_gig_id = t.id AND r.kind = 'blocks'))`
 
-// blockedCond: t has an open blocker, a "blocks" dependency or a subtask that blocks its parent.
-// Archived blockers don't count (as with subtasks): archiving parks a task, so it would block forever.
-const blockedCond = `(EXISTS (SELECT 1 FROM task_relations r JOIN tasks b ON b.id = r.from_task_id JOIN statuses bs ON bs.id = b.status_id
-		WHERE r.to_task_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled'))
-	OR EXISTS (SELECT 1 FROM tasks c JOIN statuses cs ON cs.id = c.status_id
+// blockedCond: t has an open blocker, a "blocks" dependency or a subgig that blocks its parent.
+// Archived blockers don't count (as with subgigs): archiving parks a gig, so it would block forever.
+const blockedCond = `(EXISTS (SELECT 1 FROM gig_relations r JOIN gigs b ON b.id = r.from_gig_id JOIN statuses bs ON bs.id = b.status_id
+		WHERE r.to_gig_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled'))
+	OR EXISTS (SELECT 1 FROM gigs c JOIN statuses cs ON cs.id = c.status_id
 		WHERE c.parent_id = t.id AND c.blocks_parent = 1 AND c.deleted_at IS NULL AND c.archived_at IS NULL AND cs.category NOT IN ('done','cancelled')))`
 
-const taskFrom = ` FROM tasks t JOIN projects p ON p.id = t.project_id JOIN statuses s ON s.id = t.status_id JOIN users u ON u.id = t.created_by`
+const gigFrom = ` FROM gigs t JOIN projects p ON p.id = t.project_id JOIN statuses s ON s.id = t.status_id JOIN users u ON u.id = t.created_by`
 
-func scanTask(row interface{ Scan(...any) error }) (*Task, error) {
-	var t Task
+func scanGig(row interface{ Scan(...any) error }) (*Gig, error) {
+	var t Gig
 	var color, sess sql.NullString
 	var start, due, done, parent, cloned, viaKey, lastRun, resume, rec, occ, notAfter, missed, archived sql.NullInt64
 	var tools string
@@ -140,7 +140,7 @@ func scanTask(row interface{ Scan(...any) error }) (*Task, error) {
 		&t.StatusName, &t.StatusCategory, &t.Position, &t.Priority, &color, &start, &due, &done, &parent, &cloned,
 		&t.CreatedBy, &t.CreatedByUsername, &t.CreatedByAdmin, &viaKey, &t.CreatedAt, &t.UpdatedAt, &sess, &lastRun,
 		&resume, &t.CostUSDTotal, &t.CommentCount, &t.Deleted, &t.Version, &rec, &occ, &notAfter, &missed, &archived,
-		&t.SubtaskCount, &t.SubtaskDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubtasks, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent); err != nil {
+		&t.SubgigCount, &t.SubgigDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubgigs, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -151,33 +151,33 @@ func scanTask(row interface{ Scan(...any) error }) (*Task, error) {
 	t.CreatedViaKeyID, t.LastRunID, t.ResumeRequestedAt = ptrInt(viaKey), ptrInt(lastRun), ptrInt(resume)
 	t.RecurrenceID, t.OccurrenceAt, t.NotAfter, t.MissedAt = ptrInt(rec), ptrInt(occ), ptrInt(notAfter), ptrInt(missed)
 	t.ArchivedAt = ptrInt(archived)
-	t.Labels, t.Assignees, t.Aliases, t.Custom = []TaskTag{}, []int64{}, []string{}, map[string]any{}
+	t.Labels, t.Assignees, t.Aliases, t.Custom = []GigTag{}, []int64{}, []string{}, map[string]any{}
 	t.AllowedTools = []string{}
 	_ = json.Unmarshal([]byte(tools), &t.AllowedTools)
-	t.BlockedBy += t.BlockedBySubtasks
+	t.BlockedBy += t.BlockedBySubgigs
 	return &t, nil
 }
 
-// fill loads labels, assignees and aliases for a batch of tasks.
-func fill(ctx context.Context, q Q, ts []*Task) error {
+// fill loads labels, assignees and aliases for a batch of gigs.
+func fill(ctx context.Context, q Q, ts []*Gig) error {
 	if len(ts) == 0 {
 		return nil
 	}
-	byID := map[int64]*Task{}
+	byID := map[int64]*Gig{}
 	ids := make([]int64, 0, len(ts))
 	for _, t := range ts {
 		byID[t.ID] = t
 		ids = append(ids, t.ID)
 	}
 	in := placeholders(len(ids))
-	rows, err := q.QueryContext(ctx, `SELECT tl.task_id, l.id, l.name, l.color FROM task_labels tl JOIN labels l ON l.id = tl.label_id
-		WHERE tl.task_id IN (`+in+`) ORDER BY l.name`, int64Args(ids)...)
+	rows, err := q.QueryContext(ctx, `SELECT tl.gig_id, l.id, l.name, l.color FROM gig_labels tl JOIN labels l ON l.id = tl.label_id
+		WHERE tl.gig_id IN (`+in+`) ORDER BY l.name`, int64Args(ids)...)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
 		var tid int64
-		var tag TaskTag
+		var tag GigTag
 		var color sql.NullString
 		if err := rows.Scan(&tid, &tag.ID, &tag.Name, &color); err != nil {
 			rows.Close()
@@ -187,7 +187,7 @@ func fill(ctx context.Context, q Q, ts []*Task) error {
 		byID[tid].Labels = append(byID[tid].Labels, tag)
 	}
 	rows.Close()
-	rows, err = q.QueryContext(ctx, `SELECT task_id, user_id FROM task_assignees WHERE task_id IN (`+in+`) ORDER BY user_id`, int64Args(ids)...)
+	rows, err = q.QueryContext(ctx, `SELECT gig_id, user_id FROM gig_assignees WHERE gig_id IN (`+in+`) ORDER BY user_id`, int64Args(ids)...)
 	if err != nil {
 		return err
 	}
@@ -200,8 +200,8 @@ func fill(ctx context.Context, q Q, ts []*Task) error {
 		byID[tid].Assignees = append(byID[tid].Assignees, uid)
 	}
 	rows.Close()
-	rows, err = q.QueryContext(ctx, `SELECT v.task_id, v.field_id, v.value FROM task_custom_values v JOIN custom_fields f ON f.id = v.field_id
-		WHERE f.deleted_at IS NULL AND v.task_id IN (`+in+`)`, int64Args(ids)...)
+	rows, err = q.QueryContext(ctx, `SELECT v.gig_id, v.field_id, v.value FROM gig_custom_values v JOIN custom_fields f ON f.id = v.field_id
+		WHERE f.deleted_at IS NULL AND v.gig_id IN (`+in+`)`, int64Args(ids)...)
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func fill(ctx context.Context, q Q, ts []*Task) error {
 	if err := fillRuns(ctx, q, ts); err != nil {
 		return err
 	}
-	rows, err = q.QueryContext(ctx, `SELECT task_id, project_key || '-' || number FROM task_aliases WHERE task_id IN (`+in+`)`, int64Args(ids)...)
+	rows, err = q.QueryContext(ctx, `SELECT gig_id, project_key || '-' || number FROM gig_aliases WHERE gig_id IN (`+in+`)`, int64Args(ids)...)
 	if err != nil {
 		return err
 	}
@@ -236,20 +236,20 @@ func fill(ctx context.Context, q Q, ts []*Task) error {
 	return rows.Err()
 }
 
-// GetTask loads a task by id (including trashed ones).
-func GetTask(ctx context.Context, q Q, id int64) (*Task, error) {
-	t, err := scanTask(q.QueryRowContext(ctx, "SELECT "+taskCols+taskFrom+" WHERE t.id = ?", id))
+// GetGig loads a gig by id (including trashed ones).
+func GetGig(ctx context.Context, q Q, id int64) (*Gig, error) {
+	t, err := scanGig(q.QueryRowContext(ctx, "SELECT "+gigCols+gigFrom+" WHERE t.id = ?", id))
 	if err != nil {
 		return nil, err
 	}
-	return t, fill(ctx, q, []*Task{t})
+	return t, fill(ctx, q, []*Gig{t})
 }
 
-var taskKeyRe = regexp.MustCompile(`^([A-Z][A-Z0-9]{1,4})-([1-9][0-9]{0,9})$`)
+var gigKeyRe = regexp.MustCompile(`^([A-Z][A-Z0-9]{1,4})-([1-9][0-9]{0,9})$`)
 
-// ParseTaskKey splits "GIG-12".
-func ParseTaskKey(k string) (string, int64, bool) {
-	m := taskKeyRe.FindStringSubmatch(k)
+// ParseGigKey splits "GIG-12".
+func ParseGigKey(k string) (string, int64, bool) {
+	m := gigKeyRe.FindStringSubmatch(k)
 	if m == nil {
 		return "", 0, false
 	}
@@ -257,16 +257,16 @@ func ParseTaskKey(k string) (string, int64, bool) {
 	return m[1], n, true
 }
 
-// TaskIDsByKey returns the ids of tasks whose current key or alias is key, within the given workspaces
-// (nil = all). More than one id means the key is ambiguous across workspaces. Tasks of a deleted project
+// GigIDsByKey returns the ids of gigs whose current key or alias is key, within the given workspaces
+// (nil = all). More than one id means the key is ambiguous across workspaces. Gigs of a deleted project
 // don't count: its key may belong to a new project now.
-func TaskIDsByKey(ctx context.Context, q Q, key string, workspaces []int64) ([]int64, error) {
-	pk, n, ok := ParseTaskKey(key)
+func GigIDsByKey(ctx context.Context, q Q, key string, workspaces []int64) ([]int64, error) {
+	pk, n, ok := ParseGigKey(key)
 	if !ok {
 		return nil, ErrNotFound
 	}
-	query := `SELECT t.id, t.workspace_id FROM tasks t JOIN projects p ON p.id = t.project_id WHERE p.key = ? AND t.number = ? AND p.deleted_at IS NULL
-		UNION SELECT a.task_id, a.workspace_id FROM task_aliases a JOIN tasks t ON t.id = a.task_id JOIN projects p ON p.id = t.project_id
+	query := `SELECT t.id, t.workspace_id FROM gigs t JOIN projects p ON p.id = t.project_id WHERE p.key = ? AND t.number = ? AND p.deleted_at IS NULL
+		UNION SELECT a.gig_id, a.workspace_id FROM gig_aliases a JOIN gigs t ON t.id = a.gig_id JOIN projects p ON p.id = t.project_id
 			WHERE a.project_key = ? AND a.number = ? AND p.deleted_at IS NULL`
 	rows, err := q.QueryContext(ctx, query, pk, n, pk, n)
 	if err != nil {
@@ -290,8 +290,8 @@ func TaskIDsByKey(ctx context.Context, q Q, key string, workspaces []int64) ([]i
 	return out, rows.Err()
 }
 
-// TaskFilter selects tasks in one workspace.
-type TaskFilter struct {
+// GigFilter selects gigs in one workspace.
+type GigFilter struct {
 	WorkspaceID    int64
 	Projects       []int64 // nil = all projects of the workspace
 	StatusID       *int64
@@ -306,19 +306,19 @@ type TaskFilter struct {
 	IncludeDeleted bool
 	OnlyDeleted    bool
 	Archived       string // "" = hide archived, "only", "include"
-	ParentID       *int64 // subtasks of this task
-	BlockedOnly    bool   // only tasks with an open blocker
+	ParentID       *int64 // subgigs of this gig
+	BlockedOnly    bool   // only gigs with an open blocker
 	SearchComments bool   // q also matches comment text (only for callers who may read comments)
 	Sort           string // board (default), -priority, due, created, -updated, ...
 	Limit          int
-	AfterID        int64 // cursor: tasks are paged by (sort key, id); for simplicity cursor = offset
+	AfterID        int64 // cursor: gigs are paged by (sort key, id); for simplicity cursor = offset
 	Offset         int
 }
 
-// ListTasks returns tasks matching f.
-// fillRuns attaches each task's latest run, in brief.
-func fillRuns(ctx context.Context, q Q, ts []*Task) error {
-	byRun := map[int64]*Task{}
+// ListGigs returns gigs matching f.
+// fillRuns attaches each gig's latest run, in brief.
+func fillRuns(ctx context.Context, q Q, ts []*Gig) error {
+	byRun := map[int64]*Gig{}
 	runs := []int64{}
 	for _, t := range ts {
 		if t.LastRunID != nil {
@@ -351,11 +351,11 @@ func fillRuns(ctx context.Context, q Q, ts []*Task) error {
 	return rows.Err()
 }
 
-// AttachQuestions sets Question on the waiting tasks: their latest question or report comment, cut
+// AttachQuestions sets Question on the waiting gigs: their latest question or report comment, cut
 // short, until someone other than its author comments after it (an answer, a resume request). Callers
 // check the comments:read scope first.
-func AttachQuestions(ctx context.Context, q Q, ts []*Task) error {
-	byID := map[int64]*Task{}
+func AttachQuestions(ctx context.Context, q Q, ts []*Gig) error {
+	byID := map[int64]*Gig{}
 	ids := []int64{}
 	for _, t := range ts {
 		if t.StatusCategory == "waiting" {
@@ -366,14 +366,14 @@ func AttachQuestions(ctx context.Context, q Q, ts []*Task) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	// per task, the newest question/report through the (task_id, id) index, newest first, stopping at the first
+	// per gig, the newest question/report through the (gig_id, id) index, newest first, stopping at the first
 	vals := strings.TrimSuffix(strings.Repeat("(?),", len(ids)), ",")
 	args := append(int64Args(ids), questionBriefLen+1)
 	rows, err := q.QueryContext(ctx, `WITH w(tid) AS (VALUES `+vals+`),
-		qs AS (SELECT (SELECT x.id FROM comments x WHERE x.task_id = w.tid AND x.kind IN ('question', 'report') AND x.deleted_at IS NULL
+		qs AS (SELECT (SELECT x.id FROM comments x WHERE x.gig_id = w.tid AND x.kind IN ('question', 'report') AND x.deleted_at IS NULL
 			ORDER BY x.id DESC LIMIT 1) AS id FROM w)
-		SELECT c.id, c.task_id, c.author_id, c.created_at, c.kind, substr(c.body_md, 1, ?) FROM comments c JOIN qs ON qs.id = c.id
-		WHERE NOT EXISTS (SELECT 1 FROM comments y WHERE y.task_id = c.task_id AND y.id > c.id AND y.author_id != c.author_id
+		SELECT c.id, c.gig_id, c.author_id, c.created_at, c.kind, substr(c.body_md, 1, ?) FROM comments c JOIN qs ON qs.id = c.id
+		WHERE NOT EXISTS (SELECT 1 FROM comments y WHERE y.gig_id = c.gig_id AND y.id > c.id AND y.author_id != c.author_id
 			AND y.kind != 'system' AND y.deleted_at IS NULL)`, args...)
 	if err != nil {
 		return err
@@ -395,7 +395,7 @@ func AttachQuestions(ctx context.Context, q Q, ts []*Task) error {
 	return rows.Err()
 }
 
-func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
+func ListGigs(ctx context.Context, q Q, f GigFilter) ([]*Gig, bool, error) {
 	where := []string{"t.workspace_id = ?"}
 	args := []any{f.WorkspaceID}
 	if f.Projects != nil {
@@ -403,13 +403,13 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 		args = append(args, int64Args(f.Projects)...)
 	}
 	switch {
-	case f.OnlyDeleted: // the trash: not tasks of a deleted project (they can't come back)
+	case f.OnlyDeleted: // the trash: not gigs of a deleted project (they can't come back)
 		where = append(where, "t.deleted_at IS NOT NULL", "p.deleted_at IS NULL")
 	case !f.IncludeDeleted:
 		where = append(where, "t.deleted_at IS NULL", "p.deleted_at IS NULL")
 	}
 	switch {
-	case f.OnlyDeleted: // the trash shows a trashed task whether or not it was archived first
+	case f.OnlyDeleted: // the trash shows a trashed gig whether or not it was archived first
 	case f.Archived == "only":
 		where = append(where, "t.archived_at IS NOT NULL")
 	case f.Archived == "include":
@@ -429,14 +429,14 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 		where, args = append(where, "s.category = ?"), append(args, f.Category)
 	}
 	if f.Label != "" {
-		where = append(where, "EXISTS (SELECT 1 FROM task_labels tl JOIN labels l ON l.id = tl.label_id WHERE tl.task_id = t.id AND l.name = ?)")
+		where = append(where, "EXISTS (SELECT 1 FROM gig_labels tl JOIN labels l ON l.id = tl.label_id WHERE tl.gig_id = t.id AND l.name = ?)")
 		args = append(args, f.Label)
 	}
 	if f.PriorityMin != nil {
 		where, args = append(where, "t.priority >= ?"), append(args, *f.PriorityMin)
 	}
 	if f.Assignee != nil {
-		where, args = append(where, "EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = ?)"), append(args, *f.Assignee)
+		where, args = append(where, "EXISTS (SELECT 1 FROM gig_assignees ta WHERE ta.gig_id = t.id AND ta.user_id = ?)"), append(args, *f.Assignee)
 	}
 	if f.CreatedBy != nil {
 		where, args = append(where, "t.created_by = ?"), append(args, *f.CreatedBy)
@@ -446,12 +446,12 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 		text := `t.title LIKE ? ESCAPE '\' OR t.description_md LIKE ? ESCAPE '\'`
 		args = append(args, like, like)
 		if f.SearchComments {
-			text += ` OR EXISTS (SELECT 1 FROM comments c WHERE c.task_id = t.id AND c.deleted_at IS NULL AND c.body_md LIKE ? ESCAPE '\')`
+			text += ` OR EXISTS (SELECT 1 FROM comments c WHERE c.gig_id = t.id AND c.deleted_at IS NULL AND c.body_md LIKE ? ESCAPE '\')`
 			args = append(args, like)
 		}
-		// a key ("GIG-12", any case) also finds that task, by its current key or one it had before a move
-		if key, n, ok := ParseTaskKey(strings.ToUpper(strings.TrimSpace(f.Q))); ok {
-			text += ` OR (p.key = ? AND t.number = ?) OR EXISTS (SELECT 1 FROM task_aliases a WHERE a.task_id = t.id AND a.project_key = ? AND a.number = ?)`
+		// a key ("GIG-12", any case) also finds that gig, by its current key or one it had before a move
+		if key, n, ok := ParseGigKey(strings.ToUpper(strings.TrimSpace(f.Q))); ok {
+			text += ` OR (p.key = ? AND t.number = ?) OR EXISTS (SELECT 1 FROM gig_aliases a WHERE a.gig_id = t.id AND a.project_key = ? AND a.number = ?)`
 			args = append(args, key, n, key, n)
 		}
 		where = append(where, "("+text+")")
@@ -462,7 +462,7 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 	if f.UpdatedSince != nil {
 		where, args = append(where, "t.updated_at >= ?"), append(args, *f.UpdatedSince)
 	}
-	order, err := taskOrder(f.Sort)
+	order, err := gigOrder(f.Sort)
 	if err != nil {
 		return nil, false, err
 	}
@@ -470,15 +470,15 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 200
 	}
-	query := "SELECT " + taskCols + taskFrom + " WHERE " + strings.Join(where, " AND ") + " ORDER BY " + order +
+	query := "SELECT " + gigCols + gigFrom + " WHERE " + strings.Join(where, " AND ") + " ORDER BY " + order +
 		fmt.Sprintf(" LIMIT %d OFFSET %d", limit+1, f.Offset)
 	rows, err := q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, false, err
 	}
-	var out []*Task
+	var out []*Gig
 	for rows.Next() {
-		t, err := scanTask(rows)
+		t, err := scanGig(rows)
 		if err != nil {
 			rows.Close()
 			return nil, false, err
@@ -497,7 +497,7 @@ func ListTasks(ctx context.Context, q Q, f TaskFilter) ([]*Task, bool, error) {
 	return out, more, fill(ctx, q, out)
 }
 
-// sortCols: each sort field's ORDER BY terms, ascending and descending. Tasks without a due date come
+// sortCols: each sort field's ORDER BY terms, ascending and descending. Gigs without a due date come
 // last either way, and the number sorts by project key first (numbers repeat across projects). The
 // web's all-workspaces table merges these lists and sorts them the same way (web/src/views/tableSort.ts).
 var sortCols = map[string][2]string{
@@ -509,7 +509,7 @@ var sortCols = map[string][2]string{
 	"title":    {"t.title COLLATE NOCASE", "t.title COLLATE NOCASE DESC"},
 }
 
-func taskOrder(s string) (string, error) {
+func gigOrder(s string) (string, error) {
 	if s == "" || s == "board" {
 		return "p.position, t.project_id, s.position, t.position, t.id", nil
 	}
@@ -529,8 +529,8 @@ func taskOrder(s string) (string, error) {
 	return strings.Join(parts, ", ") + ", t.id", nil
 }
 
-// NewTask is the input to CreateTask.
-type NewTask struct {
+// NewGig is the input to CreateGig.
+type NewGig struct {
 	ProjectID     int64
 	Title         string
 	DescriptionMD string
@@ -551,8 +551,8 @@ type NewTask struct {
 	Effort        string
 	AlwaysRun     bool
 	AllowedTools  []string
-	BlocksParent  bool // a subtask that holds its parent back while open (needs ParentID)
-	Quiet         bool // no "assigned" notification (subtasks made together with their parent)
+	BlocksParent  bool // a subgig that holds its parent back while open (needs ParentID)
+	Quiet         bool // no "assigned" notification (subgigs made together with their parent)
 }
 
 // Efforts are the claude -p effort levels (” = the agent's default).
@@ -576,7 +576,7 @@ func ValidRunSettings(model, effort string) error {
 	return nil
 }
 
-func validTaskText(title, desc string) error {
+func validGigText(title, desc string) error {
 	if strings.TrimSpace(title) == "" || len(title) > 250 {
 		return Invalid("title: 1-250 characters")
 	}
@@ -586,9 +586,9 @@ func validTaskText(title, desc string) error {
 	return nil
 }
 
-// CreateTask inserts a task at the bottom of its status column.
-func CreateTask(ctx context.Context, q Q, a Actor, n NewTask) (*Task, error) {
-	if err := validTaskText(n.Title, n.DescriptionMD); err != nil {
+// CreateGig inserts a gig at the bottom of its status column.
+func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
+	if err := validGigText(n.Title, n.DescriptionMD); err != nil {
 		return nil, err
 	}
 	if n.Priority < 0 || n.Priority > 4 {
@@ -625,11 +625,11 @@ func CreateTask(ctx context.Context, q Q, a Actor, n NewTask) (*Task, error) {
 		return nil, err
 	}
 	if n.ParentID != nil {
-		if par, err := GetTask(ctx, q, *n.ParentID); err != nil || par.WorkspaceID != p.WorkspaceID {
-			return nil, Invalid("parent task must be in the same workspace")
+		if par, err := GetGig(ctx, q, *n.ParentID); err != nil || par.WorkspaceID != p.WorkspaceID {
+			return nil, Invalid("parent gig must be in the same workspace")
 		}
 	} else if n.BlocksParent {
-		return nil, Invalid("blocks_parent needs a parent task")
+		return nil, Invalid("blocks_parent needs a parent gig")
 	}
 	pos, err := placePosition(ctx, q, st.ID, Place{Where: "bottom"})
 	if err != nil {
@@ -647,7 +647,7 @@ func CreateTask(ctx context.Context, q Q, a Actor, n NewTask) (*Task, error) {
 	if n.NotAfter != nil && n.StartAt != nil && *n.NotAfter <= *n.StartAt {
 		return nil, Invalid("the window must close after it opens")
 	}
-	res, err := q.ExecContext(ctx, `INSERT INTO tasks (workspace_id, project_id, number, title, description_md, status_id, position,
+	res, err := q.ExecContext(ctx, `INSERT INTO gigs (workspace_id, project_id, number, title, description_md, status_id, position,
 		priority, color, start_at, due_at, done_at, parent_id, cloned_from_id, created_by, created_via_key_id, created_at, updated_at,
 		not_after, recurrence_id, occurrence_at, model, effort, always_run, allowed_tools, blocks_parent)
 		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, p.WorkspaceID, p.ID, num, n.Title, n.DescriptionMD, st.ID, pos, n.Priority,
@@ -668,10 +668,10 @@ func CreateTask(ctx context.Context, q Q, a Actor, n NewTask) (*Task, error) {
 	if n.ClonedFromID != nil {
 		data["cloned_from"] = *n.ClonedFromID
 	}
-	if _, err := Activity(ctx, q, a, &p.WorkspaceID, &p.ID, "task.created", "task", id, data); err != nil {
+	if _, err := Activity(ctx, q, a, &p.WorkspaceID, &p.ID, "gig.created", "gig", id, data); err != nil {
 		return nil, err
 	}
-	t, err := GetTask(ctx, q, id)
+	t, err := GetGig(ctx, q, id)
 	if err != nil {
 		return nil, err
 	}
@@ -688,38 +688,38 @@ func CreateTask(ctx context.Context, q Q, a Actor, n NewTask) (*Task, error) {
 
 func nextNumber(ctx context.Context, q Q, project int64) (int64, error) {
 	var n int64
-	if err := q.QueryRowContext(ctx, `UPDATE projects SET next_task_number = next_task_number + 1 WHERE id = ? RETURNING next_task_number - 1`, project).Scan(&n); err != nil {
+	if err := q.QueryRowContext(ctx, `UPDATE projects SET next_gig_number = next_gig_number + 1 WHERE id = ? RETURNING next_gig_number - 1`, project).Scan(&n); err != nil {
 		return 0, err
 	}
 	return n, nil
 }
 
-func setLabels(ctx context.Context, q Q, a Actor, ws, task int64, names []string) error {
+func setLabels(ctx context.Context, q Q, a Actor, ws, gig int64, names []string) error {
 	if names == nil {
 		return nil
 	}
-	if _, err := q.ExecContext(ctx, `DELETE FROM task_labels WHERE task_id = ?`, task); err != nil {
+	if _, err := q.ExecContext(ctx, `DELETE FROM gig_labels WHERE gig_id = ?`, gig); err != nil {
 		return err
 	}
 	if len(names) > 20 {
-		return Invalid("at most 20 labels per task")
+		return Invalid("at most 20 labels per gig")
 	}
 	for _, name := range names {
 		l, err := LabelByName(ctx, q, a, ws, strings.TrimSpace(name), true)
 		if err != nil {
 			return err
 		}
-		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO task_labels (task_id, label_id) VALUES (?,?)`, task, l.ID); err != nil {
+		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_labels (gig_id, label_id) VALUES (?,?)`, gig, l.ID); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// MaxAssignees bounds a task's assignee list.
+// MaxAssignees bounds a gig's assignee list.
 const MaxAssignees = 50
 
-func setAssignees(ctx context.Context, q Q, ws, task int64, users []int64) error {
+func setAssignees(ctx context.Context, q Q, ws, gig int64, users []int64) error {
 	if users == nil {
 		return nil
 	}
@@ -735,22 +735,22 @@ func setAssignees(ctx context.Context, q Q, ws, task int64, users []int64) error
 	if len(uniq) > MaxAssignees {
 		return Invalid("at most %d assignees", MaxAssignees)
 	}
-	if _, err := q.ExecContext(ctx, `DELETE FROM task_assignees WHERE task_id = ?`, task); err != nil {
+	if _, err := q.ExecContext(ctx, `DELETE FROM gig_assignees WHERE gig_id = ?`, gig); err != nil {
 		return err
 	}
 	for _, u := range uniq {
 		if _, g, err := UserGrants(ctx, q, u); err != nil || !g.Has(ws, "view") {
 			return Invalid("user %d can't see this workspace", u)
 		}
-		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO task_assignees (task_id, user_id) VALUES (?,?)`, task, u); err != nil {
+		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_assignees (gig_id, user_id) VALUES (?,?)`, gig, u); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// TaskPatch is a partial task update; nil = unchanged, **T set to nil = cleared.
-type TaskPatch struct {
+// GigPatch is a partial gig update; nil = unchanged, **T set to nil = cleared.
+type GigPatch struct {
 	Title         *string
 	DescriptionMD *string
 	Priority      *int64
@@ -768,21 +768,21 @@ type TaskPatch struct {
 	BlocksParent  *bool
 }
 
-// PatchTask applies a change and records old and new values (old text in full).
-func PatchTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, p TaskPatch) (*Task, error) {
+// PatchGig applies a change and records old and new values (old text in full).
+func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatch) (*Gig, error) {
 	if expect != 0 && expect != t.Version {
 		return nil, ErrVersion
 	}
 	changed := map[string]any{}
 	data := map[string]any{}
 	if p.Title != nil {
-		if err := validTaskText(*p.Title, ""); err != nil {
+		if err := validGigText(*p.Title, ""); err != nil {
 			return nil, err
 		}
 		changed["title"], data["title"] = *p.Title, map[string]any{"old": t.Title, "new": *p.Title}
 	}
 	if p.DescriptionMD != nil {
-		if err := validTaskText("x", *p.DescriptionMD); err != nil {
+		if err := validGigText("x", *p.DescriptionMD); err != nil {
 			return nil, err
 		}
 		changed["description_md"], data["description_md"] = *p.DescriptionMD, map[string]any{"old": t.DescriptionMD}
@@ -854,20 +854,20 @@ func PatchTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, p TaskP
 	if p.ParentID != nil {
 		if *p.ParentID != nil {
 			if **p.ParentID == t.ID {
-				return nil, Invalid("a task can't be its own parent")
+				return nil, Invalid("a gig can't be its own parent")
 			}
-			if par, err := GetTask(ctx, q, **p.ParentID); err != nil || par.WorkspaceID != t.WorkspaceID {
-				return nil, Invalid("parent task must be in the same workspace")
+			if par, err := GetGig(ctx, q, **p.ParentID); err != nil || par.WorkspaceID != t.WorkspaceID {
+				return nil, Invalid("parent gig must be in the same workspace")
 			}
-			// no cycles: the new parent can't be this task's own subtask, at any depth
+			// no cycles: the new parent can't be this gig's own subgig, at any depth
 			var loop int
-			if err := q.QueryRowContext(ctx, `WITH RECURSIVE up(id) AS (SELECT parent_id FROM tasks WHERE id = ?
-				UNION SELECT t.parent_id FROM tasks t JOIN up ON t.id = up.id WHERE t.parent_id IS NOT NULL)
+			if err := q.QueryRowContext(ctx, `WITH RECURSIVE up(id) AS (SELECT parent_id FROM gigs WHERE id = ?
+				UNION SELECT t.parent_id FROM gigs t JOIN up ON t.id = up.id WHERE t.parent_id IS NOT NULL)
 				SELECT count(*) FROM up WHERE id = ?`, **p.ParentID, t.ID).Scan(&loop); err != nil {
 				return nil, err
 			}
 			if loop > 0 {
-				return nil, Invalid("that task is a subtask of this one; a task can't be under its own subtask")
+				return nil, Invalid("that gig is a subgig of this one; a gig can't be under its own subgig")
 			}
 		}
 		changed["parent_id"], data["parent_id"] = nullInt(*p.ParentID), nullInt(*p.ParentID)
@@ -878,14 +878,14 @@ func PatchTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, p TaskP
 	}
 	switch {
 	case p.BlocksParent != nil && *p.BlocksParent && parent == nil:
-		return nil, Invalid("blocks_parent needs a parent task")
+		return nil, Invalid("blocks_parent needs a parent gig")
 	case p.BlocksParent != nil && *p.BlocksParent != t.BlocksParent:
 		changed["blocks_parent"], data["blocks_parent"] = *p.BlocksParent, map[string]any{"old": t.BlocksParent, "new": *p.BlocksParent}
 	case parent == nil && t.BlocksParent:
 		changed["blocks_parent"] = false // no parent left to hold back
 	}
 	if parent != nil && (changed["blocks_parent"] == true || p.ParentID != nil && t.BlocksParent && changed["blocks_parent"] == nil) {
-		// the parent mustn't (transitively) hold this task back, or neither could ever start
+		// the parent mustn't (transitively) hold this gig back, or neither could ever start
 		if cyc, err := Blocks(ctx, q, *parent, t.ID); err != nil {
 			return nil, err
 		} else if cyc {
@@ -923,7 +923,7 @@ func PatchTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, p TaskP
 			}
 		}
 	}
-	query, args := "UPDATE tasks SET version = version + 1, updated_at = ?", []any{Now()}
+	query, args := "UPDATE gigs SET version = version + 1, updated_at = ?", []any{Now()}
 	for col, v := range changed {
 		query += ", " + col + " = ?"
 		args = append(args, v)
@@ -931,7 +931,7 @@ func PatchTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, p TaskP
 	if _, err := q.ExecContext(ctx, query+" WHERE id = ?", append(args, t.ID)...); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "task.updated", "task", t.ID, data); err != nil {
+	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "gig.updated", "gig", t.ID, data); err != nil {
 		return nil, err
 	}
 	if err := Notify(ctx, q, a, t, nil, "assigned", notifyAssigned); err != nil {
@@ -940,13 +940,13 @@ func PatchTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, p TaskP
 	if err := Notify(ctx, q, a, t, nil, "mention", notifyMention); err != nil {
 		return nil, err
 	}
-	return GetTask(ctx, q, t.ID)
+	return GetGig(ctx, q, t.ID)
 }
 
-// Place says where a task goes inside a status column.
+// Place says where a gig goes inside a status column.
 type Place struct {
-	Where  string // top | bottom | before | after
-	TaskID int64  // for before/after
+	Where string // top | bottom | before | after
+	GigID int64  // for before/after
 }
 
 // placePosition computes a position for a new slot in status column st, renumbering the column if
@@ -957,24 +957,24 @@ func placePosition(ctx context.Context, q Q, st int64, pl Place) (float64, error
 		var err error
 		switch pl.Where {
 		case "", "bottom":
-			err = q.QueryRowContext(ctx, `SELECT COALESCE(MAX(position), 0) + 1024 FROM tasks WHERE status_id = ?`, st).Scan(&pos)
+			err = q.QueryRowContext(ctx, `SELECT COALESCE(MAX(position), 0) + 1024 FROM gigs WHERE status_id = ?`, st).Scan(&pos)
 			return pos, err
 		case "top":
-			err = q.QueryRowContext(ctx, `SELECT COALESCE(MIN(position), 2048) - 1024 FROM tasks WHERE status_id = ?`, st).Scan(&pos)
+			err = q.QueryRowContext(ctx, `SELECT COALESCE(MIN(position), 2048) - 1024 FROM gigs WHERE status_id = ?`, st).Scan(&pos)
 			return pos, err
 		case "before", "after":
 			var ref float64
-			if err := q.QueryRowContext(ctx, `SELECT position FROM tasks WHERE id = ? AND status_id = ?`, pl.TaskID, st).Scan(&ref); err != nil {
-				return 0, Invalid("task %d is not in that status", pl.TaskID)
+			if err := q.QueryRowContext(ctx, `SELECT position FROM gigs WHERE id = ? AND status_id = ?`, pl.GigID, st).Scan(&ref); err != nil {
+				return 0, Invalid("gig %d is not in that status", pl.GigID)
 			}
 			var other sql.NullFloat64
 			if pl.Where == "before" {
-				err = q.QueryRowContext(ctx, `SELECT MAX(position) FROM tasks WHERE status_id = ? AND position < ?`, st, ref).Scan(&other)
+				err = q.QueryRowContext(ctx, `SELECT MAX(position) FROM gigs WHERE status_id = ? AND position < ?`, st, ref).Scan(&other)
 				if !other.Valid {
 					other.Float64 = ref - 2048
 				}
 			} else {
-				err = q.QueryRowContext(ctx, `SELECT MIN(position) FROM tasks WHERE status_id = ? AND position > ?`, st, ref).Scan(&other)
+				err = q.QueryRowContext(ctx, `SELECT MIN(position) FROM gigs WHERE status_id = ? AND position > ?`, st, ref).Scan(&other)
 				if !other.Valid {
 					other.Float64 = ref + 2048
 				}
@@ -993,7 +993,7 @@ func placePosition(ctx context.Context, q Q, st int64, pl Place) (float64, error
 			return 0, Invalid("position is top, bottom, before or after")
 		}
 	}
-	return 0, errors.New("could not place task")
+	return 0, errors.New("could not place gig")
 }
 
 func abs(f float64) float64 {
@@ -1004,8 +1004,8 @@ func abs(f float64) float64 {
 }
 
 func renumberColumn(ctx context.Context, q Q, st int64) error {
-	_, err := q.ExecContext(ctx, `UPDATE tasks SET position = (SELECT 1024.0 * r FROM (SELECT id, row_number() OVER (ORDER BY position, id) AS r
-		FROM tasks WHERE status_id = ?) x WHERE x.id = tasks.id) WHERE status_id = ?`, st, st)
+	_, err := q.ExecContext(ctx, `UPDATE gigs SET position = (SELECT 1024.0 * r FROM (SELECT id, row_number() OVER (ORDER BY position, id) AS r
+		FROM gigs WHERE status_id = ?) x WHERE x.id = gigs.id) WHERE status_id = ?`, st, st)
 	return err
 }
 
@@ -1017,14 +1017,14 @@ type Move struct {
 	Place     Place
 }
 
-// MoveTask moves a task. Moving to another project gives it the next number there and keeps the
+// MoveGig moves a gig. Moving to another project gives it the next number there and keeps the
 // old key as an alias. Entering a done status sets done_at; leaving it clears it.
-func MoveTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, m Move) (*Task, error) {
+func MoveGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, m Move) (*Gig, error) {
 	if expect != 0 && expect != t.Version {
 		return nil, ErrVersion
 	}
 	if t.Deleted {
-		return nil, Conflict("the task is in the trash: restore it first")
+		return nil, Conflict("the gig is in the trash: restore it first")
 	}
 	target := t.ProjectID
 	if m.ProjectID != nil {
@@ -1072,8 +1072,8 @@ func MoveTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, m Move) 
 	}
 	pos := t.Position
 	if m.Place.Where != "keep" {
-		if (m.Place.Where == "before" || m.Place.Where == "after") && m.Place.TaskID == t.ID {
-			return nil, Invalid("can't place a task relative to itself")
+		if (m.Place.Where == "before" || m.Place.Where == "after") && m.Place.GigID == t.ID {
+			return nil, Invalid("can't place a gig relative to itself")
 		}
 		if pos, err = placePosition(ctx, q, st.ID, m.Place); err != nil {
 			return nil, err
@@ -1094,7 +1094,7 @@ func MoveTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, m Move) 
 			return nil, err
 		}
 		oldKey, oldNum := strings.SplitN(t.Key, "-", 2)[0], t.Number
-		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO task_aliases (task_id, workspace_id, project_key, number) VALUES (?,?,?,?)`,
+		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_aliases (gig_id, workspace_id, project_key, number) VALUES (?,?,?,?)`,
 			t.ID, t.WorkspaceID, oldKey, oldNum); err != nil {
 			return nil, err
 		}
@@ -1102,22 +1102,22 @@ func MoveTask(ctx context.Context, q Q, a Actor, t *Task, expect int64, m Move) 
 		args = append(args, tp.ID, num)
 		data["from_project"], data["to_project"], data["old_key"], data["new_key"] = t.ProjectID, tp.ID, t.Key, fmt.Sprintf("%s-%d", tp.Key, num)
 	}
-	if _, err := q.ExecContext(ctx, "UPDATE tasks SET "+strings.Join(sets, ", ")+" WHERE id = ?", append(args, t.ID)...); err != nil {
+	if _, err := q.ExecContext(ctx, "UPDATE gigs SET "+strings.Join(sets, ", ")+" WHERE id = ?", append(args, t.ID)...); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &tp.ID, "task.moved", "task", t.ID, data); err != nil {
+	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &tp.ID, "gig.moved", "gig", t.ID, data); err != nil {
 		return nil, err
 	}
-	return GetTask(ctx, q, t.ID)
+	return GetGig(ctx, q, t.ID)
 }
 
-// CloneTask copies a task into a project of the same workspace (default: its own), at the bottom of
+// CloneGig copies a gig into a project of the same workspace (default: its own), at the bottom of
 // the target's default status. Title, description, priority, colour, dates, labels, assignees, model,
 // effort and custom field values are copied, and with checklist the checklist (every item unticked);
-// always_run and allowed_tools are not (setting those needs their own permissions), nor subtasks,
+// always_run and allowed_tools are not (setting those needs their own permissions), nor subgigs,
 // dependencies, comments or runs.
-func CloneTask(ctx context.Context, q Q, a Actor, t *Task, project *int64, title *string, viaKey *int64, checklist bool) (*Task, error) {
-	n := NewTask{ProjectID: t.ProjectID, Title: t.Title, DescriptionMD: t.DescriptionMD, Priority: t.Priority, Color: t.Color, Model: t.Model, Effort: t.Effort,
+func CloneGig(ctx context.Context, q Q, a Actor, t *Gig, project *int64, title *string, viaKey *int64, checklist bool) (*Gig, error) {
+	n := NewGig{ProjectID: t.ProjectID, Title: t.Title, DescriptionMD: t.DescriptionMD, Priority: t.Priority, Color: t.Color, Model: t.Model, Effort: t.Effort,
 		StartAt: t.StartAt, DueAt: t.DueAt, Assignees: t.Assignees, ClonedFromID: &t.ID, CreatedViaKey: viaKey}
 	if project != nil {
 		n.ProjectID = *project
@@ -1133,7 +1133,7 @@ func CloneTask(ctx context.Context, q Q, a Actor, t *Task, project *int64, title
 	for _, l := range t.Labels {
 		n.Labels = append(n.Labels, l.Name)
 	}
-	c, err := CreateTask(ctx, q, a, n)
+	c, err := CreateGig(ctx, q, a, n)
 	if err != nil {
 		return nil, err
 	}
@@ -1153,38 +1153,38 @@ func CloneTask(ctx context.Context, q Q, a Actor, t *Task, project *int64, title
 	if err := templateExtras(ctx, q, a, c, items, t.Custom, nil); err != nil {
 		return nil, err
 	}
-	return GetTask(ctx, q, c.ID)
+	return GetGig(ctx, q, c.ID)
 }
 
-// TrashTask soft-deletes (restore = false) or restores a task.
-func TrashTask(ctx context.Context, q Q, a Actor, t *Task, restore bool) (*Task, error) {
-	action := "task.deleted"
+// TrashGig soft-deletes (restore = false) or restores a gig.
+func TrashGig(ctx context.Context, q Q, a Actor, t *Gig, restore bool) (*Gig, error) {
+	action := "gig.deleted"
 	if restore {
 		if !t.Deleted {
 			return t, nil
 		}
-		// a task of a deleted project would come back into no list
+		// a gig of a deleted project would come back into no list
 		var gone int
 		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM projects WHERE id = ? AND deleted_at IS NOT NULL`, t.ProjectID).Scan(&gone); err != nil {
 			return nil, err
 		}
 		if gone > 0 {
-			return nil, Conflict("its project was deleted, so the task has nowhere to come back to")
+			return nil, Conflict("its project was deleted, so the gig has nowhere to come back to")
 		}
-		if _, err := q.ExecContext(ctx, `UPDATE tasks SET deleted_at = NULL, deleted_by = NULL, updated_at = ?, version = version + 1 WHERE id = ?`, Now(), t.ID); err != nil {
+		if _, err := q.ExecContext(ctx, `UPDATE gigs SET deleted_at = NULL, deleted_by = NULL, updated_at = ?, version = version + 1 WHERE id = ?`, Now(), t.ID); err != nil {
 			return nil, err
 		}
-		action = "task.restored"
+		action = "gig.restored"
 	} else {
 		if t.Deleted {
 			return t, nil
 		}
-		if _, err := q.ExecContext(ctx, `UPDATE tasks SET deleted_at = ?, deleted_by = ?, updated_at = ?, version = version + 1 WHERE id = ?`, Now(), a.UserID, Now(), t.ID); err != nil {
+		if _, err := q.ExecContext(ctx, `UPDATE gigs SET deleted_at = ?, deleted_by = ?, updated_at = ?, version = version + 1 WHERE id = ?`, Now(), a.UserID, Now(), t.ID); err != nil {
 			return nil, err
 		}
 	}
-	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, action, "task", t.ID, map[string]any{"key": t.Key}); err != nil {
+	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, action, "gig", t.ID, map[string]any{"key": t.Key}); err != nil {
 		return nil, err
 	}
-	return GetTask(ctx, q, t.ID)
+	return GetGig(ctx, q, t.ID)
 }

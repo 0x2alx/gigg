@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestTimeZoneDefaults: a recurring task or schedule that names no zone takes the user's time zone
+// TestTimeZoneDefaults: a recurring gig or schedule that names no zone takes the user's time zone
 // preference, else the instance default; an edit that names none keeps the current zone.
 func TestTimeZoneDefaults(t *testing.T) {
 	e := newEnv(t)

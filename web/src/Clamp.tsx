@@ -1,7 +1,7 @@
 // Clamp: long text (a description, a comment) shows at most `maxRem` of height, fading out at the
 // bottom, with a bar underneath that opens it fully. Text that only runs a little over the limit
 // isn't clamped (hiding two lines behind a bar helps nobody). Starts closed; the owner keys it by
-// task or comment so a newly opened task starts closed too. `off` shows it whole, without a bar.
+// gig or comment so a newly opened gig starts closed too. `off` shows it whole, without a bar.
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./icons";
 

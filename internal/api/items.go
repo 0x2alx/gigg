@@ -29,16 +29,16 @@ func items[T any](xs []T) *itemsOut[T] {
 }
 
 type relationIn struct {
-	ID   string `path:"id" doc:"Task id or key"`
+	ID   string `path:"id" doc:"Gig id or key"`
 	Body struct {
-		Task      string `json:"task" doc:"The other task (id or key, same workspace)"`
-		Direction string `json:"direction" enum:"blocks,blocked_by,relates" doc:"blocks: this task blocks the other; blocked_by: the other blocks this one"`
+		Gig       string `json:"gig" doc:"The other gig (id or key, same workspace)"`
+		Direction string `json:"direction" enum:"blocks,blocked_by,relates" doc:"blocks: this gig blocks the other; blocked_by: the other blocks this one"`
 	}
 }
 
 type relationDelIn struct {
 	ID        string `path:"id"`
-	Task      string `query:"task" required:"true"`
+	Gig       string `query:"gig" required:"true"`
 	Direction string `query:"direction" enum:"blocks,blocked_by,relates" required:"true"`
 }
 
@@ -48,26 +48,26 @@ type checklistItemPath struct {
 }
 
 type templateBody struct {
-	Project       *int64                  `json:"project_id,omitempty" doc:"Limit to one project (default: any project of the workspace)"`
-	Name          string                  `json:"name" minLength:"1" maxLength:"80"`
-	Title         string                  `json:"title" minLength:"1" maxLength:"250"`
-	DescriptionMD string                  `json:"description_md,omitempty" maxLength:"65536"`
-	Priority      int64                   `json:"priority,omitempty" minimum:"0" maximum:"4"`
-	Color         *string                 `json:"color,omitempty"`
-	Labels        []string                `json:"labels,omitempty" maxItems:"20"`
-	Assignees     []int64                 `json:"assignees,omitempty" maxItems:"50"`
-	Checklist     []string                `json:"checklist,omitempty" maxItems:"200"`
-	Subtasks      []store.TemplateSubtask `json:"subtasks,omitempty" maxItems:"50" doc:"Subtasks each task made from it gets (title; blocks_parent = the task waits for it)"`
-	Custom        map[string]any          `json:"custom,omitempty"`
-	Model         string                  `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
-	Effort        string                  `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
-	AlwaysRun     bool                    `json:"always_run,omitempty" doc:"Tasks made from it run whatever the usage budget (needs the always_run permission)"`
-	AllowedTools  []string                `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its tasks get for the runner (permission rules); on update, omit to keep, [] clears. Needs the allowed_tools permission"`
+	Project       *int64                 `json:"project_id,omitempty" doc:"Limit to one project (default: any project of the workspace)"`
+	Name          string                 `json:"name" minLength:"1" maxLength:"80"`
+	Title         string                 `json:"title" minLength:"1" maxLength:"250"`
+	DescriptionMD string                 `json:"description_md,omitempty" maxLength:"65536"`
+	Priority      int64                  `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	Color         *string                `json:"color,omitempty"`
+	Labels        []string               `json:"labels,omitempty" maxItems:"20"`
+	Assignees     []int64                `json:"assignees,omitempty" maxItems:"50"`
+	Checklist     []string               `json:"checklist,omitempty" maxItems:"200"`
+	Subgigs       []store.TemplateSubgig `json:"subgigs,omitempty" maxItems:"50" doc:"Subgigs each gig made from it gets (title; blocks_parent = the gig waits for it)"`
+	Custom        map[string]any         `json:"custom,omitempty"`
+	Model         string                 `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
+	Effort        string                 `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
+	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Gigs made from it run whatever the usage budget (needs the always_run permission)"`
+	AllowedTools  []string               `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its gigs get for the runner (permission rules); on update, omit to keep, [] clears. Needs the allowed_tools permission"`
 }
 
 func (b templateBody) apply(t *store.Template) {
 	t.ProjectID, t.Name, t.Title, t.DescriptionMD, t.Priority, t.Color = b.Project, b.Name, b.Title, b.DescriptionMD, b.Priority, b.Color
-	t.Labels, t.Assignees, t.Checklist, t.Custom, t.Subtasks = b.Labels, b.Assignees, b.Checklist, b.Custom, b.Subtasks
+	t.Labels, t.Assignees, t.Checklist, t.Custom, t.Subgigs = b.Labels, b.Assignees, b.Checklist, b.Custom, b.Subgigs
 	t.Model, t.Effort, t.AlwaysRun = b.Model, b.Effort, b.AlwaysRun
 	if b.AllowedTools != nil || t.ID == 0 {
 		t.AllowedTools = b.AllowedTools
@@ -98,20 +98,20 @@ func (a *API) field(ctx context.Context, p *access.Principal, id int64) (*store.
 
 func (a *API) registerItems() {
 	// ------------------------------------------------ relations
-	huma.Register(a.h, huma.Operation{OperationID: "list-relations", Method: "GET", Path: "/tasks/{id}/relations", Tags: []string{"tasks"},
-		Summary: "Tasks this one blocks, is blocked by, or relates to"}, func(ctx context.Context, in *taskPath) (*itemsOut[store.Relation], error) {
+	huma.Register(a.h, huma.Operation{OperationID: "list-relations", Method: "GET", Path: "/gigs/{id}/relations", Tags: []string{"gigs"},
+		Summary: "Gigs this one blocks, is blocked by, or relates to"}, func(ctx context.Context, in *gigPath) (*itemsOut[store.Relation], error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		t, err := a.task(ctx, p, in.ID)
+		t, err := a.gig(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
-		rs, err := store.TaskRelations(ctx, a.st.R, t.ID)
+		rs, err := store.GigRelations(ctx, a.st.R, t.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -122,20 +122,20 @@ func (a *API) registerItems() {
 			if other == t.ID {
 				other = r.From
 			}
-			if o, err := store.GetTask(ctx, a.st.R, other); err == nil && p.SeesProject(o.WorkspaceID, o.ProjectID) {
+			if o, err := store.GetGig(ctx, a.st.R, other); err == nil && p.SeesProject(o.WorkspaceID, o.ProjectID) {
 				vis = append(vis, r)
 			}
 		}
 		return items(vis), nil
 	})
-	link := func(ctx context.Context, id, other, dir string, del bool) (*taskOut, error) {
-		return a.withTaskOp(ctx, id, "", access.Member, "tasks:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Task, _ int64) (*store.Task, error) {
+	link := func(ctx context.Context, id, other, dir string, del bool) (*gigOut, error) {
+		return a.withGigOp(ctx, id, "", access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if err := allowed(p, t.WorkspaceID, "relations"); err != nil {
 				return nil, err
 			}
-			o, err := a.task(ctx, p, other)
+			o, err := a.gig(ctx, p, other)
 			if err != nil {
-				return nil, store.Invalid("no such task %q", other)
+				return nil, store.Invalid("no such gig %q", other)
 			}
 			from, to, kind := t, o, "blocks"
 			switch dir {
@@ -155,31 +155,31 @@ func (a *API) registerItems() {
 			if err != nil {
 				return nil, err
 			}
-			return store.GetTask(ctx, tx, t.ID)
+			return store.GetGig(ctx, tx, t.ID)
 		})
 	}
-	huma.Register(a.h, huma.Operation{OperationID: "add-relation", Method: "POST", Path: "/tasks/{id}/relations", Tags: []string{"tasks"},
-		Summary: "Link two tasks: blocks, blocked_by or relates. A blocked task can't be claimed until its blockers are done."},
-		func(ctx context.Context, in *relationIn) (*taskOut, error) {
-			return link(ctx, in.ID, in.Body.Task, in.Body.Direction, false)
+	huma.Register(a.h, huma.Operation{OperationID: "add-relation", Method: "POST", Path: "/gigs/{id}/relations", Tags: []string{"gigs"},
+		Summary: "Link two gigs: blocks, blocked_by or relates. A blocked gig can't be claimed until its blockers are done."},
+		func(ctx context.Context, in *relationIn) (*gigOut, error) {
+			return link(ctx, in.ID, in.Body.Gig, in.Body.Direction, false)
 		})
-	huma.Register(a.h, huma.Operation{OperationID: "remove-relation", Method: "DELETE", Path: "/tasks/{id}/relations", Tags: []string{"tasks"},
-		Summary: "Unlink two tasks"}, func(ctx context.Context, in *relationDelIn) (*taskOut, error) {
-		return link(ctx, in.ID, in.Task, in.Direction, true)
+	huma.Register(a.h, huma.Operation{OperationID: "remove-relation", Method: "DELETE", Path: "/gigs/{id}/relations", Tags: []string{"gigs"},
+		Summary: "Unlink two gigs"}, func(ctx context.Context, in *relationDelIn) (*gigOut, error) {
+		return link(ctx, in.ID, in.Gig, in.Direction, true)
 	})
 
 	// ------------------------------------------------ checklists
-	huma.Register(a.h, huma.Operation{OperationID: "get-checklist", Method: "GET", Path: "/tasks/{id}/checklist", Tags: []string{"tasks"},
-		Summary: "A task's checklist"}, func(ctx context.Context, in *taskPath) (*itemsOut[store.ChecklistItem], error) {
+	huma.Register(a.h, huma.Operation{OperationID: "get-checklist", Method: "GET", Path: "/gigs/{id}/checklist", Tags: []string{"gigs"},
+		Summary: "A gig's checklist"}, func(ctx context.Context, in *gigPath) (*itemsOut[store.ChecklistItem], error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		t, err := a.task(ctx, p, in.ID)
+		t, err := a.gig(ctx, p, in.ID)
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		cl, err := store.Checklist(ctx, a.st.R, t.ID)
@@ -188,24 +188,24 @@ func (a *API) registerItems() {
 		}
 		return items(cl), nil
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "add-checklist-items", Method: "POST", Path: "/tasks/{id}/checklist", Tags: []string{"tasks"},
+	huma.Register(a.h, huma.Operation{OperationID: "add-checklist-items", Method: "POST", Path: "/gigs/{id}/checklist", Tags: []string{"gigs"},
 		Summary: "Append checklist items"}, func(ctx context.Context, in *struct {
 		ID   string `path:"id"`
 		Body struct {
 			Items []string `json:"items" minItems:"1" maxItems:"200"`
 		}
-	}) (*taskOut, error) {
-		return a.withTaskOp(ctx, in.ID, "", access.Member, "tasks:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Task, _ int64) (*store.Task, error) {
+	}) (*gigOut, error) {
+		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if err := allowed(p, t.WorkspaceID, "checklists"); err != nil {
 				return nil, err
 			}
 			if err := store.AddChecklistItems(ctx, tx, p.Actor(), t, in.Body.Items); err != nil {
 				return nil, err
 			}
-			return store.GetTask(ctx, tx, t.ID)
+			return store.GetGig(ctx, tx, t.ID)
 		})
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "patch-checklist-item", Method: "PATCH", Path: "/tasks/{id}/checklist/{item}", Tags: []string{"tasks"},
+	huma.Register(a.h, huma.Operation{OperationID: "patch-checklist-item", Method: "PATCH", Path: "/gigs/{id}/checklist/{item}", Tags: []string{"gigs"},
 		Summary: "Edit, tick/untick or move a checklist item"}, func(ctx context.Context, in *struct {
 		ID   string `path:"id"`
 		Item int64  `path:"item"`
@@ -214,49 +214,49 @@ func (a *API) registerItems() {
 			Done  *bool   `json:"done,omitempty"`
 			After *int64  `json:"after,omitempty" doc:"Move after this item id (0 = top)"`
 		}
-	}) (*taskOut, error) {
-		return a.withTaskOp(ctx, in.ID, "", access.Member, "tasks:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Task, _ int64) (*store.Task, error) {
+	}) (*gigOut, error) {
+		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if err := allowed(p, t.WorkspaceID, "checklists"); err != nil {
 				return nil, err
 			}
 			if err := store.PatchChecklistItem(ctx, tx, p.Actor(), t, in.Item, store.ChecklistPatch{Text: in.Body.Text, Done: in.Body.Done, After: in.Body.After}); err != nil {
 				return nil, err
 			}
-			return store.GetTask(ctx, tx, t.ID)
+			return store.GetGig(ctx, tx, t.ID)
 		})
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "delete-checklist-item", Method: "DELETE", Path: "/tasks/{id}/checklist/{item}", Tags: []string{"tasks"},
-		Summary: "Remove a checklist item"}, func(ctx context.Context, in *checklistItemPath) (*taskOut, error) {
-		return a.withTaskOp(ctx, in.ID, "", access.Member, "tasks:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Task, _ int64) (*store.Task, error) {
+	huma.Register(a.h, huma.Operation{OperationID: "delete-checklist-item", Method: "DELETE", Path: "/gigs/{id}/checklist/{item}", Tags: []string{"gigs"},
+		Summary: "Remove a checklist item"}, func(ctx context.Context, in *checklistItemPath) (*gigOut, error) {
+		return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
 			if err := allowed(p, t.WorkspaceID, "checklists"); err != nil {
 				return nil, err
 			}
 			if err := store.DeleteChecklistItem(ctx, tx, p.Actor(), t, in.Item); err != nil {
 				return nil, err
 			}
-			return store.GetTask(ctx, tx, t.ID)
+			return store.GetGig(ctx, tx, t.ID)
 		})
 	})
 
 	// ------------------------------------------------ archive
-	// archiving takes a task out of the queue (like deleting); unarchiving puts a guarded one back, so that needs its permissions
+	// archiving takes a gig out of the queue (like deleting); unarchiving puts a guarded one back, so that needs its permissions
 	for _, arch := range []bool{true, false} {
-		op, path, sum := "archive-task", "/tasks/{id}/archive", "Archive a task (off the board and lists; not trash)"
+		op, path, sum := "archive-gig", "/gigs/{id}/archive", "Archive a gig (off the board and lists; not trash)"
 		if !arch {
-			op, path, sum = "unarchive-task", "/tasks/{id}/unarchive", "Bring an archived task back"
+			op, path, sum = "unarchive-gig", "/gigs/{id}/unarchive", "Bring an archived gig back"
 		}
-		huma.Register(a.h, huma.Operation{OperationID: op, Method: "POST", Path: path, Tags: []string{"tasks"}, Summary: sum},
-			func(ctx context.Context, in *taskPath) (*taskOut, error) {
-				return a.withTaskOp(ctx, in.ID, "", access.Member, "tasks:write", archiveOp(arch), func(tx *sql.Tx, p *access.Principal, t *store.Task, _ int64) (*store.Task, error) {
-					if err := allowed(p, t.WorkspaceID, "archive_tasks"); err != nil {
+		huma.Register(a.h, huma.Operation{OperationID: op, Method: "POST", Path: path, Tags: []string{"gigs"}, Summary: sum},
+			func(ctx context.Context, in *gigPath) (*gigOut, error) {
+				return a.withGigOp(ctx, in.ID, "", access.Member, "gigs:write", archiveOp(arch), func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+					if err := allowed(p, t.WorkspaceID, "archive_gigs"); err != nil {
 						return nil, err
 					}
-					return store.ArchiveTask(ctx, tx, p.Actor(), t, arch)
+					return store.ArchiveGig(ctx, tx, p.Actor(), t, arch)
 				})
 			})
 	}
-	huma.Register(a.h, huma.Operation{OperationID: "archive-done", Method: "POST", Path: "/projects/{p}/archive-done", Tags: []string{"tasks"},
-		Summary: "Archive the project's done and cancelled tasks finished more than N days ago"}, func(ctx context.Context, in *struct {
+	huma.Register(a.h, huma.Operation{OperationID: "archive-done", Method: "POST", Path: "/projects/{p}/archive-done", Tags: []string{"gigs"},
+		Summary: "Archive the project's done and cancelled gigs finished more than N days ago"}, func(ctx context.Context, in *struct {
 		P    int64 `path:"p"`
 		Body struct {
 			OlderThanDays int64  `json:"older_than_days" minimum:"0" maximum:"3650"`
@@ -275,10 +275,10 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Member, "tasks:write"); err != nil {
+		if err := require(p, pr.WorkspaceID, access.Member, "gigs:write"); err != nil {
 			return nil, err
 		}
-		if err := allowed(p, pr.WorkspaceID, "archive_tasks"); err != nil {
+		if err := allowed(p, pr.WorkspaceID, "archive_gigs"); err != nil {
 			return nil, err
 		}
 		out := &struct {
@@ -296,7 +296,7 @@ func (a *API) registerItems() {
 
 	// ------------------------------------------------ custom fields
 	huma.Register(a.h, huma.Operation{OperationID: "list-fields", Method: "GET", Path: "/workspaces/{ws}/fields", Tags: []string{"fields"},
-		Summary: "The workspace's custom task fields"}, func(ctx context.Context, in *wsPath) (*itemsOut[*store.CustomField], error) {
+		Summary: "The workspace's custom gig fields"}, func(ctx context.Context, in *wsPath) (*itemsOut[*store.CustomField], error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -305,7 +305,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		fs, err := store.CustomFields(ctx, a.st.R, w.ID)
@@ -391,28 +391,28 @@ func (a *API) registerItems() {
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteCustomField(ctx, tx, p.Actor(), f) })
 	})
-	huma.Register(a.h, huma.Operation{OperationID: "set-custom-values", Method: "PATCH", Path: "/tasks/{id}/custom", Tags: []string{"fields"},
-		Summary: "Set or clear (null) a task's custom field values, keyed by field id"}, func(ctx context.Context, in *struct {
+	huma.Register(a.h, huma.Operation{OperationID: "set-custom-values", Method: "PATCH", Path: "/gigs/{id}/custom", Tags: []string{"fields"},
+		Summary: "Set or clear (null) a gig's custom field values, keyed by field id"}, func(ctx context.Context, in *struct {
 		ID      string `path:"id"`
 		IfMatch string `header:"If-Match"`
 		Body    struct {
 			Values map[string]any `json:"values"`
 		}
-	}) (*taskOut, error) {
-		return a.withTaskOp(ctx, in.ID, in.IfMatch, access.Member, "tasks:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Task, v int64) (*store.Task, error) {
+	}) (*gigOut, error) {
+		return a.withGigOp(ctx, in.ID, in.IfMatch, access.Member, "gigs:write", opGuarded, func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {
 			if v != 0 && v != t.Version {
 				return nil, store.ErrVersion
 			}
 			if err := store.SetCustomValues(ctx, tx, p.Actor(), t, in.Body.Values); err != nil {
 				return nil, err
 			}
-			return store.GetTask(ctx, tx, t.ID)
+			return store.GetGig(ctx, tx, t.ID)
 		})
 	})
 
 	// ------------------------------------------------ templates
 	huma.Register(a.h, huma.Operation{OperationID: "list-templates", Method: "GET", Path: "/workspaces/{ws}/templates", Tags: []string{"templates"},
-		Summary: "Task templates of a workspace"}, func(ctx context.Context, in *struct {
+		Summary: "Gig templates of a workspace"}, func(ctx context.Context, in *struct {
 		WS      string `path:"ws"`
 		Project int64  `query:"project" doc:"Only those usable in this project"`
 	}) (*itemsOut[*store.Template], error) {
@@ -424,7 +424,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		projects := p.ProjectFilter()
@@ -441,7 +441,7 @@ func (a *API) registerItems() {
 		return items(ts), nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "create-template", Method: "POST", Path: "/workspaces/{ws}/templates", Tags: []string{"templates"},
-		Summary: "Save a task template", DefaultStatus: 201}, func(ctx context.Context, in *struct {
+		Summary: "Save a gig template", DefaultStatus: 201}, func(ctx context.Context, in *struct {
 		WS   string `path:"ws"`
 		Body templateBody
 	}) (*struct{ Body *store.Template }, error) {
@@ -453,7 +453,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Member, "tasks:write"); err != nil {
+		if err := require(p, w.ID, access.Member, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if in.Body.Project != nil && !p.SeesProject(w.ID, *in.Body.Project) {
@@ -481,7 +481,7 @@ func (a *API) registerItems() {
 		return &struct{ Body *store.Template }{t}, err
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "get-template", Method: "GET", Path: "/templates/{id}", Tags: []string{"templates"},
-		Summary: "A task template"}, func(ctx context.Context, in *idPath) (*struct{ Body *store.Template }, error) {
+		Summary: "A gig template"}, func(ctx context.Context, in *idPath) (*struct{ Body *store.Template }, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -490,13 +490,13 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Viewer, "tasks:read"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Viewer, "gigs:read"); err != nil {
 			return nil, err
 		}
 		return &struct{ Body *store.Template }{t}, nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "update-template", Method: "PUT", Path: "/templates/{id}", Tags: []string{"templates"},
-		Summary: "Replace a task template"}, func(ctx context.Context, in *struct {
+		Summary: "Replace a gig template"}, func(ctx context.Context, in *struct {
 		ID      int64  `path:"id"`
 		IfMatch string `header:"If-Match"`
 		Body    templateBody
@@ -509,7 +509,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Member, "tasks:write"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Member, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if in.Body.Project != nil && !p.SeesProject(t.WorkspaceID, *in.Body.Project) {
@@ -540,7 +540,7 @@ func (a *API) registerItems() {
 		return &struct{ Body *store.Template }{t}, err
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-template", Method: "DELETE", Path: "/templates/{id}", Tags: []string{"templates"},
-		Summary: "Delete a task template", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
+		Summary: "Delete a gig template", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -549,7 +549,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, t.WorkspaceID, access.Member, "tasks:write"); err != nil {
+		if err := require(p, t.WorkspaceID, access.Member, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if p.Narrowed() && t.ProjectID == nil {
@@ -561,13 +561,13 @@ func (a *API) registerItems() {
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteTemplate(ctx, tx, p.Actor(), t) })
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "use-template", Method: "POST", Path: "/templates/{id}/use", Tags: []string{"templates"},
-		Summary: "Create a task from a template", DefaultStatus: 201}, func(ctx context.Context, in *struct {
+		Summary: "Create a gig from a template", DefaultStatus: 201}, func(ctx context.Context, in *struct {
 		ID   int64 `path:"id"`
 		Body struct {
 			Project int64   `json:"project" doc:"Project id"`
 			Title   *string `json:"title,omitempty" maxLength:"250" doc:"Override the template's title"`
 		}
-	}) (*taskOut, error) {
+	}) (*gigOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
@@ -580,10 +580,10 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, pr.WorkspaceID, access.Member, "tasks:write"); err != nil {
+		if err := require(p, pr.WorkspaceID, access.Member, "gigs:write"); err != nil {
 			return nil, err
 		}
-		if err := allowed(p, pr.WorkspaceID, "create_tasks"); err != nil {
+		if err := allowed(p, pr.WorkspaceID, "create_gigs"); err != nil {
 			return nil, err
 		}
 		if len(tpl.Checklist) > 0 {
@@ -591,7 +591,7 @@ func (a *API) registerItems() {
 				return nil, err
 			}
 		}
-		if anyGate(tpl.Subtasks) {
+		if anyGate(tpl.Subgigs) {
 			if err := allowed(p, pr.WorkspaceID, "relations"); err != nil {
 				return nil, err
 			}
@@ -606,16 +606,16 @@ func (a *API) registerItems() {
 		if p.Key != nil {
 			via = &p.Key.ID
 		}
-		var t *store.Task
+		var t *store.Gig
 		err = a.tx(ctx, func(tx *sql.Tx) error {
 			var err error
-			t, err = store.TaskFromTemplate(ctx, tx, p.Actor(), tpl, pr, in.Body.Title, via)
+			t, err = store.GigFromTemplate(ctx, tx, p.Actor(), tpl, pr, in.Body.Title, via)
 			return err
 		})
 		if err != nil {
 			return nil, err
 		}
-		return &taskOut{ETag: etag(t.Version), Body: t}, nil
+		return &gigOut{ETag: etag(t.Version), Body: t}, nil
 	})
 
 	// ------------------------------------------------ saved filters (personal)
@@ -625,7 +625,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := need(p, "tasks:read"); err != nil {
+		if err := need(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		fs, err := store.SavedFilters(ctx, a.st.R, p.User.ID)
@@ -645,7 +645,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := need(p, "tasks:read"); err != nil {
+		if err := need(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		if !filterInReach(p, b.WorkspaceID) {
@@ -690,7 +690,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := need(p, "tasks:read"); err != nil {
+		if err := need(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		if err := a.ownFilterInReach(ctx, p, in.ID); err != nil {
@@ -714,7 +714,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := need(p, "tasks:read"); err != nil {
+		if err := need(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		ns, unread, err := store.Notifications(ctx, a.st.R, p.User.ID, p.Workspaces(), in.Unread, in.Limit)
@@ -725,8 +725,8 @@ func (a *API) registerItems() {
 		if p.Narrowed() {
 			vis := ns[:0]
 			for _, n := range ns {
-				if n.TaskID != nil {
-					if t, err := store.GetTask(ctx, a.st.R, *n.TaskID); err == nil && p.SeesProject(t.WorkspaceID, t.ProjectID) {
+				if n.GigID != nil {
+					if t, err := store.GetGig(ctx, a.st.R, *n.GigID); err == nil && p.SeesProject(t.WorkspaceID, t.ProjectID) {
 						vis = append(vis, n)
 					}
 				}
@@ -763,7 +763,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := need(p, "tasks:read"); err != nil {
+		if err := need(p, "gigs:read"); err != nil {
 			return nil, err
 		}
 		ids := in.Body.IDs
@@ -805,7 +805,7 @@ func (a *API) ownFilterInReach(ctx context.Context, p *access.Principal, id int6
 	return errNotFound()
 }
 
-func archiveOp(arch bool) taskOp {
+func archiveOp(arch bool) gigOp {
 	if arch {
 		return opEdit
 	}

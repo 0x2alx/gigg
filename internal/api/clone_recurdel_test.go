@@ -20,7 +20,7 @@ func TestCloneCopiesChecklistAndFields(t *testing.T) {
 	}
 	_ = json.Unmarshal(out, &f)
 	body := fmt.Sprintf(`{"title":"source","checklist":["one","two"],"custom":{"%d":"L"}}`, f.ID)
-	code, out, _ = e.req("POST", fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"]), body, ada)
+	code, out, _ = e.req("POST", fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"]), body, ada)
 	e.ok(code, out, 201)
 	var src struct {
 		Key string `json:"key"`
@@ -33,12 +33,12 @@ func TestCloneCopiesChecklistAndFields(t *testing.T) {
 			DoneAt *int64 `json:"done_at"`
 		} `json:"items"`
 	}
-	_, out, _ = e.req("GET", "/tasks/"+src.Key+"/checklist", "", ada)
+	_, out, _ = e.req("GET", "/gigs/"+src.Key+"/checklist", "", ada)
 	_ = json.Unmarshal(out, &ck)
-	code, out, _ = e.req("PATCH", fmt.Sprintf("/tasks/%s/checklist/%d", src.Key, ck.Items[0].ID), `{"done":true}`, ada)
+	code, out, _ = e.req("PATCH", fmt.Sprintf("/gigs/%s/checklist/%d", src.Key, ck.Items[0].ID), `{"done":true}`, ada)
 	e.ok(code, out, 200)
 
-	code, out, _ = e.req("POST", "/tasks/"+src.Key+"/clone", `{}`, ada)
+	code, out, _ = e.req("POST", "/gigs/"+src.Key+"/clone", `{}`, ada)
 	e.ok(code, out, 201)
 	var c struct {
 		Key    string         `json:"key"`
@@ -48,7 +48,7 @@ func TestCloneCopiesChecklistAndFields(t *testing.T) {
 	if c.Custom[fmt.Sprint(f.ID)] != "L" {
 		t.Fatalf("custom not copied: %s", out)
 	}
-	_, out, _ = e.req("GET", "/tasks/"+c.Key+"/checklist", "", ada)
+	_, out, _ = e.req("GET", "/gigs/"+c.Key+"/checklist", "", ada)
 	ck.Items = nil
 	_ = json.Unmarshal(out, &ck)
 	if len(ck.Items) != 2 || ck.Items[0].Text != "one" || ck.Items[0].DoneAt != nil || ck.Items[1].DoneAt != nil {
@@ -56,8 +56,8 @@ func TestCloneCopiesChecklistAndFields(t *testing.T) {
 	}
 }
 
-// TestDeleteRecurrenceWithTemplateAndSchedule: deleting a recurring task may also delete its template
-// and schedule, but not while another recurring task uses them (then nothing is deleted).
+// TestDeleteRecurrenceWithTemplateAndSchedule: deleting a recurring gig may also delete its template
+// and schedule, but not while another recurring gig uses them (then nothing is deleted).
 func TestDeleteRecurrenceWithTemplateAndSchedule(t *testing.T) {
 	e := newEnv(t)
 	ada := e.ada()
@@ -84,11 +84,11 @@ func TestDeleteRecurrenceWithTemplateAndSchedule(t *testing.T) {
 	}
 	for _, q := range []string{"?template=true", "?schedule=true"} {
 		code, out, _ := e.reqH("DELETE", fmt.Sprintf("/recurrences/%d%s", a.ID, q), "", ada, csrf)
-		if code != 409 || !strings.Contains(string(out), "recurring tasks use") {
+		if code != 409 || !strings.Contains(string(out), "recurring gigs use") {
 			t.Fatalf("shared %s: %d %s", q, code, out)
 		}
 		if code, _, _ := e.req("GET", fmt.Sprintf("/recurrences/%d", a.ID), "", ada); code != 200 {
-			t.Fatalf("refused delete still removed the recurring task: %d", code)
+			t.Fatalf("refused delete still removed the recurring gig: %d", code)
 		}
 	}
 	for _, r := range []rec{b, c} {

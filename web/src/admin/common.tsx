@@ -124,7 +124,7 @@ export function CategoryPill({ category }: { category: Category }) {
 
 // Audit action colours by prefix (data colours from theme.ts; unknown prefixes get a stable hash colour).
 const ACTION_COLOR: Record<string, string> = {
-  task: CATEGORY_COLOR.todo!,
+  gig: CATEGORY_COLOR.todo!,
   comment: CATEGORY_COLOR.done!,
   run: CATEGORY_COLOR.doing!,
   key: CATEGORY_COLOR.waiting!,

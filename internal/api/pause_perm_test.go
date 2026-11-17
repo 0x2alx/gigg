@@ -25,7 +25,7 @@ func TestPausePermission(t *testing.T) {
 	// an operator-style grant: everywhere, viewer + pause_runs
 	code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", atlas), `{"workspace_id":null,"preset":"viewer","overrides":{"pause_runs":true}}`, e.ada())
 	e.ok(code, out, 200)
-	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"ops","user_id":%d,"scopes":["workspace:read","tasks:read","runs:write"],"allowed_listeners":["internal"]}`, atlas), e.ada())
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"ops","user_id":%d,"scopes":["workspace:read","gigs:read","runs:write"],"allowed_listeners":["internal"]}`, atlas), e.ada())
 	e.ok(code, out, 201)
 	var kc KeyCreated
 	_ = json.Unmarshal(out, &kc)
@@ -53,7 +53,7 @@ func TestPausePermission(t *testing.T) {
 		t.Fatalf("caps by a pauser: %d", code)
 	}
 	// a key without runs:write can't, even with the permission
-	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"ro","user_id":%d,"scopes":["tasks:read"],"allowed_listeners":["internal"]}`, atlas), e.ada())
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"ro","user_id":%d,"scopes":["gigs:read"],"allowed_listeners":["internal"]}`, atlas), e.ada())
 	e.ok(code, out, 201)
 	_ = json.Unmarshal(out, &kc)
 	if code, out, _ := e.req("POST", "/runner/pause", `{}`, cred{token: kc.Token, listener: "internal"}); code != 403 || !strings.Contains(string(out), "runs:write") {

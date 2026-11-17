@@ -69,13 +69,13 @@ func TestMCP(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names[tl.Name] = true
 	}
-	for _, want := range []string{"whoami", "list_tasks", "get_task", "create_task", "move_task", "add_comment", "report_progress", "summary"} {
+	for _, want := range []string{"whoami", "list_gigs", "get_gig", "create_gig", "move_gig", "add_comment", "report_progress", "summary"} {
 		if !names[want] {
 			t.Errorf("tool %s missing", want)
 		}
 	}
-	if names["delete_task"] {
-		t.Error("delete_task listed for a key without tasks:delete")
+	if names["delete_gig"] {
+		t.Error("delete_gig listed for a key without gigs:delete")
 	}
 	call := func(name string, args map[string]any) *mcp.CallToolResult {
 		t.Helper()
@@ -85,43 +85,43 @@ func TestMCP(t *testing.T) {
 		}
 		return r
 	}
-	r := call("create_task", map[string]any{"project": e.ids["scout.p"], "title": "via MCP", "priority": 2, "labels": []string{"mcp"}})
+	r := call("create_gig", map[string]any{"project": e.ids["scout.p"], "title": "via MCP", "priority": 2, "labels": []string{"mcp"}})
 	if r.IsError || !strings.Contains(text(r), `"title":"via MCP"`) {
-		t.Fatalf("create_task: %s", text(r))
+		t.Fatalf("create_gig: %s", text(r))
 	}
-	r = call("get_task", map[string]any{"task": "GIG-2", "comments": true})
+	r = call("get_gig", map[string]any{"gig": "GIG-2", "comments": true})
 	if r.IsError || !strings.Contains(text(r), `"comments"`) {
-		t.Fatalf("get_task: %s", text(r))
+		t.Fatalf("get_gig: %s", text(r))
 	}
-	// another workspace's task: an error, no data
-	r = call("get_task", map[string]any{"task": "2"})
+	// another workspace's gig: an error, no data
+	r = call("get_gig", map[string]any{"gig": "2"})
 	if !r.IsError || strings.Contains(text(r), "atlas secret") {
-		t.Fatalf("cross-workspace get_task: %s", text(r))
+		t.Fatalf("cross-workspace get_gig: %s", text(r))
 	}
 	r = call("summary", map[string]any{})
 	if r.IsError || !strings.Contains(text(r), "via MCP") {
 		t.Fatalf("summary: %s", text(r))
 	}
-	r = call("update_task", map[string]any{"task": "GIG-2", "clear": []string{"labels"}, "priority": 4})
+	r = call("update_gig", map[string]any{"gig": "GIG-2", "clear": []string{"labels"}, "priority": 4})
 	if r.IsError || !strings.Contains(text(r), `"labels":[]`) || !strings.Contains(text(r), `"priority":4`) {
-		t.Fatalf("update_task: %s", text(r))
+		t.Fatalf("update_gig: %s", text(r))
 	}
 	// assignees by username, cleared with clear
-	r = call("update_task", map[string]any{"task": "GIG-2", "assignees": []string{"@scout"}})
+	r = call("update_gig", map[string]any{"gig": "GIG-2", "assignees": []string{"@scout"}})
 	if want := fmt.Sprintf(`"assignees":[%d]`, e.ids["scout.user"]); r.IsError || !strings.Contains(text(r), want) {
-		t.Fatalf("update_task assignees: %s", text(r))
+		t.Fatalf("update_gig assignees: %s", text(r))
 	}
-	r = call("update_task", map[string]any{"task": "GIG-2", "assignees": []string{"nobody-here"}})
+	r = call("update_gig", map[string]any{"gig": "GIG-2", "assignees": []string{"nobody-here"}})
 	if !r.IsError || !strings.Contains(text(r), "No such user") {
 		t.Fatalf("unknown assignee: %s", text(r))
 	}
-	r = call("update_task", map[string]any{"task": "GIG-2", "clear": []string{"assignees"}})
+	r = call("update_gig", map[string]any{"gig": "GIG-2", "clear": []string{"assignees"}})
 	if r.IsError || !strings.Contains(text(r), `"assignees":[]`) {
 		t.Fatalf("clear assignees: %s", text(r))
 	}
-	r = call("create_task", map[string]any{"project": e.ids["scout.p"], "title": "assigned via MCP", "assignees": []string{"scout"}})
+	r = call("create_gig", map[string]any{"project": e.ids["scout.p"], "title": "assigned via MCP", "assignees": []string{"scout"}})
 	if want := fmt.Sprintf(`"assignees":[%d]`, e.ids["scout.user"]); r.IsError || !strings.Contains(text(r), want) {
-		t.Fatalf("create_task assignees: %s", text(r))
+		t.Fatalf("create_gig assignees: %s", text(r))
 	}
 
 	// schedules need the permission (not in the member preset): allow it for scout
@@ -132,7 +132,7 @@ func TestMCP(t *testing.T) {
 	if s, err = e.mcpSession(t, srv, authTransport{token: e.keys["scout"]}); err != nil {
 		t.Fatal(err)
 	}
-	// recurring tasks: create (weekly, 09:00-10:00 New York), list with upcoming, partial update keeps the rest
+	// recurring gigs: create (weekly, 09:00-10:00 New York), list with upcoming, partial update keeps the rest
 	r = call("create_recurring", map[string]any{"project": e.ids["scout.p"], "title": "Weekly report", "freq": "weekly", "weekdays": []int{1, 4},
 		"window_start": "09:00", "window_minutes": 60, "labels": []string{"routine"}, "checklist": []string{"draft", "send"}})
 	if r.IsError || !strings.Contains(text(r), `"weekdays":[1,4]`) || !strings.Contains(text(r), `"upcoming":[`) || !strings.Contains(text(r), `"checklist":["draft","send"]`) {
@@ -154,9 +154,9 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("list_recurring: %s", text(r))
 	}
 	if r = call("delete_recurring", map[string]any{"id": e.ids["atlas.rec"]}); !r.IsError {
-		t.Fatalf("deleted another workspace's recurring task: %s", text(r))
+		t.Fatalf("deleted another workspace's recurring gig: %s", text(r))
 	}
-	// schedules: list, make one, put the template on it too (a second recurring task), change its timing
+	// schedules: list, make one, put the template on it too (a second recurring gig), change its timing
 	r = call("list_schedules", map[string]any{})
 	if r.IsError || !strings.Contains(text(r), `"name":"Every Mon, Thu 09:00–11:00"`) {
 		t.Fatalf("list_schedules: %s", text(r))
@@ -181,30 +181,30 @@ func TestMCP(t *testing.T) {
 		t.Fatalf("deleted a schedule in use: %s", text(r))
 	}
 
-	// work items through MCP: subtask with a checklist, dependency, archive, bell
-	r = call("create_task", map[string]any{"project": e.ids["scout.p"], "title": "child", "parent_id": e.ids["scout.task"], "checklist": []string{"a", "b"}})
+	// work items through MCP: subgig with a checklist, dependency, archive, bell
+	r = call("create_gig", map[string]any{"project": e.ids["scout.p"], "title": "child", "parent_id": e.ids["scout.gig"], "checklist": []string{"a", "b"}})
 	if r.IsError || !strings.Contains(text(r), `"checklist_total":2`) {
-		t.Fatalf("create subtask: %s", text(r))
+		t.Fatalf("create subgig: %s", text(r))
 	}
 	var child struct {
 		Key string `json:"key"`
 	}
 	_ = json.Unmarshal([]byte(text(r)), &child)
-	r = call("link_tasks", map[string]any{"task": child.Key, "other": fmt.Sprint(e.ids["scout.task"]), "direction": "blocked_by"})
+	r = call("link_gigs", map[string]any{"gig": child.Key, "other": fmt.Sprint(e.ids["scout.gig"]), "direction": "blocked_by"})
 	if r.IsError || !strings.Contains(text(r), `"blocked_by":1`) {
-		t.Fatalf("link_tasks: %s", text(r))
+		t.Fatalf("link_gigs: %s", text(r))
 	}
-	r = call("list_tasks", map[string]any{"blocked": true})
+	r = call("list_gigs", map[string]any{"blocked": true})
 	if r.IsError || !strings.Contains(text(r), child.Key) {
 		t.Fatalf("list blocked: %s", text(r))
 	}
-	r = call("update_checklist", map[string]any{"task": child.Key, "add": []string{"c"}})
+	r = call("update_checklist", map[string]any{"gig": child.Key, "add": []string{"c"}})
 	if r.IsError || strings.Count(text(r), `"text"`) != 3 {
 		t.Fatalf("update_checklist: %s", text(r))
 	}
-	r = call("archive_task", map[string]any{"task": child.Key})
+	r = call("archive_gig", map[string]any{"gig": child.Key})
 	if r.IsError || !strings.Contains(text(r), `"archived_at":1`) {
-		t.Fatalf("archive_task: %s", text(r))
+		t.Fatalf("archive_gig: %s", text(r))
 	}
 	if tools, _ := s.ListTools(ctx, nil); tools != nil {
 		for _, tl := range tools.Tools {

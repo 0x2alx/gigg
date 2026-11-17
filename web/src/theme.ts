@@ -261,7 +261,7 @@ export const CATEGORY_COLOR: Record<string, string> = {
 
 export const PRIORITY_COLOR = ["", "#0090FF", "#FFC53D", "#F76B15", "#E5484D"];
 
-// Recurring tasks: the schedule badge, and a task's time window while it is open.
+// Recurring gigs: the schedule badge, and a gig's time window while it is open.
 export const SCHEDULE_COLOR = "#8E4EC6";
 export const WINDOW_OPEN_COLOR = "#F76B15";
 
@@ -416,7 +416,7 @@ function contrastChecks(t: Theme): Check[] {
     ["accent", "background", 3, "The accent doesn't stand out from the background"],
   ];
   if (t.secondary) checks.push(["text", "secondary", 4.5, "Text on secondary buttons is hard to read"]);
-  // on the columns sit muted text ("Nothing here", "+ New task", counts) and the status chips; the
+  // on the columns sit muted text ("Nothing here", "+ New gig", counts) and the status chips; the
   // lane comes first, so Fix adjusts the column colour, not the app's secondary text
   if (t.laneColor) {
     checks.push(["laneColor", "mutedText", 3, "Secondary text on the board columns is hard to read"]);
@@ -612,7 +612,7 @@ export const THEME_DOCS_URL = "https://github.com/0x2alx/gigg/blob/main/docs/gui
 
 export function aiPrompt(description: string, current: Theme): string {
   return [
-    "I use gigg, a task board for people and AI agents, and I want a new colour theme for it.",
+    "I use gigg, a gig board for people and AI agents, and I want a new colour theme for it.",
     "A theme changes the colours, the font, the font weight, the text size, the corner roundness and the border width.",
     "Answer with ONLY the theme's JSON in one code block.",
     `How themes work: ${THEME_DOCS_URL}`,

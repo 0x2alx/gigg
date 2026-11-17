@@ -91,7 +91,7 @@ func newEnv(t *testing.T) *env {
 			if err != nil {
 				return err
 			}
-			tk, err := store.CreateTask(ctx, tx, a, store.NewTask{ProjectID: p.ID, Title: name + " secret task", Labels: []string{name + "-label"}})
+			tk, err := store.CreateGig(ctx, tx, a, store.NewGig{ProjectID: p.ID, Title: name + " secret gig", Labels: []string{name + "-label"}})
 			if err != nil {
 				return err
 			}
@@ -125,21 +125,21 @@ func newEnv(t *testing.T) *env {
 				return err
 			}
 			e.ids[name+".field"], e.ids[name+".template"], e.ids[name+".filter"] = fld.ID, tpl.ID, flt.ID
-			cr, err := store.CreateCron(ctx, tx, a, store.NewCron{WorkspaceID: w.ID, WorkerID: ag.ID, ScheduleID: rec.ScheduleID,
-				Template: &store.CronTemplate{Name: name + " secret cron", Command: "echo " + name + " secret"}}, store.CronEdit{})
+			cr, err := store.CreateErrand(ctx, tx, a, store.NewErrand{WorkspaceID: w.ID, WorkerID: ag.ID, ScheduleID: rec.ScheduleID,
+				Template: &store.ErrandTemplate{Name: name + " secret errand", Command: "echo " + name + " secret"}}, store.ErrandEdit{})
 			if err != nil {
 				return err
 			}
-			res, err := tx.ExecContext(ctx, `INSERT INTO cron_runs (cron_id, workspace_id, worker_id, status, output_tail, created_at) VALUES (?,?,?,'ok',?,?)`,
+			res, err := tx.ExecContext(ctx, `INSERT INTO errand_runs (errand_id, workspace_id, worker_id, status, output_tail, created_at) VALUES (?,?,?,'ok',?,?)`,
 				cr.ID, w.ID, ag.ID, name+" secret output", store.Now())
 			if err != nil {
 				return err
 			}
-			e.ids[name+".cron"], e.ids[name+".crontpl"] = cr.ID, cr.TemplateID
-			e.ids[name+".cronrun"], _ = res.LastInsertId()
+			e.ids[name+".errand"], e.ids[name+".errandtpl"] = cr.ID, cr.TemplateID
+			e.ids[name+".errandrun"], _ = res.LastInsertId()
 			sts, _ := store.Statuses(ctx, tx, p.ID)
 			e.ids[name+".user"], e.ids[name+".ws"], e.ids[name+".p"], e.ids[name+".p2"] = ag.ID, w.ID, p.ID, p2.ID
-			e.ids[name+".task"], e.ids[name+".comment"], e.ids[name+".run"], e.ids[name+".status"] = tk.ID, c.ID, r.ID, sts[0].ID
+			e.ids[name+".gig"], e.ids[name+".comment"], e.ids[name+".run"], e.ids[name+".status"] = tk.ID, c.ID, r.ID, sts[0].ID
 			e.ids[name+".label"] = tk.Labels[0].ID
 		}
 		return store.SetMembership(ctx, tx, a, e.ids["scout.ws"], bob.ID, "viewer")
@@ -156,7 +156,7 @@ func newEnv(t *testing.T) *env {
 	e.cookie = m[1]
 	// runner keys for both agents, internal listener only (as on the host)
 	for _, name := range []string{"scout", "atlas"} {
-		body := fmt.Sprintf(`{"name":"runner","user_id":%d,"workspace":"%s","scopes":["workspace:read","tasks:read","tasks:write","comments:read","comments:write","artifacts:write","runs:write","profile:write","keys:self"],"allowed_listeners":["internal"]}`,
+		body := fmt.Sprintf(`{"name":"runner","user_id":%d,"workspace":"%s","scopes":["workspace:read","gigs:read","gigs:write","comments:read","comments:write","artifacts:write","runs:write","profile:write","keys:self"],"allowed_listeners":["internal"]}`,
 			e.ids[name+".user"], name)
 		code, out, _ := e.req("POST", "/keys", body, e.ada())
 		if code != 201 {
@@ -271,7 +271,7 @@ func TestAuthBasics(t *testing.T) {
 func TestCSRF(t *testing.T) {
 	e := newEnv(t)
 	body := `{"title":"x"}`
-	p := fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"])
+	p := fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"])
 	for name, c := range map[string]cred{
 		"no origin":      {cookie: e.cookie, listener: "main"},
 		"foreign origin": {cookie: e.cookie, listener: "main", origin: "https://evil.example"},
@@ -296,18 +296,18 @@ func TestRolesAndScopes(t *testing.T) {
 	code, body, hdr := e.req("POST", "/auth/login", `{"username":"bob","password":"bob's long password"}`, cred{listener: "main"})
 	e.ok(code, body, 200)
 	bob := cred{cookie: regexp.MustCompile(`__Host-gigg_session=([^;]+)`).FindStringSubmatch(hdr.Get("Set-Cookie"))[1], listener: "main", origin: "https://board.example"}
-	if code, _, _ := e.req("GET", fmt.Sprintf("/tasks/%d", e.ids["scout.task"]), "", bob); code != 200 {
+	if code, _, _ := e.req("GET", fmt.Sprintf("/gigs/%d", e.ids["scout.gig"]), "", bob); code != 200 {
 		t.Fatalf("viewer read: %d", code)
 	}
-	if code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"]), `{"title":"x"}`, bob); code != 403 {
+	if code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"]), `{"title":"x"}`, bob); code != 403 {
 		t.Fatalf("viewer create: %d %s", code, out)
 	}
-	if code, _, _ := e.req("GET", fmt.Sprintf("/tasks/%d", e.ids["atlas.task"]), "", bob); code != 404 {
+	if code, _, _ := e.req("GET", fmt.Sprintf("/gigs/%d", e.ids["atlas.gig"]), "", bob); code != 404 {
 		t.Fatalf("bob sees atlas: %d", code)
 	}
 	// the runner key can't delete, manage projects or act as admin
 	for _, c := range []struct{ m, p, b string }{
-		{"DELETE", fmt.Sprintf("/tasks/%d", e.ids["scout.task"]), ""},
+		{"DELETE", fmt.Sprintf("/gigs/%d", e.ids["scout.gig"]), ""},
 		{"POST", "/workspaces/scout/projects", `{"slug":"new","name":"New","key":"NEW"}`},
 		{"POST", "/workspaces", `{"slug":"evil","name":"Evil"}`},
 		{"GET", "/keys", ""},
@@ -322,10 +322,10 @@ func TestRolesAndScopes(t *testing.T) {
 func TestNoKeyEscalation(t *testing.T) {
 	e := newEnv(t)
 	cases := map[string]string{
-		"wider scope":           `{"name":"x","workspace":"scout","scopes":["tasks:delete"]}`,
-		"other workspace":       `{"name":"x","workspace":"atlas","scopes":["tasks:read"]}`,
-		"admin key":             `{"name":"x","scopes":["tasks:read"]}`,
-		"loosen listener":       `{"name":"x","workspace":"scout","scopes":["tasks:read"],"allowed_listeners":["main"]}`,
+		"wider scope":           `{"name":"x","workspace":"scout","scopes":["gigs:delete"]}`,
+		"other workspace":       `{"name":"x","workspace":"atlas","scopes":["gigs:read"]}`,
+		"admin key":             `{"name":"x","scopes":["gigs:read"]}`,
+		"loosen listener":       `{"name":"x","workspace":"scout","scopes":["gigs:read"],"allowed_listeners":["main"]}`,
 		"admin scope on ws key": `{"name":"x","workspace":"scout","scopes":["admin:users"]}`,
 	}
 	for name, body := range cases {
@@ -335,11 +335,11 @@ func TestNoKeyEscalation(t *testing.T) {
 		}
 	}
 	// a narrower key is fine and inherits the listener restriction
-	code, out, _ := e.req("POST", "/me/keys", `{"name":"ro","workspace":"current","scopes":["tasks:read"]}`, e.key("scout"))
+	code, out, _ := e.req("POST", "/me/keys", `{"name":"ro","workspace":"current","scopes":["gigs:read"]}`, e.key("scout"))
 	if code != 422 { // "current" isn't a slug for creation... use the slug
 		_ = out
 	}
-	code, out, _ = e.req("POST", "/me/keys", `{"name":"ro","workspace":"scout","scopes":["tasks:read"]}`, e.key("scout"))
+	code, out, _ = e.req("POST", "/me/keys", `{"name":"ro","workspace":"scout","scopes":["gigs:read"]}`, e.key("scout"))
 	e.ok(code, out, 201)
 	var kc KeyCreated
 	_ = json.Unmarshal(out, &kc)
@@ -360,46 +360,46 @@ func TestNoKeyEscalation(t *testing.T) {
 func TestRunnerFlow(t *testing.T) {
 	e := newEnv(t)
 	k := e.key("scout")
-	// ada creates a task in the browser
-	code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"]), `{"title":"Write the README","priority":3}`, e.ada())
+	// ada creates a gig in the browser
+	code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"]), `{"title":"Write the README","priority":3}`, e.ada())
 	e.ok(code, out, 201)
-	// dry run, then claim (only tasks by ada or scout)
-	code, out, _ = e.req("POST", "/workspaces/current/tasks/claim", `{"created_by":["ada","scout"],"start_due":true,"dry_run":true}`, k)
+	// dry run, then claim (only gigs by ada or scout)
+	code, out, _ = e.req("POST", "/workspaces/current/gigs/claim", `{"created_by":["ada","scout"],"start_due":true,"dry_run":true}`, k)
 	e.ok(code, out, 200)
-	var t1 store.Task
+	var t1 store.Gig
 	_ = json.Unmarshal(out, &t1)
 	if t1.Title != "Write the README" || t1.StatusCategory != "todo" {
 		t.Fatalf("dry run: %s", out)
 	}
-	code, out, _ = e.req("POST", "/workspaces/current/tasks/claim", `{"created_by":["ada","scout"],"start_due":true}`, k)
+	code, out, _ = e.req("POST", "/workspaces/current/gigs/claim", `{"created_by":["ada","scout"],"start_due":true}`, k)
 	e.ok(code, out, 200)
 	_ = json.Unmarshal(out, &t1)
 	if t1.StatusCategory != "doing" {
 		t.Fatalf("claim: %s", out)
 	}
 	sid := "0b9c6a52-3f1e-4b7a-9c2d-1e2f3a4b5c6d"
-	code, out, _ = e.req("POST", "/tasks/"+t1.Key+"/runs", `{"session_id":"`+sid+`","mode":"new","attempt":1}`, k)
+	code, out, _ = e.req("POST", "/gigs/"+t1.Key+"/runs", `{"session_id":"`+sid+`","mode":"new","attempt":1}`, k)
 	e.ok(code, out, 201)
 	var rd RunDetail
 	_ = json.Unmarshal(out, &rd)
 	code, out, _ = e.req("POST", fmt.Sprintf("/runs/%d/progress", rd.ID), `{"pct":50,"note":"drafting"}`, k)
 	e.ok(code, out, 200)
 	// lists carry the latest run in brief (a board card shows it), and the progress note is live news
-	findIn := func(path string, c cred) *store.Task {
+	findIn := func(path string, c cred) *store.Gig {
 		t.Helper()
 		code, out, _ := e.req("GET", path, "", c)
 		e.ok(code, out, 200)
-		var l TaskList
+		var l GigList
 		_ = json.Unmarshal(out, &l)
 		for _, x := range l.Items {
 			if x.ID == t1.ID {
 				return x
 			}
 		}
-		t.Fatalf("%s: task %s missing", path, t1.Key)
+		t.Fatalf("%s: gig %s missing", path, t1.Key)
 		return nil
 	}
-	if lt := findIn("/workspaces/current/tasks", k); lt.LastRun == nil || lt.LastRun.Status != "running" || lt.LastRun.ProgressNote == nil || *lt.LastRun.ProgressNote != "drafting" {
+	if lt := findIn("/workspaces/current/gigs", k); lt.LastRun == nil || lt.LastRun.Status != "running" || lt.LastRun.ProgressNote == nil || *lt.LastRun.ProgressNote != "drafting" {
 		t.Fatalf("last_run in list: %+v", lt.LastRun)
 	}
 	if acts := e.allChanges("current", k, 100); acts[len(acts)-1].Action != "run.progress" {
@@ -441,10 +441,10 @@ func TestRunnerFlow(t *testing.T) {
 	e.ok(code, out, 200)
 	var fr FinishResult
 	_ = json.Unmarshal(out, &fr)
-	if fr.Task.StatusCategory != "waiting" || fr.Run.Status != "needs_human" || fr.Task.CostUSDTotal != 0.44 {
+	if fr.Gig.StatusCategory != "waiting" || fr.Run.Status != "needs_human" || fr.Gig.CostUSDTotal != 0.44 {
 		t.Fatalf("finish: %s", out)
 	}
-	if lt := findIn(fmt.Sprintf("/workspaces/%d/tasks", t1.WorkspaceID), e.ada()); lt.Question == nil || lt.Question.Text != "Siren or **chime**?" || lt.LastRun.Status != "needs_human" {
+	if lt := findIn(fmt.Sprintf("/workspaces/%d/gigs", t1.WorkspaceID), e.ada()); lt.Question == nil || lt.Question.Text != "Siren or **chime**?" || lt.LastRun.Status != "needs_human" {
 		t.Fatalf("question in list: %+v", lt.Question)
 	}
 	code, out, _ = e.req("GET", fmt.Sprintf("/projects/%d/board", t1.ProjectID), "", e.ada())
@@ -458,17 +458,17 @@ func TestRunnerFlow(t *testing.T) {
 		t.Fatalf("inbox: %s", out)
 	}
 	// ada answers with Resume; the runner sees the answer since its report
-	code, out, _ = e.req("POST", "/tasks/"+t1.Key+"/resume", `{"comment_md":"chime please"}`, e.ada())
+	code, out, _ = e.req("POST", "/gigs/"+t1.Key+"/resume", `{"comment_md":"chime please"}`, e.ada())
 	e.ok(code, out, 200)
-	code, out, _ = e.req("GET", fmt.Sprintf("/tasks/%s/comments?since_id=%d", t1.Key, *fr.Run.ReportCommentID), "", k)
+	code, out, _ = e.req("GET", fmt.Sprintf("/gigs/%s/comments?since_id=%d", t1.Key, *fr.Run.ReportCommentID), "", k)
 	e.ok(code, out, 200)
 	var cs struct{ Items []*store.Comment }
 	_ = json.Unmarshal(out, &cs)
 	if len(cs.Items) != 1 || cs.Items[0].BodyMD != "chime please" || !cs.Items[0].AuthorIsAdmin || cs.Items[0].Kind != "resume_request" {
 		t.Fatalf("answer: %s", out)
 	}
-	// nothing else to claim from atlas's or scout's other tasks created by atlas? 204 when empty
-	code, _, _ = e.req("POST", "/workspaces/current/tasks/claim", `{"created_by":["nobody"]}`, k)
+	// nothing else to claim from atlas's or scout's other gigs created by atlas? 204 when empty
+	code, _, _ = e.req("POST", "/workspaces/current/gigs/claim", `{"created_by":["nobody"]}`, k)
 	if code != 204 {
 		t.Fatalf("empty claim: %d", code)
 	}
@@ -489,23 +489,23 @@ func TestRunnerFlow(t *testing.T) {
 func TestMoveBetweenProjectsAndVersions(t *testing.T) {
 	e := newEnv(t)
 	k := e.key("scout")
-	path := fmt.Sprintf("/tasks/%d", e.ids["scout.task"])
+	path := fmt.Sprintf("/gigs/%d", e.ids["scout.gig"])
 	code, out, hdr := e.req("GET", path, "", k)
 	e.ok(code, out, 200)
 	stale := hdr.Get("ETag")
 	code, out, _ = e.req("POST", path+"/move", fmt.Sprintf(`{"project":%d}`, e.ids["scout.p2"]), k)
 	e.ok(code, out, 200)
-	var t1 store.Task
+	var t1 store.Gig
 	_ = json.Unmarshal(out, &t1)
 	if t1.Key != "SID-1" || len(t1.Aliases) != 1 || t1.Aliases[0] != "GIG-1" {
 		t.Fatalf("moved: %s", out)
 	}
 	// the old key still resolves, for this caller only within reach
-	if code, _, _ := e.req("GET", "/tasks/GIG-1", "", k); code != 200 {
+	if code, _, _ := e.req("GET", "/gigs/GIG-1", "", k); code != 200 {
 		t.Fatalf("alias: %d", code)
 	}
-	// ada sees GIG-1 in both workspaces (scout's alias, atlas's task): ambiguous
-	if code, out, _ := e.req("GET", "/tasks/GIG-1", "", e.ada()); code != 409 || !bytes.Contains(out, []byte("ambiguous_key")) {
+	// ada sees GIG-1 in both workspaces (scout's alias, atlas's gig): ambiguous
+	if code, out, _ := e.req("GET", "/gigs/GIG-1", "", e.ada()); code != 409 || !bytes.Contains(out, []byte("ambiguous_key")) {
 		t.Fatalf("ambiguous: %d %s", code, out)
 	}
 	// If-Match with a stale version
@@ -534,7 +534,7 @@ func TestMoveBetweenProjectsAndVersions(t *testing.T) {
 func (e *env) fingerprint(ws int64) string {
 	var parts []string
 	for _, q := range []string{
-		`SELECT group_concat(id || title || status_id || position || version || COALESCE(deleted_at,'') || project_id, '|') FROM tasks WHERE workspace_id = ?`,
+		`SELECT group_concat(id || title || status_id || position || version || COALESCE(deleted_at,'') || project_id, '|') FROM gigs WHERE workspace_id = ?`,
 		`SELECT group_concat(id || body_md || version || COALESCE(deleted_at,''), '|') FROM comments WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || version, '|') FROM labels WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || version, '|') FROM statuses WHERE workspace_id = ?`,
@@ -546,14 +546,14 @@ func (e *env) fingerprint(ws int64) string {
 		`SELECT group_concat(id || template_id || schedule_id || version || COALESCE(deleted_at,''), '|') FROM recurrences WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || version || COALESCE(deleted_at,''), '|') FROM schedules WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || version || COALESCE(deleted_at,''), '|') FROM custom_fields WHERE workspace_id = ?`,
-		`SELECT group_concat(id || name || version || COALESCE(deleted_at,''), '|') FROM task_templates WHERE workspace_id = ?`,
+		`SELECT group_concat(id || name || version || COALESCE(deleted_at,''), '|') FROM gig_templates WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || query, '|') FROM saved_filters WHERE workspace_id = ?`,
 		`SELECT group_concat(id || text || COALESCE(done_at,'') || position, '|') FROM checklist_items WHERE workspace_id = ?`,
-		`SELECT group_concat(from_task_id || to_task_id || kind, '|') FROM task_relations WHERE workspace_id = ?`,
-		`SELECT group_concat(task_id || field_id || value, '|') FROM task_custom_values v JOIN tasks t ON t.id = v.task_id WHERE t.workspace_id = ?`,
-		`SELECT group_concat(id || template_id || schedule_id || worker_id || version || COALESCE(paused_at,'') || COALESCE(run_now_at,'') || COALESCE(deleted_at,''), '|') FROM crons WHERE workspace_id = ?`,
-		`SELECT group_concat(id || name || command || unsandboxed || version || COALESCE(deleted_at,''), '|') FROM cron_templates WHERE workspace_id = ?`,
-		`SELECT group_concat(id || status || COALESCE(output_tail,''), '|') FROM cron_runs WHERE workspace_id = ?`,
+		`SELECT group_concat(from_gig_id || to_gig_id || kind, '|') FROM gig_relations WHERE workspace_id = ?`,
+		`SELECT group_concat(gig_id || field_id || value, '|') FROM gig_custom_values v JOIN gigs t ON t.id = v.gig_id WHERE t.workspace_id = ?`,
+		`SELECT group_concat(id || template_id || schedule_id || worker_id || version || COALESCE(paused_at,'') || COALESCE(run_now_at,'') || COALESCE(deleted_at,''), '|') FROM errands WHERE workspace_id = ?`,
+		`SELECT group_concat(id || name || command || unsandboxed || version || COALESCE(deleted_at,''), '|') FROM errand_templates WHERE workspace_id = ?`,
+		`SELECT group_concat(id || status || COALESCE(output_tail,''), '|') FROM errand_runs WHERE workspace_id = ?`,
 	} {
 		var s sql.NullString
 		if err := e.st.R.QueryRow(q, ws).Scan(&s); err != nil {
@@ -574,10 +574,10 @@ func TestIsolationSweep(t *testing.T) {
 		"{ws}": b, "{p}": fmt.Sprint(e.ids[b+".p"]), "{user}": fmt.Sprint(e.ids[b+".user"]), "{item}": "1",
 	}
 	idFor := map[string]int64{
-		"/tasks/": e.ids[b+".task"], "/comments/": e.ids[b+".comment"], "/runs/": e.ids[b+".run"], "/labels/": e.ids[b+".label"],
+		"/gigs/": e.ids[b+".gig"], "/comments/": e.ids[b+".comment"], "/runs/": e.ids[b+".run"], "/labels/": e.ids[b+".label"],
 		"/statuses/": e.ids[b+".status"], "/keys/": e.ids[b+".key"], "/me/keys/": e.ids[b+".key"], "/users/": e.ids[b+".user"],
 		"/sessions/": 1, "/auth/sessions/": 1, "/groups/": 1, "/fields/": e.ids[b+".field"], "/templates/": e.ids[b+".template"], "/me/filters/": e.ids[b+".filter"], "/recurrences/": e.ids[b+".rec"], "/schedules/": e.ids[b+".sched"],
-		"/crons/": e.ids[b+".cron"], "/cron-templates/": e.ids[b+".crontpl"], "/cron-runs/": e.ids[b+".cronrun"],
+		"/errands/": e.ids[b+".errand"], "/errand-templates/": e.ids[b+".errandtpl"], "/errand-runs/": e.ids[b+".errandrun"],
 	}
 	// scout's key with every non-admin scope: a route must refuse atlas's objects by workspace, not by scope
 	var scopes []string
@@ -593,7 +593,7 @@ func TestIsolationSweep(t *testing.T) {
 	_ = json.Unmarshal(out, &kc)
 	sweepKey := cred{token: kc.Token, listener: "internal"}
 	bodies := `{"title":"pwned","body_md":"pwned","name":"pwned","slug":"pwned","key":"PWN","status":"done","category":"done","role":"member",` +
-		`"scopes":["tasks:read"],"password":"pwned pwned pwned","ids":[1],"comment_md":"pwned","project":` + fmt.Sprint(e.ids[b+".p"]) + `}`
+		`"scopes":["gigs:read"],"password":"pwned pwned pwned","ids":[1],"comment_md":"pwned","project":` + fmt.Sprint(e.ids[b+".p"]) + `}`
 	before := e.fingerprint(e.ids[b+".ws"])
 	var paths []string
 	for p := range doc.Paths {
@@ -643,13 +643,13 @@ func TestIsolationSweep(t *testing.T) {
 		}
 	}
 	// the "current"/slug variants and key-based lookups
-	for _, c := range []struct{ m, p string }{{"GET", "/tasks/GIG-1"}, {"GET", "/workspaces/atlas/summary"}, {"GET", "/workspaces/" + fmt.Sprint(e.ids["atlas.ws"])}} {
+	for _, c := range []struct{ m, p string }{{"GET", "/gigs/GIG-1"}, {"GET", "/workspaces/atlas/summary"}, {"GET", "/workspaces/" + fmt.Sprint(e.ids["atlas.ws"])}} {
 		code, out, _ := e.req(c.m, c.p, "", e.key("scout"))
-		if c.p == "/tasks/GIG-1" {
-			var tk store.Task
+		if c.p == "/gigs/GIG-1" {
+			var tk store.Gig
 			_ = json.Unmarshal(out, &tk)
 			if code != 200 || tk.WorkspaceID != e.ids["scout.ws"] {
-				t.Errorf("GIG-1 must resolve to scout's own task: %d %s", code, out)
+				t.Errorf("GIG-1 must resolve to scout's own gig: %d %s", code, out)
 			}
 			continue
 		}
@@ -658,8 +658,8 @@ func TestIsolationSweep(t *testing.T) {
 		}
 	}
 	// lists never include atlas's objects
-	for _, p := range []string{"/workspaces", "/inbox", "/users", "/me/keys", "/workspaces/current/tasks?q=secret", "/workspaces/current/runs", "/workspaces/current/activity",
-		"/workspaces/current/crons", "/workspaces/current/cron-templates"} {
+	for _, p := range []string{"/workspaces", "/inbox", "/users", "/me/keys", "/workspaces/current/gigs?q=secret", "/workspaces/current/runs", "/workspaces/current/activity",
+		"/workspaces/current/errands", "/workspaces/current/errand-templates"} {
 		code, out, _ := e.req("GET", p, "", sweepKey)
 		if code >= 400 && code != 403 {
 			t.Errorf("GET %s: %d %s", p, code, out)
@@ -685,7 +685,7 @@ func TestOpenAPIServed(t *testing.T) {
 	if err := json.Unmarshal(out, &doc); err != nil || doc["openapi"] == nil {
 		t.Fatalf("openapi: %v", err)
 	}
-	if !bytes.Contains(out, []byte(`"/tasks/{id}/move"`)) {
+	if !bytes.Contains(out, []byte(`"/gigs/{id}/move"`)) {
 		t.Fatal("move missing from OpenAPI")
 	}
 }
@@ -726,7 +726,7 @@ func TestKeyAndSessionBoundaries(t *testing.T) {
 		}
 	}
 	// revoking (or rotating) a key revokes the keys it created
-	code, out, _ = e.req("POST", "/me/keys", `{"name":"child","workspace":"scout","scopes":["tasks:read"]}`, e.key("scout"))
+	code, out, _ = e.req("POST", "/me/keys", `{"name":"child","workspace":"scout","scopes":["gigs:read"]}`, e.key("scout"))
 	e.ok(code, out, 201)
 	var child KeyCreated
 	_ = json.Unmarshal(out, &child)
@@ -739,7 +739,7 @@ func TestKeyAndSessionBoundaries(t *testing.T) {
 	}
 	e.keys["scout"] = rot.Token
 	// a key without comments:read gets no comment text from activity, inbox or search
-	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"ro","user_id":%d,"workspace":"scout","scopes":["workspace:read","tasks:read"],"allowed_listeners":["internal"]}`, e.ids["scout.user"]), e.ada())
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"ro","user_id":%d,"workspace":"scout","scopes":["workspace:read","gigs:read"],"allowed_listeners":["internal"]}`, e.ids["scout.user"]), e.ada())
 	e.ok(code, out, 201)
 	var ro KeyCreated
 	_ = json.Unmarshal(out, &ro)
@@ -747,9 +747,9 @@ func TestKeyAndSessionBoundaries(t *testing.T) {
 	if code, _, _ := e.req("GET", "/workspaces/current/activity", "", rk); code != 403 {
 		t.Errorf("workspace activity without comments:read: %d", code)
 	}
-	for _, p := range []string{"/inbox", "/workspaces/current/tasks?q=secret+comment", "/workspaces/current/tasks"} {
+	for _, p := range []string{"/inbox", "/workspaces/current/gigs?q=secret+comment", "/workspaces/current/gigs"} {
 		code, out, _ := e.req("GET", p, "", rk)
-		if code != 200 || bytes.Contains(out, []byte("secret comment")) || bytes.Contains(out, []byte("scout secret task")) && strings.Contains(p, "q=") {
+		if code != 200 || bytes.Contains(out, []byte("secret comment")) || bytes.Contains(out, []byte("scout secret gig")) && strings.Contains(p, "q=") {
 			t.Errorf("GET %s leaked comment text: %d %s", p, code, out)
 		}
 	}
@@ -777,25 +777,25 @@ func TestForwardedForAllLines(t *testing.T) {
 func TestListFiltersApply(t *testing.T) {
 	e := newEnv(t)
 	k := e.key("scout")
-	_, _, _ = e.req("POST", fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"]), `{"title":"findme please","priority":4,"labels":["x"]}`, k)
+	_, _, _ = e.req("POST", fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"]), `{"title":"findme please","priority":4,"labels":["x"]}`, k)
 	count := func(p string) int {
 		_, out, _ := e.req("GET", p, "", k)
-		var l TaskList
+		var l GigList
 		_ = json.Unmarshal(out, &l)
 		return len(l.Items)
 	}
 	for p, want := range map[string]int{
-		"/workspaces/current/tasks":                                  2,
-		"/workspaces/current/tasks?q=findme":                         1,
-		"/workspaces/current/tasks?q=zzznomatch":                     0,
-		"/workspaces/current/tasks?priority_min=4":                   1,
-		"/workspaces/current/tasks?label=x":                          1,
-		"/workspaces/current/tasks?category=done":                    0,
-		"/workspaces/current/tasks?limit=1":                          1,
-		fmt.Sprintf("/projects/%d/tasks?q=findme", e.ids["scout.p"]): 1,
+		"/workspaces/current/gigs":                                  2,
+		"/workspaces/current/gigs?q=findme":                         1,
+		"/workspaces/current/gigs?q=zzznomatch":                     0,
+		"/workspaces/current/gigs?priority_min=4":                   1,
+		"/workspaces/current/gigs?label=x":                          1,
+		"/workspaces/current/gigs?category=done":                    0,
+		"/workspaces/current/gigs?limit=1":                          1,
+		fmt.Sprintf("/projects/%d/gigs?q=findme", e.ids["scout.p"]): 1,
 	} {
 		if got := count(p); got != want {
-			t.Errorf("%s: %d tasks, want %d", p, got, want)
+			t.Errorf("%s: %d gigs, want %d", p, got, want)
 		}
 	}
 }
@@ -883,7 +883,7 @@ func TestThemesAndAvatar(t *testing.T) {
 // a page served from that same name, but not a page of one name writing to the other.
 func TestCSRFOtherAllowedName(t *testing.T) {
 	e := newEnv(t)
-	p := fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"])
+	p := fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"])
 	post := func(host, origin string) int {
 		r := httptest.NewRequest("POST", "https://"+host+Prefix+p, strings.NewReader(`{"title":"x"}`))
 		r.Header.Set("Content-Type", "application/json")
@@ -912,55 +912,55 @@ func TestCSRFOtherAllowedName(t *testing.T) {
 	}
 }
 
-// TestQuestionOnWaitingCards: a waiting task carries the agent's latest question or report until
-// someone answers it; archived tasks can't be resumed.
+// TestQuestionOnWaitingCards: a waiting gig carries the agent's latest question or report until
+// someone answers it; archived gigs can't be resumed.
 func TestQuestionOnWaitingCards(t *testing.T) {
 	e := newEnv(t)
 	scout := e.key("scout")
-	code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/tasks", e.ids["scout.p"]), `{"title":"Pick a colour"}`, scout)
+	code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"]), `{"title":"Pick a colour"}`, scout)
 	e.ok(code, out, 201)
-	var tk store.Task
+	var tk store.Gig
 	_ = json.Unmarshal(out, &tk)
-	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/move", `{"category":"waiting"}`, scout)
+	code, out, _ = e.req("POST", "/gigs/"+tk.Key+"/move", `{"category":"waiting"}`, scout)
 	e.ok(code, out, 200)
 	question := func() *store.QuestionBrief {
 		t.Helper()
-		code, out, _ := e.req("GET", fmt.Sprintf("/projects/%d/tasks", tk.ProjectID), "", e.ada())
+		code, out, _ := e.req("GET", fmt.Sprintf("/projects/%d/gigs", tk.ProjectID), "", e.ada())
 		e.ok(code, out, 200)
-		var l TaskList
+		var l GigList
 		_ = json.Unmarshal(out, &l)
 		for _, x := range l.Items {
 			if x.ID == tk.ID {
 				return x.Question
 			}
 		}
-		t.Fatal("task missing")
+		t.Fatal("gig missing")
 		return nil
 	}
 	if q := question(); q != nil {
 		t.Fatalf("question before any comment: %+v", q)
 	}
-	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/comments", `{"body_md":"Blue or green?","kind":"report"}`, scout)
+	code, out, _ = e.req("POST", "/gigs/"+tk.Key+"/comments", `{"body_md":"Blue or green?","kind":"report"}`, scout)
 	e.ok(code, out, 201)
 	if q := question(); q == nil || q.Text != "Blue or green?" || q.Kind != "report" {
 		t.Fatalf("report as the question: %+v", q)
 	}
 	// the agent's own follow-up doesn't answer it
-	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/comments", `{"body_md":"(either is fine)"}`, scout)
+	code, out, _ = e.req("POST", "/gigs/"+tk.Key+"/comments", `{"body_md":"(either is fine)"}`, scout)
 	e.ok(code, out, 201)
 	if q := question(); q == nil || q.Text != "Blue or green?" {
 		t.Fatalf("question gone after its author's follow-up: %+v", q)
 	}
-	code, out, _ = e.req("POST", "/tasks/"+tk.Key+"/comments", `{"body_md":"green"}`, e.ada())
+	code, out, _ = e.req("POST", "/gigs/"+tk.Key+"/comments", `{"body_md":"green"}`, e.ada())
 	e.ok(code, out, 201)
 	if q := question(); q != nil {
 		t.Fatalf("answered question still shown: %+v", q)
 	}
 	csrf := map[string]string{"X-Gigg-CSRF": "1"}
-	code, out, _ = e.reqH("POST", "/tasks/"+tk.Key+"/archive", "", e.ada(), csrf)
+	code, out, _ = e.reqH("POST", "/gigs/"+tk.Key+"/archive", "", e.ada(), csrf)
 	e.ok(code, out, 200)
-	if code, out, _ := e.req("POST", "/tasks/"+tk.Key+"/resume", `{}`, e.ada()); code != 409 {
-		t.Fatalf("resume of an archived task: %d %s", code, out)
+	if code, out, _ := e.req("POST", "/gigs/"+tk.Key+"/resume", `{}`, e.ada()); code != 409 {
+		t.Fatalf("resume of an archived gig: %d %s", code, out)
 	}
 }
 

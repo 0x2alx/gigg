@@ -1,34 +1,34 @@
-// The task form: New task, New/Edit recurring task, New/Edit template. It renders the same
-// TaskEditor as the task panel (one component: the same boxes, rows and controls); the form keeps
+// The gig form: New gig, New/Edit recurring gig, New/Edit template. It renders the same
+// GigEditor as the gig panel (one component: the same boxes, rows and controls); the form keeps
 // the changes until Create/Save, and adds the template picker, Repeat and the footer.
-// With "Repeat" set, submitting creates a recurring task (the server then creates one task per
-// occurrence) instead of a single task. Its task content is a template: its own one (made from this
+// With "Repeat" set, submitting creates a recurring gig (the server then creates one gig per
+// occurrence) instead of a single gig. Its gig content is a template: its own one (made from this
 // form), or a picked template left unchanged, which it then uses as is.
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { runBody, type RunSettings } from "./runsettings";
-import { api, ApiError, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isTaskSchedule, type TaskSchedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubtask } from "./api";
+import { api, ApiError, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isGigSchedule, type GigSchedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubgig } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { assignable } from "./fields";
 import { cleanCustom, normSubs, sameAsTemplate } from "./items";
 import { RepeatFields, RfRow } from "./RepeatFields";
 import { repeatOfSchedule, sameTiming } from "./scheduleTiming";
-import { ChecklistDraft, DependenciesDraft, FieldsDraft, Row, SubtasksDraft, type DraftDep } from "./TaskSections";
-import { TaskEditor, type EditorMode } from "./TaskEditor";
+import { ChecklistDraft, DependenciesDraft, FieldsDraft, Row, SubgigsDraft, type DraftDep } from "./GigSections";
+import { GigEditor, type EditorMode } from "./GigEditor";
 import { defaultRepeat, fmtInstant, localTZ, repeatFromRule, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
 import { Modal } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
-export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, schedule, template, repeat: initialRepeat, initialStatus, initialCategory, onClose, onCreated }: {
+export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedule, template, repeat: initialRepeat, initialStatus, initialCategory, onClose, onCreated }: {
   ws: WorkspaceTree; // where the form starts (with projectId)
   projectId: number;
   statuses: Status[]; // the start project's open statuses ([]: fetched)
-  initialStatus?: number; // a new task starts in this status (the column its "+" was clicked in)
+  initialStatus?: number; // a new gig starts in this status (the column its "+" was clicked in)
   initialCategory?: Category; // ...or, in another project, the first status of this stage
   labels: Tag[]; // the start workspace's labels ([]: fetched)
   choices?: WorkspaceTree[]; // the workspaces (and their projects) the form may move it to; default: just ws
   schedule?: Recurrence; // edit this schedule
-  template?: Template | "new"; // edit (or create) a template instead of a task
+  template?: Template | "new"; // edit (or create) a template instead of a gig
   repeat?: RepeatState["freq"]; // preset the Repeat control (new schedule)
   onClose: () => void;
   onCreated: (message?: string) => void;
@@ -46,14 +46,14 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const [tplName, setTplName] = useState(tpl?.name ?? "");
   const [tplAnyProject, setTplAnyProject] = useState(tpl ? tpl.project_id === null : false);
   const [checklist, setChecklist] = useState<string[]>(schedule?.checklist ?? tpl?.checklist ?? []);
-  const [subtasks, setSubtasks] = useState<TemplateSubtask[]>(normSubs(schedule?.subtasks ?? tpl?.subtasks ?? []));
+  const [subgigs, setSubgigs] = useState<TemplateSubgig[]>(normSubs(schedule?.subgigs ?? tpl?.subgigs ?? []));
   const [deps, setDeps] = useState<DraftDep[]>([]);
   const [custom, setCustom] = useState<Record<string, unknown>>(schedule?.custom ?? tpl?.custom ?? {});
   const [fields, setFields] = useState<CustomField[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [picked, setPicked] = useState<Template | null>(null);
-  const [schedules, setSchedules] = useState<TaskSchedule[]>([]);
-  const [pickedSchedule, setPickedSchedule] = useState<TaskSchedule | null>(null);
+  const [schedules, setSchedules] = useState<GigSchedule[]>([]);
+  const [pickedSchedule, setPickedSchedule] = useState<GigSchedule | null>(null);
   const [saveAs, setSaveAs] = useState<string | null>(null); // the name being typed for "Save as template"
   const [note, setNote] = useState("");
   const [projectStatuses, setProjectStatuses] = useState<Status[]>(statuses);
@@ -63,7 +63,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const [status, setStatus] = useState<number>(
     (initialStatus !== undefined && statuses.some((s) => s.id === initialStatus) ? initialStatus : undefined) ?? statuses.find((s) => s.category === "todo")?.id ?? statuses[0]?.id ?? 0,
   );
-  const [taskLabels, setTaskLabels] = useState<string[]>(schedule?.labels ?? tpl?.labels ?? []);
+  const [gigLabels, setGigLabels] = useState<string[]>(schedule?.labels ?? tpl?.labels ?? []);
   const [assignees, setAssignees] = useState<number[]>(schedule?.assignees ?? tpl?.assignees ?? []);
   const [due, setDue] = useState<number | null>(null);
   const [start, setStart] = useState<number | null>(null);
@@ -75,7 +75,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const [err, setErr] = useState("");
   // the typed content when the form opened: closing by ×, Esc or the backdrop with more than that asks
   // once ("close again to discard") instead of losing the text; Cancel closes at once
-  const typed = JSON.stringify([title, description, checklist, subtasks, deps]);
+  const typed = JSON.stringify([title, description, checklist, subgigs, deps]);
   const typed0 = useRef(typed);
   const [discardAsked, setDiscardAsked] = useState(false);
   const guardedClose = () => {
@@ -89,7 +89,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const [busy, setBusy] = useState(false);
 
   // the project's statuses: the ones given for the start project, else fetched (not for a template or a
-  // recurring task being edited: no status there). The status picked stays when the project has it,
+  // recurring gig being edited: no status there). The status picked stays when the project has it,
   // else the same stage's first (else To-Do, else the first). Until they're in, Create waits: the old
   // project's status would be refused by the new one.
   const givenStatuses = useRef(statuses);
@@ -130,7 +130,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     };
   }, [project, projectId, statusKey, initialCategory, initialStatus, noStatus]);
   const statusReady = statusesOf === project;
-  // a template for one project doesn't follow the task to another project
+  // a template for one project doesn't follow the gig to another project
   useEffect(() => {
     setPicked((t) => (t && t.project_id !== null && t.project_id !== project && !schedule ? null : t));
   }, [project, schedule]);
@@ -185,7 +185,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
       (r) => {
         if (!live) return;
         setTemplates(r.items);
-        // editing: the recurring task's own template is the one picked
+        // editing: the recurring gig's own template is the one picked
         if (schedule) setPicked(r.items.find((t) => t.id === schedule.template_id) ?? null);
       },
       () => live && setTemplates([]),
@@ -201,7 +201,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     api.schedules(ws.id).then(
       (r) => {
         if (!live) return;
-        const items = r.items.filter(isTaskSchedule); // minutes/hours timings are for crons
+        const items = r.items.filter(isGigSchedule); // minutes/hours timings are for errands
         setSchedules(items);
         if (schedule) setPickedSchedule(items.find((x) => x.id === schedule.schedule_id) ?? null);
       },
@@ -216,8 +216,8 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   const repeating = !tplMode && !!repeat.freq;
   const problem = run.tools_error ? `Allowed tools: “${run.tools_error}” isn't one permission rule.` : tplMode ? null : repeatProblem(repeat);
   const canTemplates = hasCap(me, "templates", ws.id);
-  // a picked template (editing: the current one), unchanged: the recurring task uses it as is
-  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, taskLabels, assignees, color, run, checklist, subtasks, custom });
+  // a picked template (editing: the current one), unchanged: the recurring gig uses it as is
+  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, gigLabels, assignees, color, run, checklist, subgigs, custom });
   // likewise a picked schedule whose timing wasn't changed
   const usesSchedule = repeating && !!pickedSchedule && sameTiming(repeat, pickedSchedule);
   const pickSchedule = (id: number) => {
@@ -225,7 +225,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     setPickedSchedule(x);
     if (x) setRepeat((r) => repeatOfSchedule(x, r));
   };
-  const canCreate = hasCap(me, "create_tasks", ws.id);
+  const canCreate = hasCap(me, "create_gigs", ws.id);
   const canRepeat = editing || hasCap(me, "schedules", ws.id);
 
   // pick: fills the form from a template (the user can still change everything).
@@ -235,22 +235,22 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     setTitle(t.title);
     setDescription(t.description_md);
     setPriority(t.priority);
-    setTaskLabels(t.labels ?? []);
+    setGigLabels(t.labels ?? []);
     setAssignees(t.assignees ?? []);
     setColor(t.color);
     setRun({ model: t.model ?? "", effort: t.effort ?? "", always_run: !!t.always_run, allowed_tools: t.allowed_tools ?? [] });
     setChecklist(t.checklist ?? []);
-    setSubtasks(normSubs(t.subtasks ?? []));
+    setSubgigs(normSubs(t.subgigs ?? []));
     setCustom(t.custom ?? {});
   };
 
   const templateBody = (name: string): TemplateBody => {
-    const b: TemplateBody = { name, title, description_md: description, priority, labels: taskLabels, assignees, ...runBody(run) };
+    const b: TemplateBody = { name, title, description_md: description, priority, labels: gigLabels, assignees, ...runBody(run) };
     if (tpl) b.allowed_tools = run.allowed_tools; // an edit sends the list, so clearing it clears it
     if (!(tplMode && tplAnyProject)) b.project_id = project;
     if (color) b.color = color;
     if (checklist.length) b.checklist = checklist;
-    if (subtasks.length) b.subtasks = normSubs(subtasks);
+    if (subgigs.length) b.subgigs = normSubs(subgigs);
     const c = cleanCustom(custom);
     if (c) b.custom = c;
     return b;
@@ -299,7 +299,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    // a checklist item or subtask typed but not added yet would be lost: point at it instead
+    // a checklist item or subgig typed but not added yet would be lost: point at it instead
     const pending = (e.currentTarget as HTMLFormElement).querySelector<HTMLInputElement>(".ck-add[data-dirty], .quick-add input[data-dirty], .dep-add input[data-dirty]");
     if (pending) {
       setErr(`“${pending.value.trim()}” isn't added yet: press Enter to add it, or clear the box.`);
@@ -317,8 +317,8 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     setErr("");
     const fail = (e: unknown) => {
       if (e instanceof ApiError && e.status === 412)
-        setErr(`Someone changed this ${tplMode ? "template" : "recurring task"} meanwhile. Close and reopen it to see their version.`);
-      else setErr(e instanceof ApiError ? e.message : repeating ? "Couldn't save the recurring task." : "Couldn't create the task.");
+        setErr(`Someone changed this ${tplMode ? "template" : "recurring gig"} meanwhile. Close and reopen it to see their version.`);
+      else setErr(e instanceof ApiError ? e.message : repeating ? "Couldn't save the recurring gig." : "Couldn't create the gig.");
     };
     let done: Promise<string | undefined>;
     if (tplMode) {
@@ -331,37 +331,37 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
             title,
             description_md: description,
             priority,
-            labels: taskLabels,
+            labels: gigLabels,
             assignees,
             ...(color ? { color } : {}),
             ...runBody(run),
             ...(editing ? { model: run.model, effort: run.effort, always_run: run.always_run, allowed_tools: run.allowed_tools } : {}),
             // on an edit, unchanged lists are left out (kept as the template has them)
             ...(!schedule || JSON.stringify(checklist) !== JSON.stringify(schedule.checklist ?? []) ? { checklist } : {}),
-            ...(!schedule || JSON.stringify(normSubs(subtasks)) !== JSON.stringify(normSubs(schedule.subtasks ?? [])) ? { subtasks: normSubs(subtasks) } : {}),
+            ...(!schedule || JSON.stringify(normSubs(subgigs)) !== JSON.stringify(normSubs(schedule.subgigs ?? [])) ? { subgigs: normSubs(subgigs) } : {}),
             ...(!schedule || JSON.stringify(cleanCustom(custom) ?? {}) !== JSON.stringify(cleanCustom(schedule.custom ?? {}) ?? {}) ? { custom: cleanCustom(custom) ?? {} } : {}),
           };
       // the timing fields go along; with a schedule_id the server ignores them
       const body: RecurrenceBody = { ...content, ...repeatRule(repeat), ...(usesSchedule ? { schedule_id: pickedSchedule!.id } : {}) };
       done = (schedule ? api.putRecurrence(schedule.id, body, schedule.version) : api.createRecurrence(project, body)).then((r) =>
-        r.next_at ? `Recurring task saved · next ${fmtInstant(r.next_at, localTZ())}` : "Recurring task saved",
+        r.next_at ? `Recurring gig saved · next ${fmtInstant(r.next_at, localTZ())}` : "Recurring gig saved",
       );
     } else {
       done = api
-        .createTask(project, {
+        .createGig(project, {
           title,
           description_md: description,
           priority,
           status,
-          labels: taskLabels,
+          labels: gigLabels,
           assignees,
           ...(color ? { color } : {}),
           ...(due !== null ? { due_at: due } : {}),
           ...(start !== null ? { start_at: start } : {}),
           ...(notAfter !== null ? { not_after: notAfter } : {}),
           ...(checklist.length ? { checklist } : {}),
-          ...(subtasks.length ? { subtasks: normSubs(subtasks) } : {}),
-          ...(deps.length ? { relations: deps.map((d) => ({ task: String(d.id), direction: d.dir })) } : {}),
+          ...(subgigs.length ? { subgigs: normSubs(subgigs) } : {}),
+          ...(deps.length ? { relations: deps.map((d) => ({ gig: String(d.id), direction: d.dir })) } : {}),
           ...(cleanCustom(custom) ? { custom: cleanCustom(custom) } : {}),
           ...runBody(run),
         })
@@ -377,7 +377,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
       .finally(() => setBusy(false));
   };
 
-  const heading = tplMode ? (tpl ? "Edit template" : "New template") : editing ? "Edit recurring task" : repeating ? "New recurring task" : "New task";
+  const heading = tplMode ? (tpl ? "Edit template" : "New template") : editing ? "Edit recurring gig" : repeating ? "New recurring gig" : "New gig";
   const moveWs = (id: number) => {
     const w = places.find((x) => x.id === id);
     if (w?.projects[0]) {
@@ -386,26 +386,26 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
     }
   };
   const canRelations = hasCap(me, "relations", ws.id);
-  const single = !tplMode && !editing && !repeating; // one task, made now
+  const single = !tplMode && !editing && !repeating; // one gig, made now
   const alwaysOk = hasCap(me, "always_run", ws.id);
   const mode: EditorMode = tplMode ? "template" : repeating || editing ? "recurring" : "new";
   return (
-    <Modal title={heading} onClose={guardedClose} wide expandable help={<HelpButton topic={repeating || editing ? "recurring" : "tasks"} label={repeating || editing ? "Help: recurring tasks" : "Help: tasks"} />}>
+    <Modal title={heading} onClose={guardedClose} wide expandable help={<HelpButton topic={repeating || editing ? "recurring" : "gigs"} label={repeating || editing ? "Help: recurring gigs" : "Help: gigs"} />}>
       <form className="tm-form" onSubmit={submit} aria-label={heading}>
         {tpl && (tpl.recurring ?? 0) > 0 && (
           <p className="small muted sched-tpl" role="note">
-            ⟳ {tpl.recurring} recurring task{tpl.recurring === 1 ? " creates its" : "s create their"} tasks from this template: changes apply to the tasks they create from now on.
+            ⟳ {tpl.recurring} recurring gig{tpl.recurring === 1 ? " creates its" : "s create their"} gigs from this template: changes apply to the gigs they create from now on.
           </p>
         )}
         {editing && schedule && <ScheduleTemplateNote schedule={schedule} />}
-        <TaskEditor
+        <GigEditor
           mode={mode}
-          v={{ title, description_md: description, priority, labels: taskLabels, assignees, color, start_at: start, due_at: due, not_after: notAfter, project, status, run }}
+          v={{ title, description_md: description, priority, labels: gigLabels, assignees, color, start_at: start, due_at: due, not_after: notAfter, project, status, run }}
           set={(c) => {
             if (c.title !== undefined) setTitle(c.title);
             if (c.description_md !== undefined) setDescription(c.description_md);
             if (c.priority !== undefined) setPriority(c.priority);
-            if (c.labels) setTaskLabels(c.labels);
+            if (c.labels) setGigLabels(c.labels);
             if (c.assignees) setAssignees(c.assignees);
             if (c.color !== undefined) setColor(c.color);
             if (c.start_at !== undefined) setStart(c.start_at);
@@ -441,7 +441,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
                   {!tplMode && templates.length > 0 && (
                     <Row label={editing ? "Template" : "From template"} wide className="tpl-pick">
                       <select value={picked?.id ?? ""} onChange={(e) => pick(templates.find((t) => t.id === Number(e.target.value)) ?? null)} aria-label="From template">
-                        {!editing && <option value="">— blank task —</option>}
+                        {!editing && <option value="">— blank gig —</option>}
                         {templates.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.name}
@@ -458,7 +458,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
                       {picked && repeating && !editing && (
                         <span className="muted small rf-note">
                           {usesPicked
-                            ? `Uses template “${picked.name}” itself: later edits to that template change the tasks it creates. Change anything here to save it as a new template instead.`
+                            ? `Uses template “${picked.name}” itself: later edits to that template change the gigs it creates. Change anything here to save it as a new template instead.`
                             : `Changed from “${picked.name}”: saved as a new template with what's here.`}
                         </span>
                       )}
@@ -475,14 +475,14 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
           }
           leftSecs={
             <>
-              <ChecklistDraft items={checklist} onChange={setChecklist} note={repeating ? "Every task it creates gets this checklist." : tplMode ? "Every task made from the template gets this checklist." : undefined} />
-              <SubtasksDraft
-                items={subtasks}
-                onChange={setSubtasks}
+              <ChecklistDraft items={checklist} onChange={setChecklist} note={repeating ? "Every gig it creates gets this checklist." : tplMode ? "Every gig made from the template gets this checklist." : undefined} />
+              <SubgigsDraft
+                items={subgigs}
+                onChange={setSubgigs}
                 canGate={canRelations}
                 note={
                   repeating || tplMode
-                    ? `Every task ${repeating ? "it creates" : "made from the template"} gets these subtasks, each made like it (priority, assignees, window, agent run). Tick “blocks parent” to make the task wait for one.`
+                    ? `Every gig ${repeating ? "it creates" : "made from the template"} gets these subgigs, each made like it (priority, assignees, window, agent run). Tick “blocks parent” to make the gig wait for one.`
                     : undefined
                 }
               />
@@ -559,7 +559,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
             Cancel
           </button>
           <button type="submit" className="button" disabled={busy || (repeating && !!problem) || (single && !statusReady)}>
-            {tplMode ? "Save template" : editing ? "Save recurring task" : repeating ? "⟳ Create recurring task" : "Create task"}
+            {tplMode ? "Save template" : editing ? "Save recurring gig" : repeating ? "⟳ Create recurring gig" : "Create gig"}
           </button>
         </div>
       </form>
@@ -567,7 +567,7 @@ export function TaskModal({ ws: ws0, projectId, statuses, labels, choices, sched
   );
 }
 
-// lastProject / rememberProject: the project the last new task went to (this device), where the next
+// lastProject / rememberProject: the project the last new gig went to (this device), where the next
 // one starts when the board shows several.
 const LAST_KEY = "gigg:last-project";
 export function lastProject(): number | null {
@@ -586,17 +586,17 @@ function rememberProject(id: number) {
   }
 }
 
-// ScheduleTemplateNote: where an edited recurring task's content and timing live, and who shares them.
+// ScheduleTemplateNote: where an edited recurring gig's content and timing live, and who shares them.
 function ScheduleTemplateNote({ schedule: s }: { schedule: Recurrence }) {
   const { me } = useApp();
   const tOthers = Math.max(0, (s.template_uses ?? 1) - 1);
   const sOthers = Math.max(0, (s.schedule_uses ?? 1) - 1);
-  const others = (n: number) => `${n} other recurring task${n === 1 ? "" : "s"}`;
+  const others = (n: number) => `${n} other recurring gig${n === 1 ? "" : "s"}`;
   return (
     <p className="small muted sched-tpl" role="note">
       <Icon name="template" /> Content: template <strong>“{s.template_name}”</strong>
       {tOthers > 0 && <> (also used by {others(tOthers)}: content changes apply to them too)</>}
-      {s.template_created_by !== me.user.id && !hasCap(me, "templates", s.workspace_id) && <> · changing the content needs the Task templates permission</>}
+      {s.template_created_by !== me.user.id && !hasCap(me, "templates", s.workspace_id) && <> · changing the content needs the Gig templates permission</>}
       <br /><Icon name="clock" /> Timing: schedule <strong>“{s.schedule_name}”</strong>
       {sOthers > 0 && <> (also used by {others(sOthers)}: timing changes move them too)</>}
     </p>

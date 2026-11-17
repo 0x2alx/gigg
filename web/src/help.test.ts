@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { helpPage, type HelpTopic } from "./help";
 
-const TOPICS: HelpTopic[] = ["board", "tasks", "agents", "recurring", "dashboard", "inbox", "views", "themes", "profile", "admin"];
+const TOPICS: HelpTopic[] = ["board", "gigs", "agents", "recurring", "dashboard", "inbox", "views", "themes", "profile", "admin"];
 
 describe("help pages", () => {
   it("every section has its guide page, titled by its first heading, without screenshots or file links", () => {

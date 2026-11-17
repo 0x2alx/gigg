@@ -14,7 +14,7 @@ describe("schedules", () => {
     expect(sameTiming(s, fri)).toBe(true);
     expect(scheduleBody(" Fridays ", s)).toEqual({ name: "Fridays", freq: "weekly", interval: 1, tz: "UTC", window_start: "16:00", window_minutes: 60, lead_minutes: 15, weekdays: [5] });
   });
-  it("picking a schedule keeps the recurring task's own settings", () => {
+  it("picking a schedule keeps the recurring gig's own settings", () => {
     const base = { ...defaultRepeat(), freq: "daily" as const, endMode: "count" as const, count: 3, overlap: "create" as const, paused: true };
     const s = repeatOfSchedule(fri, base);
     expect(sameTiming(s, fri)).toBe(true);

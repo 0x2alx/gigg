@@ -17,7 +17,7 @@ func TestWorkItems(t *testing.T) {
 	pid := e.ids["scout.p"]
 	mk := func(title string, c cred) map[string]any {
 		t.Helper()
-		code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/tasks", pid), `{"title":"`+title+`","checklist":["one","two"]}`, c)
+		code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/gigs", pid), `{"title":"`+title+`","checklist":["one","two"]}`, c)
 		e.ok(code, out, 201)
 		var m map[string]any
 		_ = json.Unmarshal(out, &m)
@@ -30,23 +30,23 @@ func TestWorkItems(t *testing.T) {
 	}
 
 	// blocks: b can't be claimed while a is open; cycles refused
-	code, out, _ := e.req("POST", "/tasks/"+ak+"/relations", `{"task":"`+bk+`","direction":"blocks"}`, scout)
+	code, out, _ := e.req("POST", "/gigs/"+ak+"/relations", `{"gig":"`+bk+`","direction":"blocks"}`, scout)
 	e.ok(code, out, 200)
-	if code, out, _ := e.req("POST", "/tasks/"+bk+"/relations", `{"task":"`+ak+`","direction":"blocks"}`, scout); code != 409 {
+	if code, out, _ := e.req("POST", "/gigs/"+bk+"/relations", `{"gig":"`+ak+`","direction":"blocks"}`, scout); code != 409 {
 		t.Fatalf("cycle: %d %s", code, out)
 	}
-	code, out, _ = e.req("GET", "/tasks/"+bk, "", scout)
+	code, out, _ = e.req("GET", "/gigs/"+bk, "", scout)
 	if !strings.Contains(string(out), `"blocked_by":1`) {
 		t.Fatalf("blocked_by: %s", out)
 	}
-	code, out, _ = e.req("GET", "/tasks/"+bk+"/relations", "", scout)
+	code, out, _ = e.req("GET", "/gigs/"+bk+"/relations", "", scout)
 	if code != 200 || !strings.Contains(string(out), `"kind":"blocks"`) || !strings.Contains(string(out), `"title":"blocker"`) {
 		t.Fatalf("relations: %d %s", code, out)
 	}
 	claimSeq := func() []string {
 		var keys []string
 		for i := 0; i < 5; i++ {
-			code, out, _ := e.req("POST", "/workspaces/scout/tasks/claim", `{}`, scout)
+			code, out, _ := e.req("POST", "/workspaces/scout/gigs/claim", `{}`, scout)
 			if code == 204 {
 				break
 			}
@@ -62,15 +62,15 @@ func TestWorkItems(t *testing.T) {
 	got := claimSeq()
 	for _, k := range got {
 		if k == bk {
-			t.Fatalf("claimed a blocked task: %v", got)
+			t.Fatalf("claimed a blocked gig: %v", got)
 		}
 	}
-	if code, out, _ := e.req("GET", "/workspaces/scout/tasks?blocked=true", "", scout); code != 200 || !strings.Contains(string(out), bk) {
+	if code, out, _ := e.req("GET", "/workspaces/scout/gigs?blocked=true", "", scout); code != 200 || !strings.Contains(string(out), bk) {
 		t.Fatalf("blocked filter: %d %s", code, out)
 	}
 
 	// checklist: tick, move, delete; counts follow
-	code, out, _ = e.req("GET", "/tasks/"+ak+"/checklist", "", scout)
+	code, out, _ = e.req("GET", "/gigs/"+ak+"/checklist", "", scout)
 	var cl struct {
 		Items []struct {
 			ID int64 `json:"id"`
@@ -80,28 +80,28 @@ func TestWorkItems(t *testing.T) {
 	if len(cl.Items) != 2 {
 		t.Fatalf("checklist: %s", out)
 	}
-	code, out, _ = e.req("PATCH", fmt.Sprintf("/tasks/%s/checklist/%d", ak, cl.Items[1].ID), `{"done":true,"after":0}`, scout)
+	code, out, _ = e.req("PATCH", fmt.Sprintf("/gigs/%s/checklist/%d", ak, cl.Items[1].ID), `{"done":true,"after":0}`, scout)
 	e.ok(code, out, 200)
 	if !strings.Contains(string(out), `"checklist_done":1`) {
 		t.Fatalf("tick: %s", out)
 	}
-	code, out, _ = e.req("GET", "/tasks/"+ak+"/checklist", "", scout)
+	code, out, _ = e.req("GET", "/gigs/"+ak+"/checklist", "", scout)
 	if !strings.Contains(string(out), fmt.Sprintf(`"items":[{"id":%d`, cl.Items[1].ID)) {
 		t.Fatalf("move to top: %s", out)
 	}
 
 	// archive: off the list, back with archived=only; claim never hands it out
-	code, out, _ = e.req("POST", "/tasks/"+ak+"/archive", "", scout)
+	code, out, _ = e.req("POST", "/gigs/"+ak+"/archive", "", scout)
 	e.ok(code, out, 200)
-	_, out, _ = e.req("GET", "/workspaces/scout/tasks", "", scout)
+	_, out, _ = e.req("GET", "/workspaces/scout/gigs", "", scout)
 	if strings.Contains(string(out), ak) {
-		t.Fatal("archived task listed")
+		t.Fatal("archived gig listed")
 	}
-	_, out, _ = e.req("GET", "/workspaces/scout/tasks?archived=only", "", scout)
+	_, out, _ = e.req("GET", "/workspaces/scout/gigs?archived=only", "", scout)
 	if !strings.Contains(string(out), ak) {
 		t.Fatalf("archived=only: %s", out)
 	}
-	e.req("POST", "/tasks/"+ak+"/unarchive", "", scout)
+	e.req("POST", "/gigs/"+ak+"/unarchive", "", scout)
 
 	// custom fields: agents can't define them by default; values are validated
 	if code, _, _ := e.req("POST", "/workspaces/scout/fields", `{"name":"Size","kind":"select","options":["S","M","L"]}`, scout); code != 403 {
@@ -113,15 +113,15 @@ func TestWorkItems(t *testing.T) {
 		ID int64 `json:"id"`
 	}
 	_ = json.Unmarshal(out, &f)
-	if code, _, _ := e.req("PATCH", "/tasks/"+ak+"/custom", fmt.Sprintf(`{"values":{"%d":"XL"}}`, f.ID), scout); code != 422 {
+	if code, _, _ := e.req("PATCH", "/gigs/"+ak+"/custom", fmt.Sprintf(`{"values":{"%d":"XL"}}`, f.ID), scout); code != 422 {
 		t.Fatalf("bad select value: %d", code)
 	}
-	code, out, _ = e.req("PATCH", "/tasks/"+ak+"/custom", fmt.Sprintf(`{"values":{"%d":"M"}}`, f.ID), scout)
+	code, out, _ = e.req("PATCH", "/gigs/"+ak+"/custom", fmt.Sprintf(`{"values":{"%d":"M"}}`, f.ID), scout)
 	e.ok(code, out, 200)
 	if !strings.Contains(string(out), fmt.Sprintf(`"custom":{"%d":"M"}`, f.ID)) {
 		t.Fatalf("custom value: %s", out)
 	}
-	if code, _, _ := e.req("PATCH", "/tasks/"+ak+"/custom", fmt.Sprintf(`{"values":{"%d":"M"}}`, e.ids["atlas.field"]), scout); code != 422 {
+	if code, _, _ := e.req("PATCH", "/gigs/"+ak+"/custom", fmt.Sprintf(`{"values":{"%d":"M"}}`, e.ids["atlas.field"]), scout); code != 422 {
 		t.Fatalf("another workspace's field: %d", code)
 	}
 
@@ -144,7 +144,7 @@ func TestWorkItems(t *testing.T) {
 	}
 
 	// mentions and questions ring ada's bell, not the author's
-	code, out, _ = e.req("POST", "/tasks/"+bk+"/comments", `{"body_md":"@ada can you check? not `+"`@bob`"+`","kind":"question"}`, scout)
+	code, out, _ = e.req("POST", "/gigs/"+bk+"/comments", `{"body_md":"@ada can you check? not `+"`@bob`"+`","kind":"question"}`, scout)
 	e.ok(code, out, 201)
 	code, out, _ = e.req("GET", "/me/notifications?unread=true", "", ada)
 	if code != 200 || !strings.Contains(string(out), `"kind":"mention"`) || !strings.Contains(string(out), `"kind":"question"`) || !strings.Contains(string(out), `"unread":2`) {
@@ -187,15 +187,15 @@ func TestBadInputAndIsolation(t *testing.T) {
 	}
 	_ = json.Unmarshal(out, &f)
 	for _, bad := range []string{`"NaN"`, `"Inf"`, `"-Infinity"`} {
-		if code, out, _ := e.req("PATCH", fmt.Sprintf("/tasks/%d/custom", e.ids["scout.task"]), fmt.Sprintf(`{"values":{"%d":%s}}`, f.ID, bad), scout); code != 422 {
+		if code, out, _ := e.req("PATCH", fmt.Sprintf("/gigs/%d/custom", e.ids["scout.gig"]), fmt.Sprintf(`{"values":{"%d":%s}}`, f.ID, bad), scout); code != 422 {
 			t.Fatalf("number %s: %d %s", bad, code, out)
 		}
 	}
-	if code, _, _ := e.req("PATCH", fmt.Sprintf("/tasks/%d/custom", e.ids["scout.task"]), fmt.Sprintf(`{"values":{"0%d":1}}`, f.ID), scout); code != 422 {
+	if code, _, _ := e.req("PATCH", fmt.Sprintf("/gigs/%d/custom", e.ids["scout.gig"]), fmt.Sprintf(`{"values":{"0%d":1}}`, f.ID), scout); code != 422 {
 		t.Fatalf("aliased field key accepted: %d", code)
 	}
 
-	// a schedule in an archived project, and one whose task creation fails, don't stop the others
+	// a schedule in an archived project, and one whose gig creation fails, don't stop the others
 	code, out, _ = e.req("POST", fmt.Sprintf("/projects/%d/recurrences", pid), `{"title":"ok","freq":"daily","tz":"UTC","window_start":"00:00","window_minutes":1440}`, ada)
 	e.ok(code, out, 201)
 	if code, _, _ := e.req("POST", fmt.Sprintf("/projects/%d/recurrences", pid), `{"title":"bad","freq":"daily","labels":[""]}`, ada); code != 422 {
@@ -206,29 +206,29 @@ func TestBadInputAndIsolation(t *testing.T) {
 	}
 	code, out, _ = e.req("POST", fmt.Sprintf("/projects/%d/recurrences", pid), `{"title":"healthy","freq":"daily","tz":"UTC","window_start":"00:00","window_minutes":1440}`, ada)
 	e.ok(code, out, 201)
-	// both due again now with overlap=create (so a task is really created); break one behind the
-	// API's back: its label is now invalid for CreateLabel, so creating its task fails
+	// both due again now with overlap=create (so a gig is really created); break one behind the
+	// API's back: its label is now invalid for CreateLabel, so creating its gig fails
 	due := time.Now().UnixMilli() - 60000
-	if _, err := e.st.W.Exec(`UPDATE recurrences SET overlap = 'create', next_at = ? WHERE template_id IN (SELECT id FROM task_templates WHERE title IN ('ok','healthy'))`, due); err != nil {
+	if _, err := e.st.W.Exec(`UPDATE recurrences SET overlap = 'create', next_at = ? WHERE template_id IN (SELECT id FROM gig_templates WHERE title IN ('ok','healthy'))`, due); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.st.W.Exec(`UPDATE task_templates SET labels = '["` + strings.Repeat("x", 60) + `"]' WHERE title = 'ok'`); err != nil {
+	if _, err := e.st.W.Exec(`UPDATE gig_templates SET labels = '["` + strings.Repeat("x", 60) + `"]' WHERE title = 'ok'`); err != nil {
 		t.Fatal(err)
 	}
 	var before int
-	_ = e.st.R.QueryRow(`SELECT created_count FROM recurrences WHERE template_id = (SELECT id FROM task_templates WHERE title = 'healthy')`).Scan(&before)
+	_ = e.st.R.QueryRow(`SELECT created_count FROM recurrences WHERE template_id = (SELECT id FROM gig_templates WHERE title = 'healthy')`).Scan(&before)
 	res, err := e.st.Housekeeping(context.Background(), time.Now().UnixMilli())
 	if err != nil || len(res.Paused) != 1 || len(res.Errors) == 0 || res.Created < 1 {
 		t.Fatalf("housekeeping with a bad schedule: %+v %v", res, err)
 	}
 	var healthy int
-	_ = e.st.R.QueryRow(`SELECT created_count FROM recurrences WHERE template_id = (SELECT id FROM task_templates WHERE title = 'healthy')`).Scan(&healthy)
+	_ = e.st.R.QueryRow(`SELECT created_count FROM recurrences WHERE template_id = (SELECT id FROM gig_templates WHERE title = 'healthy')`).Scan(&healthy)
 	if healthy != before+1 {
 		t.Fatalf("the healthy schedule didn't run: %d", healthy)
 	}
 
 	// credential routes are never stored for replay
-	code, out, _ = e.reqH("POST", "/me/keys", `{"name":"idem","workspace":"scout","scopes":["tasks:read"]}`, scout, map[string]string{"Idempotency-Key": "k1"})
+	code, out, _ = e.reqH("POST", "/me/keys", `{"name":"idem","workspace":"scout","scopes":["gigs:read"]}`, scout, map[string]string{"Idempotency-Key": "k1"})
 	e.ok(code, out, 201)
 	var n int
 	_ = e.st.R.QueryRow(`SELECT count(*) FROM idempotency_keys`).Scan(&n)

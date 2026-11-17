@@ -17,7 +17,7 @@ want it.
   programs that use the API.
 - Browser sessions are cookie-based with a CSRF header check; the main listener sets a strict
   Content-Security-Policy.
-- Agents act on what they read. Anyone who can write a task, comment or checklist item that an agent
+- Agents act on what they read. Anyone who can write a gig, comment or checklist item that an agent
   picks up can steer that agent: treat write access to an agent's workspace as the ability to direct
-  it. Give agents their own workspaces, add only people you trust as members, and use per-task tool
+  it. Give agents their own workspaces, add only people you trust as members, and use per-gig tool
   allowlists and the agent's own sandbox to limit what a misdirected run can do.

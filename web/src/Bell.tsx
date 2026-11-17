@@ -10,7 +10,7 @@ import { countsChange, onActivity } from "./live";
 import { badgeCount, kindInfo, notificationsApi, notificationText, placeBelow, type Notification, type Placement } from "./notifications";
 import { Avatar } from "./ui";
 import { Icon } from "./icons";
-import { errMsg, fromHere, relTime, taskHref } from "./views/viewsApi";
+import { errMsg, fromHere, relTime, gigHref } from "./views/viewsApi";
 import { HelpButton } from "./help";
 
 const POLL_MS = 60_000;
@@ -107,7 +107,7 @@ function BellPopover({ anchor, onClose }: { anchor: HTMLElement | null; onClose:
       const t = e.target as Node;
       if (!ref.current?.contains(t) && !anchor?.contains(t)) onClose();
     };
-    // capture phase, and stopped: Esc closes only the popover, not the task panel (or dialog) under it
+    // capture phase, and stopped: Esc closes only the popover, not the gig panel (or dialog) under it
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
@@ -190,14 +190,14 @@ function NotificationList({ compact, onNavigate }: { compact?: boolean; onNaviga
       setUnread((u) => Math.max(0, u - 1));
       notificationsApi.read([n.id]).then(changed, () => undefined);
     }
-    const ref = n.task_key ?? n.task_id;
+    const ref = n.gig_key ?? n.gig_id;
     if (ref === null) return;
     try {
-      const t = await api.task(ref);
+      const t = await api.gig(ref);
       onNavigate?.();
-      navigate(taskHref(tree, t), fromHere());
+      navigate(gigHref(tree, t), fromHere());
     } catch (e) {
-      setError(`${n.task_key ?? "Task"}: ${errMsg(e)}`);
+      setError(`${n.gig_key ?? "Gig"}: ${errMsg(e)}`);
     }
   };
 
@@ -236,13 +236,13 @@ function NotificationList({ compact, onNavigate }: { compact?: boolean; onNaviga
                     <span className="pill" style={{ "--c": k.color } as CSSProperties}>
                       {k.icon} {k.label}
                     </span>
-                    {n.task_key && <span className="pill pill-key">{n.task_key}</span>}
+                    {n.gig_key && <span className="pill pill-key">{n.gig_key}</span>}
                     <time className="muted small notif-time" dateTime={new Date(n.created_at).toISOString()} title={new Date(n.created_at).toLocaleString()}>
                       {relTime(n.created_at)}
                     </time>
                   </span>
-                  <span className="notif-title">{n.task_title ?? notificationText(n, name)}</span>
-                  {n.task_title && <span className="muted small notif-text">{notificationText(n, name)}</span>}
+                  <span className="notif-title">{n.gig_title ?? notificationText(n, name)}</span>
+                  {n.gig_title && <span className="muted small notif-text">{notificationText(n, name)}</span>}
                 </span>
                 {!n.read_at && <span className="notif-dot" aria-label="unread" />}
               </button>

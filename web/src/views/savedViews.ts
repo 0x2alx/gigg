@@ -44,7 +44,7 @@ export const DEFAULT_FILTERS: TableFilters = {
   extra: {},
 };
 
-// keys passed straight to the task list (the list endpoint understands them; the table has no control)
+// keys passed straight to the gig list (the list endpoint understands them; the table has no control)
 export const PASSTHROUGH = ["status", "created_by", "due_before", "archived", "blocked"] as const;
 
 const sortStr = (s: TableFilters["sort"]) => (s.desc ? "-" : "") + s.key;

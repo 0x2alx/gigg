@@ -295,7 +295,7 @@ func (c *certLoader) get(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return c.cur, nil
 }
 
-// housekeeping runs the scheduled data work once a minute: recurring task occurrences, missed
+// housekeeping runs the scheduled data work once a minute: recurring gig occurrences, missed
 // windows, stale runs and the nightly snapshot. Inside gigg only; no processes, no outbound calls.
 func (s *Server) housekeeping(ctx context.Context) {
 	t := time.NewTicker(time.Minute)

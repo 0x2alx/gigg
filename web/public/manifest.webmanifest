@@ -1,7 +1,7 @@
 {
   "name": "gigg",
   "short_name": "gigg",
-  "description": "Self-hosted task board for people and AI agents.",
+  "description": "Self-hosted gig board for people and AI agents.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

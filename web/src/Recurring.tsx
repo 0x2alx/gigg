@@ -1,4 +1,4 @@
-// Every recurring task in reach (a template on a schedule), across the workspaces, narrowed by an optional
+// Every recurring gig in reach (a template on a schedule), across the workspaces, narrowed by an optional
 // workspace/project filter: rule, next occurrence, counts; pause, edit, delete.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { api, ApiError, fmtDate, hasCap, recurrenceBody, type Recurrence, type Tag } from "./api";
@@ -6,7 +6,7 @@ import { useApp, type WorkspaceTree } from "./App";
 import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { describeRule, fmtInstant, localTZ } from "./recurrence";
-import { TaskModal } from "./TaskModal";
+import { GigModal } from "./GigModal";
 import { SCHEDULE_COLOR } from "./theme";
 import { ClearFilters, Avatar, LabelChip, Modal, Pill, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
@@ -48,7 +48,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
       const bad: string[] = [];
       res.forEach((r, i) => (r.status === "fulfilled" ? all.push(...r.value.items) : bad.push(tree[i]!.name)));
       setItems(all.sort((a, b) => a.title.localeCompare(b.title)));
-      setErr(bad.length ? `Couldn't load the recurring tasks of ${bad.join(", ")}.` : "");
+      setErr(bad.length ? `Couldn't load the recurring gigs of ${bad.join(", ")}.` : "");
     });
   }, [wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(load, [load]);
@@ -59,7 +59,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
   }, [wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const wsOf = useCallback((id: number) => tree.find((w) => w.id === id), [tree]);
   const shown = useMemo(() => (items ?? []).filter((r) => placeMatch(place, tree, r.workspace_id, r.project_id)), [items, place, tree]);
-  const writable = useMemo(() => tree.filter((w) => canWriteIn(w) && hasCap(me, "schedules", w.id)), [tree, me]); // the server wants Schedules for recurring tasks
+  const writable = useMemo(() => tree.filter((w) => canWriteIn(w) && hasCap(me, "schedules", w.id)), [tree, me]); // the server wants Schedules for recurring gigs
   const start = placeStart(place, tree, (w) => writable.includes(w));
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
 
   const fail = (e: unknown) => {
     if (e instanceof ApiError && (e.status === 412 || e.status === 409)) {
-      setErr("Someone changed that recurring task meanwhile; the list is reloaded.");
+      setErr("Someone changed that recurring gig meanwhile; the list is reloaded.");
       load();
     } else setErr(e instanceof ApiError ? e.message : "That didn't work.");
   };
@@ -103,7 +103,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
   const editWs = editing && editing !== "new" ? wsOf(editing.workspace_id) : undefined;
   if (editing && (editing === "new" ? start : editWs)) {
     return (
-      <TaskModal
+      <GigModal
         ws={editing === "new" ? start!.ws : editWs!}
         projectId={editing === "new" ? start!.projectId : editing.project_id}
         statuses={[]}
@@ -122,7 +122,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
 
   const tz = localTZ();
   return (
-    <Modal title="Recurring tasks" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring tasks" />}>
+    <Modal title="Recurring gigs" onClose={onClose} wide help={<HelpButton topic="recurring" label="Help: templates, schedules and recurring gigs" />}>
       {err && (
         <p className="danger" role="alert">
           {err}
@@ -134,9 +134,9 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
         {items && <span className="muted small">{shown.length === items.length ? `${items.length} recurring` : `${shown.length} of ${items.length}`}</span>}
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}
-      {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No recurring tasks yet. Make one here, or with Repeat in a new task." : "None here. Show everything to see the others."}</p>}
+      {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No recurring gigs yet. Make one here, or with Repeat in a new gig." : "None here. Show everything to see the others."}</p>}
       {shown.length > 0 && (
-        <ul className="schedules" ref={listRef} aria-label="Recurring tasks">
+        <ul className="schedules" ref={listRef} aria-label="Recurring gigs">
           {shown.map((r) => {
             const rws = wsOf(r.workspace_id);
             const canWrite = !!rws && canWriteIn(rws) && hasCap(me, "schedules", rws.id);
@@ -161,7 +161,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
               <div className="chips">
                 {r.next_at && !r.paused && <span className="pill pill-accent">next {fmtInstant(r.next_at, tz)}</span>}
                 {r.next_at && r.paused && <span className="pill pill-muted">next {fmtInstant(r.next_at, tz)} (paused)</span>}
-                <span className="pill pill-muted" title="Tasks created">
+                <span className="pill pill-muted" title="Gigs created">
                   ✓ {r.created_count}
                   {r.max_count ? ` / ${r.max_count}` : ""} created
                 </span>
@@ -181,7 +181,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                   </span>
                 )}
                 {(r.template_name !== r.title || r.template_uses > 1) && (
-                  <span className="pill pill-muted" title="The template its tasks are made from">
+                  <span className="pill pill-muted" title="The template its gigs are made from">
                     <Icon name="template" /> {r.template_name}
                     {r.template_uses > 1 ? ` · ×${r.template_uses}` : ""}
                   </span>
@@ -199,8 +199,8 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                 <div className="schedule-actions">
                   {confirm === r.id ? (
                     <div className="rec-delete">
-                      <span className="small">Delete this recurring task? The tasks it already made stay.</span>
-                      {/* its template and schedule can go too, when no other recurring task uses them */}
+                      <span className="small">Delete this recurring gig? The gigs it already made stay.</span>
+                      {/* its template and schedule can go too, when no other recurring gig uses them */}
                       {r.template_uses <= 1 ? (
                         (r.template_created_by === me.user.id || hasCap(me, "templates", r.workspace_id)) && (
                           <label className="check small">
@@ -209,7 +209,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                           </label>
                         )
                       ) : (
-                        <span className="muted small">Its template “{r.template_name}” stays: {r.template_uses - 1} other recurring task{r.template_uses === 2 ? " uses" : "s use"} it.</span>
+                        <span className="muted small">Its template “{r.template_name}” stays: {r.template_uses - 1} other recurring gig{r.template_uses === 2 ? " uses" : "s use"} it.</span>
                       )}
                       {r.schedule_uses <= 1 ? (
                         <label className="check small">
@@ -217,7 +217,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                           Also delete its schedule “{r.schedule_name}”
                         </label>
                       ) : (
-                        <span className="muted small">Its schedule “{r.schedule_name}” stays: {r.schedule_uses - 1} other recurring task{r.schedule_uses === 2 ? " uses" : "s use"} it.</span>
+                        <span className="muted small">Its schedule “{r.schedule_name}” stays: {r.schedule_uses - 1} other recurring gig{r.schedule_uses === 2 ? " uses" : "s use"} it.</span>
                       )}
                       <div className="row">
                         <button type="button" className="button danger-button small" disabled={busy === r.id} onClick={() => remove(r)}>
@@ -252,7 +252,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
       {start && (
         <div className="row end">
           <button type="button" className="button" onClick={() => setEditing("new")}>
-            + New recurring task
+            + New recurring gig
           </button>
         </div>
       )}

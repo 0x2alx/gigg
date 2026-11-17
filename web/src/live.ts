@@ -1,7 +1,7 @@
 // Live updates: one EventSource per workspace (at most MAX_STREAMS; the server allows 24 per user, enough for a few tabs),
 // each activity event re-dispatched on window as
 //   new CustomEvent("gigg:activity", { detail: { workspaceId, item } })
-// for the board, the task panel, the bell and the shell to react to. The browser reconnects on its
+// for the board, the gig panel, the bell and the shell to react to. The browser reconnects on its
 // own after the server's 10-minute stream end (with Last-Event-ID); when a stream is closed for
 // good (an HTTP error such as 401/429) or keeps failing, we close it and retry with a backoff,
 // resuming after the last id seen.
@@ -46,7 +46,7 @@ export function combine(states: LiveState[]): LiveState {
 
 // countsChange: actions after which the inbox count and the bell may have moved.
 export function countsChange(action: string): boolean {
-  return action.startsWith("task.") || action.startsWith("comment.");
+  return action.startsWith("gig.") || action.startsWith("comment.");
 }
 
 // treeChange: actions after which the sidebar tree (projects, memberships) may be stale.

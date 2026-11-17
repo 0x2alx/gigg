@@ -1,8 +1,8 @@
 -- gigg:foreign-keys-off
--- Crons: commands an agent's executor runs on a schedule, with a run history and no tasks. A cron
--- template is the content (command, timeout, output, sandbox); a cron links one template, one
+-- Errands: commands an agent's executor runs on a schedule, with a run history and no gigs. An errand
+-- template is the content (command, timeout, output, sandbox); an errand links one template, one
 -- schedule and one worker (the agent whose executor runs it). Schedules gain minute and hour
--- frequencies (crons only; recurring tasks keep daily/weekly/monthly), so the table is rebuilt for
+-- frequencies (errands only; recurring gigs keep daily/weekly/monthly), so the table is rebuilt for
 -- its CHECK constraint (12-step procedure; foreign keys are off for this migration and checked
 -- before commit).
 CREATE TABLE schedules_new (
@@ -30,7 +30,7 @@ DROP TABLE schedules;
 ALTER TABLE schedules_new RENAME TO schedules;
 CREATE INDEX schedules_ws ON schedules(workspace_id) WHERE deleted_at IS NULL;
 
-CREATE TABLE cron_templates (
+CREATE TABLE errand_templates (
   id              INTEGER PRIMARY KEY,
   workspace_id    INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   name            TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
@@ -47,16 +47,16 @@ CREATE TABLE cron_templates (
   deleted_at      INTEGER,
   version         INTEGER NOT NULL DEFAULT 1
 ) STRICT;
-CREATE INDEX cron_templates_ws ON cron_templates(workspace_id) WHERE deleted_at IS NULL;
+CREATE INDEX errand_templates_ws ON errand_templates(workspace_id) WHERE deleted_at IS NULL;
 
-CREATE TABLE crons (
+CREATE TABLE errands (
   id              INTEGER PRIMARY KEY,
   workspace_id    INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  template_id     INTEGER REFERENCES cron_templates(id),
+  template_id     INTEGER REFERENCES errand_templates(id),
   schedule_id     INTEGER REFERENCES schedules(id),
   worker_id       INTEGER NOT NULL REFERENCES users(id),
   created_by      INTEGER NOT NULL REFERENCES users(id),
-  on_failure_task INTEGER NOT NULL DEFAULT 0 CHECK (on_failure_task IN (0, 1)), -- the first failure opens a task for the worker
+  on_failure_gig INTEGER NOT NULL DEFAULT 0 CHECK (on_failure_gig IN (0, 1)), -- the first failure opens a gig for the worker
   next_at         INTEGER,          -- the next slot (null: none)
   run_now_at      INTEGER,          -- someone asked for a run now
   paused_at       INTEGER,
@@ -69,14 +69,14 @@ CREATE TABLE crons (
   version         INTEGER NOT NULL DEFAULT 1,
   CHECK (deleted_at IS NOT NULL OR (template_id IS NOT NULL AND schedule_id IS NOT NULL))
 ) STRICT;
-CREATE INDEX crons_due ON crons(worker_id, next_at) WHERE deleted_at IS NULL AND paused_at IS NULL;
-CREATE INDEX crons_ws ON crons(workspace_id) WHERE deleted_at IS NULL;
-CREATE INDEX crons_template ON crons(template_id) WHERE deleted_at IS NULL;
-CREATE INDEX crons_schedule ON crons(schedule_id) WHERE deleted_at IS NULL;
+CREATE INDEX errands_due ON errands(worker_id, next_at) WHERE deleted_at IS NULL AND paused_at IS NULL;
+CREATE INDEX errands_ws ON errands(workspace_id) WHERE deleted_at IS NULL;
+CREATE INDEX errands_template ON errands(template_id) WHERE deleted_at IS NULL;
+CREATE INDEX errands_schedule ON errands(schedule_id) WHERE deleted_at IS NULL;
 
-CREATE TABLE cron_runs (
+CREATE TABLE errand_runs (
   id              INTEGER PRIMARY KEY,
-  cron_id         INTEGER NOT NULL REFERENCES crons(id) ON DELETE CASCADE,
+  errand_id         INTEGER NOT NULL REFERENCES errands(id) ON DELETE CASCADE,
   workspace_id    INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   worker_id       INTEGER NOT NULL REFERENCES users(id),
   scheduled_for   INTEGER,          -- the slot (null: run now)
@@ -91,10 +91,10 @@ CREATE TABLE cron_runs (
   error           TEXT CHECK (error IS NULL OR length(error) <= 1000),
   created_at      INTEGER NOT NULL
 ) STRICT;
-CREATE INDEX cron_runs_cron ON cron_runs(cron_id, id);
-CREATE INDEX cron_runs_running ON cron_runs(started_at) WHERE status = 'running';
+CREATE INDEX errand_runs_errand ON errand_runs(errand_id, id);
+CREATE INDEX errand_runs_running ON errand_runs(started_at) WHERE status = 'running';
 
--- Two pause boxes: PAUSE stops new task runs and cron runs; each can be resumed alone. Crons pause
+-- Two pause boxes: PAUSE stops new gig runs and errand runs; each can be resumed alone. Errands pause
 -- until resumed (no end time).
-ALTER TABLE runner_settings ADD COLUMN crons_paused_at INTEGER;
-ALTER TABLE runner_settings ADD COLUMN crons_paused_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE runner_settings ADD COLUMN errands_paused_at INTEGER;
+ALTER TABLE runner_settings ADD COLUMN errands_paused_by INTEGER REFERENCES users(id) ON DELETE SET NULL;

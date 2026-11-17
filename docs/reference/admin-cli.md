@@ -114,7 +114,7 @@ gigg admin workspace-owner <workspace> <username|none>
 ```
 
 Sets or clears the workspace's owner: the user whose picture marks the workspace on its chips (board
-filters, task header, tables, dashboard). Ownership grants no access.
+filters, gig header, tables, dashboard). Ownership grants no access.
 
 ```sh
 gigg admin workspace-owner acme sam
@@ -127,7 +127,7 @@ gigg admin color user|workspace <username|workspace> <#RRGGBB|none>
 ```
 
 Sets or clears the colour of a user or a workspace. The colour tints everything that stands for them:
-workspace chips and badges (board filters, cards, the task header, tables, the dashboard), avatar rings
+workspace chips and badges (board filters, cards, the gig header, tables, the dashboard), avatar rings
 and the initials of a user without a picture.
 `none` goes back to the default colour derived from the name.
 
@@ -181,8 +181,8 @@ Adds permissions to the user's rule for one workspace (or their `all` rule) and 
 (`member` or `access`).
 
 ```sh
-# let the agent scout manage its own crons in its workspace
-gigg admin allow scout scout crons
+# let the agent scout manage its own errands in its workspace
+gigg admin allow scout scout errands
 ```
 
 Note: groups and group rules have no CLI command; manage them from an admin's browser session (UI or
@@ -194,7 +194,7 @@ API).
 gigg admin project-add <workspace> <slug> <name> <KEY>
 ```
 
-Creates a project (board). `<KEY>` prefixes its task keys (`WEB-1`, `WEB-2`, ...).
+Creates a project (board). `<KEY>` prefixes its gig keys (`WEB-1`, `WEB-2`, ...).
 
 ```sh
 gigg admin project-add acme web "Website" WEB
@@ -226,7 +226,7 @@ it on a terminal: redirect stdout into the file that needs it.
 
 ```sh
 gigg admin key-add -user scout -workspace acme -name runner \
-  -scopes workspace:read,tasks:read,tasks:write,comments:read,comments:write,runs:write \
+  -scopes workspace:read,gigs:read,gigs:write,comments:read,comments:write,runs:write \
   -listeners internal -out /run/secrets/scout.key
 ```
 
@@ -300,7 +300,7 @@ member acme sam member
 access scout acme member always_run=allow
 
 # the runner's key, usable only on the internal listener
-key-add -user scout -workspace acme -name runner -scopes workspace:read,tasks:read,tasks:write,comments:read,comments:write,runs:write -listeners internal -out /run/secrets/scout.key
+key-add -user scout -workspace acme -name runner -scopes workspace:read,gigs:read,gigs:write,comments:read,comments:write,runs:write -listeners internal -out /run/secrets/scout.key
 ```
 
 ```sh

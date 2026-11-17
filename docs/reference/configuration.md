@@ -17,7 +17,7 @@ variables are read by `gigg serve`, `gigg healthcheck` and `gigg admin`. An inva
 | `GIGG_ALLOWED_HOSTS` | (none) | Extra host names (comma- or space-separated, no ports) the server answers for. `localhost`, `127.0.0.1` and `::1` are always allowed. |
 | `GIGG_TRUSTED_PROXIES` | (none) | Comma- or space-separated networks in CIDR notation (a single address is written `/32` or `/128`). When the TCP peer is in one of them, the client address is taken from `X-Forwarded-For` (see below), and the scheme the browser used from `X-Forwarded-Proto` (for the origin check on names other than the public URL). |
 | `GIGG_BACKUP_AT` | `03:30` | Local time (`HH:MM`, 24 h) of the nightly database snapshot, or `off` to disable it. |
-| `GIGG_DEFAULT_TZ` | `UTC` | IANA time zone for schedules and recurring tasks that name none and whose creator has no time zone preference (Profile). Also the default of `GIGG_BACKUP_TZ`. The zone database is built into the binary. |
+| `GIGG_DEFAULT_TZ` | `UTC` | IANA time zone for schedules and recurring gigs that name none and whose creator has no time zone preference (Profile). Also the default of `GIGG_BACKUP_TZ`. The zone database is built into the binary. |
 | `GIGG_BACKUP_TZ` | `GIGG_DEFAULT_TZ` | IANA time zone `GIGG_BACKUP_AT` is read in. |
 | `GIGG_STALE_RUN_HOURS` | `6` | A run that sends no heartbeat (start or progress) for this many hours (1-168) is closed as `interrupted` by the server's housekeeping. |
 | `GIGG_BACKUP_KEEP` | `7` | How many nightly snapshots to keep (1-365). |
@@ -157,7 +157,7 @@ All three directories are created with mode `0700` on start. The container image
 
 Once a minute the server:
 
-- creates the tasks of recurring tasks that are due, and marks windowed tasks whose window closed
+- creates the gigs of recurring gigs that are due, and marks windowed gigs whose window closed
   untouched as missed;
 - deletes stored idempotency responses older than 24 hours;
 - closes runs that sent no heartbeat for `GIGG_STALE_RUN_HOURS` as `interrupted`;

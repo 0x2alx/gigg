@@ -585,7 +585,7 @@ function Preview({ t, flash }: { t: Theme; flash: string }) {
           A card on a column
         </div>
         <span className={hl("mutedText")} style={{ color: t.mutedText }}>
-          + New task
+          + New gig
         </span>
       </div>
     </div>

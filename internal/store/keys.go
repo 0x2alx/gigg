@@ -123,8 +123,8 @@ type APIKey struct {
 
 // AllScopes is every scope a key can carry; admin:* scopes only on admin keys.
 var AllScopes = []string{
-	"workspace:read", "workspace:write", "tasks:read", "tasks:write", "tasks:delete", "comments:read", "comments:write",
-	"artifacts:write", "runs:write", "projects:write", "profile:write", "keys:self", "crons:read", "crons:output", "crons:write", "crons:run",
+	"workspace:read", "workspace:write", "gigs:read", "gigs:write", "gigs:delete", "comments:read", "comments:write",
+	"artifacts:write", "runs:write", "projects:write", "profile:write", "keys:self", "errands:read", "errands:output", "errands:write", "errands:run",
 	"admin:workspaces", "admin:members", "admin:users", "admin:keys", "admin:transfer", "admin:audit",
 	"admin:export", "admin:settings",
 }

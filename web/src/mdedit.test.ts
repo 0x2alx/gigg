@@ -52,16 +52,16 @@ describe("toggleLines", () => {
   });
   it("numbers lines and switches list kinds", () => {
     expect(toggleLines(sel("[- a\n- b]"), "ol").text).toBe("1. a\n2. b");
-    expect(toggleLines(sel("[1. a\n2. b]"), "task").text).toBe("- [ ] a\n- [ ] b");
+    expect(toggleLines(sel("[1. a\n2. b]"), "gig").text).toBe("- [ ] a\n- [ ] b");
   });
   it("removes the prefix when every line has it", () => {
     expect(toggleLines(sel("[> a\n> b]"), "quote").text).toBe("a\nb");
-    expect(toggleLines(sel("- [ ] a|"), "task").text).toBe("a");
+    expect(toggleLines(sel("- [ ] a|"), "gig").text).toBe("a");
   });
   it("keeps the caret on its text for a single line", () => {
     expect(show(toggleLines(sel("x\nhel|lo"), "heading"))).toBe("x\n## hel|lo");
   });
-  it("does not treat a task item as a plain bullet", () => {
+  it("does not treat a gig item as a plain bullet", () => {
     expect(toggleLines(sel("- [ ] a|"), "ul").text).toBe("- a");
   });
 });
@@ -79,7 +79,7 @@ describe("indentList", () => {
 });
 
 describe("continueList", () => {
-  it("continues bullets, numbers and tasks", () => {
+  it("continues bullets, numbers and gigs", () => {
     expect(show(continueList(sel("- a|")))).toBe("- a\n- |");
     expect(show(continueList(sel("  9. a|")))).toBe("  9. a\n  10. |");
     expect(show(continueList(sel("- [x] done|")))).toBe("- [x] done\n- [ ] |");
@@ -95,7 +95,7 @@ describe("continueList", () => {
 import MarkdownIt from "markdown-it";
 import { taskLists } from "./mdtasks";
 const renderRaw = (src: string) => new MarkdownIt({ html: false, breaks: true }).use(taskLists).render(src);
-describe("task lists", () => {
+describe("gig lists", () => {
   it("renders read-only checkboxes", () => {
     const html = renderRaw("- [ ] todo\n- [x] done\n- plain [ ] text");
     expect(html).toContain('<input type="checkbox" disabled> todo');

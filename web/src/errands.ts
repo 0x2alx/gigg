@@ -1,14 +1,14 @@
-// Crons: commands an agent's executor runs on a schedule, sandboxed, with a run history (no tasks).
+// Errands: commands an agent's executor runs on a schedule, sandboxed, with a run history (no gigs).
 // Types, API calls and the editor's pure helpers (form state <-> API body, a description of the
 // timing, validation), unit-tested on their own.
 import { call } from "./http";
 import { WEEKDAYS, localTZ } from "./recurrence";
 
-export type CronFreq = "minutes" | "hours" | "daily" | "weekly" | "monthly";
-export type CronRunStatus = "running" | "ok" | "failed" | "timeout" | "missed" | "skipped";
+export type ErrandFreq = "minutes" | "hours" | "daily" | "weekly" | "monthly";
+export type ErrandRunStatus = "running" | "ok" | "failed" | "timeout" | "missed" | "skipped";
 
-export interface CronRule {
-  freq: CronFreq;
+export interface ErrandRule {
+  freq: ErrandFreq;
   interval: number;
   weekdays: number[] | null;
   month_day: number | null;
@@ -18,39 +18,39 @@ export interface CronRule {
   lead_minutes: number;
 }
 
-export interface CronRun {
+export interface ErrandRun {
   id: number;
-  cron_id: number;
+  errand_id: number;
   workspace_id: number;
   worker_id: number;
   scheduled_for: number | null; // null: a run-now request
   started_at: number | null;
   finished_at: number | null;
-  status: CronRunStatus;
+  status: ErrandRunStatus;
   exit_code: number | null;
   duration_ms: number | null;
   sandboxed: boolean;
   has_output: boolean;
-  output_tail?: string; // only with crons:output
+  output_tail?: string; // only with errands:output
   output_bytes: number | null;
   error: string | null;
   created_at: number;
 }
 
-export interface Cron {
+export interface Errand {
   id: number;
   workspace_id: number;
   worker_id: number;
   worker_username: string;
   created_by: number;
-  on_failure_task: boolean;
+  on_failure_gig: boolean;
   next_at: number | null;
   run_now_at: number | null;
   paused: boolean;
   state: "never" | "ok" | "failing";
   fail_streak: number;
   failing_since: number | null;
-  last_run: CronRun | null;
+  last_run: ErrandRun | null;
   created_at: number;
   version: number;
   template_id: number;
@@ -66,45 +66,45 @@ export interface Cron {
   schedule_id: number;
   schedule_name: string;
   schedule_text: string;
-  rule: CronRule;
+  rule: ErrandRule;
 }
 
-export interface CronBody {
+export interface ErrandBody {
   name?: string;
   description_md?: string;
   command?: string;
   timeout_s?: number;
   output?: "gigg" | "host";
   unsandboxed?: boolean;
-  rule?: Partial<CronRule> & { freq: CronFreq };
+  rule?: Partial<ErrandRule> & { freq: ErrandFreq };
   worker?: string;
-  on_failure_task?: boolean;
+  on_failure_gig?: boolean;
   paused?: boolean;
 }
 
-export const cronApi = {
-  list: (ws: string | number) => call<{ items: Cron[] }>("GET", `/workspaces/${ws}/crons`),
-  get: (id: number) => call<Cron>("GET", `/crons/${id}`),
-  create: (ws: string | number, body: CronBody) => call<Cron>("POST", `/workspaces/${ws}/crons`, body),
-  patch: (id: number, body: CronBody, version?: number) => call<Cron>("PATCH", `/crons/${id}`, body, version),
-  remove: (id: number) => call<void>("DELETE", `/crons/${id}`),
-  pause: (id: number) => call<Cron>("POST", `/crons/${id}/pause`),
-  resume: (id: number) => call<Cron>("POST", `/crons/${id}/resume`),
-  runNow: (id: number) => call<Cron>("POST", `/crons/${id}/run-now`),
-  runs: (id: number, before = 0, limit = 30) => call<{ items: CronRun[] }>("GET", `/crons/${id}/runs?limit=${limit}${before ? `&before=${before}` : ""}`),
-  run: (id: number) => call<CronRun>("GET", `/cron-runs/${id}`),
+export const errandApi = {
+  list: (ws: string | number) => call<{ items: Errand[] }>("GET", `/workspaces/${ws}/errands`),
+  get: (id: number) => call<Errand>("GET", `/errands/${id}`),
+  create: (ws: string | number, body: ErrandBody) => call<Errand>("POST", `/workspaces/${ws}/errands`, body),
+  patch: (id: number, body: ErrandBody, version?: number) => call<Errand>("PATCH", `/errands/${id}`, body, version),
+  remove: (id: number) => call<void>("DELETE", `/errands/${id}`),
+  pause: (id: number) => call<Errand>("POST", `/errands/${id}/pause`),
+  resume: (id: number) => call<Errand>("POST", `/errands/${id}/resume`),
+  runNow: (id: number) => call<Errand>("POST", `/errands/${id}/run-now`),
+  runs: (id: number, before = 0, limit = 30) => call<{ items: ErrandRun[] }>("GET", `/errands/${id}/runs?limit=${limit}${before ? `&before=${before}` : ""}`),
+  run: (id: number) => call<ErrandRun>("GET", `/errand-runs/${id}`),
 };
 
 // ---- the editor's form
 
-export interface CronForm {
+export interface ErrandForm {
   name: string;
   description: string;
   command: string;
   timeout: number; // seconds
   output: "gigg" | "host";
   unsandboxed: boolean;
-  freq: CronFreq;
+  freq: ErrandFreq;
   interval: number;
   weekdays: number[]; // weekly: the days; minutes/hours: only these (empty = every day)
   monthDay: number;
@@ -114,10 +114,10 @@ export interface CronForm {
   to: string;
   tz: string;
   worker: string; // username; "" = yourself
-  onFailureTask: boolean;
+  onFailureGig: boolean;
 }
 
-export function defaultCronForm(now: Date = new Date()): CronForm {
+export function defaultErrandForm(now: Date = new Date()): ErrandForm {
   return {
     name: "",
     description: "",
@@ -135,7 +135,7 @@ export function defaultCronForm(now: Date = new Date()): CronForm {
     to: "17:00",
     tz: localTZ(),
     worker: "",
-    onFailureTask: false,
+    onFailureGig: false,
   };
 }
 
@@ -143,10 +143,10 @@ const HM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 const pad = (n: number) => String(n).padStart(2, "0");
 const toMin = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
 const toHM = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
-export const frequent = (f: CronFreq) => f === "minutes" || f === "hours";
+export const frequent = (f: ErrandFreq) => f === "minutes" || f === "hours";
 
-// formOfCron: the editor's state for an existing cron.
-export function formOfCron(c: Cron): CronForm {
+// formOfErrand: the editor's state for an existing errand.
+export function formOfErrand(c: Errand): ErrandForm {
   const r = c.rule;
   const fr = frequent(r.freq);
   const allDay = r.window_start === "00:00" && r.window_minutes === 1440;
@@ -167,21 +167,21 @@ export function formOfCron(c: Cron): CronForm {
     to: fr && !allDay ? toHM(toMin(r.window_start) + r.window_minutes) : "17:00",
     tz: r.tz || localTZ(),
     worker: c.worker_username,
-    onFailureTask: c.on_failure_task,
+    onFailureGig: c.on_failure_gig,
   };
 }
 
 // windowOf: minutes/hours ticking window (from..to, past midnight when to <= from).
-function windowOf(f: CronForm): { start: string; minutes: number } {
+function windowOf(f: ErrandForm): { start: string; minutes: number } {
   if (!f.limited) return { start: "00:00", minutes: 1440 };
   let m = toMin(f.to) - toMin(f.from);
   if (m <= 0) m += 1440;
   return { start: f.from, minutes: m };
 }
 
-// cronRule: the rule for the API (fields that don't apply are left out).
-export function cronRule(f: CronForm): CronBody["rule"] & { freq: CronFreq } {
-  const r: CronBody["rule"] & { freq: CronFreq } = { freq: f.freq, interval: f.interval, tz: f.tz };
+// errandRule: the rule for the API (fields that don't apply are left out).
+export function errandRule(f: ErrandForm): ErrandBody["rule"] & { freq: ErrandFreq } {
+  const r: ErrandBody["rule"] & { freq: ErrandFreq } = { freq: f.freq, interval: f.interval, tz: f.tz };
   if (frequent(f.freq)) {
     const w = windowOf(f);
     r.window_start = w.start;
@@ -196,9 +196,9 @@ export function cronRule(f: CronForm): CronBody["rule"] & { freq: CronFreq } {
   return r;
 }
 
-// sameTiming: the form still holds the cron's timing (so a save doesn't move it to another schedule).
-export function sameTiming(f: CronForm, r: CronRule): boolean {
-  const n = cronRule(f);
+// sameTiming: the form still holds the errand's timing (so a save doesn't move it to another schedule).
+export function sameTiming(f: ErrandForm, r: ErrandRule): boolean {
+  const n = errandRule(f);
   if (n.freq !== r.freq || n.interval !== (r.interval || 1) || n.tz !== r.tz || n.window_start !== r.window_start) return false;
   const days = (d?: number[] | null) => JSON.stringify([...(d ?? [])].sort((a, b) => a - b));
   if (frequent(n.freq)) {
@@ -210,8 +210,8 @@ export function sameTiming(f: CronForm, r: CronRule): boolean {
   return true;
 }
 
-// cronProblem: the first thing that stops the form from saving, or null.
-export function cronProblem(f: CronForm): string | null {
+// errandProblem: the first thing that stops the form from saving, or null.
+export function errandProblem(f: ErrandForm): string | null {
   if (!f.name.trim()) return "Give it a name.";
   if (!f.command.trim()) return "Give it a command.";
   if (f.command.length > 16384) return "The command is limited to 16 KiB.";
@@ -236,9 +236,9 @@ function days(d: number[]): string {
 
 const ord = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th"));
 
-// describeCron: "Every 5 min", "Every 2 h on weekdays, 09:00–17:00", "Every day at 03:30",
+// describeErrand: "Every 5 min", "Every 2 h on weekdays, 09:00–17:00", "Every day at 03:30",
 // "Every Mon, Thu at 08:00", "Monthly on the last day at 06:00" (as the server names it).
-export function describeCron(f: CronForm): string {
+export function describeErrand(f: ErrandForm): string {
   const n = f.interval > 1 ? f.interval : 1;
   let s: string;
   switch (f.freq) {
@@ -267,11 +267,11 @@ export function describeCron(f: CronForm): string {
   return `${s} at ${f.at}`;
 }
 
-// cronBody: what to send. A new cron gets everything; an edit only what changed (so a save that
+// errandBody: what to send. A new errand gets everything; an edit only what changed (so a save that
 // doesn't touch the timing keeps a shared schedule, and the sandbox flag is only sent by someone who may set it).
-export function cronBody(f: CronForm, cur: Cron | null, canUnsandbox: boolean): CronBody {
-  const b: CronBody = {};
-  const content: [keyof CronBody, unknown, unknown][] = [
+export function errandBody(f: ErrandForm, cur: Errand | null, canUnsandbox: boolean): ErrandBody {
+  const b: ErrandBody = {};
+  const content: [keyof ErrandBody, unknown, unknown][] = [
     ["name", f.name.trim(), cur?.name],
     ["description_md", f.description, cur?.description_md],
     ["command", f.command, cur?.command],
@@ -280,16 +280,16 @@ export function cronBody(f: CronForm, cur: Cron | null, canUnsandbox: boolean): 
   ];
   for (const [k, v, old] of content) if (!cur || v !== old) (b as Record<string, unknown>)[k] = v;
   if (canUnsandbox && (!cur ? f.unsandboxed : f.unsandboxed !== cur.unsandboxed)) b.unsandboxed = f.unsandboxed;
-  if (!cur || !sameTiming(f, cur.rule)) b.rule = cronRule(f);
+  if (!cur || !sameTiming(f, cur.rule)) b.rule = errandRule(f);
   if (f.worker && (!cur || f.worker !== cur.worker_username)) b.worker = f.worker;
-  if (!cur ? f.onFailureTask : f.onFailureTask !== cur.on_failure_task) b.on_failure_task = f.onFailureTask;
+  if (!cur ? f.onFailureGig : f.onFailureGig !== cur.on_failure_gig) b.on_failure_gig = f.onFailureGig;
   return b;
 }
 
 // ---- display
 
 // schedText: the server's description, without the time zone when it's the viewer's own.
-export function schedText(c: Pick<Cron, "schedule_text" | "rule">, tz: string): string {
+export function schedText(c: Pick<Errand, "schedule_text" | "rule">, tz: string): string {
   const suffix = ` (${c.rule.tz})`;
   return c.rule.tz === tz && c.schedule_text.endsWith(suffix) ? c.schedule_text.slice(0, -suffix.length) : c.schedule_text;
 }
@@ -320,7 +320,7 @@ export function relTime(ms: number, now: number): string {
   return d > 0 ? `in ${f}` : `${f} ago`;
 }
 
-export const RUN_STATUS_TEXT: Record<CronRunStatus, string> = {
+export const RUN_STATUS_TEXT: Record<ErrandRunStatus, string> = {
   running: "running",
   ok: "ok",
   failed: "failed",
@@ -329,11 +329,11 @@ export const RUN_STATUS_TEXT: Record<CronRunStatus, string> = {
   skipped: "skipped",
 };
 
-export const RUN_STATUS_TIP: Record<CronRunStatus, string> = {
+export const RUN_STATUS_TIP: Record<ErrandRunStatus, string> = {
   running: "Started by the executor, not reported back yet",
   ok: "Exited 0",
   failed: "Exited non-zero, or couldn't start",
   timeout: "Killed at its timeout (or never reported back)",
-  missed: "Its slot passed while nothing ran it (executor down, crons paused): never caught up",
+  missed: "Its slot passed while nothing ran it (executor down, errands paused): never caught up",
   skipped: "The previous run was still going",
 };

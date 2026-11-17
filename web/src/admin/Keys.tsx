@@ -250,7 +250,7 @@ function CreateKey({ users, workspaces, onClose, onDone }: { users: AdminUser[];
   const [userId, setUserId] = useState<number>(active[0]?.id ?? 0);
   const [wsId, setWsId] = useState<number>(0); // 0 = admin key
   const [projectIds, setProjectIds] = useState<number[]>([]);
-  const [scopes, setScopes] = useState<string[]>(["workspace:read", "tasks:read", "comments:read"]);
+  const [scopes, setScopes] = useState<string[]>(["workspace:read", "gigs:read", "comments:read"]);
   const [mode, setMode] = useState<"full" | "read" | "custom">("full"); // what the key may do, within its user's permissions
   const [listeners, setListeners] = useState("");
   const [cidrs, setCidrs] = useState("");

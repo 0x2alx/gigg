@@ -169,7 +169,7 @@ export function UsersPage() {
                       <ConfirmButton
                         label="Disable"
                         title={`Disable ${u.username}?`}
-                        message="Their sessions and keys stop working until you enable them again. Their tasks and comments stay."
+                        message="Their sessions and keys stop working until you enable them again. Their gigs and comments stay."
                         confirmLabel="Disable"
                         disabled={u.id === me.user.id}
                         onConfirm={() => adminApi.patchUser(u, { disabled: true }).then(changed)}

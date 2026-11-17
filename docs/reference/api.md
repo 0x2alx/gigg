@@ -34,7 +34,7 @@ A key acts as one user and has these properties:
 |---|---|
 | `user_id` | The user the key acts as. A key never has more permissions than its user. |
 | `workspace_id` | The workspace the key is bound to, or `null` (unbound). A bound key reaches nothing outside its workspace. |
-| `project_ids` | Optional narrowing to some projects of its workspace (needs a workspace). Other projects' tasks, runs and activity are invisible. |
+| `project_ids` | Optional narrowing to some projects of its workspace (needs a workspace). Other projects' gigs, runs and activity are invisible. |
 | `scopes` | What kinds of operations the key may perform (at least one; see below). |
 | `allowed_listeners` | Listener names the key works on (`null` = any). |
 | `allowed_cidrs` | Networks (CIDR) the key works from (`null` = any). The client address is resolved as described in [configuration.md](configuration.md#client-address). |
@@ -67,19 +67,19 @@ permission in the workspace (see [access.md](access.md#api-keys-scopes-and-permi
 
 | Scope | Gates |
 |---|---|
-| `workspace:read` | Reading workspaces, members, projects, statuses, labels; activity and the change feed (with `tasks:read` and `comments:read`). |
+| `workspace:read` | Reading workspaces, members, projects, statuses, labels; activity and the change feed (with `gigs:read` and `comments:read`). |
 | `workspace:write` | Defining custom fields. |
 | `projects:write` | Workspace settings, projects, statuses and labels (manager operations). |
-| `tasks:read` | Reading tasks, runs, relations, checklists, custom fields, templates, recurring tasks, schedules, runner state, stats, summary, inbox, notifications and saved filters. |
-| `tasks:write` | Creating, changing, moving, cloning, archiving tasks; claiming; relations, checklists, custom values; templates, recurring tasks, schedules; resume requests. |
-| `tasks:delete` | Moving tasks to the trash and restoring them. |
+| `gigs:read` | Reading gigs, runs, relations, checklists, custom fields, templates, recurring gigs, schedules, runner state, stats, summary, inbox, notifications and saved filters. |
+| `gigs:write` | Creating, changing, moving, cloning, archiving gigs; claiming; relations, checklists, custom values; templates, recurring gigs, schedules; resume requests. |
+| `gigs:delete` | Moving gigs to the trash and restoring them. |
 | `comments:read` | Reading comments (also needed for activity). |
 | `comments:write` | Writing comments, run reports, resume comments. |
 | `runs:write` | Recording runs (start, progress, finish, usage); pausing and resuming runs with the `pause_runs` permission. |
-| `crons:read` | Reading crons, cron templates and cron runs (without output). |
-| `crons:output` | Reading a cron run's output tail (with `crons:read`). |
-| `crons:write` | Making, changing, pausing, running now and deleting crons and cron templates (with the `crons` permission). |
-| `crons:run` | An agent's cron executor: claiming its own due runs and reporting them. |
+| `errands:read` | Reading errands, errand templates and errand runs (without output). |
+| `errands:output` | Reading an errand run's output tail (with `errands:read`). |
+| `errands:write` | Making, changing, pausing, running now and deleting errands and errand templates (with the `errands` permission). |
+| `errands:run` | An agent's errand executor: claiming its own due runs and reporting them. |
 | `profile:write` | Your own profile, themes and picture. |
 | `keys:self` | Managing keys that act as yourself. |
 | `artifacts:write` | Accepted on keys. Note: not used by any endpoint yet. |
@@ -128,9 +128,9 @@ Otherwise it gets 403 with code `csrf`. Requests with a bearer key are not subje
 
 - JSON bodies; times are UTC Unix milliseconds; ids are integers.
 - Workspace references in paths (`{ws}`) are an id, a slug, or `current` (workspace keys only).
-- Task references (`{id}` under `/tasks/`) are an id or a key such as `WEB-12` (case-insensitive). A
-  task moved to another project gets a new key; the old one keeps working as an alias. A key that
-  matches tasks in more than one of your workspaces answers 409 `ambiguous_key`.
+- Gig references (`{id}` under `/gigs/`) are an id or a key such as `WEB-12` (case-insensitive). A
+  gig moved to another project gets a new key; the old one keeps working as an alias. A key that
+  matches gigs in more than one of your workspaces answers 409 `ambiguous_key`.
 - Anything outside the caller's reach answers 404, never 403, so ids can't be probed. 403 means the
   object is visible but the caller lacks a permission or scope; the `detail` names which.
 - `PATCH` bodies follow JSON Merge Patch: an absent field is unchanged, `null` clears it.
@@ -165,7 +165,7 @@ Errors are RFC 9457 `application/problem+json` with a stable `code`:
 | 404 | `not_found` | No such object, or out of reach. |
 | 405 | `method_not_allowed` | |
 | 409 | `conflict` | State conflict (e.g. run already ended, cap reached, name taken). |
-| 409 | `ambiguous_key` | Task key matches several of your workspaces. |
+| 409 | `ambiguous_key` | Gig key matches several of your workspaces. |
 | 409 | `idempotency_in_progress` | A request with this `Idempotency-Key` is still running. |
 | 409 | `idempotency_unreplayable` | The request with this `Idempotency-Key` already ran, but its answer was too large to keep. |
 | 412 | `version_conflict` | `If-Match` doesn't match the current version. |
@@ -174,7 +174,7 @@ Errors are RFC 9457 `application/problem+json` with a stable `code`:
 | 421 | `bad_host` | `Host` header not an allowed host. |
 | 422 | `invalid` | Validation failed. |
 | 422 | `idempotency_mismatch` | `Idempotency-Key` reused for a different request. |
-| 423 | `paused` | Task runs are paused for the workspace (claim, run start). |
+| 423 | `paused` | Gig runs are paused for the workspace (claim, run start). |
 | 429 | `rate_limited` | Rate limit hit. |
 | 429 | `too_many_streams` | Too many open event streams. |
 | 500 | `internal` | Server error. |
@@ -182,13 +182,13 @@ Errors are RFC 9457 `application/problem+json` with a stable `code`:
 
 ### Versions, ETag and If-Match
 
-Versioned objects (tasks, comments, workspaces, projects, statuses, labels, users, groups, templates,
-schedules, recurring tasks, custom fields) have a `version` that increases with every change.
-Responses that return a single versioned object (for example `GET /tasks/{id}`, task writes, a
+Versioned objects (gigs, comments, workspaces, projects, statuses, labels, users, groups, templates,
+schedules, recurring gigs, custom fields) have a `version` that increases with every change.
+Responses that return a single versioned object (for example `GET /gigs/{id}`, gig writes, a
 successful claim, `GET /me`) carry `ETag: "<version>"`; the `version` field in the body is the same number.
 
-Write endpoints that accept `If-Match` (see the OpenAPI document; e.g. `PATCH /tasks/{id}`,
-`POST /tasks/{id}/move`, `PATCH /comments/{id}`, `PATCH /me`, `PATCH /workspaces/{ws}`,
+Write endpoints that accept `If-Match` (see the OpenAPI document; e.g. `PATCH /gigs/{id}`,
+`POST /gigs/{id}/move`, `PATCH /comments/{id}`, `PATCH /me`, `PATCH /workspaces/{ws}`,
 `PUT /templates/{id}`) take `"N"`, `W/"N"` or `*`. Without the header (or with `*`) the write is
 unconditional. If the version differs, the answer is 412 `version_conflict`: reload and retry.
 
@@ -213,14 +213,14 @@ Any authenticated `POST` may carry `Idempotency-Key` (1-200 printable ASCII char
 
 | Endpoint family | Parameters | Order |
 |---|---|---|
-| Task lists (`/workspaces/{ws}/tasks`, `/projects/{p}/tasks`) | `limit` (default 50, max 500), `cursor` (pass back `next_cursor`; absent when there is no more) | board order, or `sort` |
+| Gig lists (`/workspaces/{ws}/gigs`, `/projects/{p}/gigs`) | `limit` (default 50, max 500), `cursor` (pass back `next_cursor`; absent when there is no more) | board order, or `sort` |
 | Activity (`/workspaces/{ws}/activity`, `/audit`) | `limit` (default 100, max 500), `before_id` | newest first |
 | Change feed (`/workspaces/{ws}/changes`) | `after_id` (an id or `latest`), `limit` (default 100, max 500); response `next_after_id`, `more` | oldest first |
-| Comments (`/tasks/{id}/comments`) | `since_id`, `limit` (max 500) | oldest first |
+| Comments (`/gigs/{id}/comments`) | `since_id`, `limit` (max 500) | oldest first |
 | Runs (`/workspaces/{ws}/runs`) | `limit` (default 200, max 500), `status`, `started_since` | newest first |
 | Notifications | `limit` (max 200), `unread` | newest first |
 
-Note: the task `cursor` is an opaque string (currently an offset), so pages can shift if tasks change
+Note: the gig `cursor` is an opaque string (currently an offset), so pages can shift if gigs change
 between requests.
 
 ### Rate limits
@@ -244,7 +244,7 @@ in-process API calls, each counted against the key.
 
 `GET /api/v1/workspaces/{ws}/events` (not in the OpenAPI document) streams the workspace's activity
 as `text/event-stream`, with the same visibility as the change feed (viewer, and the scopes
-`workspace:read`, `tasks:read`, `comments:read`):
+`workspace:read`, `gigs:read`, `comments:read`):
 
 - each entry is `event: activity`, `id: <activity id>`, `data: <activity item JSON>`; entries the
   caller made carry `request_id` (the `X-Request-Id` of the request behind them), so a client can
@@ -349,7 +349,7 @@ in [access.md](access.md).
 | GET | `/workspaces/{ws}/activity` | Activity, newest first. |
 | GET | `/workspaces/{ws}/changes` | Change feed: activity after an id, oldest first. |
 | GET | `/workspaces/{ws}/events` | The same as a Server-Sent Events stream (see above; not in OpenAPI). |
-| GET | `/workspaces/{ws}/summary` | Plain-text board summary: per project, each status with up to 5 tasks. |
+| GET | `/workspaces/{ws}/summary` | Plain-text board summary: per project, each status with up to 5 gigs. |
 
 ### labels
 
@@ -358,7 +358,7 @@ in [access.md](access.md).
 | GET | `/workspaces/{ws}/labels` | A workspace's labels. |
 | POST | `/workspaces/{ws}/labels` | Create a label (managers). |
 | PATCH | `/labels/{id}` | Change a label (managers). |
-| DELETE | `/labels/{id}` | Delete a label and remove it from every task (managers). |
+| DELETE | `/labels/{id}` | Delete a label and remove it from every gig (managers). |
 
 ### projects
 
@@ -368,52 +368,52 @@ in [access.md](access.md).
 | POST | `/workspaces/{ws}/projects` | Create a project (managers). |
 | GET | `/projects/{p}` | A project. |
 | PATCH | `/projects/{p}` | Change a project (managers). |
-| DELETE | `/projects/{p}` | Delete an empty project (managers). It can't be restored; its slug and key are free for a new project (the key stays taken while moved tasks still answer to old keys with it). |
-| GET | `/projects/{p}/board` | The board: statuses with their tasks, and the workspace's labels. Up to 5000 unarchived tasks; past that, `truncated: true` (the rest are in task lists). |
+| DELETE | `/projects/{p}` | Delete an empty project (managers). It can't be restored; its slug and key are free for a new project (the key stays taken while moved gigs still answer to old keys with it). |
+| GET | `/projects/{p}/board` | The board: statuses with their gigs, and the workspace's labels. Up to 5000 unarchived gigs; past that, `truncated: true` (the rest are in gig lists). |
 | GET | `/projects/{p}/statuses` | Statuses in board order. |
 | POST | `/projects/{p}/statuses` | Add a status (managers). |
 | POST | `/projects/{p}/statuses/reorder` | Set the order of statuses (managers). |
 | PATCH | `/statuses/{id}` | Change a status (managers). |
 | DELETE | `/statuses/{id}` | Delete an empty status (managers). |
 
-### tasks
+### gigs
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/workspaces/{ws}/tasks` | Tasks across a workspace (filters combine). |
-| GET | `/projects/{p}/tasks` | A project's tasks (filters combine). |
-| POST | `/projects/{p}/tasks` | Create a task; `subtasks` (`{title, blocks_parent}`) and `relations` (`{task, direction}`) are created with it, in one transaction. |
-| GET | `/tasks/{id}` | A task, by id or key. |
-| PATCH | `/tasks/{id}` | Change a task's fields (`null` clears). |
-| POST | `/tasks/{id}/move` | Move a task: status, position, or another project of the workspace. |
-| POST | `/tasks/{id}/clone` | Copy a task (optionally into another project): content, labels, assignees, dates, custom field values, and the checklist unticked (with the Checklists permission). |
-| DELETE | `/tasks/{id}` | Move a task to the trash. |
-| POST | `/tasks/{id}/restore` | Restore a task from the trash. |
-| POST | `/tasks/{id}/archive` | Archive a task (off the board and lists; not trash). |
-| POST | `/tasks/{id}/unarchive` | Bring an archived task back. |
-| POST | `/projects/{p}/archive-done` | Archive done and cancelled tasks finished more than N days ago (`older_than_days`); `category` (`done` or `cancelled`) limits it to one. |
-| POST | `/tasks/{id}/resume` | Ask for the task's agent session to be resumed (records the request, moves the task to todo). |
-| GET | `/tasks/{id}/activity` | A task's history (old values included). |
-| GET | `/tasks/{id}/relations` | Tasks this one blocks, is blocked by, or relates to. |
-| POST | `/tasks/{id}/relations` | Link two tasks (`blocks`, `blocked_by`, `relates`). |
-| DELETE | `/tasks/{id}/relations` | Unlink two tasks (`?task=...&direction=...`). |
-| GET | `/tasks/{id}/checklist` | A task's checklist. |
-| POST | `/tasks/{id}/checklist` | Append checklist items. |
-| PATCH | `/tasks/{id}/checklist/{item}` | Edit, tick/untick or move an item. |
-| DELETE | `/tasks/{id}/checklist/{item}` | Remove an item. |
-| GET | `/inbox` | Tasks waiting for a human (category `waiting`) across your workspaces, with the latest question. |
+| GET | `/workspaces/{ws}/gigs` | Gigs across a workspace (filters combine). |
+| GET | `/projects/{p}/gigs` | A project's gigs (filters combine). |
+| POST | `/projects/{p}/gigs` | Create a gig; `subgigs` (`{title, blocks_parent}`) and `relations` (`{gig, direction}`) are created with it, in one transaction. |
+| GET | `/gigs/{id}` | A gig, by id or key. |
+| PATCH | `/gigs/{id}` | Change a gig's fields (`null` clears). |
+| POST | `/gigs/{id}/move` | Move a gig: status, position, or another project of the workspace. |
+| POST | `/gigs/{id}/clone` | Copy a gig (optionally into another project): content, labels, assignees, dates, custom field values, and the checklist unticked (with the Checklists permission). |
+| DELETE | `/gigs/{id}` | Move a gig to the trash. |
+| POST | `/gigs/{id}/restore` | Restore a gig from the trash. |
+| POST | `/gigs/{id}/archive` | Archive a gig (off the board and lists; not trash). |
+| POST | `/gigs/{id}/unarchive` | Bring an archived gig back. |
+| POST | `/projects/{p}/archive-done` | Archive done and cancelled gigs finished more than N days ago (`older_than_days`); `category` (`done` or `cancelled`) limits it to one. |
+| POST | `/gigs/{id}/resume` | Ask for the gig's agent session to be resumed (records the request, moves the gig to todo). |
+| GET | `/gigs/{id}/activity` | A gig's history (old values included). |
+| GET | `/gigs/{id}/relations` | Gigs this one blocks, is blocked by, or relates to. |
+| POST | `/gigs/{id}/relations` | Link two gigs (`blocks`, `blocked_by`, `relates`). |
+| DELETE | `/gigs/{id}/relations` | Unlink two gigs (`?gig=...&direction=...`). |
+| GET | `/gigs/{id}/checklist` | A gig's checklist. |
+| POST | `/gigs/{id}/checklist` | Append checklist items. |
+| PATCH | `/gigs/{id}/checklist/{item}` | Edit, tick/untick or move an item. |
+| DELETE | `/gigs/{id}/checklist/{item}` | Remove an item. |
+| GET | `/inbox` | Gigs waiting for a human (category `waiting`) across your workspaces, with the latest question. |
 
-Task list filters: `project` (workspace list only), `status`, `category`, `label`, `priority_min`,
+Gig list filters: `project` (workspace list only), `status`, `category`, `label`, `priority_min`,
 `assignee`, `created_by`, `q` (text in titles, descriptions and comments), `due_before`,
 `updated_since`, `include_deleted`, `deleted`, `archived` (`only` or `include`), `parent`, `blocked`,
 `sort` (`board`, or a comma list of `priority`, `due`, `created`, `updated`, `number`, `title`, each
 optionally prefixed with `-` for descending), `limit`, `cursor`.
 
 
-Every task carries `last_run` (absent when it never ran): its latest run in brief (`id`, `status`,
+Every gig carries `last_run` (absent when it never ran): its latest run in brief (`id`, `status`,
 `worker_user_id`, `started_at`, `heartbeat_at`, `ended_at`, `model`, `progress_pct`, `progress_note`,
-`error_reason`). In task lists and on the board (`GET /projects/{p}/board`), a task in a Waiting status
-also carries `question` when the caller has `comments:read`: the task's latest `question` or `report`
+`error_reason`). In gig lists and on the board (`GET /projects/{p}/board`), a gig in a Waiting status
+also carries `question` when the caller has `comments:read`: the gig's latest `question` or `report`
 comment, until someone other than its author comments after it (an answer clears it; the author's own
 follow-ups don't): `comment_id`, `author_id`, `created_at`, `kind` (`question` or `report`), `text` (its
 Markdown cut to 280 characters).
@@ -422,8 +422,8 @@ Markdown cut to 280 characters).
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/tasks/{id}/comments` | A task's comments, oldest first, with author facts. |
-| POST | `/tasks/{id}/comments` | Comment (Markdown; `kind` = `comment`, `report` or `question`). |
+| GET | `/gigs/{id}/comments` | A gig's comments, oldest first, with author facts. |
+| POST | `/gigs/{id}/comments` | Comment (Markdown; `kind` = `comment`, `report` or `question`). |
 | PATCH | `/comments/{id}` | Edit your comment (the old text stays in the history). |
 | DELETE | `/comments/{id}` | Delete a comment (yours, or any as a manager). |
 
@@ -431,65 +431,65 @@ Markdown cut to 280 characters).
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/workspaces/{ws}/fields` | Custom task fields. |
+| GET | `/workspaces/{ws}/fields` | Custom gig fields. |
 | POST | `/workspaces/{ws}/fields` | Add a custom field. |
 | PUT | `/fields/{id}` | Rename a field or change its options. |
 | DELETE | `/fields/{id}` | Remove a field and its values. |
-| PATCH | `/tasks/{id}/custom` | Set or clear (`null`) a task's custom values, keyed by field id. |
+| PATCH | `/gigs/{id}/custom` | Set or clear (`null`) a gig's custom values, keyed by field id. |
 
 ### templates
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/workspaces/{ws}/templates` | Task templates (`?project=` for those usable in a project). |
+| GET | `/workspaces/{ws}/templates` | Gig templates (`?project=` for those usable in a project). |
 | POST | `/workspaces/{ws}/templates` | Save a template. |
 | GET | `/templates/{id}` | A template. |
 | PUT | `/templates/{id}` | Replace a template. |
 | DELETE | `/templates/{id}` | Delete a template. |
-| POST | `/templates/{id}/use` | Create a task from a template. |
+| POST | `/templates/{id}/use` | Create a gig from a template. |
 
 ### recurrence
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/workspaces/{ws}/recurrences` | Recurring tasks (each pairs a template with a schedule). |
-| POST | `/projects/{p}/recurrences` | Create a recurring task. |
-| GET | `/recurrences/{id}` | A recurring task with its next five occurrences. |
-| PUT | `/recurrences/{id}` | Replace a recurring task; the next occurrence is recomputed from now (an occurrence already made is never made again). The editor becomes its owner, so this needs `create_tasks` too; new timing changes the shared schedule and needs what `PUT /schedules/{id}` needs. |
-| DELETE | `/recurrences/{id}` | Stop a recurring task. Its tasks stay; `?template=true` / `?schedule=true` also delete its template / schedule (409 and nothing deleted while another recurring task uses it). |
-| GET | `/workspaces/{ws}/schedules` | Schedules (named timing; `minutes`/`hours` ones are for crons only). |
+| GET | `/workspaces/{ws}/recurrences` | Recurring gigs (each pairs a template with a schedule). |
+| POST | `/projects/{p}/recurrences` | Create a recurring gig. |
+| GET | `/recurrences/{id}` | A recurring gig with its next five occurrences. |
+| PUT | `/recurrences/{id}` | Replace a recurring gig; the next occurrence is recomputed from now (an occurrence already made is never made again). The editor becomes its owner, so this needs `create_gigs` too; new timing changes the shared schedule and needs what `PUT /schedules/{id}` needs. |
+| DELETE | `/recurrences/{id}` | Stop a recurring gig. Its gigs stay; `?template=true` / `?schedule=true` also delete its template / schedule (409 and nothing deleted while another recurring gig uses it). |
+| GET | `/workspaces/{ws}/schedules` | Schedules (named timing; `minutes`/`hours` ones are for errands only). |
 | POST | `/workspaces/{ws}/schedules` | Make a schedule. |
 | GET | `/schedules/{id}` | A schedule. |
-| PUT | `/schedules/{id}` | Replace a schedule (every recurring task and cron on it follows; with crons on it, this also needs `crons`). |
-| DELETE | `/schedules/{id}` | Delete a schedule no recurring task or cron uses. |
+| PUT | `/schedules/{id}` | Replace a schedule (every recurring gig and errand on it follows; with errands on it, this also needs `errands`). |
+| DELETE | `/schedules/{id}` | Delete a schedule no recurring gig or errand uses. |
 
-### crons
+### errands
 
-Commands an agent's executor runs on a schedule, sandboxed, with a run history and no tasks (see
-[the guide](../guide/crons.md)). Reading needs view and `crons:read`; changing needs the `crons`
-permission and `crons:write`; `unsandboxed: true` also needs `cron_unsandboxed`. A change by someone
-without `cron_unsandboxed` turns the flag off (on a template other crons share: on a sandboxed copy for
-that cron); they can't resume or run-now a no-sandbox cron, retime its schedule, or `PUT` a no-sandbox
-template directly (403: edit a cron that uses it instead).
+Commands an agent's executor runs on a schedule, sandboxed, with a run history and no gigs (see
+[the guide](../guide/errands.md)). Reading needs view and `errands:read`; changing needs the `errands`
+permission and `errands:write`; `unsandboxed: true` also needs `errand_unsandboxed`. A change by someone
+without `errand_unsandboxed` turns the flag off (on a template other errands share: on a sandboxed copy for
+that errand); they can't resume or run-now a no-sandbox errand, retime its schedule, or `PUT` a no-sandbox
+template directly (403: edit an errand that uses it instead).
 `command_set_by` changes only with the command text; `unsandboxed_set_by` is who turned the sandbox
-off. Sending a `host` cron's output to gigg needs the command's author or `manage_workspace`; changing
-a cron's worker needs `manage_workspace`; its failure task, the worker or `manage_workspace`.
+off. Sending a `host` errand's output to gigg needs the command's author or `manage_workspace`; changing
+an errand's worker needs `manage_workspace`; its failure gig, the worker or `manage_workspace`.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/workspaces/{ws}/crons` | Crons, failing first, each with its schedule in words, next slot and last run. |
-| POST | `/workspaces/{ws}/crons` | Make a cron: `template_id` or content (`name`, `command`, `timeout_s` 10-3600, `output` `gigg`/`host`, `unsandboxed`), `schedule_id` or `rule` (`freq` `minutes`/`hours`/`daily`/`weekly`/`monthly`, `interval`, `weekdays`, `month_day`, `tz`, `window_start`, `window_minutes`), `worker` (default you; someone else needs `manage_workspace`), `on_failure_task`, `paused`. |
-| GET | `/crons/{id}` | A cron. |
-| PATCH | `/crons/{id}` | Change a cron (`If-Match`); content fields change its template, shared by the template's other crons. |
-| DELETE | `/crons/{id}` | Delete a cron and its runs (its template and schedule stay). |
-| POST | `/crons/{id}/pause`, `/crons/{id}/resume` | Pause; resume from the next slot (no catch-up). |
-| POST | `/crons/{id}/run-now` | Run once at the executor's next poll. |
-| GET | `/crons/{id}/runs?before=&limit=` | Runs, newest first. |
-| GET | `/cron-runs/{id}` | One run; `output_tail` only with `crons:output`. |
-| GET, POST | `/workspaces/{ws}/cron-templates` | Cron templates. |
-| GET, PUT, DELETE | `/cron-templates/{id}` | A cron template (delete: none uses it). |
-| POST | `/workspaces/{ws}/crons/claim` | The executor (`crons:run`, own crons only): start due runs, at most `limit` (optional body; its free slots), the rest stay due. Returns `items` (run id, command, timeout, output, unsandboxed, `command_set_by`, `unsandboxed_set_by`) and `paused`. Older missed slots are recorded as `missed`; a slot while the previous run is going as `skipped`. |
-| POST | `/cron-runs/{id}/finish` | The executor reports a run: `status` `ok`/`failed`/`timeout`, `exit_code`, `duration_ms`, `output_tail` (last 64 KiB, cut on a character boundary if longer; dropped for `host` output), `output_bytes`, `error`. Returns whether the cron became failing or recovered. |
+| GET | `/workspaces/{ws}/errands` | Errands, failing first, each with its schedule in words, next slot and last run. |
+| POST | `/workspaces/{ws}/errands` | Make an errand: `template_id` or content (`name`, `command`, `timeout_s` 10-3600, `output` `gigg`/`host`, `unsandboxed`), `schedule_id` or `rule` (`freq` `minutes`/`hours`/`daily`/`weekly`/`monthly`, `interval`, `weekdays`, `month_day`, `tz`, `window_start`, `window_minutes`), `worker` (default you; someone else needs `manage_workspace`), `on_failure_gig`, `paused`. |
+| GET | `/errands/{id}` | An errand. |
+| PATCH | `/errands/{id}` | Change an errand (`If-Match`); content fields change its template, shared by the template's other errands. |
+| DELETE | `/errands/{id}` | Delete an errand and its runs (its template and schedule stay). |
+| POST | `/errands/{id}/pause`, `/errands/{id}/resume` | Pause; resume from the next slot (no catch-up). |
+| POST | `/errands/{id}/run-now` | Run once at the executor's next poll. |
+| GET | `/errands/{id}/runs?before=&limit=` | Runs, newest first. |
+| GET | `/errand-runs/{id}` | One run; `output_tail` only with `errands:output`. |
+| GET, POST | `/workspaces/{ws}/errand-templates` | Errand templates. |
+| GET, PUT, DELETE | `/errand-templates/{id}` | An errand template (delete: none uses it). |
+| POST | `/workspaces/{ws}/errands/claim` | The executor (`errands:run`, own errands only): start due runs, at most `limit` (optional body; its free slots), the rest stay due. Returns `items` (run id, command, timeout, output, unsandboxed, `command_set_by`, `unsandboxed_set_by`) and `paused`. Older missed slots are recorded as `missed`; a slot while the previous run is going as `skipped`. |
+| POST | `/errand-runs/{id}/finish` | The executor reports a run: `status` `ok`/`failed`/`timeout`, `exit_code`, `duration_ms`, `output_tail` (last 64 KiB, cut on a character boundary if longer; dropped for `host` output), `output_bytes`, `error`. Returns whether the errand became failing or recovered. |
 
 ### runs
 
@@ -497,20 +497,20 @@ See [runner-protocol.md](runner-protocol.md) for how these fit together.
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/workspaces/{ws}/tasks/claim` | Take the next matching task and move it, atomically (204 when nothing matches). |
-| GET | `/tasks/{id}/runs` | A task's runs, newest first. |
-| POST | `/tasks/{id}/runs` | Record that a worker started on the task. |
+| POST | `/workspaces/{ws}/gigs/claim` | Take the next matching gig and move it, atomically (204 when nothing matches). |
+| GET | `/gigs/{id}/runs` | A gig's runs, newest first. |
+| POST | `/gigs/{id}/runs` | Record that a worker started on the gig. |
 | GET | `/runs/{id}` | A run with its timeline. |
 | POST | `/runs/{id}/progress` | Heartbeat and an optional progress note. |
-| POST | `/runs/{id}/finish` | Close a run, store the report, move the task if asked. |
+| POST | `/runs/{id}/finish` | Close a run, store the report, move the gig if asked. |
 | POST | `/runs/{id}/usage` | Record a finished run's share of the account's usage meter (once). |
 | GET | `/workspaces/{ws}/runs` | Runs in a workspace, newest first. |
-| GET | `/workspaces/{ws}/stats` | Runs, cost and tasks since a time. |
+| GET | `/workspaces/{ws}/stats` | Runs, cost and gigs since a time. |
 | GET | `/runner` | Runner caps, pause state and the last 24 hours, per workspace in reach. |
 | GET | `/workspaces/{ws}/runner` | The same for one workspace. |
-| PATCH | `/workspaces/{ws}/runner` | Change a workspace's task caps (admin). |
-| POST | `/runner/pause` | Pause new task runs and cron runs in some or all workspaces (admin, or `pause_runs`); `tasks`/`crons` (default true) pick the boxes. Crons stay paused until resumed. |
-| POST | `/runner/resume` | Lift the pause (admin, or `pause_runs`); `tasks`/`crons` as above. |
+| PATCH | `/workspaces/{ws}/runner` | Change a workspace's gig caps (admin). |
+| POST | `/runner/pause` | Pause new gig runs and errand runs in some or all workspaces (admin, or `pause_runs`); `gigs`/`errands` (default true) pick the boxes. Errands stay paused until resumed. |
+| POST | `/runner/resume` | Lift the pause (admin, or `pause_runs`); `gigs`/`errands` as above. |
 
 ### admin
 

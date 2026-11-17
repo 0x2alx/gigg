@@ -19,7 +19,7 @@ func TestUnboundKeyForMember(t *testing.T) {
 	if code != 422 {
 		t.Fatalf("admin scope on a non-admin unbound key: %d %s", code, out)
 	}
-	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"bob-all","user_id":%d,"scopes":["workspace:read","workspace:write","tasks:read"],"allowed_listeners":["internal"]}`, bob), e.ada())
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"bob-all","user_id":%d,"scopes":["workspace:read","workspace:write","gigs:read"],"allowed_listeners":["internal"]}`, bob), e.ada())
 	e.ok(code, out, 201)
 	var kc KeyCreated
 	_ = json.Unmarshal(out, &kc)
@@ -34,10 +34,10 @@ func TestUnboundKeyForMember(t *testing.T) {
 	if !strings.Contains(string(out), `"slug":"scout"`) || strings.Contains(string(out), `"slug":"atlas"`) {
 		t.Fatalf("workspaces in reach: %s", out)
 	}
-	if code, out, _ = e.req("GET", "/workspaces/scout/tasks", "", key); code != 200 || !strings.Contains(string(out), "scout secret task") {
-		t.Fatalf("member workspace tasks: %d %s", code, out)
+	if code, out, _ = e.req("GET", "/workspaces/scout/gigs", "", key); code != 200 || !strings.Contains(string(out), "scout secret gig") {
+		t.Fatalf("member workspace gigs: %d %s", code, out)
 	}
-	for _, p := range []string{"/workspaces/atlas/tasks", "/workspaces/atlas", fmt.Sprintf("/tasks/%d", e.ids["atlas.task"]), "/workspaces/atlas/fields"} {
+	for _, p := range []string{"/workspaces/atlas/gigs", "/workspaces/atlas", fmt.Sprintf("/gigs/%d", e.ids["atlas.gig"]), "/workspaces/atlas/fields"} {
 		if code, out, _ := e.req("GET", p, "", key); code != 404 {
 			t.Errorf("%s from a non-member unbound key: %d %s", p, code, out)
 		}
@@ -71,7 +71,7 @@ func TestUnboundKeyForMember(t *testing.T) {
 	// membership changes apply live: removed from scout, the key reaches nothing
 	code, out, _ = e.reqH("DELETE", fmt.Sprintf("/workspaces/scout/members/%d", bob), "", e.ada(), map[string]string{"X-Gigg-CSRF": "1"})
 	e.ok(code, out, 204)
-	if code, out, _ := e.req("GET", "/workspaces/scout/tasks", "", key); code != 404 {
+	if code, out, _ := e.req("GET", "/workspaces/scout/gigs", "", key); code != 404 {
 		t.Fatalf("after removal: %d %s", code, out)
 	}
 	code, out, _ = e.req("GET", "/workspaces", "", key)
@@ -82,7 +82,7 @@ func TestUnboundKeyForMember(t *testing.T) {
 
 	// a member can mint their own unbound key in a session-free way only through an existing
 	// unbound key with keys:self; a workspace key still can't widen to unbound
-	code, out, _ = e.req("POST", "/me/keys", `{"name":"wide","scopes":["tasks:read"]}`, e.key("scout"))
+	code, out, _ = e.req("POST", "/me/keys", `{"name":"wide","scopes":["gigs:read"]}`, e.key("scout"))
 	if code != 403 {
 		t.Fatalf("workspace key minting an unbound key: %d %s", code, out)
 	}

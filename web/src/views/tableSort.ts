@@ -1,12 +1,12 @@
 // Sorting the all-workspaces table on the client. Each workspace's list comes sorted (and paged) by the
 // server; merged, the rows need the server's exact order, or a capped list would show the wrong top
-// rows. So this mirrors internal/store/tasks.go (sortCols): number (project key, then the number), title
+// rows. So this mirrors internal/store/gigs.go (sortCols): number (project key, then the number), title
 // (ASCII case-insensitive, like SQLite's NOCASE), priority, due (no due date last either way), updated,
 // created; ties by id, ascending.
-import type { Task } from "../api";
+import type { Gig } from "../api";
 import type { SortKey } from "./savedViews";
 
-type Row = Pick<Task, "key" | "title" | "priority" | "due_at" | "updated_at" | "created_at" | "id">;
+type Row = Pick<Gig, "key" | "title" | "priority" | "due_at" | "updated_at" | "created_at" | "id">;
 
 const keyParts = (key: string): [string, number] => {
   const i = key.lastIndexOf("-");
@@ -17,7 +17,7 @@ const keyParts = (key: string): [string, number] => {
 const nocase = (s: string) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
-export function compareTasks(a: Row, b: Row, sort: { key: SortKey; desc: boolean }): number {
+export function compareGigs(a: Row, b: Row, sort: { key: SortKey; desc: boolean }): number {
   const dir = sort.desc ? -1 : 1;
   let c = 0;
   switch (sort.key) {

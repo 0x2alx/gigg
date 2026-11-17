@@ -31,21 +31,21 @@ type Permission struct {
 
 // Permissions, in display order.
 var Permissions = []Permission{
-	{"view", "See the workspace", "See the workspace, its projects, tasks, comments and runs. Every other permission needs it.", "Basics"},
+	{"view", "See the workspace", "See the workspace, its projects, gigs, comments and runs. Every other permission needs it.", "Basics"},
 	{"comment", "Comment", "Write comments and edit or delete your own.", "Basics"},
-	{"edit_tasks", "Edit tasks", "Change, move and assign tasks; claim tasks and report runs (agents).", "Tasks"},
-	{"create_tasks", "Create tasks", "Create one-off tasks, clone tasks, and create tasks from templates (with Edit tasks).", "Tasks"},
-	{"delete_tasks", "Delete tasks", "Move tasks to the trash and restore them (with Edit tasks).", "Tasks"},
-	{"archive_tasks", "Archive tasks", "Archive and unarchive tasks (with Edit tasks).", "Tasks"},
-	{"relations", "Dependencies", "Add and remove blocking/related links between tasks (with Edit tasks).", "Tasks"},
-	{"checklists", "Checklists", "Add, tick and remove checklist items (with Edit tasks).", "Tasks"},
-	{"always_run", "Always-run tasks", "Mark tasks to run whatever the usage budget (cron-like tasks). The task cap and pauses still apply.", "Runner"},
-	{"allowed_tools", "Task tool allowlists", "Give tasks (templates, recurring tasks) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change tasks that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner"},
-	{"crons", "Crons", "Create, change, pause and delete crons (commands an agent's executor runs on a schedule, sandboxed) and cron templates. A cron's worker is yourself, or any agent with Manage the workspace.", "Runner"},
-	{"cron_unsandboxed", "No-sandbox crons", "Let a cron run outside its agent's sandbox. Any change to such a cron by someone without this permission turns its sandbox back on.", "Runner"},
-	{"pause_runs", "Pause task runs", "Pause and resume new agent task runs and cron runs; with an all-workspaces rule, every workspace at once. Changing the caps stays with admins.", "Runner"},
-	{"schedules", "Recurring tasks", "Create, change, pause and stop recurring task schedules (with Edit tasks; they make tasks with Create tasks).", "Planning"},
-	{"templates", "Task templates", "Create, change and delete task templates, with Edit tasks (using one only needs Create tasks).", "Planning"},
+	{"edit_gigs", "Edit gigs", "Change, move and assign gigs; claim gigs and report runs (agents).", "Gigs"},
+	{"create_gigs", "Create gigs", "Create one-off gigs, clone gigs, and create gigs from templates (with Edit gigs).", "Gigs"},
+	{"delete_gigs", "Delete gigs", "Move gigs to the trash and restore them (with Edit gigs).", "Gigs"},
+	{"archive_gigs", "Archive gigs", "Archive and unarchive gigs (with Edit gigs).", "Gigs"},
+	{"relations", "Dependencies", "Add and remove blocking/related links between gigs (with Edit gigs).", "Gigs"},
+	{"checklists", "Checklists", "Add, tick and remove checklist items (with Edit gigs).", "Gigs"},
+	{"always_run", "Always-run gigs", "Mark gigs to run whatever the usage budget (cron-like gigs). The gig cap and pauses still apply.", "Runner"},
+	{"allowed_tools", "Gig tool allowlists", "Give gigs (templates, recurring gigs) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change gigs that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner"},
+	{"errands", "Errands", "Create, change, pause and delete errands (commands an agent's executor runs on a schedule, sandboxed) and errand templates. An errand's worker is yourself, or any agent with Manage the workspace.", "Runner"},
+	{"errand_unsandboxed", "No-sandbox errands", "Let an errand run outside its agent's sandbox. Any change to such an errand by someone without this permission turns its sandbox back on.", "Runner"},
+	{"pause_runs", "Pause gig runs", "Pause and resume new agent gig runs and errand runs; with an all-workspaces rule, every workspace at once. Changing the caps stays with admins.", "Runner"},
+	{"schedules", "Recurring gigs", "Create, change, pause and stop recurring gig schedules (with Edit gigs; they make gigs with Create gigs).", "Planning"},
+	{"templates", "Gig templates", "Create, change and delete gig templates, with Edit gigs (using one only needs Create gigs).", "Planning"},
 	{"custom_fields", "Custom fields", "Define the workspace's custom fields.", "Planning"},
 	{"saved_filters", "Saved filters", "Save personal filtered views.", "Planning"},
 	{"manage_workspace", "Manage the workspace", "Projects, columns, sections and labels, and other people's comments.", "Admin"},
@@ -55,8 +55,8 @@ var Permissions = []Permission{
 var Presets = map[string][]string{
 	"viewer":    {"view"},
 	"commenter": {"view", "comment"},
-	"member":    {"view", "comment", "edit_tasks", "create_tasks", "delete_tasks", "archive_tasks", "relations", "checklists", "saved_filters"},
-	"manager": {"view", "comment", "edit_tasks", "create_tasks", "delete_tasks", "archive_tasks", "relations", "checklists", "saved_filters",
+	"member":    {"view", "comment", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "saved_filters"},
+	"manager": {"view", "comment", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "saved_filters",
 		"schedules", "templates", "custom_fields", "manage_workspace"},
 }
 
@@ -284,7 +284,7 @@ func RoleLabel(admin bool, perms []string) string {
 		return "admin"
 	case slices.Contains(perms, "manage_workspace"):
 		return "manager"
-	case slices.Contains(perms, "edit_tasks"):
+	case slices.Contains(perms, "edit_gigs"):
 		return "member"
 	case slices.Contains(perms, "comment"):
 		return "commenter"
@@ -471,9 +471,9 @@ func SetMembership(ctx context.Context, q Q, a Actor, ws, user int64, role strin
 	return SetRule(ctx, q, a, "user", user, &ws, role, ov)
 }
 
-// dropUnseenAssignees removes assignees who can no longer see their task's workspace.
+// dropUnseenAssignees removes assignees who can no longer see their gig's workspace.
 func dropUnseenAssignees(ctx context.Context, q Q) error {
-	rows, err := q.QueryContext(ctx, `SELECT DISTINCT a.user_id, t.workspace_id FROM task_assignees a JOIN tasks t ON t.id = a.task_id`)
+	rows, err := q.QueryContext(ctx, `SELECT DISTINCT a.user_id, t.workspace_id FROM gig_assignees a JOIN gigs t ON t.id = a.gig_id`)
 	if err != nil {
 		return err
 	}
@@ -492,7 +492,7 @@ func dropUnseenAssignees(ctx context.Context, q Q) error {
 		if _, g, err := UserGrants(ctx, q, p.user); err == nil && g.Has(p.ws, "view") {
 			continue
 		}
-		if _, err := q.ExecContext(ctx, `DELETE FROM task_assignees WHERE user_id = ? AND task_id IN (SELECT id FROM tasks WHERE workspace_id = ?)`, p.user, p.ws); err != nil {
+		if _, err := q.ExecContext(ctx, `DELETE FROM gig_assignees WHERE user_id = ? AND gig_id IN (SELECT id FROM gigs WHERE workspace_id = ?)`, p.user, p.ws); err != nil {
 			return err
 		}
 	}
