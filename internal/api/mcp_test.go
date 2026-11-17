@@ -242,7 +242,21 @@ func TestMCPNoCreate(t *testing.T) {
 	if code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"create_gigs":false}}`, e.ids["scout.ws"]), e.ada()); code != 200 {
 		t.Fatalf("deny: %d %s", code, out)
 	}
-	s, err := e.mcpSession(t, srv, authTransport{token: e.keys["scout"]})
+	// a consumer agent's MCP key: errands read-only
+	body := fmt.Sprintf(`{"name":"mcp","user_id":%d,"workspace":"scout","scopes":["workspace:read","gigs:read","gigs:write","comments:read","comments:write","artifacts:write","runs:write","profile:write","errands:read","errands:output"],"allowed_listeners":["internal"]}`, e.ids["scout.user"])
+	code, out, _ := e.req("POST", "/keys", body, e.ada())
+	if code != 201 {
+		t.Fatalf("mcp key: %d %s", code, out)
+	}
+	var kc KeyCreated
+	_ = json.Unmarshal(out, &kc)
+	code, out, _ = e.req("POST", "/workspaces/scout/errands", `{"name":"disk","command":"df -h /","worker":"scout","rule":{"freq":"hours","interval":2,"tz":"UTC"}}`, e.ada())
+	if code != 201 {
+		t.Fatalf("errand by ada: %d %s", code, out)
+	}
+	var er struct{ ID int64 }
+	_ = json.Unmarshal(out, &er)
+	s, err := e.mcpSession(t, srv, authTransport{token: kc.Token})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,17 +269,24 @@ func TestMCPNoCreate(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names[tl.Name] = true
 	}
-	for _, gone := range []string{"create_gig", "clone_gig", "create_from_template"} {
+	for _, gone := range []string{"create_gig", "clone_gig", "create_from_template", "save_errand", "pause_errand", "run_errand_now", "delete_errand"} {
 		if names[gone] {
-			t.Errorf("%s offered to an agent that may not create gigs", gone)
+			t.Errorf("%s offered to an agent that may not create gigs or manage errands", gone)
 		}
 	}
-	for _, want := range []string{"update_gig", "move_gig", "add_comment", "get_gig"} {
+	for _, want := range []string{"update_gig", "move_gig", "add_comment", "get_gig", "list_errands", "get_errand", "list_errand_runs", "get_errand_run", "list_errand_templates"} {
 		if !names[want] {
 			t.Errorf("%s missing", want)
 		}
 	}
-	if code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"]), `{"title":"x"}`, e.key("scout")); code != 403 {
+	// reading errands needs only view (no Errands permission)
+	for name, args := range map[string]map[string]any{"list_errands": {"workspace": "scout"}, "get_errand": {"id": er.ID}, "list_errand_runs": {"id": er.ID}} {
+		r, err := s.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})
+		if err != nil || r.IsError {
+			t.Errorf("%s as an agent without Errands: %v %+v", name, err, r)
+		}
+	}
+	if code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"]), `{"title":"x"}`, cred{token: kc.Token, listener: "internal"}); code != 403 {
 		t.Fatalf("API create without create_gigs: %d %s", code, out)
 	}
 }
