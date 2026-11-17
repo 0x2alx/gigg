@@ -215,7 +215,7 @@ export function errandProblem(f: ErrandForm): string | null {
   if (!f.name.trim()) return "Give it a name.";
   if (!f.command.trim()) return "Give it a command.";
   if (f.command.length > 16384) return "The command is limited to 16 KiB.";
-  if (!Number.isInteger(f.timeout) || f.timeout < 10 || f.timeout > 3600) return "Timeout: 10 to 3600 seconds.";
+  if (!Number.isInteger(f.timeout) || f.timeout < 10 || f.timeout > 43200) return "Timeout: 10 to 43200 seconds (12 h).";
   const max = { minutes: 360, hours: 24, daily: 365, weekly: 52, monthly: 12 }[f.freq];
   if (!Number.isInteger(f.interval) || f.interval < 1 || f.interval > max) return `Every 1 to ${max}.`;
   if (frequent(f.freq)) {

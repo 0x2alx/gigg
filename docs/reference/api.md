@@ -478,7 +478,7 @@ an errand's worker needs `manage_workspace`; its failure gig, the worker or `man
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/workspaces/{ws}/errands` | Errands, failing first, each with its schedule in words, next slot and last run. |
-| POST | `/workspaces/{ws}/errands` | Make an errand: `template_id` or content (`name`, `command`, `timeout_s` 10-3600, `output` `gigg`/`host`, `unsandboxed`), `schedule_id` or `rule` (`freq` `minutes`/`hours`/`daily`/`weekly`/`monthly`, `interval`, `weekdays`, `month_day`, `tz`, `window_start`, `window_minutes`), `worker` (default you; someone else needs `manage_workspace`), `on_failure_gig`, `paused`. |
+| POST | `/workspaces/{ws}/errands` | Make an errand: `template_id` or content (`name`, `command`, `timeout_s` 10-43200 (default 300; another value needs `run_timeout`), `output` `gigg`/`host`, `unsandboxed`), `schedule_id` or `rule` (`freq` `minutes`/`hours`/`daily`/`weekly`/`monthly`, `interval`, `weekdays`, `month_day`, `tz`, `window_start`, `window_minutes`), `worker` (default you; someone else needs `manage_workspace`), `on_failure_gig`, `paused`. |
 | GET | `/errands/{id}` | An errand. |
 | PATCH | `/errands/{id}` | Change an errand (`If-Match`); content fields change its template, shared by the template's other errands. |
 | DELETE | `/errands/{id}` | Delete an errand and its runs (its template and schedule stay). |

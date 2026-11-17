@@ -14,7 +14,7 @@ import { Markdown } from "./markdown";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { Clamp } from "./Clamp";
 import { AgentRunGroup, PropGroup, Row } from "./GigSections";
-import type { RunSettings } from "./runsettings";
+import { ARCHIVE_CHOICES, MinutesSelect, type RunSettings } from "./runsettings";
 import { LabelChip, Pill, PriorityBadge, StatusBadge, UserBadge } from "./ui";
 import { Icon } from "./icons";
 
@@ -61,6 +61,7 @@ export function GigEditor(p: {
   knownLabels: Tag[];
   candidates: User[];
   alwaysLocked: boolean;
+  timeoutLock?: "clear" | "all";
   canTools: boolean;
   overdue?: boolean;
   head?: ReactNode; // in the gig box, above the text (template name, from template)
@@ -228,10 +229,20 @@ export function GigEditor(p: {
                 <span className="muted">none</span>
               )}
             </Row>
+            <Row tip="Archive it on its own this long after it is done or cancelled" label="Auto-archive">
+              <MinutesSelect
+                value={v.run.auto_archive_minutes}
+                choices={ARCHIVE_CHOICES}
+                none="never"
+                label="Auto-archive"
+                lock={canWrite ? undefined : "all"}
+                onChange={(auto_archive_minutes) => p.setRun({ auto_archive_minutes })}
+              />
+            </Row>
             {p.detailsEnd}
           </PropGroup>
 
-          <AgentRunGroup value={v.run} canWrite={canWrite} alwaysLocked={p.alwaysLocked} canTools={p.canTools} onChange={p.setRun} onToolsError={p.onToolsError} />
+          <AgentRunGroup value={v.run} canWrite={canWrite} alwaysLocked={p.alwaysLocked} timeoutLock={p.timeoutLock} canTools={p.canTools} onChange={p.setRun} onToolsError={p.onToolsError} />
         </div>
         {p.sideMid}
         <div className="tsecs">{p.rightSecs}</div>

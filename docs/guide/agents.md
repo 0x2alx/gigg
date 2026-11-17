@@ -25,6 +25,7 @@ On a gig, a template or a recurring gig:
 |---|---|
 | **Model** | The model a runner should ask for (an alias like `opus` or `sonnet`, or a full model id). Empty: the agent's default. |
 | **Effort** | The reasoning effort level (low, medium, high, xhigh, max). Empty: the agent's default. |
+| **Run timeout** | How long the agent may work on one run before the runner stops it (15 min to 5 h). Empty: the agent's default (1 h). The agent's host may allow less. Needs the *Run timeouts* permission. |
 | **Always run** | Runs it whatever the usage budget, day or night: for cron-like jobs. The daily cap and pauses still apply. Needs the *Always-run gigs* permission. |
 | **Allowed tools** | Gives the agent exactly these tools for this gig and nothing else, one permission rule per line (for example `Read`, `Bash(git status *)`, `WebFetch(domain:example.com)`). A runner should pass them to the agent so that nothing else is allowed (for Claude Code: `--allowedTools` with `--permission-mode dontAsk`). Empty: the agent's usual setup. Needs the *Gig tool allowlists* permission. |
 

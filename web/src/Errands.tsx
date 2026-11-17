@@ -559,6 +559,7 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const canUnsandbox = hasCap(me, "errand_unsandboxed", ws.id);
+  const canTimeout = hasCap(me, "run_timeout", ws.id); // another timeout than the default, or a change
   const manager = hasCap(me, "manage_workspace", ws.id);
   // the agents who can run it: yourself (an agent), or with Manage the workspace any agent member
   const agents = useMemo(() => (members.get(ws.id) ?? []).map((id) => users.get(id)).filter((u) => u && u.kind === "agent"), [members, users, ws.id]);
@@ -684,11 +685,11 @@ function ErrandEditor({ errand, choices, initialWs, onClose, onSaved }: { errand
             <Icon name="clock" /> {describeErrand(f)}
           </p>
         </div>
-        <label>
+        <label title={canTimeout ? undefined : "Changing it needs the Run timeouts permission"}>
           <span>
-            Timeout <span className="muted small">seconds, 10–3600</span>
+            Timeout <span className="muted small">seconds, 10–43200 (12 h)</span>
           </span>
-          <input type="number" min={10} max={3600} value={f.timeout} onChange={(e) => set({ timeout: int(e.target.value, 300) })} />
+          <input type="number" min={10} max={43200} value={f.timeout} disabled={!canTimeout} onChange={(e) => set({ timeout: int(e.target.value, 300) })} />
         </label>
         <label>
           Agent

@@ -6,7 +6,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, type ChecklistItem, type CustomField, type Relation, type RelationDirection, type Gig, type TemplateSubgig } from "./api";
 import { formatCustom, fromInput, moveAfter, progress, reorder, splitLines, toInput } from "./items";
 import { CATEGORY_COLOR } from "./theme";
-import { EffortSelect, ModelInput, ToolsInput, type RunSettings } from "./runsettings";
+import { EffortSelect, MinutesSelect, ModelInput, TIMEOUT_CHOICES, ToolsInput, type RunSettings } from "./runsettings";
 import { Pill, StatusBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon, type IconName } from "./icons";
@@ -96,10 +96,11 @@ function Problem({ text }: { text: string }) {
 
 // ---- agent run
 
-// AgentRunGroup: model, effort, always run and the tool allowlist. onChange gets the one setting
-// changed. alwaysLocked: the Always run box can't be changed (no permission).
-export function AgentRunGroup({ value, canWrite, alwaysLocked, canTools, onChange, onToolsError }: {
-  value: RunSettings; canWrite: boolean; alwaysLocked: boolean; canTools: boolean; onChange: (p: Partial<RunSettings>) => void; onToolsError?: (bad: string | null) => void;
+// AgentRunGroup: model, effort, run timeout, always run and the tool allowlist. onChange gets the one
+// setting changed. alwaysLocked: the Always run box can't be changed (no permission). timeoutLock:
+// without the Run timeouts permission ("clear": a new item may only drop the one it got).
+export function AgentRunGroup({ value, canWrite, alwaysLocked, timeoutLock, canTools, onChange, onToolsError }: {
+  value: RunSettings; canWrite: boolean; alwaysLocked: boolean; timeoutLock?: "clear" | "all"; canTools: boolean; onChange: (p: Partial<RunSettings>) => void; onToolsError?: (bad: string | null) => void;
 }) {
   return (
     <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run gigs" />}>
@@ -108,6 +109,17 @@ export function AgentRunGroup({ value, canWrite, alwaysLocked, canTools, onChang
       </Row>
       <Row tip="Reasoning effort for the agent’s run (low to max). Empty: the agent’s default" label="Effort">
         <EffortSelect value={value.effort} disabled={!canWrite} onChange={(effort) => onChange({ effort })} />
+      </Row>
+      <Row tip="How long the agent may work on one run before it is stopped (the agent’s host may allow less). Empty: the agent’s default, 1 h" label="Run timeout">
+        <MinutesSelect
+          value={value.run_timeout_minutes}
+          choices={TIMEOUT_CHOICES}
+          none="agent default"
+          label="Run timeout"
+          lock={!canWrite ? "all" : timeoutLock}
+          title={timeoutLock ? "Changing it needs the Run timeouts permission" : undefined}
+          onChange={(run_timeout_minutes) => onChange({ run_timeout_minutes })}
+        />
       </Row>
       <Row tip="Run it whatever the usage budget, day or night, like a cron job. The daily cap and pauses still apply" label="Always run" wide>
         <label className="admin-check run-always" title={alwaysLocked ? "Changing it needs the Always-run gigs permission" : "Runs whatever the usage budget, day or night"}>

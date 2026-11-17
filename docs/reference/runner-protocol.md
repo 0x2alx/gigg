@@ -244,7 +244,7 @@ Requesting a resume needs `edit_gigs` and `gigs:write` (plus `comments:write` wi
 
 ## Gig run settings
 
-Gigs (and templates and recurring gigs) carry four fields for the runner. gigg validates and stores
+Gigs (and templates and recurring gigs) carry five fields for the runner. gigg validates and stores
 them; applying them is the runner's job.
 
 | Field | Values | Meaning |
@@ -253,6 +253,7 @@ them; applying them is the runner's job.
 | `effort` | `low`, `medium`, `high`, `xhigh`, `max`, or `""` = the agent's default | Effort level for the agent. Note: gigg only stores it; how it reaches the agent (flag, setting or environment) depends on the agent CLI and the runner. |
 | `always_run` | boolean | Run the gig whatever the runner's usage budget, day or night. On the server side it ranks first in claims and counts against `daily_cap` but not `night_cap`. Pauses and caps still apply. |
 | `allowed_tools` | up to 64 rules, each up to 500 characters; `[]` = none | Tools the agent may use for this gig, as Claude Code permission rules. |
+| `run_timeout_minutes` | 5-300, or `null` = the agent's default | How long the runner lets one run go before it stops the agent. A runner should cap it at its own ceiling. It stays under the 6 h after which the server closes a run that sends no heartbeat. |
 
 `allowed_tools` rules are one rule per entry: a tool name (`Read`, `Bash`, `WebFetch`,
 `mcp__server__tool`) optionally followed by a specifier in parentheses (`Bash(git status *)`,
@@ -273,8 +274,9 @@ Who may change them:
   resuming a gig that has it.
 - `allowed_tools`: setting, changing or clearing it needs the `allowed_tools` permission; so does
   editing, reopening or resuming a gig that has a list.
+- `run_timeout_minutes`: setting, changing or clearing it needs the `run_timeout` permission.
 
-Both permissions are in no preset (see [access.md](access.md)). Give them to the people who decide what
+These permissions are in no preset (see [access.md](access.md)). Give them to the people who decide what
 unattended agents may do, not to the agents themselves unless intended.
 
 ## A minimal runner

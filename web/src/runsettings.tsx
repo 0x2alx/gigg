@@ -1,6 +1,7 @@
 // How an agent runs a gig: model and effort for claude -p, always-run (worked whatever the usage
-// budget, day or night) and a tool allowlist (a runner should allow exactly those tools). Empty
-// model/effort = the agent's default; no tools = the runner's usual mode.
+// budget, day or night), a tool allowlist (a runner should allow exactly those tools) and a run
+// timeout. Empty model/effort/timeout = the agent's default; no tools = the runner's usual mode.
+// Auto-archive rides along (it isn't about the run, but every editor carries it the same way).
 import { useEffect, useId, useRef, useState } from "react";
 
 // Aliases always mean the latest of that family; full ids pin one version. Anything else can be typed.
@@ -17,7 +18,50 @@ export interface RunSettings {
   effort: string;
   always_run: boolean;
   allowed_tools: string[];
+  run_timeout_minutes: number | null; // null: the agent's default (60)
+  auto_archive_minutes: number | null; // archived this long after done or cancelled; null: never
   tools_error?: string | null; // the allowlist text has a rule that isn't one (the form can't be sent)
+}
+
+// runFrom: the run settings a gig, template or recurring gig has.
+export function runFrom(x?: { model?: string; effort?: string; always_run?: boolean; allowed_tools?: string[] | null; run_timeout_minutes?: number | null; auto_archive_minutes?: number | null } | null): RunSettings {
+  return {
+    model: x?.model ?? "",
+    effort: x?.effort ?? "",
+    always_run: !!x?.always_run,
+    allowed_tools: x?.allowed_tools ?? [],
+    run_timeout_minutes: x?.run_timeout_minutes ?? null,
+    auto_archive_minutes: x?.auto_archive_minutes ?? null,
+  };
+}
+
+// The choices offered (minutes). The server takes any value in range; one set elsewhere is shown too.
+export const TIMEOUT_CHOICES = [15, 30, 45, 60, 90, 120, 180, 240, 300];
+export const ARCHIVE_CHOICES = [60, 360, 720, 1440, 4320, 10080, 43200];
+
+// fmtMinutes: 45 min, 2 h, 1 h 30 min, 3 days.
+export function fmtMinutes(m: number): string {
+  if (m % 1440 === 0) return m === 1440 ? "1 day" : `${m / 1440} days`;
+  if (m >= 60) return m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m / 60} h`;
+  return `${m} min`;
+}
+
+// MinutesSelect: a duration from a list, or none (`none` names what none means). lock "clear": only
+// none can be chosen (taking a value off needs no permission on a new item); "all": read-only.
+export function MinutesSelect({ value, onChange, choices, none, label, lock, title }: {
+  value: number | null; onChange: (v: number | null) => void; choices: number[]; none: string; label: string; lock?: "clear" | "all"; title?: string;
+}) {
+  const opts = lock ? (value != null ? [value] : []) : value != null && !choices.includes(value) ? [...choices, value].sort((a, b) => a - b) : choices;
+  return (
+    <select value={value ?? ""} disabled={lock === "all" || (lock === "clear" && value == null)} aria-label={label} title={title} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
+      <option value="">{none}</option>
+      {opts.map((m) => (
+        <option key={m} value={m}>
+          {fmtMinutes(m)}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 // validTool mirrors the server: Tool or Tool(specifier), never a flag, no control characters; commas
@@ -148,5 +192,7 @@ export function runBody(v: RunSettings): Partial<RunSettings> {
     ...(v.effort ? { effort: v.effort } : {}),
     ...(v.always_run ? { always_run: true } : {}),
     ...(v.allowed_tools.length ? { allowed_tools: v.allowed_tools } : {}),
+    ...(v.run_timeout_minutes != null ? { run_timeout_minutes: v.run_timeout_minutes } : {}),
+    ...(v.auto_archive_minutes != null ? { auto_archive_minutes: v.auto_archive_minutes } : {}),
   };
 }

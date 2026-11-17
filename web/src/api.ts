@@ -92,6 +92,8 @@ export interface Gig {
   model?: string; // claude -p --model for the agent ("" = its default)
   effort?: string; // claude -p --effort ("" = its default)
   always_run?: boolean; // worked whatever the usage budget
+  run_timeout_minutes?: number | null; // null: the agent's default
+  auto_archive_minutes?: number | null; // archived this long after done or cancelled; null: never
   allowed_tools?: string[]; // the runner runs it with exactly these tools (claude -p --allowedTools)
   id: number;
   key: string;
@@ -204,6 +206,8 @@ export interface TemplateBody {
   model?: string;
   effort?: string;
   always_run?: boolean;
+  run_timeout_minutes?: number | null;
+  auto_archive_minutes?: number | null;
   allowed_tools?: string[]; // runner tool allowlist (permission rules)
   name: string;
   project_id?: number;
@@ -222,6 +226,8 @@ export interface Template {
   model?: string;
   effort?: string;
   always_run?: boolean;
+  run_timeout_minutes?: number | null;
+  auto_archive_minutes?: number | null;
   allowed_tools?: string[]; // runner tool allowlist (permission rules)
   id: number;
   workspace_id: number;
@@ -244,6 +250,8 @@ export interface GigCreateBody {
   model?: string;
   effort?: string;
   always_run?: boolean;
+  run_timeout_minutes?: number | null;
+  auto_archive_minutes?: number | null;
   allowed_tools?: string[]; // runner tool allowlist (permission rules)
   title: string;
   description_md?: string;
@@ -274,6 +282,8 @@ export interface RecurrenceBody {
   model?: string;
   effort?: string;
   always_run?: boolean;
+  run_timeout_minutes?: number | null;
+  auto_archive_minutes?: number | null;
   allowed_tools?: string[]; // runner tool allowlist (permission rules)
   title?: string;
   description_md?: string;
@@ -300,6 +310,8 @@ export interface Recurrence {
   model?: string;
   effort?: string;
   always_run?: boolean;
+  run_timeout_minutes?: number | null;
+  auto_archive_minutes?: number | null;
   allowed_tools?: string[]; // runner tool allowlist (permission rules)
   id: number;
   workspace_id: number;

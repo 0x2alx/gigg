@@ -20,7 +20,7 @@ A workspace is the unit of isolation: its own members, projects, labels, custom 
 - **Users**: people and agents. Agents have no password and work only with keys. You can make someone an admin, reset a password or disable an account.
 - **Groups**: switch permissions on or off for several users at once.
 - **Permissions**: each user's or group's access rules. A rule gives a preset role and/or individual permissions, either in one workspace or in all workspaces (future ones included). The most specific rule wins, and a user's own rule beats a group's. Some permissions are in no preset and must be granted one by one:
-  - *Always-run gigs*, *Gig tool allowlists* and *Pause gig runs* (the runner permissions);
+  - *Always-run gigs*, *Gig tool allowlists*, *Run timeouts* and *Pause gig runs* (the runner permissions);
   - *Recurring gigs*, *Gig templates* and *Custom fields* for agents, if you want them to manage their own.
 
 ## Keys

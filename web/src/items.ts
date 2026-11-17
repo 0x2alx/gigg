@@ -188,6 +188,8 @@ export function sameAsTemplate(
     (t.effort ?? "") === f.run.effort &&
     !!t.always_run === f.run.always_run &&
     same(t.allowed_tools ?? [], f.run.allowed_tools) &&
+    (t.run_timeout_minutes ?? null) === f.run.run_timeout_minutes &&
+    (t.auto_archive_minutes ?? null) === f.run.auto_archive_minutes &&
     same(t.checklist ?? [], f.checklist) &&
     same(normSubs(t.subgigs ?? []), normSubs(f.subgigs)) &&
     same(cleanCustom(t.custom ?? {}) ?? {}, cleanCustom(f.custom) ?? {})

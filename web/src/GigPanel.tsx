@@ -5,6 +5,7 @@ import { assignable } from "./fields";
 import { Markdown, setMentionUsers } from "./markdown";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { ChecklistSection, CustomFieldsSection, DependenciesSection, Row, Section, SubgigsSection } from "./GigSections";
+import { runFrom } from "./runsettings";
 import { GigEditor } from "./GigEditor";
 import { Clamp } from "./Clamp";
 import { HistorySection } from "./GigHistory";
@@ -381,7 +382,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
           not_after: gig.not_after ?? null,
           project: gig.project_id,
           status: gig.status_id,
-          run: { model: gig.model ?? "", effort: gig.effort ?? "", always_run: !!gig.always_run, allowed_tools: gig.allowed_tools ?? [] },
+          run: runFrom(gig),
         }}
         set={(c) => {
           if (c.project !== undefined) act(api.moveGig(gig.id, { project: c.project }), (t) => onMoved(t));
@@ -412,6 +413,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
         knownLabels={labels}
         candidates={candidates}
         alwaysLocked={!can("always_run")}
+        timeoutLock={can("run_timeout") ? undefined : "all"}
         canTools={can("allowed_tools")}
         overdue={overdue}
         aliases={gig.aliases}

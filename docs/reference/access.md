@@ -29,6 +29,7 @@ same workspace: without it, it counts as not held.
 | `checklists` | Gigs | Add, tick and remove checklist items (with `edit_gigs`). An override alone doesn't give a viewer these: the admin page marks it "needs Edit gigs". |
 | `always_run` | Runner | Mark gigs to run whatever the usage budget. The gig caps and pauses still apply. |
 | `allowed_tools` | Runner | Give gigs (templates, recurring gigs) the list of tools the agent runner may use for them, and change gigs that have one. |
+| `run_timeout` | Runner | Set, change or clear how long a runner lets one run of a gig (template, recurring gig) go, and give an errand a timeout other than the default or change it. |
 | `pause_runs` | Runner | Pause and resume new agent gig runs and errand runs; with an all-workspaces rule, in every workspace at once. Changing the caps stays with admins. |
 | `errands` | Runner | Make, change, pause, run and delete errands; an agent's executor needs it to run its errands. |
 | `errand_unsandboxed` | Runner | Let an errand run outside the agent's sandbox. An errand loses the flag when someone without this permission changes it, and its runs fail while the person who set it lacks the permission. |
@@ -57,6 +58,12 @@ These two decide what an unattended agent does, so they also protect existing gi
   gig whose content (or template) carries it, needs the matching permission.
 - Cloning a gig copies neither setting.
 
+`run_timeout` guards only the timeout itself: setting, changing or clearing `run_timeout_minutes` on
+a gig, template or recurring gig, creating a gig or recurring gig from a template that has one, and
+an errand `timeout_s` other than the default (300) on a new errand or a change of it. Other edits of
+a gig with a timeout need nothing extra. The agent's host caps every timeout (the runner's
+`timeout_max`, the errand executor's `errand_timeout_max`), whatever gigg stores.
+
 ## Presets
 
 A preset is a named bundle of permissions. Roles shown in the UI are presets.
@@ -78,9 +85,10 @@ A preset is a named bundle of permissions. Roles shown in the UI are presets.
 | `manage_workspace` | | | | x |
 | `always_run` | | | | |
 | `allowed_tools` | | | | |
+| `run_timeout` | | | | |
 | `pause_runs` | | | | |
 
-`always_run`, `allowed_tools` and `pause_runs` are in no preset: they are granted only by an override
+`always_run`, `allowed_tools`, `run_timeout` and `pause_runs` are in no preset: they are granted only by an override
 (or by being an instance admin).
 
 The role displayed for a user in a workspace (`role` in `/auth/me` and member lists) is the closest

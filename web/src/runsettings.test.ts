@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTools, runBody, validModel, validTool } from "./runsettings";
+import { fmtMinutes, parseTools, runBody, runFrom, validModel, validTool } from "./runsettings";
 
 describe("run settings", () => {
   it("accepts model names and refuses anything that isn't one argument", () => {
@@ -7,8 +7,16 @@ describe("run settings", () => {
     for (const bad of ["-x", "opus; id", "a b", "$(id)", "x".repeat(65)]) expect(validModel(bad)).toBe(false);
   });
   it("sends only what is set", () => {
-    expect(runBody({ model: "", effort: "", always_run: false, allowed_tools: [] })).toEqual({});
-    expect(runBody({ model: "sonnet", effort: "high", always_run: true, allowed_tools: ["Read"] })).toEqual({ model: "sonnet", effort: "high", always_run: true, allowed_tools: ["Read"] });
+    expect(runBody(runFrom(null))).toEqual({});
+    expect(runBody({ ...runFrom(null), model: "sonnet", effort: "high", always_run: true, allowed_tools: ["Read"], run_timeout_minutes: 120, auto_archive_minutes: 720 })).toEqual({
+      model: "sonnet", effort: "high", always_run: true, allowed_tools: ["Read"], run_timeout_minutes: 120, auto_archive_minutes: 720,
+    });
+  });
+  it("reads a gig's settings, missing ones as defaults", () => {
+    expect(runFrom({ model: "opus", allowed_tools: null, run_timeout_minutes: 90 })).toEqual({ model: "opus", effort: "", always_run: false, allowed_tools: [], run_timeout_minutes: 90, auto_archive_minutes: null });
+  });
+  it("names durations the short way", () => {
+    expect([15, 60, 90, 300, 720, 1440, 4320, 43200].map(fmtMinutes)).toEqual(["15 min", "1 h", "1 h 30 min", "5 h", "12 h", "1 day", "3 days", "30 days"]);
   });
   it("tool rules: what the server and the runner accept", () => {
     for (const ok of ["Read", "Bash(git status *)", "Edit(//data/reports/**)", "mcp__gigg__get_gig", "WebFetch(domain:example.com)", 'Bash(curl -s "api.example.com/v1/forecast?city=Paris,FR")']) expect(validTool(ok)).toBe(true);

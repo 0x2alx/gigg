@@ -5,7 +5,7 @@
 // occurrence) instead of a single gig. Its gig content is a template: its own one (made from this
 // form), or a picked template left unchanged, which it then uses as is.
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { runBody, type RunSettings } from "./runsettings";
+import { runBody, runFrom, type RunSettings } from "./runsettings";
 import { api, ApiError, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isGigSchedule, type GigSchedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubgig } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { assignable } from "./fields";
@@ -70,7 +70,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const [notAfter, setNotAfter] = useState<number | null>(null);
   const [color, setColor] = useState<string | null>(schedule?.color ?? tpl?.color ?? null);
   const src = schedule ?? tpl;
-  const [run, setRun] = useState<RunSettings>({ model: src?.model ?? "", effort: src?.effort ?? "", always_run: !!src?.always_run, allowed_tools: src?.allowed_tools ?? [] });
+  const [run, setRun] = useState<RunSettings>(runFrom(src));
   const [repeat, setRepeat] = useState<RepeatState>(() => (schedule ? repeatFromRule(schedule) : { ...defaultRepeat(), freq: initialRepeat ?? "" }));
   const [err, setErr] = useState("");
   // the typed content when the form opened: closing by ×, Esc or the backdrop with more than that asks
@@ -167,7 +167,8 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     // run settings and Repeat only as far as this workspace lets you
     const always = hasCap(me, "always_run", ws.id);
     const tools = hasCap(me, "allowed_tools", ws.id);
-    setRun((r) => ({ ...r, always_run: r.always_run && always, allowed_tools: tools ? r.allowed_tools : [] }));
+    const timeout = hasCap(me, "run_timeout", ws.id);
+    setRun((r) => ({ ...r, always_run: r.always_run && always, allowed_tools: tools ? r.allowed_tools : [], run_timeout_minutes: timeout ? r.run_timeout_minutes : null }));
     if (!hasCap(me, "schedules", ws.id)) setRepeat((r) => ({ ...r, freq: "" }));
   }, [ws.id, users, members, me]);
 
@@ -238,7 +239,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     setGigLabels(t.labels ?? []);
     setAssignees(t.assignees ?? []);
     setColor(t.color);
-    setRun({ model: t.model ?? "", effort: t.effort ?? "", always_run: !!t.always_run, allowed_tools: t.allowed_tools ?? [] });
+    setRun(runFrom(t));
     setChecklist(t.checklist ?? []);
     setSubgigs(normSubs(t.subgigs ?? []));
     setCustom(t.custom ?? {});
@@ -335,7 +336,10 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
             assignees,
             ...(color ? { color } : {}),
             ...runBody(run),
-            ...(editing ? { model: run.model, effort: run.effort, always_run: run.always_run, allowed_tools: run.allowed_tools } : {}),
+            // an edit sends every setting (0 clears a timeout or auto-archive), so taking one off takes it off
+            ...(editing
+              ? { model: run.model, effort: run.effort, always_run: run.always_run, allowed_tools: run.allowed_tools, run_timeout_minutes: run.run_timeout_minutes ?? 0, auto_archive_minutes: run.auto_archive_minutes ?? 0 }
+              : {}),
             // on an edit, unchanged lists are left out (kept as the template has them)
             ...(!schedule || JSON.stringify(checklist) !== JSON.stringify(schedule.checklist ?? []) ? { checklist } : {}),
             ...(!schedule || JSON.stringify(normSubs(subgigs)) !== JSON.stringify(normSubs(schedule.subgigs ?? [])) ? { subgigs: normSubs(subgigs) } : {}),
@@ -388,6 +392,8 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const canRelations = hasCap(me, "relations", ws.id);
   const single = !tplMode && !editing && !repeating; // one gig, made now
   const alwaysOk = hasCap(me, "always_run", ws.id);
+  // without Run timeouts: an edit keeps the timeout as it is; a new item may only drop the one it got
+  const timeoutLock = hasCap(me, "run_timeout", ws.id) ? undefined : editing || tpl ? "all" : "clear";
   const mode: EditorMode = tplMode ? "template" : repeating || editing ? "recurring" : "new";
   return (
     <Modal title={heading} onClose={guardedClose} wide expandable help={<HelpButton topic={repeating || editing ? "recurring" : "gigs"} label={repeating || editing ? "Help: recurring gigs" : "Help: gigs"} />}>
@@ -428,6 +434,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           knownLabels={known}
           candidates={candidates}
           alwaysLocked={!alwaysOk && !run.always_run}
+          timeoutLock={timeoutLock}
           canTools={hasCap(me, "allowed_tools", ws.id)}
           head={
             <>
