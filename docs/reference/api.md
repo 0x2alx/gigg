@@ -83,7 +83,6 @@ permission in the workspace (see [access.md](access.md#api-keys-scopes-and-permi
 | `errands:run` | An agent's errand executor: claiming its own due runs and reporting them. |
 | `profile:write` | Your own profile, themes and picture. |
 | `keys:self` | Managing keys that act as yourself. |
-| `artifacts:write` | Accepted on keys. Note: not used by any endpoint yet. |
 | `admin:workspaces` | Creating workspaces; archiving them and setting owners; runner caps; pausing any workspace. |
 | `admin:members` | Seeing how members got their access (preset, source) in member lists. Changing members also needs a browser session. |
 | `admin:users` | Users, agent pictures, groups and access rules (several of these also need a browser session, see below). |
@@ -387,7 +386,7 @@ in [access.md](access.md).
 | GET | `/gigs/{id}` | A gig, by id or key. |
 | PATCH | `/gigs/{id}` | Change a gig's fields (`null` clears). |
 | POST | `/gigs/{id}/move` | Move a gig: status, position, or another project of the workspace. |
-| POST | `/gigs/{id}/clone` | Copy a gig (optionally into another project): content, labels, assignees, dates, custom field values, and the checklist unticked (with the Checklists permission). |
+| POST | `/gigs/{id}/clone` | Copy a gig (optionally into another project): content, labels, assignees, dates, custom field values, and the checklist unticked. |
 | DELETE | `/gigs/{id}` | Move a gig to the trash. |
 | POST | `/gigs/{id}/restore` | Restore a gig from the trash. |
 | POST | `/gigs/{id}/archive` | Archive a gig (off the board and lists; not trash). |

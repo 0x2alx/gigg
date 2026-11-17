@@ -139,7 +139,7 @@ gigg admin color user sam none
 ### member
 
 ```
-gigg admin member <workspace> <username> <viewer|commenter|member|manager|none>
+gigg admin member <workspace> <username> <viewer|consumer|member|manager|none>
 ```
 
 Sets the user's preset in one workspace, keeping any per-permission overrides they already have

@@ -22,19 +22,17 @@ same workspace: without it, it counts as not held.
 | `view` | Basics | See the workspace, its projects, gigs, comments and runs. Every other permission needs it. |
 | `comment` | Basics | Write comments and edit or delete your own. |
 | `work_gigs` | Gigs | Work on gigs: move them between statuses of their project (and reorder), tick checklist items, ask for a resume; claim gigs assigned to you and report runs (agents). |
-| `edit_gigs` | Gigs | Change and assign gigs (title, description, dates, labels, run settings...) and move them to another project. |
+| `edit_gigs` | Gigs | Change and assign gigs (title, description, dates, labels, run settings...), add, edit, reorder and remove checklist items, add and remove dependencies (blocking/related links, subgigs that hold their parent), and move gigs to another project. |
 | `create_gigs` | Gigs | Create one-off gigs, clone gigs, and create gigs from templates (with `edit_gigs`). |
 | `delete_gigs` | Gigs | Move gigs to the trash and restore them (with `edit_gigs`). |
 | `archive_gigs` | Gigs | Archive and unarchive gigs (with `edit_gigs`). |
-| `relations` | Gigs | Add and remove blocking/related links between gigs (with `edit_gigs`). |
-| `checklists` | Gigs | Add, edit, reorder and remove checklist items (with `edit_gigs`; ticking them is `work_gigs`). An override alone doesn't give a viewer these: the admin page marks it "needs Edit gigs". |
 | `always_run` | Runner | Mark gigs to run whatever the usage budget. The gig caps and pauses still apply. |
 | `allowed_tools` | Runner | Give gigs (templates, recurring gigs) the list of tools the agent runner may use for them, and change gigs that have one. |
 | `run_timeout` | Runner | Set, change or clear how long a runner lets one run of a gig (template, recurring gig) go, and give an errand a timeout other than the default or change it. |
 | `pause_runs` | Runner | Pause and resume new agent gig runs and errand runs; with an all-workspaces rule, in every workspace at once. Changing the caps stays with admins. |
 | `errands` | Runner | Make, change, pause, run and delete errands; an agent's executor needs it to run its errands. |
 | `errand_unsandboxed` | Runner | Let an errand run outside the agent's sandbox. An errand loses the flag when someone without this permission changes it, and its runs fail while the person who set it lacks the permission. |
-| `schedules` | Planning | Create, change, pause and stop recurring gigs and schedules (recurring gigs also need `edit_gigs`, and `create_gigs` to make their gigs). |
+| `recurring_gigs` | Planning | Create, change, pause and stop recurring gigs and schedules (recurring gigs also need `edit_gigs`, and `create_gigs` to make their gigs). |
 | `templates` | Planning | Create, change and delete gig templates, with `edit_gigs` (using one only needs `create_gigs`). |
 | `custom_fields` | Planning | Define the workspace's custom fields. |
 | `saved_filters` | Planning | Save personal filtered views. |
@@ -49,8 +47,8 @@ agent) holds `work_gigs` without `edit_gigs`: it reads its gigs, comments, moves
 statuses of their project, ticks checklist items, claims the gigs assigned to it, records runs and asks
 for resumes, but can't change a title, description, prompt, model, tools, dates, labels, assignees,
 custom fields or dependencies, add or remove checklist items, move a gig to another project, or
-delete or archive it. A **producer** (a person, or the admin agent that plans the work) also holds
-`edit_gigs` and the rest. The key scopes follow the same split: `gigs:work` and `gigs:write`.
+delete or archive it. The `consumer` preset is exactly this. A **producer** (a person, or an agent
+trusted to plan work) also holds `edit_gigs` and the rest. The key scopes follow the same split: `gigs:work` and `gigs:write`.
 
 ### What `always_run` and `allowed_tools` guard
 
@@ -77,42 +75,49 @@ a gig with a timeout need nothing extra. The agent's host caps every timeout (th
 
 ## Presets
 
-A preset is a named bundle of permissions. Roles shown in the UI are presets.
+A preset is a named bundle of permissions. Roles shown in the UI are presets. Each one includes the
+one before it:
 
-| Permission | `viewer` | `commenter` | `member` | `manager` |
+- **viewer** sees the workspace and changes nothing;
+- **consumer** works on what it's given: comments, moves gigs between statuses, ticks checklist items,
+  claims and runs the gigs assigned to it, runs its own errands;
+- **member** also makes and shapes gigs;
+- **manager** also runs the workspace: planning, errands, the runner's settings.
+
+| Permission | `viewer` | `consumer` | `member` | `manager` |
 |---|:-:|:-:|:-:|:-:|
 | `view` | x | x | x | x |
 | `comment` | | x | x | x |
-| `work_gigs` | | | x | x |
+| `work_gigs` | | x | x | x |
 | `edit_gigs` | | | x | x |
 | `create_gigs` | | | x | x |
 | `delete_gigs` | | | x | x |
 | `archive_gigs` | | | x | x |
-| `relations` | | | x | x |
-| `checklists` | | | x | x |
 | `saved_filters` | | | x | x |
-| `schedules` | | | | x |
+| `recurring_gigs` | | | | x |
 | `templates` | | | | x |
 | `custom_fields` | | | | x |
 | `manage_workspace` | | | | x |
-| `always_run` | | | | |
-| `allowed_tools` | | | | |
-| `run_timeout` | | | | |
-| `pause_runs` | | | | |
+| `errands` | | | | x |
+| `pause_runs` | | | | x |
+| `always_run` | | | | x |
+| `allowed_tools` | | | | x |
+| `run_timeout` | | | | x |
+| `errand_unsandboxed` | | | | |
 
-`always_run`, `allowed_tools`, `run_timeout` and `pause_runs` are in no preset: they are granted only by an override
-(or by being an instance admin).
+`errand_unsandboxed` is in no preset: it is granted only by an override (or by being an instance
+admin). A preset is a starting point: any rule can add or remove single permissions with overrides.
 
 The role displayed for a user in a workspace (`role` in `/auth/me` and member lists) is the closest
 preset to what they actually hold there: `admin`, else `manager` if they have `manage_workspace`,
-`member` if `edit_gigs`, `commenter` if `comment`, `viewer` if `view`. It is for display only.
+`member` if `edit_gigs`, `consumer` if `work_gigs`, `viewer` if `view`. It is for display only.
 
 ## Access rules
 
 A rule belongs to one user or one group, and to one workspace or to all workspaces. A user or group has
 at most one rule per level. A rule has:
 
-- `preset`: `viewer`, `commenter`, `member`, `manager`, or none;
+- `preset`: `viewer`, `consumer`, `member`, `manager`, or none;
 - `overrides`: a map of permission to `true` (allow) or `false` (deny).
 
 Inside one rule, an override beats the preset. A permission that the rule's preset doesn't include and
@@ -197,7 +202,7 @@ Typical scope sets:
 | Use | Scopes | Permissions (in the workspace) |
 |---|---|---|
 | Read-only dashboard | `workspace:read`, `gigs:read`, `comments:read` | `viewer` |
-| Agent working gigs via MCP (a consumer) | `workspace:read`, `gigs:read`, `gigs:work`, `comments:read`, `comments:write`, `runs:write` | `member` minus `edit_gigs`, `create_gigs`, `delete_gigs`, `archive_gigs`, `relations`, `checklists` |
+| Agent working gigs via MCP (a consumer) | `workspace:read`, `gigs:read`, `gigs:work`, `comments:read`, `comments:write`, `runs:write` | `consumer` |
 | Unattended runner | the same | the same |
 | Someone who also writes gigs through a key (a producer) | add `gigs:write` (and `gigs:delete`) | `member` |
 | Admin automation | `admin:*` as needed, plus the workspace scopes | instance admin |

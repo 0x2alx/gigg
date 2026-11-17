@@ -9,7 +9,7 @@ Admins see **Admin** in the sidebar. Everything here is also available through t
 A workspace is the unit of isolation: its own members, projects, labels, custom fields, templates and schedules. A key bound to one workspace never sees another.
 
 - **Settings**: name, colour (its badge and chips everywhere: the board's filters and cards, the gig header, tables, the dashboard), owner (whose picture marks it on the board's workspace filter), description, archive.
-- **Members**: who belongs and with which preset role (viewer, commenter, member, manager). Admins reach every workspace without a membership.
+- **Members**: who belongs and with which preset role (viewer, consumer, member, manager). Admins reach every workspace without a membership.
 - **Projects**: each project has a name, a key (gig keys look like `KEY-12`), a colour, and its statuses (columns). Each status belongs to a category (backlog, to-do, doing, waiting, done, cancelled), has an optional WIP limit, and one status is the default for new gigs.
 - **Custom fields**: extra properties on every gig of the workspace (text, number, date, select, checkbox, link).
 

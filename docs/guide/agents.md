@@ -48,7 +48,7 @@ The claim moves the gig to Doing, so two runners never get the same gig.
 
 ## What an agent may change
 
-Agents are usually set up as **consumers** of their board: they read their gigs, comment, move them between statuses (To-Do, Doing, Waiting, Done...), tick checklist items and report their runs. Writing gigs is for people (and the admin agent that plans the work): the title, description, model, tools, dates, labels, assignees, custom fields and dependencies, adding or removing checklist items, moving a gig to another project, archiving or deleting it. The permissions behind this are *Work on gigs* and *Edit gigs* (see the access reference).
+Agents are usually set up as **consumers** of their board: they read their gigs, comment, move them between statuses (To-Do, Doing, Waiting, Done...), tick checklist items and report their runs. Writing gigs is for producers (people, or an agent trusted to plan work): the title, description, model, tools, dates, labels, assignees, custom fields and dependencies, adding or removing checklist items, moving a gig to another project, archiving or deleting it. The permissions behind this are *Work on gigs* and *Edit gigs*; the **Consumer** preset gives exactly the first (see the access reference).
 
 ## Limits and pausing
 

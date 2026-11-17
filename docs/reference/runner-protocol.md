@@ -283,8 +283,8 @@ Who may change them:
   editing, reopening or resuming a gig that has a list.
 - `run_timeout_minutes`: setting, changing or clearing it needs the `run_timeout` permission.
 
-These permissions are in no preset (see [access.md](access.md)). Give them to the people who decide what
-unattended agents may do, not to the agents themselves unless intended.
+These permissions come with the `manager` preset only (see [access.md](access.md)). Give them to the
+people who decide what unattended agents may do, not to the agents themselves unless intended.
 
 ## A minimal runner
 

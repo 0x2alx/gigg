@@ -90,9 +90,9 @@ There are no MCP tools for claiming gigs or recording runs; runners use the REST
 | `clone_gig` | `gigs:write` | `gig`, `project?`, `title?` | Copies a gig: its content, labels, assignees, dates, custom field values and checklist (unticked). |
 | `resume_gig` | `gigs:work` | `gig`, `comment_md?` | Asks for the gig's agent session to be resumed (records the request, moves the gig to todo; runs nothing). |
 | `set_custom_fields` | `gigs:write` | `gig`, `values` (field id -> value, `null` clears) | `PATCH /gigs/{gig}/custom`. |
-| `link_gigs` | `gigs:write`, `relations` anywhere | `gig`, `other`, `direction` (`blocks`, `blocked_by`, `relates`) | Adds a dependency. A blocked gig isn't claimed until its blockers are done. |
-| `unlink_gigs` | `gigs:write`, `relations` anywhere | `gig`, `other`, `direction` | Removes a dependency. |
-| `update_checklist` | `gigs:work` and `work_gigs` anywhere (ticking), or `gigs:write` and `checklists` anywhere (adding, removing) | `gig`, `add?`, `check?`, `uncheck?`, `remove?` (item ids) | Applies the changes in that order and returns the checklist. Stops at the first failing step; each step needs its own permission. |
+| `link_gigs` | `gigs:write`, `edit_gigs` anywhere | `gig`, `other`, `direction` (`blocks`, `blocked_by`, `relates`) | Adds a dependency. A blocked gig isn't claimed until its blockers are done. |
+| `unlink_gigs` | `gigs:write`, `edit_gigs` anywhere | `gig`, `other`, `direction` | Removes a dependency. |
+| `update_checklist` | `gigs:work` and `work_gigs` anywhere (ticking), or `gigs:write` and `edit_gigs` anywhere (adding, removing) | `gig`, `add?`, `check?`, `uncheck?`, `remove?` (item ids) | Applies the changes in that order and returns the checklist. Stops at the first failing step; each step needs its own permission. |
 | `archive_gig` | `gigs:write`, `archive_gigs` anywhere | `gig`, `restore?` | Archives a gig, or unarchives it with `restore: true`. |
 | `create_from_template` | `gigs:write`, `create_gigs` anywhere | `template`, `project`, `title?` | Creates a gig from a template. |
 | `save_template` | `gigs:write`, `templates` anywhere | `workspace?`, `id?` (replace), `project_id?`, `name`, `title`, `description_md?`, `priority?`, `labels?`, `assignees?`, `checklist?`, `subgigs?` (`{title, blocks_parent?}` each), `custom?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` | Creates a template, or replaces template `id`. Gigs made from it get its subgigs. |
@@ -105,10 +105,10 @@ There are no MCP tools for claiming gigs or recording runs; runners use the REST
 
 | Tool | Needs | Arguments | Does |
 |---|---|---|---|
-| `create_recurring` | `gigs:write`, `schedules` anywhere | `project`, content (`title`, `description_md`, `priority`, `labels`, `assignees`, `checklist`, `subgigs`, `model`, `effort`, `always_run`, `allowed_tools`) or `template_id`; timing (`freq` `daily`/`weekly`/`monthly`, `interval`, `weekdays` 1=Mon..7=Sun, `month_day` 1-31 or -1, `tz`, `window_start` HH:MM, `window_minutes`, `lead_minutes`) or `schedule_id`; `ends_on?`, `max_count?`, `overlap?` (`skip`/`create`), `paused?` | Creates a recurring gig. Content given here is saved as a new template; timing reuses an identical schedule or makes one. |
+| `create_recurring` | `gigs:write`, `recurring_gigs` anywhere | `project`, content (`title`, `description_md`, `priority`, `labels`, `assignees`, `checklist`, `subgigs`, `model`, `effort`, `always_run`, `allowed_tools`) or `template_id`; timing (`freq` `daily`/`weekly`/`monthly`, `interval`, `weekdays` 1=Mon..7=Sun, `month_day` 1-31 or -1, `tz`, `window_start` HH:MM, `window_minutes`, `lead_minutes`) or `schedule_id`; `ends_on?`, `max_count?`, `overlap?` (`skip`/`create`), `paused?` | Creates a recurring gig. Content given here is saved as a new template; timing reuses an identical schedule or makes one. |
 | `update_recurring` | same | `id` plus any of the above | Changes a recurring gig; omitted fields stay. `template_id`/`schedule_id` switch; content and timing fields edit the shared template/schedule in place. `ends_on`/`max_count` of 0 clear them. |
 | `delete_recurring` | same | `id`, `also_template?`, `also_schedule?` | Stops a recurring gig. Its gigs stay; its template and schedule too, unless asked (refused while another recurring gig uses them). |
-| `save_schedule` | `gigs:write`, `schedules` anywhere | `id?`, `workspace?`, `name?`, `freq`, `interval?`, `weekdays?`, `month_day?`, `tz?`, `window_start?`, `window_minutes?`, `lead_minutes?` | Makes a schedule, or changes schedule `id` (omitted fields stay); every recurring gig on it follows. |
+| `save_schedule` | `gigs:write`, `recurring_gigs` anywhere | `id?`, `workspace?`, `name?`, `freq`, `interval?`, `weekdays?`, `month_day?`, `tz?`, `window_start?`, `window_minutes?`, `lead_minutes?` | Makes a schedule, or changes schedule `id` (omitted fields stay); every recurring gig on it follows. |
 | `delete_schedule` | same | `id` | Deletes a schedule no recurring gig uses. |
 
 Defaults for timing: every 1 period, window from 00:00 for 1440 minutes, and the zone of your time zone preference (else the instance default, `GIGG_DEFAULT_TZ`).
