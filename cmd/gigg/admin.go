@@ -30,7 +30,7 @@ const adminUsage = `gigg admin: first setup and recovery, working directly on th
   gigg admin member <workspace> <username> <viewer|commenter|member|manager|none>
   gigg admin access <username> <workspace|all> <preset|none> [permission=allow|deny ...]
                                                set the user's access rule there (replaces it)
-  gigg admin allow <username> <workspace|all> <permission> [...]
+  gigg admin allow|deny <username> <workspace|all|each> <permission> [...]
                                                add permissions to the user's rule there (keeps the rest)
   gigg admin project-add <workspace> <slug> <name> <KEY>
   gigg admin key-add -user U [-workspace W] -scopes a,b [-listeners x,y] [-cidrs c] [-name N] [-days 365] [-out F]
@@ -258,9 +258,21 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 			}
 			return store.SetRule(ctx, tx, a, "user", u.ID, ws, preset, over)
 		})
-	case "allow":
+	case "allow", "deny":
+		// adds overrides to a user's rule(s), keeping the rest; "each" = every rule the user has (a deny
+		// meant for the user everywhere has to be on each: the most specific rule wins)
 		if len(args) < 3 {
-			return errors.New("usage: allow <username> <workspace|all> <permission> [...]")
+			return fmt.Errorf("usage: %s <username> <workspace|all|each> <permission> [...]", cmd)
+		}
+		val := cmd == "allow"
+		known := map[string]bool{}
+		for _, p := range store.Permissions {
+			known[p.Name] = true
+		}
+		for _, perm := range args[2:] {
+			if !known[perm] {
+				return fmt.Errorf("no permission %q (see gigg admin permissions in the docs)", perm)
+			}
 		}
 		return st.Tx(ctx, func(tx *sql.Tx) error {
 			u, err := store.GetUserByName(ctx, tx, args[0])
@@ -268,42 +280,54 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 				return fmt.Errorf("user %s: %w", args[0], err)
 			}
 			var ws *int64
-			if args[1] != "all" {
+			switch args[1] {
+			case "all", "each":
+				if _, err := store.GetWorkspaceBySlug(ctx, tx, args[1]); err == nil {
+					return fmt.Errorf("a workspace is named %q: ambiguous, use the UI", args[1])
+				}
+			default:
 				w, err := store.GetWorkspaceBySlug(ctx, tx, args[1])
 				if err != nil {
 					return fmt.Errorf("workspace %s: %w", args[1], err)
 				}
 				ws = &w.ID
-			} else if _, err := store.GetWorkspaceBySlug(ctx, tx, "all"); err == nil {
-				return errors.New(`a workspace is named "all": ambiguous, use the UI`)
 			}
 			rules, err := store.RulesOfUser(ctx, tx, u.ID)
 			if err != nil {
 				return err
 			}
-			var rule *store.AccessRule
+			var targets []*store.AccessRule
 			for _, r := range rules {
-				if (ws == nil && r.WorkspaceID == nil) || (ws != nil && r.WorkspaceID != nil && *r.WorkspaceID == *ws) {
-					rule = r
+				if args[1] == "each" || (args[1] == "all" && r.WorkspaceID == nil) || (ws != nil && r.WorkspaceID != nil && *r.WorkspaceID == *ws) {
+					targets = append(targets, r)
 				}
 			}
-			if rule == nil {
+			if len(targets) == 0 {
 				return fmt.Errorf("%s has no access rule for %s (make them a member first, or use access)", u.Username, args[1])
 			}
-			ov := map[string]bool{}
-			for k, v := range rule.Overrides {
-				ov[k] = v
-			}
-			for _, perm := range args[2:] {
-				if v, ok := ov[perm]; ok && !v {
-					fmt.Fprintf(os.Stderr, "%s: was denied for %s, now allowed\n", perm, u.Username)
+			for _, rule := range targets {
+				ov := map[string]bool{}
+				for k, v := range rule.Overrides {
+					ov[k] = v
 				}
-				ov[perm] = true
+				for _, perm := range args[2:] {
+					if v, ok := ov[perm]; ok && v != val {
+						fmt.Fprintf(os.Stderr, "%s: was %s for %s, now %sed\n", perm, map[bool]string{true: "allowed", false: "denied"}[v], u.Username, cmd)
+					}
+					ov[perm] = val
+				}
+				if err := store.SetRule(ctx, tx, a, "user", u.ID, rule.WorkspaceID, rule.Preset, ov); err != nil {
+					return err
+				}
+				where := "all"
+				if rule.WorkspaceID != nil {
+					where = fmt.Sprintf("workspace %d", *rule.WorkspaceID)
+					if w, err := store.GetWorkspace(ctx, tx, *rule.WorkspaceID); err == nil {
+						where = w.Slug
+					}
+				}
+				fmt.Fprintf(os.Stderr, "%s in %s: %s %sed\n", u.Username, where, strings.Join(args[2:], ", "), cmd)
 			}
-			if err := store.SetRule(ctx, tx, a, "user", u.ID, ws, rule.Preset, ov); err != nil {
-				return err
-			}
-			fmt.Fprintf(os.Stderr, "%s in %s: %s allowed\n", u.Username, args[1], strings.Join(args[2:], ", "))
 			return nil
 		})
 	case "project-add":

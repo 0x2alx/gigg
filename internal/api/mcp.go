@@ -284,6 +284,14 @@ func mcpUserIDs(call apiCall, names []string) ([]int64, *mcp.CallToolResult) {
 	return ids, nil
 }
 
+// addToolIf registers a tool only when the caller could use it: an agent that may not create gigs
+// isn't shown create_gig.
+func addToolIf[In any](ok bool, s *mcp.Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, any]) {
+	if ok {
+		mcp.AddTool(s, t, h)
+	}
+}
+
 func (a *API) mcpServer(r *http.Request) *mcp.Server {
 	p := access.From(r.Context())
 	call := a.caller(r)
@@ -365,7 +373,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 			})
 	}
 	if has("gigs:write") {
-		mcp.AddTool(s, &mcp.Tool{Name: "create_gig", Description: "Create a gig in a project.", Annotations: rw("Create gig", false)},
+		addToolIf(p.AllowedAnywhere("create_gigs"), s, &mcp.Tool{Name: "create_gig", Description: "Create a gig in a project.", Annotations: rw("Create gig", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in createGigArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{"title": in.Title}
 				setIf(b, "description_md", in.DescriptionMD)
@@ -485,7 +493,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				return toolResult(call("POST", "/gigs/"+t(in.Gig)+"/move", nil, b))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "clone_gig", Description: "Copy a gig, optionally into another project of the workspace.", Annotations: rw("Clone gig", false)},
+		addToolIf(p.AllowedAnywhere("create_gigs"), s, &mcp.Tool{Name: "clone_gig", Description: "Copy a gig, optionally into another project of the workspace.", Annotations: rw("Clone gig", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in cloneGigArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{}
 				if in.Project != 0 {

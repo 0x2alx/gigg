@@ -8,6 +8,12 @@
   the names stored in data (key scopes, permission overrides, activity, allowed tool lists). Old
   `/board/p/<id>/t/<key>` and `/crons` links redirect. Clients using the old API paths or MCP tool
   names need updating.
+- An agent's errand executor needs only view and `errands:run`: running your own errands isn't
+  managing them, so an errand can be given to an agent without the Errands permission.
+- MCP hides `create_gig`, `clone_gig` and `create_from_template` from a key whose user may not
+  create gigs.
+- `gigg admin deny`, and `each` as a target of `allow`/`deny` (every rule the user has); both
+  refuse unknown permission names.
 - MCP `create_gig` and `update_gig` take `assignees` (usernames or user ids); `update_gig`
   clears them with `clear: ["assignees"]`.
 - **Errands**: shell commands an agent runs on a schedule (every N minutes or hours, optionally on

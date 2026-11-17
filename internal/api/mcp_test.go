@@ -231,3 +231,41 @@ func TestMCP(t *testing.T) {
 		t.Error("listener-restricted key connected on main")
 	}
 }
+
+// TestMCPNoCreate: an agent whose user may not create gigs
+// isn't offered create_gig or clone_gig, keeps update/move/comment, and the API refuses anyway.
+func TestMCPNoCreate(t *testing.T) {
+	e := newEnv(t)
+	srv := e.mcpServer("internal")
+	defer srv.Close()
+	ctx := context.Background()
+	if code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"create_gigs":false}}`, e.ids["scout.ws"]), e.ada()); code != 200 {
+		t.Fatalf("deny: %d %s", code, out)
+	}
+	s, err := e.mcpSession(t, srv, authTransport{token: e.keys["scout"]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	tools, err := s.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, tl := range tools.Tools {
+		names[tl.Name] = true
+	}
+	for _, gone := range []string{"create_gig", "clone_gig", "create_from_template"} {
+		if names[gone] {
+			t.Errorf("%s offered to an agent that may not create gigs", gone)
+		}
+	}
+	for _, want := range []string{"update_gig", "move_gig", "add_comment", "get_gig"} {
+		if !names[want] {
+			t.Errorf("%s missing", want)
+		}
+	}
+	if code, out, _ := e.req("POST", fmt.Sprintf("/projects/%d/gigs", e.ids["scout.p"]), `{"title":"x"}`, e.key("scout")); code != 403 {
+		t.Fatalf("API create without create_gigs: %d %s", code, out)
+	}
+}

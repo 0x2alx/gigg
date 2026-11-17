@@ -170,19 +170,23 @@ gigg admin access sam all viewer
 gigg admin access sam acme none pause_runs=allow
 ```
 
-### allow
+### allow, deny
 
 ```
-gigg admin allow <username> <workspace|all> <permission> [...]
+gigg admin allow <username> <workspace|all|each> <permission> [...]
+gigg admin deny  <username> <workspace|all|each> <permission> [...]
 ```
 
-Adds permissions to the user's rule for one workspace (or their `all` rule) and keeps the rest of it
-(preset and other overrides); `access` replaces the rule as a whole. The user needs that rule first
-(`member` or `access`).
+Allows or denies permissions on the user's rule for one workspace, their `all` rule, or `each` rule
+they have, and keeps the rest of it (preset and other overrides); `access` replaces a rule as a
+whole. The user needs that rule first (`member` or `access`). The most specific rule wins, so a deny
+meant for the user everywhere goes on `each`.
 
 ```sh
 # let the agent scout manage its own errands in its workspace
 gigg admin allow scout scout errands
+# agents create no gigs anywhere
+gigg admin deny scout each create_gigs
 ```
 
 Note: groups and group rules have no CLI command; manage them from an admin's browser session (UI or

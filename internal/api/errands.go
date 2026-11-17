@@ -103,7 +103,7 @@ func (a *API) errandTemplate(ctx context.Context, p *access.Principal, id int64)
 }
 
 // errandWorker resolves the worker: yourself by default; another user only with Manage the workspace.
-// The worker must be an agent holding the Errands permission there.
+// The worker must be an agent that can see the workspace (running errands needs no Errands permission).
 func (a *API) errandWorker(ctx context.Context, p *access.Principal, ws int64, name string) (int64, error) {
 	if name == "" || name == p.User.Username {
 		if p.User.Kind != "agent" {
@@ -121,8 +121,8 @@ func (a *API) errandWorker(ctx context.Context, p *access.Principal, ws int64, n
 	if u.Kind != "agent" {
 		return 0, fail(422, "invalid", "An errand's worker is an agent.")
 	}
-	if !store.UserHas(ctx, a.st.R, u.ID, ws, "errands") {
-		return 0, fail(422, "invalid", name+" doesn't have the Errands permission in this workspace.")
+	if !store.UserHas(ctx, a.st.R, u.ID, ws, "view") { // it runs them, it needn't manage them
+		return 0, fail(422, "invalid", name+" can't see this workspace.")
 	}
 	return u.ID, nil
 }
@@ -404,7 +404,7 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, "errands", "errands:run"); err != nil {
+		if err := require(p, w.ID, access.Viewer, "errands:run"); err != nil { // running your own errands isn't managing them: a worker without the Errands permission still runs its own
 			return nil, err
 		}
 		out := &struct {
@@ -448,7 +448,7 @@ func (a *API) registerErrands() {
 			if err != nil || !p.SeesWorkspace(r.WorkspaceID) {
 				return nil, errNotFound()
 			}
-			if err := require(p, r.WorkspaceID, "errands", "errands:run"); err != nil {
+			if err := require(p, r.WorkspaceID, access.Viewer, "errands:run"); err != nil {
 				return nil, err
 			}
 			if r.WorkerID != p.User.ID {

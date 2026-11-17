@@ -70,6 +70,16 @@ func TestErrandsAPI(t *testing.T) {
 		t.Fatalf("recurring on a minute schedule: %d %s", code, out)
 	}
 
+	// scout loses the Errands permission (a setup where agents only read their errands): it can't
+	// change them any more, but its executor still runs them, and ada can still give it new ones
+	code, out, _ = e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"errands":false}}`, ws), ada)
+	e.ok(code, out, 200)
+	if code, out, _ = e.req("PATCH", fmt.Sprintf("/errands/%d", c.ID), `{"timeout_s":60}`, scout); code != 403 {
+		t.Fatalf("read-only agent changed its errand: %d %s", code, out)
+	}
+	code, out, _ = e.req("POST", fmt.Sprintf("/workspaces/%d/errands", ws), `{"name":"by ada","command":"true","worker":"scout","paused":true,"rule":{"freq":"hours","tz":"UTC"}}`, ada)
+	e.ok(code, out, 201)
+
 	// the executor: due at the first slot
 	store.Now = func() int64 { return *c.NextAt }
 	code, out, _ = e.req("POST", "/workspaces/current/errands/claim", "", scout)
@@ -83,6 +93,8 @@ func TestErrandsAPI(t *testing.T) {
 		t.Fatalf("claim: %s", out)
 	}
 	run := claim.Items[0].RunID
+	code, out, _ = e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), fmt.Sprintf(`{"workspace_id":%d,"preset":"member","overrides":{"errands":true}}`, ws), ada)
+	e.ok(code, out, 200)
 	// another agent can't claim or finish scout's
 	code, out, _ = e.req("POST", fmt.Sprintf("/errand-runs/%d/finish", run), `{"status":"ok","duration_ms":5}`, atlas)
 	if code != 404 && code != 403 {
@@ -180,7 +192,7 @@ func TestErrandsAPI(t *testing.T) {
 		Items []store.Errand `json:"items"`
 	}
 	_ = json.Unmarshal(out, &list)
-	if len(list.Items) != 3 || list.Items[0].ID != c.ID || list.Items[0].State != "failing" || list.Items[0].LastRun == nil {
+	if len(list.Items) != 4 || list.Items[0].ID != c.ID || list.Items[0].State != "failing" || list.Items[0].LastRun == nil {
 		t.Fatalf("list: %s", out)
 	}
 	// atlas sees none of scout's

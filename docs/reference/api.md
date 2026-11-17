@@ -488,7 +488,7 @@ an errand's worker needs `manage_workspace`; its failure gig, the worker or `man
 | GET | `/errand-runs/{id}` | One run; `output_tail` only with `errands:output`. |
 | GET, POST | `/workspaces/{ws}/errand-templates` | Errand templates. |
 | GET, PUT, DELETE | `/errand-templates/{id}` | An errand template (delete: none uses it). |
-| POST | `/workspaces/{ws}/errands/claim` | The executor (`errands:run`, own errands only): start due runs, at most `limit` (optional body; its free slots), the rest stay due. Returns `items` (run id, command, timeout, output, unsandboxed, `command_set_by`, `unsandboxed_set_by`) and `paused`. Older missed slots are recorded as `missed`; a slot while the previous run is going as `skipped`. |
+| POST | `/workspaces/{ws}/errands/claim` | The executor (view and `errands:run`, own errands only; no Errands permission needed): start due runs, at most `limit` (optional body; its free slots), the rest stay due. Returns `items` (run id, command, timeout, output, unsandboxed, `command_set_by`, `unsandboxed_set_by`) and `paused`. Older missed slots are recorded as `missed`; a slot while the previous run is going as `skipped`. |
 | POST | `/errand-runs/{id}/finish` | The executor reports a run: `status` `ok`/`failed`/`timeout`, `exit_code`, `duration_ms`, `output_tail` (last 64 KiB, cut on a character boundary if longer; dropped for `host` output), `output_bytes`, `error`. Returns whether the errand became failing or recovered. |
 
 ### runs
