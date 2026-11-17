@@ -41,7 +41,6 @@ import {
 
 type StateFilter = "" | "failing" | "paused";
 
-const canWriteIn = (ws: WorkspaceTree) => ws.role !== "viewer" && ws.role !== "commenter";
 
 // stateOf: what the list shows first about an errand.
 function stateOf(c: Errand): { text: string; tip: string; color: string; cls: string } {
@@ -104,7 +103,7 @@ export function ErrandsPage({ open }: { open?: number }) {
   const wsOf = useCallback((id: number) => tree.find((w) => w.id === id), [tree]);
   const canEdit = useCallback((ws: number) => {
     const w = wsOf(ws);
-    return !!w && canWriteIn(w) && hasCap(me, "errands", ws);
+    return !!w && hasCap(me, "errands", ws);
   }, [wsOf, me]);
   const writable = useMemo(() => tree.filter((w) => canEdit(w.id)), [tree, canEdit]);
 

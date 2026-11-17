@@ -426,7 +426,7 @@ function SubgigAdd({ onAdd }: { onAdd: (title: string) => Promise<unknown> | voi
 
 const SUB_NOTE = "Each subgig is a gig of its own, made like this one (priority, assignees, dates, agent run). Tick “blocks parent” to make this gig wait for it.";
 
-// canEdit: may switch "blocks parent" (the relations permission). assignable: who can be assigned in
+// canEdit: may switch "blocks parent" (Edit gigs). assignable: who can be assigned in
 // the workspace (a new subgig gets the parent's assignees, but not former members).
 export function SubgigsSection({ gig, wsId, canCreate, canEdit, assignable, onOpen, onGig, onChanged }: {
   gig: Gig; wsId: number; canCreate: boolean; canEdit: boolean; assignable: number[]; onOpen: (t: Gig) => void; onGig: (t: Gig) => void; onChanged: () => void;
@@ -546,7 +546,7 @@ export function SubgigsSection({ gig, wsId, canCreate, canEdit, assignable, onOp
 }
 
 // SubgigsDraft: subgigs for a gig (or template) not saved yet; created with it.
-// canGate: may tick "blocks parent" (the relations permission).
+// canGate: may tick "blocks parent" (Edit gigs).
 export function SubgigsDraft({ items, onChange, canGate, note = SUB_NOTE }: { items: TemplateSubgig[]; onChange: (v: TemplateSubgig[]) => void; canGate: boolean; note?: string }) {
   const gates = items.filter((s) => s.blocks_parent).length;
   return (

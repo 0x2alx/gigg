@@ -1,8 +1,8 @@
 // Every recurring gig in reach (a template on a schedule), across the workspaces, narrowed by an optional
 // workspace/project filter: rule, next occurrence, counts; pause, edit, delete.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { api, ApiError, fmtDate, hasCap, recurrenceBody, type Recurrence, type Tag } from "./api";
-import { useApp, type WorkspaceTree } from "./App";
+import { api, ApiError, fmtDate, canWriteIn, hasCap, recurrenceBody, type Recurrence, type Tag } from "./api";
+import { useApp } from "./App";
 import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { describeRule, fmtInstant, localTZ } from "./recurrence";
@@ -12,7 +12,6 @@ import { ClearFilters, Avatar, LabelChip, Modal, Pill, PriorityBadge } from "./u
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
-const canWriteIn = (ws: WorkspaceTree) => ws.role !== "viewer" && ws.role !== "commenter";
 
 export function RecurringModal({ initialPlace = "", highlight, onClose, onChanged }: {
   initialPlace?: Place;
@@ -59,7 +58,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
   }, [wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const wsOf = useCallback((id: number) => tree.find((w) => w.id === id), [tree]);
   const shown = useMemo(() => (items ?? []).filter((r) => placeMatch(place, tree, r.workspace_id, r.project_id)), [items, place, tree]);
-  const writable = useMemo(() => tree.filter((w) => canWriteIn(w) && hasCap(me, "schedules", w.id)), [tree, me]); // the server wants Schedules for recurring gigs
+  const writable = useMemo(() => tree.filter((w) => canWriteIn(w) && hasCap(me, "recurring_gigs", w.id)), [tree, me]);
   const start = placeStart(place, tree, (w) => writable.includes(w));
 
   useEffect(() => {
@@ -139,7 +138,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
         <ul className="schedules" ref={listRef} aria-label="Recurring gigs">
           {shown.map((r) => {
             const rws = wsOf(r.workspace_id);
-            const canWrite = !!rws && canWriteIn(rws) && hasCap(me, "schedules", rws.id);
+            const canWrite = !!rws && canWriteIn(rws) && hasCap(me, "recurring_gigs", rws.id);
             const labels = labelsOf.get(r.workspace_id) ?? [];
             return (
             <li key={r.id} data-schedule={r.id} className={"schedule" + (r.id === highlight ? " flash highlighted" : "") + (r.paused ? " paused" : "")} style={r.color ? ({ "--row-c": r.color } as CSSProperties) : undefined}>

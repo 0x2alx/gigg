@@ -4,7 +4,7 @@
 // Shared schedules (every workspace's) come with each workspace's list: shown once, under any filter, changed
 // only by instance admins; a workspace that retimes a recurring gig on one moves it to a schedule of its own.
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { api, ApiError, hasCap, isGigSchedule, type GigSchedule as Schedule } from "./api";
+import { api, ApiError, canWriteIn, hasCap, isGigSchedule, type GigSchedule as Schedule } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { optionOf, PlaceFilter, placeMatch, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
@@ -15,7 +15,6 @@ import { ClearFilters, Modal } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
-const canWriteIn = (ws: WorkspaceTree) => ws.role !== "viewer" && ws.role !== "commenter";
 
 export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
   initialPlace?: Place; // "" or "w:<id>" (a project filter shows its workspace's)
@@ -45,7 +44,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
   }, [wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(load, [load]);
   const wsOf = useCallback((id: number) => tree.find((w) => w.id === id), [tree]);
-  const canWriteWs = useCallback((w: WorkspaceTree) => canWriteIn(w) && hasCap(me, "schedules", w.id), [me]);
+  const canWriteWs = useCallback((w: WorkspaceTree) => canWriteIn(w) && hasCap(me, "recurring_gigs", w.id), [me]);
   const shown = useMemo(() => (items ?? []).filter((x) => x.shared || placeMatch(place, tree, x.workspace_id, null)), [items, place, tree]);
   const writable = useMemo(() => tree.filter(canWriteWs), [tree, canWriteWs]);
   const startWs = (place.startsWith("w:") ? writable.find((w) => w.id === Number(place.slice(2))) : undefined) ?? writable[0] ?? (me.admin ? tree[0] : undefined);

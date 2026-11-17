@@ -4,8 +4,8 @@
 import { request } from "../transport";
 import { ApiError, noteStatus, type Category } from "../api";
 
-export type Role = "viewer" | "commenter" | "member" | "manager";
-export const ROLES: Role[] = ["viewer", "commenter", "member", "manager"];
+export type Role = "viewer" | "consumer" | "member" | "manager";
+export const ROLES: Role[] = ["viewer", "consumer", "member", "manager"];
 export const CATEGORIES: Category[] = ["backlog", "todo", "doing", "waiting", "done", "cancelled"];
 
 export interface StatusTemplate {
@@ -133,7 +133,7 @@ export const SCOPE_GROUPS: { name: string; scopes: string[] }[] = [
   { name: "Read", scopes: ["workspace:read", "gigs:read", "comments:read", "errands:read", "errands:output"] },
   {
     name: "Write",
-    scopes: ["workspace:write", "gigs:work", "gigs:write", "gigs:delete", "comments:write", "artifacts:write", "runs:write", "projects:write", "profile:write", "keys:self", "errands:write", "errands:run"],
+    scopes: ["workspace:write", "gigs:work", "gigs:write", "gigs:delete", "comments:write", "runs:write", "projects:write", "profile:write", "keys:self", "errands:write", "errands:run"],
   },
   {
     name: "Admin",

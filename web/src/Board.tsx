@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { api, ApiError, fmtTime, hasCap, priorityNames, type Board, type Category, type CustomField, type Status, type Tag, type Gig } from "./api";
+import { api, ApiError, fmtTime, canWriteIn, hasCap, priorityNames, type Board, type Category, type CustomField, type Status, type Tag, type Gig } from "./api";
 import { fmtDue } from "./dates";
 import { useApp, type WorkspaceTree } from "./App";
 import {
@@ -39,7 +39,6 @@ import { cardState, elapsed, plainText } from "./cardState";
 
 
 const openStatuses = (b: Board): Status[] => b.statuses.filter((s) => s.category !== "cancelled");
-const canWriteIn = (ws: WorkspaceTree) => ws.role !== "viewer" && ws.role !== "commenter";
 
 type BoardAction = "new" | "recurring" | "templates" | "schedules" | "archive";
 

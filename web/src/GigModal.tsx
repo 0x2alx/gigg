@@ -171,7 +171,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     const tools = hasCap(me, "allowed_tools", ws.id);
     const timeout = hasCap(me, "run_timeout", ws.id);
     setRun((r) => ({ ...r, always_run: r.always_run && always, allowed_tools: tools ? r.allowed_tools : [], run_timeout_minutes: timeout ? r.run_timeout_minutes : null }));
-    if (!hasCap(me, "schedules", ws.id)) setRepeat((r) => ({ ...r, freq: "" }));
+    if (!hasCap(me, "recurring_gigs", ws.id)) setRepeat((r) => ({ ...r, freq: "" }));
   }, [ws.id, users, members, me]);
 
   useEffect(() => {
@@ -239,7 +239,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
       : [];
   const [askDetach, setAskDetach] = useState(false);
   const canCreate = hasCap(me, "create_gigs", ws.id);
-  const canRepeat = editing || hasCap(me, "schedules", ws.id);
+  const canRepeat = editing || hasCap(me, "recurring_gigs", ws.id);
 
   // pick: fills the form from a template (the user can still change everything).
   const pick = (t: Template | null) => {
@@ -413,7 +413,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
       setProject(w.projects[0].id);
     }
   };
-  const canRelations = hasCap(me, "relations", ws.id);
+  const canRelations = hasCap(me, "edit_gigs", ws.id);
   const single = !tplMode && !editing && !repeating; // one gig, made now
   const alwaysOk = hasCap(me, "always_run", ws.id);
   // without Run timeouts: an edit keeps the timeout as it is; a new item may only drop the one it got

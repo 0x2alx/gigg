@@ -437,8 +437,8 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
         }
         leftSecs={
           <>
-            <ChecklistSection gig={gig} canEdit={can("checklists")} onGig={onGig} />
-            <SubgigsSection gig={gig} wsId={ws.id} canCreate={can("create_gigs") && !gig.deleted} canEdit={can("relations") && !gig.deleted} assignable={candidates.map((u) => u.id)} onOpen={onMoved} onGig={onGig} onChanged={onChanged} />
+            <ChecklistSection gig={gig} canEdit={can("edit_gigs")} onGig={onGig} />
+            <SubgigsSection gig={gig} wsId={ws.id} canCreate={can("create_gigs") && !gig.deleted} canEdit={can("edit_gigs") && !gig.deleted} assignable={candidates.map((u) => u.id)} onOpen={onMoved} onGig={onGig} onChanged={onChanged} />
           </>
         }
         mainEnd={
@@ -585,7 +585,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
         }
         rightSecs={
           <>
-            <DependenciesSection gig={gig} wsId={ws.id} canEdit={can("relations")} onGig={onGig} onOpen={onMoved} />
+            <DependenciesSection gig={gig} wsId={ws.id} canEdit={can("edit_gigs")} onGig={onGig} onOpen={onMoved} />
             <CustomFieldsSection gig={gig} fields={fields} canEdit={canWrite} onGig={onGig} />
             <HistorySection gig={gig} />
           </>

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type CSSProperties } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { fmtDue } from "../dates";
-import { api, fmtTime, hasCap, priorityNames, type Board, type Category, type Tag, type Gig } from "../api";
+import { api, canWriteIn, fmtTime, hasCap, priorityNames, type Board, type Category, type Tag, type Gig } from "../api";
 import { GigPanel } from "../GigPanel";
 import { RecurringModal } from "../Recurring";
 import { useApp, type WorkspaceTree } from "../App";
@@ -30,7 +30,6 @@ interface Sort {
 const PAGE = 200;
 const MAX_PAGES = 5; // all workspaces: at most this many pages each (1000 gigs), then "+" says there are more
 
-const writableWs = (w: WorkspaceTree) => w.role !== "viewer" && w.role !== "commenter";
 
 // TableView: no ws, every workspace (/table); a ws, that workspace; a pid, that project.
 export function TableView({ ws: wsSlug, pid }: { ws?: string; pid?: number }) {
@@ -50,11 +49,11 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const project = ws && pid ? ws.projects.find((p) => p.id === pid) : undefined;
   const scope = useMemo(() => (ws ? [ws] : tree), [ws, tree]);
   const scopeKey = scope.map((w) => w.slug).join(",");
-  const canWrite = scope.some(writableWs);
+  const canWrite = scope.some(canWriteIn);
   const wsOfGig = (t: Gig) => scope.find((w) => w.id === t.workspace_id);
   const canWriteGig = (t: Gig) => {
     const w = wsOfGig(t);
-    return !!w && writableWs(w);
+    return !!w && canWriteIn(w);
   };
 
   // the filters live in the URL (shareable, and what saved views link to)
@@ -493,7 +492,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           ws={openWs}
           statuses={openBoard.statuses.filter((x) => x.category !== "cancelled")}
           labels={openBoard.labels}
-          canWrite={writableWs(openWs)}
+          canWrite={canWriteIn(openWs)}
           onClose={() => setOpenGig(null)}
           onChanged={() => refreshRow(openGig.key)}
           onMoved={(t) => setOpenGig({ pid: t.project_id, key: t.key })}

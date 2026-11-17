@@ -63,6 +63,10 @@ export function hasCap(me: Pick<Me, "capabilities" | "workspaces" | "admin"> | n
   return !me.capabilities || me.capabilities.includes(cap);
 }
 
+// canWriteIn: whether a workspace role reaches Edit gigs (member and up), which creating gigs,
+// templates and recurring gigs need besides their own permission. One place for every screen.
+export const canWriteIn = (ws: { role?: string }) => ws.role !== "viewer" && ws.role !== "consumer";
+
 export interface Project {
   id: number;
   workspace_id: number;

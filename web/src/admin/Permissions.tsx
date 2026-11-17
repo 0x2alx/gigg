@@ -38,7 +38,7 @@ export function TriState({ value, onChange, inheritWord = "Inherit", label, disa
 }
 
 // these only take effect together with Edit gigs (the server checks that first)
-export const NEEDS_EDIT = new Set(["create_gigs", "delete_gigs", "archive_gigs", "relations", "checklists", "templates", "schedules"]);
+export const NEEDS_EDIT = new Set(["create_gigs", "delete_gigs", "archive_gigs", "templates", "recurring_gigs"]);
 
 export function Effective({ allowed, blocked }: { allowed: boolean; blocked?: string }) {
   if (allowed && blocked)

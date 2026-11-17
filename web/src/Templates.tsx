@@ -3,7 +3,7 @@
 // Shared templates (every workspace's) come with each workspace's list: shown once, under any filter,
 // changed only by instance admins.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { api, ApiError, hasCap, type Tag, type Template } from "./api";
+import { api, ApiError, canWriteIn, hasCap, type Tag, type Template } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
@@ -12,7 +12,6 @@ import { ClearFilters, Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 
-const canWriteIn = (ws: WorkspaceTree) => ws.role !== "viewer" && ws.role !== "commenter";
 
 export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
   initialPlace?: Place;
