@@ -1601,7 +1601,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
           disabled={archiving}
           onClick={archive}
           aria-label={`Archive ${gig.key}`}
-          data-tip="Archive: off the board and lists, still searchable (Undo in the message that follows)"
+          data-tip="Archive"
         >
           <Icon name="archive" />
         </button>

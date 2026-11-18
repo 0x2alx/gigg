@@ -396,7 +396,9 @@ a.pulse-item:hover { color: var(--text); }
 /* the card's last line: the schedule that made it, and when it was done */
 .card-when { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.2rem var(--sp-4); margin-top: calc(-1 * var(--sp-2)); font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
 .card-when .meta-item { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gig-card:has(> .card-archive) .card-when { padding-right: 1.5rem; } /* room for the archive button */
+/* a done card's archive button opens its "Done ..." line, bottom left */
+.gig-card:has(> .card-archive) .card-when { padding-left: 1.4rem; }
+.gig-card:has(> .card-archive) .card-done-at { margin-left: 0; order: -1; }
 .card-done-at { margin-left: auto; }
 .card-top .ws-chip { max-width: 10rem; }
 .card-break { flex-basis: 100%; height: 0; }
@@ -418,11 +420,9 @@ a.pulse-item:hover { color: var(--text); }
 /* the card's menu button shows on hover and keyboard focus (it stays in the tab order), and always on touch screens */
 .gig-card:not(:hover):not(:focus-within) .card-menu:not(:has(.menu)) { opacity: 0; }
 @media (hover: none) { .gig-card .card-menu { opacity: 1 !important; } }
-/* a done card's one-click archive: bottom right, beside its "Done ..." line; shows like the ⋯ */
-.card-archive { position: absolute; right: 0.25rem; bottom: 0.25rem; width: 1.6rem; height: 1.6rem; padding: 0; color: var(--muted); transition: opacity 0.12s ease-out; }
+/* a done card's one-click archive: bottom left, just before its "Done ..." line, always there and quiet */
+.card-archive { position: absolute; left: 0.4rem; bottom: 0.3rem; width: 1.6rem; height: 1.6rem; padding: 0; color: var(--muted); }
 .card-archive:hover, .card-archive:focus-visible { color: var(--text); }
-.gig-card:not(:hover):not(:focus-within) .card-archive { opacity: 0; }
-@media (hover: none) { .gig-card .card-archive { opacity: 1; } }
 .menu {
   position: absolute; right: 0; top: calc(100% + 0.25rem); z-index: 20; min-width: 11rem;
   background: var(--high); border: 1px solid var(--line-strong); border-radius: var(--radius-m);

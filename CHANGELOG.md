@@ -18,8 +18,8 @@
 - A click outside the errand panel closes it, as it does the gig panel (one shared hook).
 - The gig panel always opens beside the board again: the expand button widens that gig only, no
   longer every later one (the choice older versions kept per browser is cleared).
-- Done cards get a one-click archive button (bottom corner, on hover; always on touch screens). The
-  message that follows has **Undo**.
+- Done cards get a one-click archive button (bottom left, before **Done …**). The message that
+  follows has **Undo**.
 - **Someone given only some projects of a workspace** no longer reads the workspace's description,
   the members who see none of those projects (nor others' project rows), labels not used in those
   projects, the runner's caps, usage and errand counts (only whether runs are paused), or errand
