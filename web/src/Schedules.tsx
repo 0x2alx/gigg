@@ -107,18 +107,16 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
               <div className="schedule-top">
                 <span className="pill pill-accent"><Icon name="clock" /></span>
                 <strong className="schedule-title">{s.name}</strong>
-                {s.shared ? (
-                  <span className="pill pill-shared" data-tip="Offered in every workspace; only instance admins change it">
-                    Shared
-                  </span>
-                ) : (
-                  sws && tree.length > 1 && <WorkspaceBadge ws={sws} />
-                )}
-                {s.tz !== tz && (
-                  <span className="rec-state">
-                    <span className="pill pill-ws">{s.tz}</span>
-                  </span>
-                )}
+                <span className="rec-state">
+                  {s.tz !== tz && <span className="pill pill-ws">{s.tz}</span>}
+                  {s.shared ? (
+                    <span className="pill pill-shared" data-tip="Offered in every workspace; only instance admins change it">
+                      Shared
+                    </span>
+                  ) : (
+                    sws && tree.length > 1 && <WorkspaceBadge ws={sws} />
+                  )}
+                </span>
               </div>
               {/* the timing, unless the name is only the timing already */}
               {!sameAsRule(s.name, describeRule(s)) && <div className="schedule-rule">{describeRule(s)}</div>}

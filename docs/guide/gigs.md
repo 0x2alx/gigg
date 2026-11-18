@@ -4,7 +4,7 @@ A gig belongs to one project of one workspace. Its key (for example `GIG-12`) is
 
 ## Creating a gig
 
-Click **+ Gig** in the top bar. You can also press **Ctrl+K** (⌘K on a Mac) and choose "New gig".
+Click **+ New gig** in the top bar. You can also press **Ctrl+K** (⌘K on a Mac) and choose "New gig".
 
 ![The new gig form (Nightwalker theme)](../images/gig-new-night.png)
 
@@ -73,7 +73,7 @@ A gig can have a window: it may only be started between its start time and **Win
 
 ## Archiving and deleting
 
-- **Archive** (at the bottom of the panel, the archive button on a done card, **Archive all** at the foot of Done, or **Archive done**): the gig leaves the board and lists, stays searchable, and can be unarchived. An archived gig no longer blocks anything (as a dependency or a **blocks parent** subgig).
+- **Archive** (at the bottom of the panel, the archive button on a done card, **Archive all** at the foot of Done, or **Archive done** in the account menu): the gig leaves the board and lists, stays searchable, and can be unarchived. An archived gig no longer blocks anything (as a dependency or a **blocks parent** subgig).
 - **Auto-archive** (in **Details**): the gig archives itself this long after it's done or cancelled (1 hour to 30 days; **never** by default). Set it on a template or a recurring gig and every gig it makes gets it. gigg checks once a minute.
 - **Delete** moves the gig to the trash. **Trash** on the board lists the deleted gigs of the projects in view, with **Restore**. A deleted gig opened from a link shows **Restore** too.
 - Every change is recorded with its old and new values: the API's gig activity (`GET /gigs/{id}/activity`) and, for admins, **Admin → Audit**.

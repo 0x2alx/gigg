@@ -152,12 +152,12 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                   ⟳
                 </Pill>
                 <strong className="schedule-title">{r.title}</strong>
-                {rws && tree.length > 1 && <WorkspaceBadge ws={rws} />}
-                <span className="pill pill-key">{rws?.projects.find((p) => p.id === r.project_id)?.key ?? "?"}</span>
                 <span className="rec-state">
                   {r.paused && <span className="pill pill-danger">paused</span>}
                   {!r.next_at && <span className="pill pill-muted">finished</span>}
                   <PriorityBadge priority={r.priority} />
+                  <span className="pill pill-key">{rws?.projects.find((p) => p.id === r.project_id)?.key ?? "?"}</span>
+                  {rws && tree.length > 1 && <WorkspaceBadge ws={rws} />}
                 </span>
               </div>
               <div className="schedule-rule">

@@ -34,7 +34,11 @@ export function LogoMark({ className, title, compact }: { className?: string; ti
       {!compact && <path d={fin} />}
       {!compact && <path d={fin} transform={mirror} />}
       <path className="logo-flame" d={flame} />
-      <path className="logo-flame" d={flame} transform={mirror} />
+      {/* the mirror sits on a group: a CSS transform on the path (the flicker) would replace its own
+          transform attribute and draw both flames on the left */}
+      <g transform={mirror}>
+        <path className="logo-flame" d={flame} />
+      </g>
     </svg>
   );
 }

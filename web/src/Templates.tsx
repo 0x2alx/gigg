@@ -115,16 +115,16 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
               <div className="schedule-top">
                 <span className="pill pill-accent"><Icon name="template" /></span>
                 <strong className="schedule-title">{t.name}</strong>
-                {t.shared ? (
-                  <span className="pill pill-shared" data-tip="Offered in every workspace; only instance admins change it">
-                    Shared
-                  </span>
-                ) : (
-                  tws && tree.length > 1 && <WorkspaceBadge ws={tws} />
-                )}
-                {t.project_id === null ? <span className="pill pill-ws">any project</span> : <span className="pill pill-key">{tws?.projects.find((p) => p.id === t.project_id)?.key ?? "?"}</span>}
                 <span className="rec-state">
                   <PriorityBadge priority={t.priority} />
+                  {t.project_id === null ? <span className="pill pill-ws">any project</span> : <span className="pill pill-key">{tws?.projects.find((p) => p.id === t.project_id)?.key ?? "?"}</span>}
+                  {t.shared ? (
+                    <span className="pill pill-shared" data-tip="Offered in every workspace; only instance admins change it">
+                      Shared
+                    </span>
+                  ) : (
+                    tws && tree.length > 1 && <WorkspaceBadge ws={tws} />
+                  )}
                 </span>
               </div>
               {/* the title its gigs get, when it says more than the template's name */}

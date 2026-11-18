@@ -2,16 +2,20 @@
 
 ## Unreleased
 
-- The top bar's buttons read **+ Gig** and **+ Errand**. The live dot is gone: when live updates have
+- The live dot is gone: when live updates have
   been lost for 30 seconds, a bar under the top bar says so, with Retry now, until they are back.
-- The logo flies when you point at it (a bob, star streaks, its engines lit), and creating a gig or
-  an errand plays a short launch: ships hover with stars streaking past, then take off. Clicks go
-  through; it is skipped for "reduce motion", and Profile has a switch for it.
-- Done column: **Archive all (N)** archives the done gigs it shows under the current filters, with
-  Undo; **Archive done…** beside it opens the dialog. Columns lose their header **+** (the same as
-  **+ New gig** at their foot, which now stays in view while a long column scrolls past).
-- Schedules and Templates cards take the Recurring layout (state at the right, actions at the
-  bottom left, assignees at the bottom right); all three dialogs put **+ New …** at the top. A
+- The logo flies while the pointer is on the top bar (a bob, star streaks, both engines lit), and
+  creating a gig or an errand plays a short launch: a big ship and a dozen small ones hover with
+  stars streaking past, then take off. Clicks go through; it is skipped for "reduce motion", and
+  Profile has a switch for it. (The logo's right engine flame was drawn on the left.)
+- Done column: a small **Archive all (N)** archives the done gigs it shows under the current
+  filters, with Undo (Archive done stays in the account menu). Columns lose their header **+** (the
+  same as **+ New gig** at their foot, which now stays in view while a long column scrolls past);
+  their sort and collapse icons always show. With Archived on, archived gigs come first in their
+  column.
+- Schedules and Templates cards take the Recurring layout (actions at the bottom left, assignees at
+  the bottom right); on all three the badges sit at the right end of the title row, the workspace
+  (or Shared) last, so only the text moves; all three dialogs put **+ New …** at the top. A
   template's title no longer repeats its name.
 - The Archive done dialog lines up the workspace, key and name of its project rows in columns.
 - The table: the workspace picker is a filter like the others (Clear filters resets it), and on a

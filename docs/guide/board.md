@@ -5,7 +5,7 @@ The board shows the gigs of every workspace and project you can see, in one plac
 The bar runs across the top of every page and stays there while the page scrolls:
 
 - On the left, the gigg logo and the two pages: **Gigs** (this board, and its table) and **Errands**. The page you are on is filled with the theme's accent colour.
-- On the right, **+ Gig** and **+ Errand** (each shown only where you can make one), **Inbox** (an envelope) and **Notifications** (a bell), each with its count (see [Inbox and notifications](inbox.md)), and your picture.
+- On the right, **+ New gig** and **+ New errand** (each shown only where you can make one), **Inbox** (an envelope) and **Notifications** (a bell), each with its count (see [Inbox and notifications](inbox.md)), and your picture.
 - Your picture opens the account menu: rest the pointer on it, or click it. It holds **Recurring**, **Schedules**, **Templates**, **Archive done** and **Trash** (described below); your saved views; **Dashboard** and **Admin** (admins only; click it for its sections); then **Profile**, **Themes** and **Log out**.
 
 On a phone the two pages are icons, and **+** holds New gig and New errand.
@@ -26,7 +26,7 @@ Each column header shows the column's name on a label filled with its colour, wi
 - **+**: a new gig in this column. The form starts in this column's status; if you move the gig to another project in the form, it starts in that project's first status of the same stage.
 - **Collapse** (two arrows pointing in): the column leaves the board and becomes a small button above it, with its name and count. Click the button to bring the column back. The board remembers collapsed columns per browser. You can drop a card on a collapsed column's button too.
 
-A done card has an archive button at its bottom left, before **Done …**: one click archives that gig, and the message that follows has **Undo**. Each column also ends with **+ New gig**, which stays in view at the bottom of the window while a long column runs past it. Done ends with **Archive all (N)** instead: one click archives the done gigs the column shows, under the filters in use, and the message has **Undo**. Beside it, **Archive done…** opens the archive dialog for whole projects, or for gigs finished some time ago (see **Archive done** below). Cancelled gigs never show on the board; **⋯ → Archive done** archives them too. On a phone, the columns are tabs above the cards.
+A done card has an archive button at its bottom left, before **Done …**: one click archives that gig, and the message that follows has **Undo**. Each column also ends with **+ New gig**, which stays in view at the bottom of the window while a long column runs past it. Done ends with a small **Archive all (N)** instead: one click archives the done gigs the column shows, under the filters in use, and the message has **Undo**. To archive whole projects, or only gigs finished some time ago, use **Archive done** in the account menu (below). With **Archived** on (in **Filters**), archived gigs show first in their column, dimmed. Cancelled gigs never show on the board; **⋯ → Archive done** archives them too. On a phone, the columns are tabs above the cards.
 
 ### Agent activity
 
@@ -104,7 +104,7 @@ The filters row ends, on the right, with the count of open gigs, the **?** help 
 
 - **Board | Table**: a switch between this board and the same gigs as a sortable table, with bulk actions: the project in view, the workspace in view, or every workspace. See [Views](views.md).
 - **Columns | Rows** (the two small icons next to it): the board's layout. Columns put each status side by side, as usual; rows stack the statuses top to bottom, each a lane whose cards run left to right and scroll sideways. Everything else works the same (dragging, sorting, collapsing, filters). The choice is saved with your profile; a phone always shows one column at a time.
-**+ Gig** in the top bar opens the form right away, in the project in view (with several in view, the one you last added a gig to). The form's **Where** section moves it to any project you can add to.
+**+ New gig** in the top bar opens the form right away, in the project in view (with several in view, the one you last added a gig to). The form's **Where** section moves it to any project you can add to.
 
 The account menu (your picture) holds the board's less frequent actions. From another page they open the board first:
 

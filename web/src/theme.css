@@ -197,14 +197,14 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .fly-stars i:nth-child(4) { left: 92%; }
 .fly-stars i:nth-child(5) { left: 50%; height: 0.3rem; }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .brand:hover .fly-stars { opacity: 1; }
-  .brand:hover .fly-stars i { animation: fly-star 0.7s linear infinite; }
-  .brand:hover .fly-stars i:nth-child(2) { animation-duration: 0.5s; animation-delay: -0.2s; }
-  .brand:hover .fly-stars i:nth-child(3) { animation-duration: 0.85s; animation-delay: -0.5s; }
-  .brand:hover .fly-stars i:nth-child(4) { animation-duration: 0.6s; animation-delay: -0.35s; }
-  .brand:hover .fly-stars i:nth-child(5) { animation-duration: 0.95s; animation-delay: -0.1s; }
-  .brand:hover .brand-mark { animation: fly-bob 1.3s ease-in-out infinite; }
-  .brand:hover .logo-flame { fill: var(--flame); animation: flame-flicker 0.14s ease-in-out infinite alternate; }
+  .appbar:hover .brand .fly-stars { opacity: 1; }
+  .appbar:hover .brand .fly-stars i { animation: fly-star 0.7s linear infinite; }
+  .appbar:hover .brand .fly-stars i:nth-child(2) { animation-duration: 0.5s; animation-delay: -0.2s; }
+  .appbar:hover .brand .fly-stars i:nth-child(3) { animation-duration: 0.85s; animation-delay: -0.5s; }
+  .appbar:hover .brand .fly-stars i:nth-child(4) { animation-duration: 0.6s; animation-delay: -0.35s; }
+  .appbar:hover .brand .fly-stars i:nth-child(5) { animation-duration: 0.95s; animation-delay: -0.1s; }
+  .appbar:hover .brand .brand-mark { animation: fly-bob 1.3s ease-in-out infinite; }
+  .appbar:hover .brand .logo-flame { fill: var(--flame); animation: flame-flicker 0.14s ease-in-out infinite alternate; }
 }
 :root { --flame: #ffb547; }
 @keyframes fly-star { from { transform: translateY(0); } to { transform: translateY(2.6rem); } }
@@ -301,7 +301,6 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .column-tools { margin-left: auto; display: inline-flex; gap: 0.1rem; transition: opacity 0.12s ease-out; }
 .column-tools .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
 .column-tools .icon-button:hover { color: var(--text); }
-.column:not(:hover):not(:focus-within) .column-tools { opacity: 0; }
 /* a column's sort: an icon among the tools, lit and always shown beside the title once the column is sorted */
 .col-sort .menu { min-width: 13rem; }
 .col-sort > .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
@@ -325,7 +324,15 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   box-shadow: 0 -0.35rem 0.5rem -0.2rem var(--lane), 0 0.35rem 0 var(--lane); /* a full strip the cards pass behind */
 }
 .cards > .column-add:not(.column-add-empty):hover, .cards > .column-add:not(.column-add-empty):focus-visible { background: var(--hover); }
-.column-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); align-self: stretch; border-radius: var(--radius-s); }
+.column-foot { display: flex; align-items: center; min-height: 1.9rem; padding: 0 0.3rem; align-self: stretch; border-radius: var(--radius-s); }
+/* a small badge-like button (the Done column's Archive all) */
+.pill-button {
+  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.12rem 0.55rem; cursor: pointer;
+  font: inherit; font-size: var(--fs-xs); font-weight: var(--weight-strong); color: var(--muted);
+  background: color-mix(in srgb, var(--text) 6%, transparent); border: 1px solid var(--line-strong); border-radius: 999px;
+}
+.pill-button:hover, .pill-button:focus-visible { color: var(--text); border-color: var(--accent); }
+.pill-button:disabled { opacity: 0.6; cursor: default; }
 /* rows: each status is a lane across the page, its name on the left and its cards running left to
    right (the lane scrolls sideways, not the page) */
 .board.board-rows { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }
@@ -852,7 +859,12 @@ label.check input { width: auto; accent-color: var(--accent); }
    facts, then a foot with the actions on the left and the assignees in the bottom-right corner */
 .rec-card .schedule-top { gap: var(--sp-2) var(--sp-3); }
 .rec-card .schedule-title { font-size: var(--fs-md); }
-.rec-state { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-2); }
+/* the badges at the right end of a card's title row (the workspace last, at the edge); the title
+   takes the rest and wraps */
+.rec-card .schedule-top { flex-wrap: nowrap; align-items: flex-start; }
+.rec-card .schedule-top > .pill:first-child { flex: none; }
+.rec-card .schedule-title { flex: 1; }
+.rec-state { margin-left: auto; flex: none; display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--sp-2); max-width: 60%; }
 .rec-card .schedule-rule { color: var(--muted); font-size: var(--fs-sm); margin-top: calc(-1 * var(--sp-2)); }
 .rec-foot { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--sp-3) var(--sp-4); }
 .rec-foot:not(:has(.schedule-actions)) { justify-content: flex-end; }
@@ -1315,7 +1327,8 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   /* a gig row as a card, the same shape on every row: the checkbox in its own column; title and key;
      status, priority, labels, due; the project and when it changed, the assignees bottom right */
   .narrow .vw-table tr.vw-card-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 0 var(--sp-3); }
-  .narrow .vw-table tr.vw-card-row > td.vw-check { padding-top: 0.15rem; }
+  .narrow .vw-table tr.vw-card-row > td.vw-check { padding-top: 0.15rem; padding-right: 0.35rem; }
+  .vw-card-top .vw-title-link[style] { margin-left: 0; }
   .narrow .vw-table tr.vw-card-row > td.vw-card { grid-column: -2; display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
   .vw-card-top { display: flex; align-items: flex-start; gap: var(--sp-3); }
   .vw-card-top .vw-title { flex: 1; min-width: 0; font-size: 1rem; overflow-wrap: anywhere; }

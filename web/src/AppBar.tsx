@@ -1,5 +1,5 @@
 // The app bar: one row across the top that stays put while the page scrolls. The logo, the two pages
-// (Gigs, Errands); on the right "+ Gig" and "+ Errand", the inbox, the bell, and your
+// (Gigs, Errands); on the right New gig and New errand, the inbox, the bell, and your
 // picture, which opens the account menu (the board's tools, Dashboard, Admin, Profile, Themes, Log out).
 // On a phone the pages are icons and the two New buttons fold into one "+" menu.
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
@@ -64,13 +64,13 @@ export function AppBar({ inboxCount, onLogout }: { inboxCount: number; onLogout:
         : (
             <>
               {canGig && (
-                <Link href={newGig} className="button appbar-button" aria-label="New gig" data-tip="New gig">
-                  <Icon name="plus" strokeWidth={2.2} /> Gig
+                <Link href={newGig} className="button appbar-button">
+                  <Icon name="plus" strokeWidth={2.2} /> New gig
                 </Link>
               )}
               {canErrand && (
-                <Link href={newErrand} className="button secondary appbar-button" aria-label="New errand" data-tip="New errand">
-                  <Icon name="plus" strokeWidth={2.2} /> Errand
+                <Link href={newErrand} className="button secondary appbar-button">
+                  <Icon name="plus" strokeWidth={2.2} /> New errand
                 </Link>
               )}
             </>

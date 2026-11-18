@@ -19,11 +19,19 @@ export function launch(): void {
 
 // the fleet: one medium ship in the middle, smaller ones further off (fainter, later, slower to go)
 const SHIPS = [
-  { x: 50, y: 52, w: 7.5, d: 0, o: 1 },
-  { x: 20, y: 64, w: 3.2, d: 0.12, o: 0.75 },
-  { x: 79, y: 38, w: 2.6, d: 0.22, o: 0.65 },
-  { x: 33, y: 28, w: 1.9, d: 0.3, o: 0.5 },
-  { x: 68, y: 74, w: 2.2, d: 0.08, o: 0.6 },
+  { x: 50, y: 50, w: 11, d: 0, o: 1 },
+  { x: 18, y: 66, w: 3.6, d: 0.12, o: 0.8 },
+  { x: 81, y: 36, w: 3.2, d: 0.22, o: 0.75 },
+  { x: 31, y: 26, w: 2.2, d: 0.3, o: 0.55 },
+  { x: 69, y: 76, w: 2.6, d: 0.08, o: 0.65 },
+  { x: 9, y: 30, w: 1.7, d: 0.38, o: 0.45 },
+  { x: 91, y: 70, w: 2, d: 0.16, o: 0.5 },
+  { x: 42, y: 84, w: 1.6, d: 0.26, o: 0.45 },
+  { x: 60, y: 16, w: 1.5, d: 0.34, o: 0.4 },
+  { x: 25, y: 46, w: 1.4, d: 0.44, o: 0.4 },
+  { x: 76, y: 56, w: 1.8, d: 0.04, o: 0.5 },
+  { x: 86, y: 12, w: 1.3, d: 0.48, o: 0.35 },
+  { x: 13, y: 86, w: 1.5, d: 0.2, o: 0.4 },
 ];
 
 export function LaunchOverlay() {
