@@ -76,3 +76,16 @@ describe("project access", () => {
     expect(errandBody({ ...f, project: 8 }, cur, false).project).toBe(8);
   });
 });
+
+describe("errands per project", () => {
+  it("hasCap reads Errands from the project's own permissions", () => {
+    const m: Pick<Me, "capabilities" | "workspaces" | "admin"> = {
+      admin: false,
+      capabilities: ["view", "errands"],
+      workspaces: [{ id: 2, slug: "other", name: "Other", role: "", whole: false, permissions: [], projects: [{ id: 21, role: "consumer", permissions: ["view", "comment", "work_gigs", "errands"] }, { id: 22, role: "viewer", permissions: ["view"] }] }],
+    };
+    expect(hasCap(m, "errands", 2, 21)).toBe(true);
+    expect(hasCap(m, "errands", 2, 22)).toBe(false);
+    expect(hasCap(m, "errands", 2)).toBe(false); // not the whole workspace's
+  });
+});

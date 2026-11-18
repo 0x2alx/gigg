@@ -134,7 +134,7 @@ function RuleEditor({ info, rule, level, decisions, busy, onSet, who }: {
                 <li key={p.name} className="admin-list-row perm-row">
                   <span className="perm-name" title={p.description}>
                     {project && p.name === "view" ? "See the project" : p.label}
-                    <span className="muted small perm-desc">{project && p.name === "view" ? "See this project: its gigs, comments and runs (and its workspace's name). Every other permission here needs it." : p.description}</span>
+                    <span className="muted small perm-desc">{project && p.name === "view" ? "See this project: its gigs, comments, runs and errands (and its workspace's name). Every other permission here needs it." : p.description}</span>
                   </span>
                   {d && <Effective allowed={d.allowed} blocked={NEEDS_EDIT.has(p.name) && dec.get("edit_gigs")?.allowed === false ? "Edit gigs" : undefined} />}
                   {d && <span className={"pill perm-src perm-src-" + d.source}>{sourceText(d)}</span>}
@@ -225,7 +225,7 @@ export function PermissionsModal({ user, onClose }: { user: AdminUser; onClose: 
                 {level.ws === null
                   ? "Applies in every workspace, including new ones, unless the user's rule for a workspace says otherwise."
                   : level.project
-                    ? "Applies in this project only (its gigs): beats every other rule. On its own it shows the user this project, and none of the rest of the workspace."
+                    ? "Applies in this project only (its gigs and errands): beats every other rule. On its own it shows the user this project, and none of the rest of the workspace."
                     : "Applies in this workspace only; beats the all-workspaces rule and the groups."}
                 {row && row.role && <> Effective here: <strong>{row.role}</strong>.</>}
               </p>

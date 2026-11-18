@@ -44,8 +44,9 @@ Kinds of keys:
 
 - **Limited key** (bound): reaches only its places, whole workspaces or single projects, never more
   even when its user gets more. In them it has its user's permissions, limited by its scopes. A key
-  limited to some projects of a workspace sees only those projects, and none of the workspace-level
-  things (templates, schedules, errands, settings), which need the whole workspace. Changing a limited
+  limited to some projects of a workspace sees only those projects, with their gigs and errands, and
+  none of the other workspace-level things (templates, schedules, settings), which need the whole
+  workspace. Changing a limited
   key's places means making a new key.
 - **Key that follows its user** (unbound, non-admin user): reaches every workspace and project its user
   can see, at the user's permissions, limited by its scopes (like the user's session, without the
@@ -496,6 +497,7 @@ an errand's worker needs `manage_workspace`; its failure gig, the worker or `man
 | GET, POST | `/workspaces/{ws}/errand-templates` | Errand templates. |
 | GET, PUT, DELETE | `/errand-templates/{id}` | An errand template (delete: none uses it). |
 | POST | `/workspaces/{ws}/errands/claim` | The executor (view and `errands:run`, own errands only; no Errands permission needed): start due runs, at most `limit` (optional body; its free slots), the rest stay due. Returns `items` (run id, command, timeout, output, unsandboxed, `command_set_by`, `unsandboxed_set_by`) and `paused`. Older missed slots are recorded as `missed`; a slot while the previous run is going as `skipped`. |
+| POST | `/errands/claim` | The same over every workspace and project in reach, own workspace first: `items`, `paused` (true only when every workspace is) and `paused_workspaces` (slugs skipped). |
 | POST | `/errand-runs/{id}/finish` | The executor reports a run: `status` `ok`/`failed`/`timeout`, `exit_code`, `duration_ms`, `output_tail` (last 64 KiB, cut on a character boundary if longer; dropped for `host` output), `output_bytes`, `error`. Returns whether the errand became failing or recovered. |
 
 ### runs

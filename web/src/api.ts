@@ -76,7 +76,7 @@ export function hasCap(me: Pick<Me, "capabilities" | "workspaces" | "admin"> | n
 }
 
 // The permissions a project's rules can decide; the rest are the whole workspace's.
-export const PROJECT_PERMISSIONS = new Set(["view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs"]);
+export const PROJECT_PERMISSIONS = new Set(["view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "errands"]);
 
 // canWriteIn: whether you may edit gigs (Edit gigs: member and up), which creating gigs, templates
 // and recurring gigs need besides their own permission: in one project when given (its own rules

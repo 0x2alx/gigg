@@ -434,7 +434,7 @@ function Members({ ws, users }: { ws: AdminWorkspace; users: AdminUser[] }) {
     <section className="card" aria-label="Members">
       <div className="admin-section-head">
         <h2>Members</h2>
-        <span className="muted small">Admins reach every workspace without a membership. A member of only some projects sees just those (none of the workspace's templates, schedules, errands or settings).</span>
+        <span className="muted small">Admins reach every workspace without a membership. A member of only some projects sees just those, with their gigs and errands (none of the workspace's templates, schedules or settings).</span>
       </div>
       <ErrorLine error={error} />
       {items && items.length === 0 && <Empty>No members yet.</Empty>}

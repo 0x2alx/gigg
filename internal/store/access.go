@@ -48,7 +48,7 @@ var Permissions = []Permission{
 	{"always_run", "Always-run gigs", "Mark gigs to run whatever the usage budget (cron-like gigs). The gig cap and pauses still apply.", "Runner", false},
 	{"run_timeout", "Run timeouts", "Set how long an agent may run on a gig (templates and recurring gigs too) or how long an errand may run, instead of the default. The agent's host caps it.", "Runner", false},
 	{"allowed_tools", "Gig tool allowlists", "Give gigs (templates, recurring gigs) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change gigs that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner", false},
-	{"errands", "Errands", "Create, change, pause and delete errands (commands an agent's executor runs on a schedule, sandboxed) and errand templates. An errand's worker is yourself, or any agent with Manage the workspace.", "Runner", false},
+	{"errands", "Errands", "Create, change, pause and delete errands (commands an agent's executor runs on a schedule, sandboxed); in a whole workspace, its errand templates too. Given for one project: that project's errands, and changing one's command never changes other errands' template. An errand's worker is yourself, or any agent with Manage the workspace.", "Runner", false},
 	{"errand_unsandboxed", "No-sandbox errands", "Let an errand run outside its agent's sandbox. Any change to such an errand by someone without this permission turns its sandbox back on.", "Runner", false},
 	{"pause_runs", "Pause gig runs", "Pause and resume new agent gig runs and errand runs; with an all-workspaces rule, every workspace at once. Changing the caps stays with admins.", "Runner", false},
 	{"recurring_gigs", "Recurring gigs", "Create, change, pause and stop recurring gigs (with Edit gigs; they make gigs with Create gigs).", "Planning", false},
@@ -58,9 +58,9 @@ var Permissions = []Permission{
 	{"manage_workspace", "Manage the workspace", "Projects, columns, sections and labels, and other people's comments.", "Admin", false},
 }
 
-// ProjectPermissions are the permissions a project rule can hold: what can be done to the gigs of
-// one project. The others are about the workspace as a whole.
-var ProjectPermissions = []string{"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs"}
+// ProjectPermissions are the permissions a project rule can hold: what can be done to the gigs and
+// errands of one project. The others are about the workspace as a whole.
+var ProjectPermissions = []string{"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "errands"}
 
 // ProjectRoles are the presets a project rule can use (manager is about the workspace).
 var ProjectRoles = []string{"viewer", "consumer", "member"}

@@ -30,7 +30,7 @@ same workspace: without it, it counts as not held.
 | `allowed_tools` | Runner | Give gigs (templates, recurring gigs) the list of tools the agent runner may use for them, and change gigs that have one. |
 | `run_timeout` | Runner | Set, change or clear how long a runner lets one run of a gig (template, recurring gig) go, and give an errand a timeout other than the default or change it. |
 | `pause_runs` | Runner | Pause and resume new agent gig runs and errand runs; with an all-workspaces rule, in every workspace at once. Changing the caps stays with admins. |
-| `errands` | Runner | Make, change, pause, run and delete errands; an agent's executor needs it to run its errands. |
+| `errands` | Runner | Make, change, pause, run and delete errands (in one project, with a project rule); in a whole workspace, its errand templates too. An agent's executor needs no permission to run the errands it is the worker of. |
 | `errand_unsandboxed` | Runner | Let an errand run outside the agent's sandbox. An errand loses the flag when someone without this permission changes it, and its runs fail while the person who set it lacks the permission. |
 | `recurring_gigs` | Planning | Create, change, pause and stop recurring gigs and schedules (recurring gigs also need `edit_gigs`, and `create_gigs` to make their gigs). |
 | `templates` | Planning | Create, change and delete gig templates, with `edit_gigs` (using one only needs `create_gigs`). |
@@ -125,18 +125,25 @@ that has no override is "no opinion" (inherit), not a deny.
 
 ### Rules for one project
 
-A project rule decides the gig permissions in that project only: `view`, `comment`, `work_gigs`,
-`edit_gigs`, `create_gigs`, `delete_gigs`, `archive_gigs`. Its preset is `viewer`, `consumer` or `member`
-(the others give workspace-level permissions). Everything else (templates, recurring gigs, schedules,
-custom fields, errands, runner settings, managing the workspace) is decided for the whole workspace and
-needs `view` of the whole workspace.
+A project rule decides, in that project only, the gig permissions (`view`, `comment`, `work_gigs`,
+`edit_gigs`, `create_gigs`, `delete_gigs`, `archive_gigs`) and `errands`. Its preset is `viewer`,
+`consumer` or `member` (the others give workspace-level permissions); `errands` is in no preset there
+either, and is given as an override. Everything else (templates, recurring gigs, schedules, custom
+fields, errand templates, no-sandbox errands, run timeouts, runner settings, managing the workspace) is
+decided for the whole workspace and needs `view` of the whole workspace.
 
 Uses:
 
 - **Give someone one project of a workspace**: a project rule alone. They see the workspace (its name,
   and its labels and members, which gigs show) and only the projects they have, with their gigs,
-  comments, runs and activity; nothing workspace-level. Their gigs' assignees, notifications and
-  claims follow the same reach.
+  comments, runs, activity and errands (and the errand templates and schedules those errands use);
+  nothing else workspace-level. Their gigs' assignees, notifications and claims follow the same reach,
+  and so do their own errands: an agent's executor runs the errands it is the worker of wherever it
+  sees their project.
+- **Let someone run errands in one project**: a project rule with `errands=allow`. They make, change,
+  pause, run and delete that project's errands. Changing one's command never changes another errand
+  that shares its template: the errand gets its own copy. Errand templates, no-sandbox errands and
+  other timeouts than the default stay with whoever holds them for the whole workspace.
 - **Lower or raise a member in one project**: a project rule with overrides (`edit_gigs=deny` in a
   project where they should only move gigs). A preset only adds permissions; an override can remove one.
 

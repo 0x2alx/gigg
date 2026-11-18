@@ -134,8 +134,20 @@ func GetErrandTemplate(ctx context.Context, q Q, id int64) (*ErrandTemplate, err
 // ListErrandTemplates returns the live errand templates a workspace can use, by name: its own, then the
 // shared ones. ws 0: only the shared ones.
 func ListErrandTemplates(ctx context.Context, q Q, ws int64) ([]*ErrandTemplate, error) {
-	rows, err := q.QueryContext(ctx, "SELECT "+ctCols+` FROM errand_templates t WHERE (t.workspace_id = ? OR t.workspace_id IS NULL) AND t.deleted_at IS NULL
-		ORDER BY t.workspace_id IS NULL, t.name COLLATE NOCASE, t.id`, ws)
+	return ListErrandTemplatesIn(ctx, q, ws, nil)
+}
+
+// ListErrandTemplatesIn: with projects nil, ListErrandTemplates; else (someone who sees only those
+// projects) the shared templates and the workspace's templates errands of those projects use.
+func ListErrandTemplatesIn(ctx context.Context, q Q, ws int64, projects []int64) ([]*ErrandTemplate, error) {
+	where, args := `(t.workspace_id = ? OR t.workspace_id IS NULL)`, []any{ws}
+	if projects != nil {
+		where = `(t.workspace_id IS NULL OR (t.workspace_id = ? AND EXISTS (SELECT 1 FROM errands c WHERE c.template_id = t.id AND c.deleted_at IS NULL
+			AND c.project_id IN (` + placeholders(len(projects)) + `))))`
+		args = append(args, int64Args(projects)...)
+	}
+	rows, err := q.QueryContext(ctx, "SELECT "+ctCols+` FROM errand_templates t WHERE `+where+` AND t.deleted_at IS NULL
+		ORDER BY t.workspace_id IS NULL, t.name COLLATE NOCASE, t.id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +199,10 @@ type ErrandEdit struct {
 	CanUnsandbox bool
 	CanManage    bool
 	CanTimeout   bool // run_timeout: set a timeout other than the default, or change one
+	// OwnTemplate: the editor holds Errands in some projects only, so a content change never writes
+	// through a template other errands use (they may be in projects the editor can't touch): the
+	// errand gets its own copy.
+	OwnTemplate bool
 }
 
 // SaveErrandTemplate creates (ID 0) or replaces a template. Provenance, which the executor trusts:
@@ -451,6 +467,21 @@ func ListErrands(ctx context.Context, q Q, ws int64, projects []int64) ([]*Erran
 	return loadErrands(ctx, q, where+` ORDER BY c.state = 'failing' DESC, t.name COLLATE NOCASE, c.id`, args...)
 }
 
+// ErrandRefUsedIn reports whether a live errand of one of projects uses template (column
+// "template_id") or schedule ("schedule_id") id: what someone who sees only those projects may reuse.
+func ErrandRefUsedIn(ctx context.Context, q Q, column string, id int64, projects []int64) (bool, error) {
+	if column != "template_id" && column != "schedule_id" {
+		return false, fmt.Errorf("ErrandRefUsedIn: bad column %q", column)
+	}
+	if len(projects) == 0 {
+		return false, nil
+	}
+	var n int
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM errands WHERE `+column+` = ? AND deleted_at IS NULL AND project_id IN (`+placeholders(len(projects))+`)`,
+		append([]any{id}, int64Args(projects)...)...).Scan(&n)
+	return n > 0, err
+}
+
 // ErrandProject checks the project an errand is put in: a live project of its workspace; 0 = the
 // workspace's first live project (none: an error).
 func ErrandProject(ctx context.Context, q Q, ws, project int64) (int64, error) {
@@ -633,7 +664,15 @@ func UpdateErrand(ctx context.Context, q Q, a Actor, id, expect int64, ch Errand
 		if err != nil {
 			return nil, err
 		}
-		if t.Shared { // a shared template is never written through one workspace's errand: it gets its own copy
+		copyIt := t.Shared // a shared template is never written through one workspace's errand: it gets its own copy
+		if !copyIt && e.OwnTemplate {
+			var others int64
+			if err := q.QueryRowContext(ctx, `SELECT count(*) FROM errands WHERE template_id = ? AND deleted_at IS NULL AND id != ?`, tplID, c.ID).Scan(&others); err != nil {
+				return nil, err
+			}
+			copyIt = others > 0
+		}
+		if copyIt {
 			if tplID, err = copyErrandTemplate(ctx, q, a, t, c.WorkspaceID, false); err != nil {
 				return nil, err
 			}

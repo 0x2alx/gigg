@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -86,7 +87,7 @@ type errandTemplateOut struct {
 
 func (a *API) errandEdit(p *access.Principal, ws int64) store.ErrandEdit {
 	return store.ErrandEdit{CanUnsandbox: p.Can(ws, "errand_unsandboxed", "errands:write"), CanManage: allowed(p, ws, access.Manager) == nil,
-		CanTimeout: allowed(p, ws, "run_timeout") == nil}
+		CanTimeout: allowed(p, ws, "run_timeout") == nil, OwnTemplate: !p.Allowed(ws, "errands")}
 }
 
 // seesErrand: an errand is seen by those who see its project (one without a project: by those who
@@ -106,14 +107,42 @@ func (a *API) errand(ctx context.Context, p *access.Principal, id int64) (*store
 	return c, nil
 }
 
-// errandTemplate: a workspace's errand templates are workspace-level (whole-workspace readers); the
-// shared ones, for anyone who sees some workspace whole.
+// errandTemplate: a workspace's errand templates are seen by whole-workspace readers, and by someone
+// who sees only some projects when an errand of those projects uses it; the shared ones, by anyone who
+// sees some workspace whole.
 func (a *API) errandTemplate(ctx context.Context, p *access.Principal, id int64) (*store.ErrandTemplate, error) {
 	t, err := store.GetErrandTemplate(ctx, a.st.R, id)
-	if err != nil || (t.Shared && !seesShared(p)) || (!t.Shared && !p.Allowed(t.WorkspaceID, access.Viewer)) {
+	if err != nil || (t.Shared && !seesShared(p)) || (!t.Shared && !a.seesErrandRef(ctx, p, t.WorkspaceID, "template_id", t.ID)) {
 		return nil, errNotFound()
 	}
 	return t, nil
+}
+
+// seesErrandRef: a workspace's errand template or schedule is the workspace's (whole-workspace readers),
+// and also seen by someone with only some projects when an errand of those projects uses it.
+func (a *API) seesErrandRef(ctx context.Context, p *access.Principal, ws int64, column string, id int64) bool {
+	if p.Allowed(ws, access.Viewer) {
+		return true
+	}
+	ok, err := store.ErrandRefUsedIn(ctx, a.st.R, column, id, p.ProjectsWith(ws, access.Viewer))
+	return err == nil && ok
+}
+
+// errandRefs: the template and schedule an errand is pointed at must be ones the caller sees (a
+// project-only caller can't reach the workspace's others by id).
+func (a *API) errandRefs(ctx context.Context, p *access.Principal, ws, template, schedule int64) error {
+	if template != 0 {
+		if _, err := a.errandTemplate(ctx, p, template); err != nil {
+			return fail(422, "invalid", "No such errand template.")
+		}
+	}
+	if schedule != 0 {
+		s, err := store.GetSchedule(ctx, a.st.R, schedule)
+		if err != nil || (s.Shared && !seesShared(p)) || (!s.Shared && (s.WorkspaceID != ws || !a.seesErrandRef(ctx, p, ws, "schedule_id", s.ID))) {
+			return fail(422, "invalid", "No such schedule.")
+		}
+	}
+	return nil
 }
 
 // sharedErrandEdit: a shared errand template is saved by an instance admin (who holds every permission,
@@ -154,10 +183,18 @@ func (a *API) errandWorker(ctx context.Context, p *access.Principal, ws, project
 	return u.ID, nil
 }
 
-// errandEditGuard: changing an errand needs Errands (errands:write); setting the sandbox off also needs
-// No-sandbox errands (the store turns it off when someone without it changes anything).
-func errandEditGuard(p *access.Principal, ws int64, unsandboxOn bool) error {
-	if err := require(p, ws, "errands", "errands:write"); err != nil {
+// errandEditGuard: changing an errand needs Errands (errands:write) in its project (project nil: the
+// whole workspace, as for templates and errands whose project is gone); setting the sandbox off also
+// needs No-sandbox errands, a workspace permission (the store turns it off when someone without it
+// changes anything).
+func errandEditGuard(p *access.Principal, ws int64, project *int64, unsandboxOn bool) error {
+	var err error
+	if project != nil {
+		err = requireIn(p, ws, *project, "errands", "errands:write")
+	} else {
+		err = require(p, ws, "errands", "errands:write")
+	}
+	if err != nil {
 		return err
 	}
 	if unsandboxOn {
@@ -204,11 +241,20 @@ func (a *API) registerErrands() {
 				return nil, err
 			}
 			b := in.Body
-			if err := errandEditGuard(p, w.ID, b.TemplateID == 0 && b.Unsandboxed); err != nil {
-				return nil, err
-			}
 			project, err := store.ErrandProject(ctx, a.st.R, w.ID, b.Project)
 			if err != nil {
+				return nil, err
+			}
+			if b.Project == 0 && !p.AllowedIn(w.ID, project, "errands") {
+				// no project named: the first one where the caller may make errands
+				if ps := p.ProjectsWith(w.ID, "errands"); len(ps) > 0 {
+					project = ps[0]
+				}
+			}
+			if err := errandEditGuard(p, w.ID, &project, b.TemplateID == 0 && b.Unsandboxed); err != nil {
+				return nil, err
+			}
+			if err := a.errandRefs(ctx, p, w.ID, b.TemplateID, b.ScheduleID); err != nil {
 				return nil, err
 			}
 			worker, err := a.errandWorker(ctx, p, w.ID, project, b.Worker)
@@ -266,7 +312,17 @@ func (a *API) registerErrands() {
 				return nil, err
 			}
 			b := in.Body
-			if err := errandEditGuard(p, c.WorkspaceID, b.Unsandboxed != nil && *b.Unsandboxed && !c.Unsandboxed); err != nil {
+			if err := errandEditGuard(p, c.WorkspaceID, c.ProjectID, b.Unsandboxed != nil && *b.Unsandboxed && !c.Unsandboxed); err != nil {
+				return nil, err
+			}
+			var tplRef, schedRef int64
+			if b.TemplateID != nil {
+				tplRef = *b.TemplateID
+			}
+			if b.ScheduleID != nil {
+				schedRef = *b.ScheduleID
+			}
+			if err := a.errandRefs(ctx, p, c.WorkspaceID, tplRef, schedRef); err != nil {
 				return nil, err
 			}
 			v, err := ifMatch(in.IfMatch)
@@ -287,6 +343,9 @@ func (a *API) registerErrands() {
 			}
 			if b.Project != nil {
 				if project, err = store.ErrandProject(ctx, a.st.R, c.WorkspaceID, *b.Project); err != nil {
+					return nil, err
+				}
+				if err := errandEditGuard(p, c.WorkspaceID, &project, false); err != nil { // moving it there is making one there
 					return nil, err
 				}
 				if b.Worker == nil && !store.UserHasIn(ctx, a.st.R, c.WorkerID, c.WorkspaceID, project, "view") {
@@ -332,7 +391,7 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := errandEditGuard(p, c.WorkspaceID, false); err != nil {
+		if err := errandEditGuard(p, c.WorkspaceID, c.ProjectID, false); err != nil {
 			return nil, err
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteErrand(ctx, tx, p.Actor(), c) })
@@ -352,7 +411,7 @@ func (a *API) registerErrands() {
 			if err != nil {
 				return nil, err
 			}
-			if err := errandEditGuard(p, c.WorkspaceID, false); err != nil {
+			if err := errandEditGuard(p, c.WorkspaceID, c.ProjectID, false); err != nil {
 				return nil, err
 			}
 			if c.Unsandboxed && act.path != "pause" {
@@ -473,6 +532,76 @@ func (a *API) registerErrands() {
 		}
 		return out, err
 	})
+	type claimAllOut struct {
+		Body struct {
+			Items   []*store.ClaimedErrand `json:"items"`
+			Paused  bool                   `json:"paused" doc:"Every workspace in reach has its errands paused"`
+			Skipped []string               `json:"paused_workspaces" doc:"Slugs of the workspaces whose errands are paused (their errands wait)"`
+		}
+	}
+	huma.Register(a.h, huma.Operation{OperationID: "claim-errands-anywhere", Method: "POST", Path: "/errands/claim", Tags: []string{"errands"},
+		Summary:     "Start due runs of your own errands in every workspace and project in reach (the executor polls this every minute)",
+		Description: "The workspace you own first, then the others. A workspace whose errands are paused is skipped (paused_workspaces); paused is true only when every one is."},
+		func(ctx context.Context, in *struct {
+			Body *struct {
+				Limit int `json:"limit,omitempty" minimum:"0" maximum:"100" doc:"Start at most this many runs in all (the executor's free slots); the rest stay due. 0: all"`
+			}
+		}) (*claimAllOut, error) {
+			p, err := me(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if err := requireScope(p, "errands:run"); err != nil {
+				return nil, err
+			}
+			wss := p.Workspaces()
+			if wss == nil { // an instance admin: every workspace (only their own errands are claimed anyway)
+				all, err := store.ListWorkspaces(ctx, a.st.R, nil)
+				if err != nil {
+					return nil, err
+				}
+				for _, w := range all {
+					wss = append(wss, w.ID)
+				}
+			}
+			if own, err := store.OwnedWorkspace(ctx, a.st.R, p.User.ID); err == nil {
+				slices.SortStableFunc(wss, func(x, y int64) int { return b2i(x != own) - b2i(y != own) })
+			}
+			limit := 0
+			if in.Body != nil {
+				limit = in.Body.Limit
+			}
+			out := &claimAllOut{}
+			out.Body.Items, out.Body.Skipped = []*store.ClaimedErrand{}, []string{}
+			paused := 0
+			for _, ws := range wss {
+				left := 0
+				if limit > 0 {
+					if left = limit - len(out.Body.Items); left <= 0 {
+						break
+					}
+				}
+				var got []*store.ClaimedErrand
+				err := a.tx(ctx, func(tx *sql.Tx) error {
+					var err error
+					got, err = store.ClaimErrands(ctx, tx, p.User.ID, ws, p.ProjectFilter(ws), left)
+					return err
+				})
+				if errors.Is(err, store.ErrErrandsPaused) {
+					paused++
+					if w, err := store.GetWorkspace(ctx, a.st.R, ws); err == nil {
+						out.Body.Skipped = append(out.Body.Skipped, w.Slug)
+					}
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				out.Body.Items = append(out.Body.Items, got...)
+			}
+			out.Body.Paused = len(wss) > 0 && paused == len(wss)
+			return out, nil
+		})
 	huma.Register(a.h, huma.Operation{OperationID: "finish-errand-run", Method: "POST", Path: "/errand-runs/{id}/finish", Tags: []string{"errands"},
 		Summary: "Report a run's end (the worker's executor only): status, exit code, duration, the output tail unless the errand keeps it on the host"},
 		func(ctx context.Context, in *struct {
@@ -530,7 +659,7 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := require(p, w.ID, access.Viewer, "errands:read"); err != nil {
+		if err := requireScope(p, "errands:read"); err != nil {
 			return nil, err
 		}
 		out := &struct {
@@ -538,7 +667,8 @@ func (a *API) registerErrands() {
 				Items []*store.ErrandTemplate `json:"items"`
 			}
 		}{}
-		out.Body.Items, err = store.ListErrandTemplates(ctx, a.st.R, w.ID)
+		// with only some projects: the shared templates and those their errands use
+		out.Body.Items, err = store.ListErrandTemplatesIn(ctx, a.st.R, w.ID, p.ProjectFilter(w.ID))
 		return out, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "create-errand-template", Method: "POST", Path: "/workspaces/{ws}/errand-templates", Tags: []string{"errands"},
@@ -554,7 +684,7 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		if err := errandEditGuard(p, w.ID, in.Body.Unsandboxed); err != nil {
+		if err := errandEditGuard(p, w.ID, nil, in.Body.Unsandboxed); err != nil {
 			return nil, err
 		}
 		t := in.Body.template()
@@ -625,11 +755,11 @@ func (a *API) registerErrands() {
 		if err != nil {
 			return nil, err
 		}
-		t, err := a.errandTemplate(ctx, p, in.ID)
+		t, err := a.errandTemplate(ctx, p, in.ID) // decides who sees it (project-only callers too)
 		if err != nil {
 			return nil, err
 		}
-		if err := readIn(p, t.WorkspaceID, "errands:read"); err != nil {
+		if err := requireScope(p, "errands:read"); err != nil {
 			return nil, err
 		}
 		return &errandTemplateOut{ETag: etag(t.Version), Body: t}, nil
@@ -655,7 +785,7 @@ func (a *API) registerErrands() {
 					return nil, err
 				}
 			} else {
-				if err := errandEditGuard(p, cur.WorkspaceID, in.Body.Unsandboxed && !cur.Unsandboxed); err != nil {
+				if err := errandEditGuard(p, cur.WorkspaceID, nil, in.Body.Unsandboxed && !cur.Unsandboxed); err != nil {
 					return nil, err
 				}
 				e = a.errandEdit(p, cur.WorkspaceID)
@@ -689,9 +819,17 @@ func (a *API) registerErrands() {
 			if _, err := sharedErrandEdit(p); err != nil {
 				return nil, err
 			}
-		} else if err := errandEditGuard(p, t.WorkspaceID, false); err != nil {
+		} else if err := errandEditGuard(p, t.WorkspaceID, nil, false); err != nil {
 			return nil, err
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteErrandTemplate(ctx, tx, p.Actor(), t) })
 	})
+}
+
+// b2i: false before true, for sorting.
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

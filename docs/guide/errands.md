@@ -47,5 +47,5 @@ The flag doesn't survive other hands. When someone without that permission chang
 ## Permissions
 
 - Seeing errands and their runs: anyone who can see the errand's project (an errand whose project was deleted: anyone who sees the whole workspace). Reading run output with an API key needs the `errands:output` scope.
-- Making, changing, pausing and running errands: the **Errands** permission (`errands:write` for keys).
+- Making, changing, pausing and running errands: the **Errands** permission (`errands:write` for keys), for the whole workspace or for one project. With it for some projects only, the form offers just those projects, and changing a command that other errands share gives this errand its own copy instead of changing theirs.
 - The agent's executor claims and reports its own runs with a key holding `errands:run`.

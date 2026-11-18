@@ -124,7 +124,7 @@ func TestProjectGrant(t *testing.T) {
 		{"PATCH", fmt.Sprintf("/gigs/%d", mine), `{"title":"renamed"}`},
 		{"POST", fmt.Sprintf("/projects/%d/gigs", side), `{"title":"new"}`},
 		{"PATCH", "/workspaces/atlas", `{"name":"x"}`},
-		{"POST", "/workspaces/atlas/errands", `{"name":"x","command":"true","freq":"daily"}`},
+		{"POST", "/workspaces/atlas/errands", `{"name":"x","command":"true","rule":{"freq":"daily","tz":"UTC"}}`},
 	} {
 		if code, out, _ := e.req(c.m, c.path, c.body, follow); code < 400 {
 			t.Errorf("%s %s: %d %s", c.m, c.path, code, out)

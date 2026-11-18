@@ -101,11 +101,15 @@ export function ErrandsPage({ open }: { open?: number }) {
   }, [load]);
 
   const wsOf = useCallback((id: number) => tree.find((w) => w.id === id), [tree]);
-  const canEdit = useCallback((ws: number) => {
+  // Errands can be given for a whole workspace or for some of its projects
+  const canEdit = useCallback((ws: number, project?: number | null) => {
     const w = wsOf(ws);
-    return !!w && hasCap(me, "errands", ws);
+    return !!w && hasCap(me, "errands", ws, project ?? undefined);
   }, [wsOf, me]);
-  const writable = useMemo(() => tree.filter((w) => canEdit(w.id)), [tree, canEdit]);
+  const writable = useMemo(() => tree.filter((w) => canEdit(w.id) || w.projects.some((p) => canEdit(w.id, p.id))), [tree, canEdit]);
+  // making one also needs a worker: an agent makes errands for itself; giving one to an agent takes
+  // Manage the workspace (a person with only Errands changes the existing ones)
+  const makers = useMemo(() => writable.filter((w) => me.user.kind === "agent" || hasCap(me, "manage_workspace", w.id)), [writable, me]);
 
   const inPlace = useMemo(() => (items ?? []).filter((c) => placeMatch(place, tree, c.workspace_id, c.project_id)), [items, place, tree]);
   const shown = useMemo(() => {
@@ -146,7 +150,7 @@ export function ErrandsPage({ open }: { open?: number }) {
               <Icon name="template" /> Shared templates
             </button>
           )}
-          {writable.length > 0 && (
+          {makers.length > 0 && (
             <button type="button" className="button" onClick={() => setEditing("new")}>
               <Icon name="plus" /> New errand
             </button>
@@ -298,7 +302,7 @@ export function ErrandsPage({ open }: { open?: number }) {
         <ErrandPanel
           key={selected.id}
           errand={selected}
-          canEdit={canEdit(selected.workspace_id)}
+          canEdit={canEdit(selected.workspace_id, selected.project_id)}
           canUnsandbox={hasCap(me, "errand_unsandboxed", selected.workspace_id)}
           onClose={() => navigate("/errands")}
           onEdit={() => setEditing(selected)}
@@ -318,11 +322,11 @@ export function ErrandsPage({ open }: { open?: number }) {
         </aside>
       )}
       {library && <SharedTemplates ws={writable[0] ?? tree[0]!} onClose={() => setLibrary(false)} />}
-      {editing && (editing !== "new" || writable.length > 0) && (
+      {editing && (editing !== "new" || makers.length > 0) && (
         <ErrandEditor
           errand={editing === "new" ? null : editing}
-          choices={writable}
-          initialWs={editing === "new" ? (writable.find((w) => placeMatch(place, tree, w.id, null)) ?? writable[0]!) : wsOf(editing.workspace_id)!}
+          choices={editing === "new" ? makers : writable}
+          initialWs={editing === "new" ? (makers.find((w) => placeMatch(place, tree, w.id, null)) ?? makers[0]!) : wsOf(editing.workspace_id)!}
           initialProject={place?.startsWith("p:") ? Number(place.slice(2)) : 0}
           onClose={() => setEditing(null)}
           onSaved={(c) => {
@@ -684,6 +688,9 @@ function ErrandEditor({ errand, template, choices, initialWs, initialProject = 0
   const tpl = template && template !== "new" ? template : null;
   const [wsId, setWsId] = useState(initialWs.id);
   const ws = errand ? initialWs : (choices.find((w) => w.id === wsId) ?? initialWs);
+  // the projects it can go in: where you may make errands (its own stays listed when editing)
+  const wholeErrands = hasCap(me, "errands", ws.id);
+  const projects = ws.projects.filter((p) => hasCap(me, "errands", ws.id, p.id) || p.id === errand?.project_id);
   const [f, setF] = useState<ErrandForm>(() => (errand ? formOfErrand(errand) : tpl ? { ...defaultErrandForm(), ...contentOf(tpl) } : { ...defaultErrandForm(), project: initialProject }));
   const set = (p: Partial<ErrandForm>) => setF((x) => ({ ...x, ...p }));
   const [err, setErr] = useState("");
@@ -738,7 +745,7 @@ function ErrandEditor({ errand, template, choices, initialWs, initialProject = 0
         .finally(() => setBusy(false));
       return;
     }
-    const body = errandBody({ ...f, worker, project: ws.projects.some((p) => p.id === f.project) ? f.project : 0 }, errand, canUnsandbox, picked);
+    const body = errandBody({ ...f, worker, project: projects.some((p) => p.id === f.project) ? f.project : wholeErrands ? 0 : (projects[0]?.id ?? 0) }, errand, canUnsandbox, picked);
     const leaving = detaching(errand, body);
     if (leaving.length && !confirmed) {
       setBusy(false);
@@ -772,11 +779,11 @@ function ErrandEditor({ errand, template, choices, initialWs, initialProject = 0
             </select>
           </label>
         )}
-        {!tplMode && ws.projects.length > 1 && (
+        {!tplMode && projects.length > 1 && (
           <label className="span2">
             Project
-            <select value={ws.projects.some((p) => p.id === f.project) ? f.project : ws.projects[0]!.id} onChange={(e) => set({ project: Number(e.target.value) })}>
-              {ws.projects.map((p) => (
+            <select value={projects.some((p) => p.id === f.project) ? f.project : projects[0]!.id} onChange={(e) => set({ project: Number(e.target.value) })}>
+              {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -787,7 +794,7 @@ function ErrandEditor({ errand, template, choices, initialWs, initialProject = 0
         )}
         {errand && errand.template_uses > 1 && (
           <p className="span2 small muted" role="note">
-            {errand.template_uses} errands share this command: changing its name, command, timeout or output changes them all.
+            {errand.template_uses} errands share this command: {wholeErrands ? "changing its name, command, timeout or output changes them all." : "changing its name, command, timeout or output gives this errand its own copy; the others keep theirs."}
           </p>
         )}
         {!errand && !tplMode && library.length > 0 && (

@@ -133,7 +133,7 @@ func TestProjectRules(t *testing.T) {
 			return SetRule(f.ctx, tx, f.a, "user", f.guest, &f.ws, &f.tools, "manager", nil)
 		},
 		"workspace permission": func(tx *sql.Tx) error {
-			return SetRule(f.ctx, tx, f.a, "user", f.guest, &f.ws, &f.tools, "", map[string]bool{"errands": true})
+			return SetRule(f.ctx, tx, f.a, "user", f.guest, &f.ws, &f.tools, "", map[string]bool{"templates": true})
 		},
 		"project of another ws": func(tx *sql.Tx) error {
 			other := f.ws + 99
