@@ -108,6 +108,16 @@ func TestProjectRules(t *testing.T) {
 	if d := g.DecideIn(f.ws, f.tools, "work_gigs"); d.Source != "user_project" {
 		t.Fatalf("source %+v", d)
 	}
+	// a project's rules count in its own workspace only: asked about another workspace with that
+	// project's id, the answer is that workspace's (none here)
+	for _, other := range g.workspaces {
+		if other != f.ws && (g.HasIn(other, f.tools, "view") || g.DecideIn(other, f.tools, "work_gigs").Source == "user_project") {
+			t.Fatalf("tools' rule leaked into workspace %d", other)
+		}
+	}
+	if g.HasIn(f.ws+1000, f.tools, "view") {
+		t.Fatal("tools' rule answered for a workspace that doesn't exist")
+	}
 
 	// a workspace member with an off override on tools: lowered there only
 	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
@@ -126,6 +136,18 @@ func TestProjectRules(t *testing.T) {
 	if !c.HasIn(f.ws, f.main, "work_gigs") || c.HasIn(f.ws, f.tools, "view") || c.DecideIn(f.ws, f.main, "work_gigs").Source != "group_project" {
 		t.Fatal("crew: consumer on main through the group")
 	}
+	// the user's own all-workspaces denies outrank the group's project rule (how agents keep their
+	// denies wherever a group puts them)
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		return SetRule(f.ctx, tx, f.a, "user", f.crewUser, nil, nil, "", map[string]bool{"work_gigs": false})
+	}))
+	c = f.grants(t, f.crewUser)
+	if c.HasIn(f.ws, f.main, "work_gigs") || !c.HasIn(f.ws, f.main, "comment") || c.DecideIn(f.ws, f.main, "work_gigs").Source != "user_all" {
+		t.Fatalf("crew with an all-workspaces deny: %+v", c.DecideIn(f.ws, f.main, "work_gigs"))
+	}
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		return SetRule(f.ctx, tx, f.a, "user", f.crewUser, nil, nil, "", nil)
+	}))
 
 	// what a project rule can't hold
 	for name, fn := range map[string]func(tx *sql.Tx) error{

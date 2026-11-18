@@ -181,11 +181,12 @@ type Grants struct {
 	groupProj  map[int64][]*AccessRule
 	workspaces []int64           // every workspace id
 	projects   map[int64][]int64 // live projects per workspace, in sidebar order
+	projectWS  map[int64]int64   // every project (deleted too) -> its workspace
 }
 
 func newGrants(admin bool) *Grants {
 	return &Grants{Admin: admin, userWS: map[int64]*AccessRule{}, groupWS: map[int64][]*AccessRule{},
-		userProj: map[int64]*AccessRule{}, groupProj: map[int64][]*AccessRule{}, projects: map[int64][]int64{}}
+		userProj: map[int64]*AccessRule{}, groupProj: map[int64][]*AccessRule{}, projects: map[int64][]int64{}, projectWS: map[int64]int64{}}
 }
 
 func (g *Grants) add(r *AccessRule) {
@@ -239,17 +240,21 @@ func LoadGrants(ctx context.Context, q Q, u *User) (*Grants, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	rows, err = q.QueryContext(ctx, `SELECT id, workspace_id FROM projects WHERE deleted_at IS NULL ORDER BY workspace_id, position, id`)
+	rows, err = q.QueryContext(ctx, `SELECT id, workspace_id, deleted_at IS NOT NULL FROM projects ORDER BY workspace_id, position, id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id, ws int64
-		if err := rows.Scan(&id, &ws); err != nil {
+		var deleted bool
+		if err := rows.Scan(&id, &ws, &deleted); err != nil {
 			return nil, err
 		}
-		g.projects[ws] = append(g.projects[ws], id)
+		g.projectWS[id] = ws
+		if !deleted {
+			g.projects[ws] = append(g.projects[ws], id)
+		}
 	}
 	return g, rows.Err()
 }
@@ -274,6 +279,11 @@ func groupOpinion(rules []*AccessRule, perm string) (d Decision, has bool) {
 func (g *Grants) raw(ws, project int64, perm string) Decision {
 	if g.Admin {
 		return Decision{Name: perm, Allowed: true, Source: "admin"}
+	}
+	// a project's rules count only for that project's own workspace (a caller passing a project of
+	// another workspace gets the workspace's answer, never that project's rules)
+	if pw, ok := g.projectWS[project]; project != 0 && (!ok || pw != ws) {
+		project = 0
 	}
 	inProject := project != 0 && IsProjectPermission(perm)
 	if r := g.userProj[project]; inProject && r != nil {

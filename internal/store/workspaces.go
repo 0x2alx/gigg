@@ -783,8 +783,16 @@ func scanLabel(row interface{ Scan(...any) error }) (*Label, error) {
 }
 
 // Labels lists a workspace's labels.
-func Labels(ctx context.Context, q Q, ws int64) ([]*Label, error) {
-	rows, err := q.QueryContext(ctx, `SELECT id, workspace_id, name, color, description, version FROM labels WHERE workspace_id = ? ORDER BY name`, ws)
+func Labels(ctx context.Context, q Q, ws int64) ([]*Label, error) { return LabelsIn(ctx, q, ws, nil) }
+
+// LabelsIn lists a workspace's labels; with projects (not nil), only those on a gig of one of them.
+func LabelsIn(ctx context.Context, q Q, ws int64, projects []int64) ([]*Label, error) {
+	where, args := `workspace_id = ?`, []any{ws}
+	if projects != nil {
+		where += ` AND id IN (SELECT gl.label_id FROM gig_labels gl JOIN gigs t ON t.id = gl.gig_id WHERE t.project_id IN (` + placeholders(len(projects)) + `))`
+		args = append(args, int64Args(projects)...)
+	}
+	rows, err := q.QueryContext(ctx, `SELECT id, workspace_id, name, color, description, version FROM labels WHERE `+where+` ORDER BY name`, args...)
 	if err != nil {
 		return nil, err
 	}

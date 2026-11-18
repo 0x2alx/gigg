@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **A top bar replaces the sidebar**: the logo, **Gigs** and **Errands** on the left; **+ New gig**,
+  **+ New errand**, the live dot, Inbox, Notifications and your picture on the right. Your picture
+  opens the account menu (on hover or click): Recurring, Schedules, Templates, Archive done, Trash,
+  saved views, Dashboard, Admin (with its sections), Profile, Themes, Log out. The board's own header
+  is gone: its count, help and the Board | Table and Columns | Rows switches end the filters row.
+  The **My gigs** page is gone (`/my` opens the board filtered to "Assigned to me").
+- Board: rows are 12% wider in the Rows layout; card text is a step smaller; the gig form has more
+  room between its rows.
+- **Someone given only some projects of a workspace** no longer reads the workspace's description,
+  the members who see none of those projects (nor others' project rows), labels not used in those
+  projects, the runner's caps, usage and errand counts (only whether runs are paused), or errand
+  templates (shared ones included) that no errand of those projects uses.
+- A project's access rules apply only in its own workspace, whatever a caller asks.
+
 - **Gigs and errands**: tasks are now **gigs** and crons are **errands**, everywhere: the UI, the
   API (`/gigs`, `/errands`, `gigs:read` ...), MCP tools (`create_gig`, `list_errands` ...),
   permissions (`create_gigs` ...), the database and the docs. Migration 0013 renames the tables and

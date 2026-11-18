@@ -23,6 +23,7 @@ type RunnerState struct {
 	Settings    *store.RunnerSettings `json:"settings"`
 	Usage       *store.RunnerUsage    `json:"usage"`
 	Errands     ErrandCounts          `json:"errands"`
+	PauseOnly   bool                  `json:"pause_only,omitempty" doc:"You see only some projects of the workspace: only the pause state is filled in"`
 }
 
 // ErrandCounts: a workspace's live errands and how many of them are failing.
@@ -81,7 +82,7 @@ func (a *API) registerRunner() {
 			if !p.SeesWorkspace(w.ID) {
 				continue
 			}
-			s, err := a.runnerState(ctx, w)
+			s, err := a.runnerStateFor(ctx, p, w)
 			if err != nil {
 				return nil, err
 			}
@@ -102,7 +103,7 @@ func (a *API) registerRunner() {
 		if err := requireScope(p, "gigs:read"); err != nil {
 			return nil, err
 		}
-		s, err := a.runnerState(ctx, w)
+		s, err := a.runnerStateFor(ctx, p, w)
 		return &struct{ Body RunnerState }{s}, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "set-runner-caps", Method: "PATCH", Path: "/workspaces/{ws}/runner", Tags: []string{"runs"},
@@ -130,7 +131,7 @@ func (a *API) registerRunner() {
 		}); err != nil {
 			return nil, err
 		}
-		s, err := a.runnerState(ctx, w)
+		s, err := a.runnerStateFor(ctx, p, w)
 		return &struct{ Body RunnerState }{s}, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "pause-runner", Method: "POST", Path: "/runner/pause", Tags: []string{"runs"},
@@ -247,7 +248,7 @@ func (a *API) pauseOrResume(ctx context.Context, b PauseBody, pause bool) (*runn
 	out := &runnerList{}
 	out.Body.Items = []RunnerState{}
 	for _, w := range chosen {
-		s, err := a.runnerState(ctx, w)
+		s, err := a.runnerStateFor(ctx, p, w)
 		if err != nil {
 			return nil, err
 		}
@@ -261,4 +262,20 @@ func noPauseErr(p *access.Principal) error {
 		return errForbidden("This key lacks the runs:write scope.")
 	}
 	return errNoPermission("pause_runs")
+}
+
+// runnerStateFor is runnerState as the caller may read it: someone who sees only some projects of the
+// workspace gets whether gig and errand runs are paused (and until when, which runners read before
+// each pass), nothing about its caps, usage or errands.
+func (a *API) runnerStateFor(ctx context.Context, p *access.Principal, w *store.Workspace) (RunnerState, error) {
+	s, err := a.runnerState(ctx, w)
+	if err != nil || p.ProjectFilter(w.ID) == nil {
+		return s, err
+	}
+	out := RunnerState{WorkspaceID: s.WorkspaceID, Slug: s.Slug, Name: s.Name, Usage: &store.RunnerUsage{}, PauseOnly: true}
+	if s.Settings != nil {
+		out.Settings = &store.RunnerSettings{WorkspaceID: s.Settings.WorkspaceID, PausedUntil: s.Settings.PausedUntil,
+			PausedOpen: s.Settings.PausedOpen, Paused: s.Settings.Paused, ErrandsPaused: s.Settings.ErrandsPaused, Version: s.Settings.Version}
+	}
+	return out, nil
 }

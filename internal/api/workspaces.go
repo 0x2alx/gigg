@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"slices"
 	"strconv"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -327,6 +328,11 @@ func (a *API) registerWorkspaces() {
 		if err := requireScope(p, "workspace:read"); err != nil {
 			return nil, err
 		}
+		if p.ProjectFilter(w.ID) != nil { // only some projects: the workspace's own description isn't theirs
+			c := *w
+			c.DescriptionMD = ""
+			w = &c
+		}
 		return &workspaceOut{ETag: etag(w.Version), Body: w}, nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "patch-workspace", Method: "PATCH", Path: "/workspaces/{ws}", Tags: []string{"workspaces"},
@@ -386,6 +392,9 @@ func (a *API) registerWorkspaces() {
 		out.Body.Items, err = store.Members(ctx, a.st.R, w.ID)
 		if out.Body.Items == nil {
 			out.Body.Items = []store.Membership{}
+		}
+		if pf := p.ProjectFilter(w.ID); pf != nil && err == nil {
+			out.Body.Items = membersOfProjects(ctx, a.st.R, w.ID, pf, out.Body.Items)
 		}
 		if !p.AdminWith("admin:members") { // how others got their access is admin business
 			for i := range out.Body.Items {
@@ -497,7 +506,7 @@ func (a *API) registerWorkspaces() {
 			return nil, err
 		}
 		out := &labelsOut{}
-		out.Body.Items, err = store.Labels(ctx, a.st.R, w.ID)
+		out.Body.Items, err = store.LabelsIn(ctx, a.st.R, w.ID, p.ProjectFilter(w.ID))
 		if out.Body.Items == nil {
 			out.Body.Items = []*store.Label{}
 		}
@@ -844,4 +853,31 @@ func (a *API) registerWorkspaces() {
 		}
 		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.ReorderStatuses(ctx, tx, p.Actor(), pr, in.Body.IDs) })
 	})
+}
+
+// membersOfProjects narrows a workspace's member list for a caller who sees only some of its projects:
+// the people who see at least one of those projects, each with only those projects' rows.
+func membersOfProjects(ctx context.Context, q store.Q, ws int64, projects []int64, all []store.Membership) []store.Membership {
+	out := []store.Membership{}
+	for _, m := range all {
+		shares := false
+		for _, pr := range projects {
+			if store.UserHasIn(ctx, q, m.UserID, ws, pr, "view") {
+				shares = true
+				break
+			}
+		}
+		if !shares {
+			continue
+		}
+		rows := []store.ProjectMembership{}
+		for _, r := range m.Projects {
+			if slices.Contains(projects, r.ProjectID) {
+				rows = append(rows, r)
+			}
+		}
+		m.Projects = rows
+		out = append(out, m)
+	}
+	return out
 }

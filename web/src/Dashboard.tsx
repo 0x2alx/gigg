@@ -44,6 +44,7 @@ export interface RunnerState {
   settings: RunnerSettings;
   usage: RunnerUsage;
   errands?: { total: number; failing: number };
+  pause_only?: boolean; // you see only some projects there: only the pause state is filled in
 }
 
 // Boxes: which runs a pause or resume touches (both when omitted).
@@ -248,6 +249,10 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
           </button>
         )}
       </div>
+      {it.pause_only ? (
+        <p className="muted small dash-partial">You see only some projects of this workspace: its runner caps and usage stay with its members.</p>
+      ) : (
+      <>
       <Meter label="Gigs, last 24 h" n={u.gigs_24h} cap={s.daily_cap} tip="Different gigs started in the last 24 hours, against the daily cap (a gig that goes on counts once)" />
       <Meter
         label="Budget-dependent (night)"
@@ -281,7 +286,9 @@ function RunnerCard({ it, admin, canPause, onAct }: { it: RunnerState; admin: bo
           </>
         )}
       </dl>
-      {admin &&
+      </>
+      )}
+      {admin && !it.pause_only &&
         (editing ? (
           <form className="row dash-caps" onSubmit={save}>
             <label>

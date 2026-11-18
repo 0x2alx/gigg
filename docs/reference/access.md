@@ -6,7 +6,7 @@
   API keys. Any user can be disabled; a disabled user's sessions and keys stop working.
 - **Instance admins** are users with the admin flag.
 - **Workspaces** hold projects (boards), and projects hold gigs. Permissions are granted per
-  workspace, and the gig permissions also per project. A workspace may name an **owner**, shown next to it in the sidebar; ownership grants
+  workspace, and the gig permissions also per project. A workspace may name an **owner**, shown next to it on the board's workspace chips; ownership grants
   nothing.
 - **Groups** are named sets of users that share access rules.
 - **Access rules** give a user or a group a **preset** and/or per-permission **overrides** in one
@@ -134,10 +134,13 @@ decided for the whole workspace and needs `view` of the whole workspace.
 
 Uses:
 
-- **Give someone one project of a workspace**: a project rule alone. They see the workspace (its name,
-  and its labels and members, which gigs show) and only the projects they have, with their gigs,
-  comments, runs, activity and errands (and the errand templates and schedules those errands use);
-  nothing else workspace-level. Their gigs' assignees, notifications and claims follow the same reach,
+- **Give someone one project of a workspace**: a project rule alone. They see the workspace's name
+  and only the projects they have, with their gigs, comments, runs, activity and errands (and the
+  errand templates, shared ones included, and schedules those errands use); of the workspace itself,
+  only what those gigs show: the labels used on them, the members who see one of those projects (with
+  only those projects' rows), the custom field definitions, and whether runs are paused (not the
+  runner's caps or usage, nor the workspace's description). Nothing else workspace-level, and never
+  anything to write there: a project's own description takes Manage the workspace. Their gigs' assignees, notifications and claims follow the same reach,
   and so do their own errands: an agent's executor runs the errands it is the worker of wherever it
   sees their project.
 - **Let someone run errands in one project**: a project rule with `errands=allow`. They make, change,

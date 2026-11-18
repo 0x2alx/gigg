@@ -141,9 +141,10 @@ func ListErrandTemplates(ctx context.Context, q Q, ws int64) ([]*ErrandTemplate,
 // projects) the shared templates and the workspace's templates errands of those projects use.
 func ListErrandTemplatesIn(ctx context.Context, q Q, ws int64, projects []int64) ([]*ErrandTemplate, error) {
 	where, args := `(t.workspace_id = ? OR t.workspace_id IS NULL)`, []any{ws}
-	if projects != nil {
-		where = `(t.workspace_id IS NULL OR (t.workspace_id = ? AND EXISTS (SELECT 1 FROM errands c WHERE c.template_id = t.id AND c.deleted_at IS NULL
-			AND c.project_id IN (` + placeholders(len(projects)) + `))))`
+	if projects != nil { // only the templates (shared ones too) the errands of those projects use
+		where = `(t.workspace_id = ? OR t.workspace_id IS NULL) AND EXISTS (SELECT 1 FROM errands c WHERE c.template_id = t.id
+			AND c.workspace_id = ? AND c.deleted_at IS NULL AND c.project_id IN (` + placeholders(len(projects)) + `))`
+		args = append(args, ws)
 		args = append(args, int64Args(projects)...)
 	}
 	rows, err := q.QueryContext(ctx, "SELECT "+ctCols+` FROM errand_templates t WHERE `+where+` AND t.deleted_at IS NULL
