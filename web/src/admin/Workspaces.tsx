@@ -81,7 +81,7 @@ export function WorkspacesPage() {
       {rows === null && !error && <p className="muted">Loading…</p>}
       {rows && (
         <div className="card admin-table-card">
-          <table className="admin-table ws-table">
+          <table className="admin-table admin-fit ws-table">
             <thead>
               <tr>
                 <th>Workspace</th>

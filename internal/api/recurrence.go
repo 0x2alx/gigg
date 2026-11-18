@@ -20,8 +20,8 @@ type RecurrenceOut struct {
 // RecurrenceBody creates or replaces a recurring gig: a template (template_id, or the gig content
 // here) paired with a schedule (schedule_id, or the timing here), plus its own settings.
 type RecurrenceBody struct {
-	TemplateID    *int64                 `json:"template_id,omitempty" doc:"Make each gig from this template (same workspace; for this project or any); the content fields are then ignored. On update, another id switches to that template; without it, content changes are written to the current template (every recurring gig using it follows)."`
-	ScheduleID    *int64                 `json:"schedule_id,omitempty" doc:"Use this schedule (same workspace); the timing fields are then ignored. On update, another id switches to it; without it, timing changes are written to the current schedule (every recurring gig on it moves). On create without it, a schedule with exactly this timing is reused or made."`
+	TemplateID    *int64                 `json:"template_id,omitempty" doc:"Make each gig from this template (this workspace's, for this project or any, or a shared one); the content fields are then ignored. On update, another id switches to that template; without it, content changes are written to the current template (every recurring gig using it follows)."`
+	ScheduleID    *int64                 `json:"schedule_id,omitempty" doc:"Use this schedule (this workspace's or a shared one); the timing fields are then ignored. On update, another id switches to it; without it, timing changes are written to the current schedule (every recurring gig on it moves). On create without it, a schedule with exactly this timing is reused or made."`
 	Title         string                 `json:"title,omitempty" maxLength:"250" doc:"Gig title (required unless template_id is given)"`
 	Checklist     []string               `json:"checklist,omitempty" maxItems:"200" doc:"Checklist items each gig gets; omit to keep the template's, [] clears"`
 	Subgigs       []store.TemplateSubgig `json:"subgigs,omitempty" maxItems:"50" doc:"Subgigs each gig gets (title; blocks_parent = the gig waits for it); omit to keep the template's, [] clears"`

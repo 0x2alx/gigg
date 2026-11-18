@@ -48,12 +48,12 @@ const Prefix = "/api/v1"
 // New builds the API handler (mounted at /api/v1 by the server).
 func New(cfg *config.Config, st *store.Store, log *slog.Logger) *API {
 	huma.NewError = newProblem
-	huma.NewErrorWithContext = func(_ huma.Context, status int, msg string, errs ...error) huma.StatusError {
-		return newProblem(status, msg, errs...)
+	huma.NewErrorWithContext = func(ctx huma.Context, status int, msg string, errs ...error) huma.StatusError {
+		return withHints(ctx, newProblem(status, msg, errs...))
 	}
 	mux := http.NewServeMux()
 	hc := huma.DefaultConfig("gigg", version.Version)
-	hc.Info.Description = "gigg gig board API. Bearer keys or a browser session. Errors are RFC 9457 problem+json with a stable `code`. POSTs may carry `Idempotency-Key` (1-200 printable chars): a repeat within 24 h replays the first response (`Idempotent-Replayed: true`)."
+	hc.Info.Description = "gigg gig board API. Bearer keys or a browser session. Errors are RFC 9457 problem+json with a stable `code`. A PUT takes the body its GET returns, edited: the read-only fields in it (id, version, counts, joined names) are ignored; any other unknown field is refused. POSTs may carry `Idempotency-Key` (1-200 printable chars): a repeat within 24 h replays the first response (`Idempotent-Replayed: true`)."
 	hc.OpenAPIPath = "/openapi"
 	hc.DocsPath = ""
 	hc.SchemasPath = ""
@@ -66,6 +66,9 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger) *API {
 	hc.Security = []map[string][]string{{"bearer": {}}, {"session": {}}}
 	a := &API{cfg: cfg, st: st, log: log, mux: mux, limiter: newLimiter(), hashSlots: make(chan struct{}, 2)}
 	a.h = humago.New(mux, hc)
+	a.h.UseMiddleware(a.readOnlyEcho()) // before any Register: huma binds the stack at registration
+	reg := a.h.OpenAPI().Components.Schemas
+	schemaRegistry.Store(&reg)
 	a.registerAuth()
 	a.registerUsers()
 	a.registerWorkspaces()

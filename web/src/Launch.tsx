@@ -18,21 +18,30 @@ export function launch(): void {
 
 
 // the fleet: one medium ship in the middle, smaller ones further off (fainter, later, slower to go)
-const SHIPS = [
-  { x: 50, y: 50, w: 11, d: 0, o: 1 },
-  { x: 18, y: 66, w: 3.6, d: 0.12, o: 0.8 },
-  { x: 81, y: 36, w: 3.2, d: 0.22, o: 0.75 },
-  { x: 31, y: 26, w: 2.2, d: 0.3, o: 0.55 },
-  { x: 69, y: 76, w: 2.6, d: 0.08, o: 0.65 },
-  { x: 9, y: 30, w: 1.7, d: 0.38, o: 0.45 },
-  { x: 91, y: 70, w: 2, d: 0.16, o: 0.5 },
-  { x: 42, y: 84, w: 1.6, d: 0.26, o: 0.45 },
-  { x: 60, y: 16, w: 1.5, d: 0.34, o: 0.4 },
-  { x: 25, y: 46, w: 1.4, d: 0.44, o: 0.4 },
-  { x: 76, y: 56, w: 1.8, d: 0.04, o: 0.5 },
-  { x: 86, y: 12, w: 1.3, d: 0.48, o: 0.35 },
-  { x: 13, y: 86, w: 1.5, d: 0.2, o: 0.4 },
-];
+// the lead ship, centred
+const LEAD = { x: 50, y: 50, w: 12.7, d: 0, o: 1 };
+// where the escorts fly: spread round the screen, clear of the lead; each launch jitters them a little
+// and gives each a random size (a bigger ship flies nearer, so brighter)
+const SPOTS = [
+  [18, 66], [81, 36], [31, 26], [69, 76], [9, 30], [91, 70],
+  [42, 84], [60, 16], [25, 46], [76, 56], [86, 12], [13, 86],
+] as const;
+
+export function fleet(rand: () => number = Math.random) {
+  return [
+    LEAD,
+    ...SPOTS.map(([x, y]) => {
+      const size = rand(); // 0: far and small, 1: near and big
+      return {
+        x: x + (rand() - 0.5) * 6,
+        y: y + (rand() - 0.5) * 6,
+        w: 1.1 + size * 4.4,
+        d: rand() * 0.5,
+        o: 0.35 + size * 0.5,
+      };
+    }),
+  ];
+}
 
 export function LaunchOverlay() {
   const { prefs } = useApp();
@@ -65,6 +74,9 @@ export function LaunchOverlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [run],
   );
+  // a new fleet for each launch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const ships = useMemo(() => fleet(), [run]);
   if (!run) return null;
   return (
     <div className="launch" key={run} aria-hidden="true">
@@ -75,7 +87,7 @@ export function LaunchOverlay() {
           style={{ "--x": `${s.x}%`, "--len": `${s.len}rem`, "--dur": `${s.dur}s`, "--d": `${s.d}s`, "--o": s.o } as CSSProperties}
         />
       ))}
-      {SHIPS.map((s, i) => (
+      {ships.map((s, i) => (
         <span key={i} className="launch-ship" style={{ "--x": `${s.x}%`, "--y": `${s.y}%`, "--w": `${s.w}rem`, "--d": `${s.d}s`, "--o": s.o } as CSSProperties}>
           <LogoMark className="launch-mark" />
         </span>

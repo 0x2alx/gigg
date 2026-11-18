@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- API: a `PUT` takes the body its `GET` returned, edited: read-only fields (id, version, counts,
+  joined names) are ignored instead of each refused; unknown fields still fail. An unknown field's
+  error names the one it likely meant (`status_id`: did you mean `status`?) and the detail lists
+  what the body takes. The recurring-gig `template_id` and `schedule_id` docs now say a shared
+  template or schedule works too.
+- The launch: the lead ship is 15% bigger and the escorts take a random size (and place, a little)
+  on every launch, the bigger ones brighter.
+- The Done column's Archive all button follows the theme's button shape.
+- Admin: the Workspaces and Users tables size each column to its content with the same gap after
+  it; the buttons take the rest at the right edge (the spare width no longer lands between columns).
+- Shared errand templates: **+ New shared template** is at the top, and the Shared badge at the
+  right end of each card's title row, as in the other lists.
 - The live dot is gone: when live updates have
   been lost for 30 seconds, a bar under the top bar says so, with Retry now, until they are back.
 - The logo flies while the pointer is on the top bar (a bob, star streaks, both engines lit), and

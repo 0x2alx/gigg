@@ -635,19 +635,27 @@ function SharedTemplates({ ws, onClose }: { ws: WorkspaceTree; onClose: () => vo
           {err}
         </p>
       )}
+      <div className="list-bar">
+        {!!items?.length && <span className="muted small">{`${items.length} shared template${items.length === 1 ? "" : "s"}`}</span>}
+        <button type="button" className="button small list-new" onClick={() => setEditing("new")}>
+          + New shared template
+        </button>
+      </div>
       {items === null && !err && <p className="muted">Loading…</p>}
       {items?.length === 0 && <p className="muted">No shared errand templates yet.</p>}
       {!!items?.length && (
         <ul className="schedules" aria-label="Shared errand templates">
           {items.map((t) => (
-            <li key={t.id} className="schedule">
+            <li key={t.id} className="schedule rec-card">
               <div className="schedule-top">
                 <span className="pill pill-accent">
                   <Icon name="template" />
                 </span>
                 <strong className="schedule-title">{t.name}</strong>
-                <span className="pill pill-shared">Shared</span>
-                {t.unsandboxed && <span className="pill pill-danger">no sandbox</span>}
+                <span className="rec-state">
+                  {t.unsandboxed && <span className="pill pill-danger">no sandbox</span>}
+                  <span className="pill pill-shared">Shared</span>
+                </span>
               </div>
               <code className="schedule-rule errand-cmd-line">{t.command.split("\n")[0]}</code>
               <div className="chips">
@@ -689,11 +697,6 @@ function SharedTemplates({ ws, onClose }: { ws: WorkspaceTree; onClose: () => vo
           ))}
         </ul>
       )}
-      <div className="row end">
-        <button type="button" className="button" onClick={() => setEditing("new")}>
-          + New shared template
-        </button>
-      </div>
     </Modal>
   );
 }

@@ -92,7 +92,7 @@ export function UsersPage() {
       {items === null && !error && <p className="muted">Loading…</p>}
       {items && (
         <div className="card admin-table-card">
-          <table className="admin-table">
+          <table className="admin-table admin-fit">
             <thead>
               <tr>
                 <th>User</th>

@@ -157,7 +157,9 @@ Errors are RFC 9457 `application/problem+json` with a stable `code`:
 }
 ```
 
-`errors` lists validation details when there are any. Some errors also carry `request_id`; the
+`errors` lists validation details when there are any. A body field the endpoint doesn't take is an
+`unexpected property` item naming the field it most likely meant (`"status_id"` on a new gig:
+`did you mean "status"?`), and the `detail` then lists the fields that body takes. Some errors also carry `request_id`; the
 `X-Request-Id` response header is always present and matches the server log.
 
 | Status | `code` | When |
@@ -197,6 +199,15 @@ Write endpoints that accept `If-Match` (see the OpenAPI document; e.g. `PATCH /g
 `POST /gigs/{id}/move`, `PATCH /comments/{id}`, `PATCH /me`, `PATCH /workspaces/{ws}`,
 `PUT /templates/{id}`) take `"N"`, `W/"N"` or `*`. Without the header (or with `*`) the write is
 unconditional. If the version differs, the answer is 412 `version_conflict`: reload and retry.
+
+### Replacing with PUT
+
+A `PUT` takes the body its `GET` returns, edited: the read-only fields in it (`id`, `version`,
+`created_at`, use counts, names joined from other objects and the like: whatever the answer has and
+the request doesn't take) are ignored, so a read-edit-write needs no clean-up. Any other unknown
+field is still refused (422), so a misspelt one doesn't pass unnoticed. A recurring gig's body
+names its template (`template_id`), so its content comes from that template: change the content
+with `PUT /templates/{id}`, or drop `template_id` to write it to the current template.
 
 ### Idempotency
 
