@@ -1,6 +1,6 @@
 // Small shared pieces: colour-coded badges and a modal. Data colours (labels, statuses, priorities,
 // users) come from theme.ts; their text colour is chosen for contrast so they read on any theme.
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNarrow } from "./narrow";
 import { avatarURL, priorityNames, type Category, type CustomField, type Tag, type Gig, type User } from "./api";
@@ -376,6 +376,19 @@ export function MoreMenu({ label, children, icon, className, buttonClass, face }
       document.removeEventListener("keydown", key, true);
     };
   }, [open]);
+  // keep the open menu inside the window: CSS places it under its button (to the left or right by
+  // screen size); a menu that would still run off an edge (a column's sort at the right on a phone)
+  // is shifted back in
+  const menuRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const m = menuRef.current;
+    if (!open || !m) return;
+    m.style.transform = "";
+    const r = m.getBoundingClientRect();
+    const pad = 8;
+    const dx = r.right > window.innerWidth - pad ? window.innerWidth - pad - r.right : r.left < pad ? pad - r.left : 0;
+    if (dx) m.style.transform = `translateX(${Math.round(Math.max(dx, pad - r.left))}px)`;
+  }, [open]);
   return (
     <div className={"more-menu" + (className ? " " + className : "")} ref={ref}>
       <button
@@ -390,7 +403,7 @@ export function MoreMenu({ label, children, icon, className, buttonClass, face }
         {face ?? (icon ? "⋯" : buttonClass ? `${label} ▾` : `⋯ ${label}`)}
       </button>
       {open && (
-        <div className="menu" role="menu" onClick={() => setOpen(false)}>
+        <div className="menu" role="menu" ref={menuRef} onClick={() => setOpen(false)}>
           {children}
         </div>
       )}

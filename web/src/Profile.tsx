@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { launchOn } from "./launchPref";
 import { api, ApiError, fmtTime, type Session } from "./api";
 import { useApp } from "./App";
 import { ColorPicker } from "./fields";
@@ -63,6 +64,7 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
           <ColorPicker value={color} onChange={setColor} />
         </div>
         <TimeZoneField />
+        <LaunchField />
         {err && <p className="danger span2">{err}</p>}
         {msg && <p className="accent span2">{msg}</p>}
         <div className="row end span2">
@@ -213,6 +215,17 @@ function Picture() {
       <p className="muted small">PNG, JPEG, WebP or GIF, up to 2 MB. It's cropped to a square and stored as a 256 px PNG.</p>
       {err && <p className="danger">{err}</p>}
     </section>
+  );
+}
+
+// LaunchField: the short ship animation after creating a gig or an errand, saved at once.
+function LaunchField() {
+  const { prefs, setPref } = useApp();
+  return (
+    <label className="check span2">
+      <input type="checkbox" checked={launchOn(prefs)} onChange={(e) => setPref("launch_animation", e.target.checked ? undefined : false)} />
+      Play the launch animation after creating a gig or an errand <span className="muted small">(skipped when your system asks for less motion)</span>
+    </label>
   );
 }
 

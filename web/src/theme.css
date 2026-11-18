@@ -155,6 +155,7 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .button:disabled { opacity: 0.6; cursor: default; }
 .button.danger-button:disabled, .button.secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 .link, .icon-button { background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer; padding: 0.2rem; }
+.link.small { font-size: var(--fs-sm); } /* font: inherit above would undo .small */
 /* every filtered list has one; greyed out while nothing is filtered */
 .clear-filters { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; font-size: var(--fs-sm); }
 .clear-filters:disabled { color: var(--muted); opacity: 0.6; cursor: default; }
@@ -180,6 +181,66 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 }
 .brand-mark { flex: none; width: 1.5rem; height: 1.7rem; color: var(--logo, var(--accent)); }
 .brand-word { line-height: 1; }
+
+/* ---- the ship in flight: the top-left mark on hover, and the launch after a create ---- */
+.logo-flame { transform-box: fill-box; transform-origin: 50% 0; }
+.brand-fly { position: relative; display: inline-grid; place-items: center; }
+.brand-fly > * { grid-area: 1 / 1; }
+.fly-stars { position: absolute; inset: -0.35rem -0.45rem; overflow: hidden; pointer-events: none; opacity: 0; transition: opacity var(--dur-2) var(--ease); }
+.fly-stars i {
+  position: absolute; top: -40%; width: 1.5px; height: 0.55rem; border-radius: 1px;
+  background: linear-gradient(transparent, var(--text)); opacity: 0.55;
+}
+.fly-stars i:nth-child(1) { left: 6%; }
+.fly-stars i:nth-child(2) { left: 28%; height: 0.35rem; }
+.fly-stars i:nth-child(3) { left: 74%; height: 0.45rem; }
+.fly-stars i:nth-child(4) { left: 92%; }
+.fly-stars i:nth-child(5) { left: 50%; height: 0.3rem; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .brand:hover .fly-stars { opacity: 1; }
+  .brand:hover .fly-stars i { animation: fly-star 0.7s linear infinite; }
+  .brand:hover .fly-stars i:nth-child(2) { animation-duration: 0.5s; animation-delay: -0.2s; }
+  .brand:hover .fly-stars i:nth-child(3) { animation-duration: 0.85s; animation-delay: -0.5s; }
+  .brand:hover .fly-stars i:nth-child(4) { animation-duration: 0.6s; animation-delay: -0.35s; }
+  .brand:hover .fly-stars i:nth-child(5) { animation-duration: 0.95s; animation-delay: -0.1s; }
+  .brand:hover .brand-mark { animation: fly-bob 1.3s ease-in-out infinite; }
+  .brand:hover .logo-flame { fill: var(--flame); animation: flame-flicker 0.14s ease-in-out infinite alternate; }
+}
+:root { --flame: #ffb547; }
+@keyframes fly-star { from { transform: translateY(0); } to { transform: translateY(2.6rem); } }
+@keyframes fly-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.12rem); } }
+@keyframes flame-flicker { from { transform: scaleY(1); opacity: 1; } to { transform: scaleY(0.72); opacity: 0.8; } }
+
+.launch {
+  position: fixed; inset: 0; z-index: 70; pointer-events: none; overflow: hidden;
+  animation: launch-sky 3.2s ease both;
+}
+@keyframes launch-sky {
+  0% { background: transparent; }
+  12%, 78% { background: color-mix(in srgb, var(--bg) 62%, transparent); }
+  100% { background: transparent; }
+}
+.launch-star {
+  position: absolute; left: var(--x); top: calc(-1 * var(--len)); width: 2px; height: var(--len); border-radius: 1px;
+  background: linear-gradient(transparent, var(--text)); opacity: var(--o);
+  animation: launch-star var(--dur) linear var(--d) infinite, launch-fade 3.2s ease both;
+}
+@keyframes launch-star { to { transform: translateY(calc(100vh + 8rem)); } }
+@keyframes launch-fade { 0% { opacity: 0; } 15%, 80% { opacity: var(--o); } 100% { opacity: 0; } }
+.launch-ship {
+  position: absolute; left: var(--x); top: var(--y); width: var(--w); opacity: var(--o);
+  color: var(--logo, var(--accent)); filter: drop-shadow(0 0.4rem 1.2rem color-mix(in srgb, var(--flame) 35%, transparent));
+  animation: launch-rise 3.2s var(--d) both;
+}
+.launch-mark { display: block; width: 100%; height: auto; animation: fly-bob 0.9s ease-in-out infinite; }
+.launch-mark .logo-flame { fill: var(--flame); animation: launch-flame 0.12s ease-in-out infinite alternate; }
+@keyframes launch-flame { from { transform: scaleY(1.5); opacity: 1; } to { transform: scaleY(1.05); opacity: 0.8; } }
+@keyframes launch-rise {
+  0% { transform: translate(-50%, 40vh); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1); }
+  15% { transform: translate(-50%, -50%); opacity: var(--o); }
+  70% { transform: translate(-50%, -50%); animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5); }
+  100% { transform: translate(-50%, -140vh); opacity: var(--o); }
+}
 /* Pages: wide ones fill the content area; reading-width ones are centred (never stuck to the left). */
 .inbox, .profile, .theme-editor { margin-inline: auto; width: 100%; }
 /* full-width pages keep running text to a readable line length */
@@ -257,6 +318,14 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 }
 .column-add:hover, .column-add:focus-visible { color: var(--text); background: var(--hover); }
 .column-add-empty { visibility: hidden; pointer-events: none; }
+/* a long column keeps its "+ New gig" (or the Done footer) in reach: it sticks to the bottom of the
+   window while the column runs past it */
+.cards > .column-add:not(.column-add-empty), .cards > .column-foot {
+  position: sticky; bottom: 0; z-index: 1; align-self: stretch; background: var(--lane);
+  box-shadow: 0 -0.35rem 0.5rem -0.2rem var(--lane), 0 0.35rem 0 var(--lane); /* a full strip the cards pass behind */
+}
+.cards > .column-add:not(.column-add-empty):hover, .cards > .column-add:not(.column-add-empty):focus-visible { background: var(--hover); }
+.column-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); align-self: stretch; border-radius: var(--radius-s); }
 /* rows: each status is a lane across the page, its name on the left and its cards running left to
    right (the lane scrolls sideways, not the page) */
 .board.board-rows { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }
@@ -788,6 +857,8 @@ label.check input { width: auto; accent-color: var(--accent); }
 .rec-foot { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--sp-3) var(--sp-4); }
 .rec-foot:not(:has(.schedule-actions)) { justify-content: flex-end; }
 .rec-people { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-2); }
+/* a list dialog's "+ New ..." sits at the right end of its filter bar, above the list */
+.list-bar .list-new { margin-left: auto; }
 .rec-delete { display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem; } /* the delete confirm: question, the "also delete" ticks, the buttons */
 .schedule-ref { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .schedule-ref .link { padding: 0; text-align: left; overflow-wrap: anywhere; }
@@ -929,16 +1000,21 @@ label.check input { width: auto; accent-color: var(--accent); }
 .sched-tpl { margin: 0; padding: 0.4rem 0.6rem; border-radius: var(--radius-m); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 .archive-days { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.6rem 0 1rem; }
 .archive-days .assignee { padding: 0.2rem 0.7rem; }
-.archive-pick { border: 0; padding: 0; margin: 0.6rem 0 0; display: flex; flex-direction: column; gap: 0.3rem; max-height: 45vh; overflow-y: auto; }
+/* the project rows share one grid (subgrid), so the tick, workspace, key and name line up in columns */
+.archive-pick {
+  border: 0; padding: 0; margin: 0.6rem 0 0; max-height: 45vh; overflow-y: auto;
+  display: grid; grid-template-columns: auto max-content max-content minmax(0, 1fr); row-gap: 0.3rem; align-content: start;
+}
 .archive-pick legend { padding: 0; margin-bottom: 0.3rem; }
 .archive-row {
-  display: flex; flex-direction: row; align-items: center; justify-content: flex-start; text-align: left;
+  grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; justify-items: start; text-align: left;
   gap: var(--sp-3); padding: 0.35rem 0.6rem; cursor: pointer; color: var(--text);
   border: 1px solid var(--line); border-radius: var(--radius-m); font-size: var(--fs-base);
 }
 .archive-row:hover { background: var(--hover); }
 .archive-row input { width: auto; flex: none; accent-color: var(--accent); }
 .archive-all { border-style: dashed; font-weight: var(--weight-strong); }
+.archive-all > span { grid-column: 2 / -1; }
 .button.on { outline: 2px solid var(--accent); outline-offset: 1px; }
 .gig-card.archived { border-style: dashed; }
 .gig-card.archived > :not(.card-menu) { opacity: 0.55; }
@@ -986,8 +1062,14 @@ label.check input { width: auto; accent-color: var(--accent); }
 .notif-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notif-text { overflow-wrap: anywhere; }
 .notif-dot { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--accent); margin-top: 0.45rem; }
-.live-dot { color: var(--muted); display: inline-flex; align-items: center; padding: 0.4rem; }
-.live-pip { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--live, var(--muted)); flex: none; }
+/* live updates gone for a while: a slim bar under the top bar (it stays until they are back) */
+.live-banner {
+  position: sticky; top: var(--topbar-h); z-index: 35; display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3); padding: 0.35rem var(--page-px); font-size: var(--fs-sm); text-align: center;
+  background: color-mix(in srgb, var(--danger) 16%, var(--bg)); color: var(--text); border-bottom: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+}
+.live-banner .ico { color: var(--danger); flex: none; }
+.live-banner .link { font-size: inherit; padding: 0 0.2rem; }
 .mention-agent { background: var(--accent); color: var(--on-accent); }
 
 /* ---- themes gallery: header actions, current theme, equal-size cards with an icon tool row ---- */
@@ -1230,10 +1312,19 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   .narrow .ws-table td.ws-owner .user-badge { min-width: 0; margin-right: 0; overflow-wrap: anywhere; }
   .narrow .ws-table td.ws-owner > .muted { font-size: inherit; }
   .narrow .ws-table td.ws-owner .avatar-xs { width: 1.45rem; height: 1.45rem; font-size: 0.56rem; }
-  /* first line: checkbox, title, key on the right (always there, whatever else the row holds) */
-  .narrow .vw-table td.vw-title { flex: 1 1 calc(100% - 8rem); min-width: 0; order: -2; font-size: 1rem; }
-  .narrow .vw-table td.vw-check { order: -3; }
-  .narrow .vw-table td.vw-key { order: -1; margin-left: auto; align-self: flex-start; padding-top: 0.15rem; }
+  /* a gig row as a card, the same shape on every row: the checkbox in its own column; title and key;
+     status, priority, labels, due; the project and when it changed, the assignees bottom right */
+  .narrow .vw-table tr.vw-card-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 0 var(--sp-3); }
+  .narrow .vw-table tr.vw-card-row > td.vw-check { padding-top: 0.15rem; }
+  .narrow .vw-table tr.vw-card-row > td.vw-card { grid-column: -2; display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+  .vw-card-top { display: flex; align-items: flex-start; gap: var(--sp-3); }
+  .vw-card-top .vw-title { flex: 1; min-width: 0; font-size: 1rem; overflow-wrap: anywhere; }
+  .vw-card-top .vw-key { flex: none; margin-left: auto; padding-top: 0.15rem; }
+  .vw-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); }
+  .vw-card-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); min-height: 1.75rem; }
+  .vw-card-where { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); min-width: 0; }
+  .vw-card-foot .vw-people { margin-left: auto; gap: var(--sp-2); }
+  .vw-card-foot .vw-people .avatar + .avatar { margin-left: 0; }
   .narrow .vw-search { flex: 1 1 100%; min-width: 0; }
   .narrow .admin-table-card, .narrow .vw-table-card { overflow-x: visible; }
   .narrow .vw-table td:empty { display: none; }
@@ -1546,7 +1637,6 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .appbar-tab:hover { background: var(--hover); color: var(--text); }
 .appbar-tab.on, .appbar-tab.on:hover { background: var(--accent); color: var(--on-accent); }
 .appbar-button { text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
-.appbar .live-dot { margin-left: var(--sp-2); }
 /* the account menu: your picture; the menu hangs under it, right-aligned */
 .account { position: relative; display: inline-flex; margin-left: var(--sp-2); }
 .account-button {
@@ -1683,9 +1773,12 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .place-filter:has(select.active) { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
 .tm-foot .save-tpl .link { font-size: var(--fs-sm); }
 
-/* the gig panel starts under the app bar on wide screens, so the pages, the inbox and the bell stay in reach */
+/* the gig and errand panels start under the app bar, so the pages, the inbox and the bell stay in reach;
+   on a phone too: starting at the top, the bar (layered above the panel) covered the panel's own header
+   and its close button */
+.panel { top: var(--topbar-h); }
 @media (min-width: 721px) {
-  .panel { top: var(--topbar-h); border-top: 1px solid var(--line-strong); border-top-left-radius: var(--radius-l); }
+  .panel { border-top: 1px solid var(--line-strong); border-top-left-radius: var(--radius-l); }
 }
 @media (max-width: 720px) {
   :root { --topbar-h: calc(2.4rem + 0.9rem + 1px); }

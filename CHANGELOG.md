@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- The top bar's buttons read **+ Gig** and **+ Errand**. The live dot is gone: when live updates have
+  been lost for 30 seconds, a bar under the top bar says so, with Retry now, until they are back.
+- The logo flies when you point at it (a bob, star streaks, its engines lit), and creating a gig or
+  an errand plays a short launch: ships hover with stars streaking past, then take off. Clicks go
+  through; it is skipped for "reduce motion", and Profile has a switch for it.
+- Done column: **Archive all (N)** archives the done gigs it shows under the current filters, with
+  Undo; **Archive done…** beside it opens the dialog. Columns lose their header **+** (the same as
+  **+ New gig** at their foot, which now stays in view while a long column scrolls past).
+- Schedules and Templates cards take the Recurring layout (state at the right, actions at the
+  bottom left, assignees at the bottom right); all three dialogs put **+ New …** at the top. A
+  template's title no longer repeats its name.
+- The Archive done dialog lines up the workspace, key and name of its project rows in columns.
+- The table: the workspace picker is a filter like the others (Clear filters resets it), and on a
+  phone each row is a card of one shape: title and key, then status, priority, labels and due, then
+  the project and the update time, the assignees at the bottom right.
+- Admin: the Users buttons line up across rows (each slot as wide as its longest label); the
+  Workspaces "Show N archived" is small and in line with the first column (`.link.small` keeps its
+  size now).
+- Phones: the gig and errand panels start under the top bar, so their close button shows; menus
+  stay inside the window (a column's sort menu ran off the right edge).
 - **A top bar replaces the sidebar**: the logo, **Gigs** and **Errands** on the left; **+ New gig**,
   **+ New errand**, the live dot, Inbox, Notifications and your picture on the right. Your picture
   opens the account menu (on hover or click): Recurring, Schedules, Templates, Archive done, Trash,

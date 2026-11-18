@@ -24,10 +24,6 @@ Click one to open the gig. **Mark all read** clears the badge. The command palet
 
 ## Live updates
 
-The small dot in the top-right corner, beside the envelope, shows the live connection to the server (hover it for the details):
-
-- **Live** (green): changes by others, people or agents, appear within a second or two.
-- **Connecting** (amber): reconnecting after a restart or a network blip.
-- **Offline** (grey): no connection, still retrying. Pages work, but only update when you act or reload.
+Changes by others, people or agents, appear within a second or two over a live connection to the server. A short drop (a restart, a network blip) passes unnoticed: the page reconnects and catches up on what it missed. When the connection has been gone for 30 seconds, a bar under the top bar says so (the page may be out of date), with **Retry now**; when the connection is back, the bar goes, "Reconnected" shows, and the page refreshes.
 
 A request that fails on a network blip or a busy server is tried again a few times on its own (0.5 s, 1 s, 2 s) before an error shows. Creating something is safe to repeat: the server recognises the repeat and answers it once, and when the first try is merely slow, the page waits for it (up to about 30 s) instead of showing an error.

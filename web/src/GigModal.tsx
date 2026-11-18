@@ -4,6 +4,7 @@
 // With "Repeat" set, submitting creates a recurring gig (the server then creates one gig per
 // occurrence) instead of a single gig. Its gig content is a template: its own one (made from this
 // form), or a picked template left unchanged, which it then uses as is.
+import { launch } from "./Launch";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { runBody, runFrom, type RunSettings } from "./runsettings";
 import { api, ApiError, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isGigSchedule, type GigSchedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubgig } from "./api";
@@ -303,6 +304,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     api
       .useTemplate(picked.id, project, title.trim() && title !== picked.title ? title.trim() : undefined)
       .then((t) => {
+        launch();
         onCreated(`Created ${t.key} from “${picked.name}”`);
         onClose();
       })
@@ -393,7 +395,10 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           ...(cleanCustom(custom) ? { custom: cleanCustom(custom) } : {}),
           ...runBody(run),
         })
-        .then(() => undefined);
+        .then(() => {
+          launch();
+          return undefined;
+        });
     }
     done
       .then((msg) => {

@@ -4,7 +4,7 @@ Your own gigs: the board's **Filters** › **Assignee** › **Assigned to me** (
 
 ## The table
 
-**Table** on the board opens the gigs in view as a table (click a row to open the gig's panel over the table; closing it leaves the table as it was): one project's, one workspace's, or every workspace's. The **Show** filter at the top moves between them and keeps your other filters. Across workspaces, each workspace's gigs are fetched and merged (up to 1,000 per workspace, in the order you sort by; the count shows a **+** and a note at the bottom when there are more: narrow the filters, or open that workspace's table to page through all of it). A view saved there covers every workspace.
+**Table** on the board opens the gigs in view as a table (click a row to open the gig's panel over the table; closing it leaves the table as it was): one project's, one workspace's, or every workspace's. The workspace filter (first after the search) moves between them and keeps your other filters; **Clear filters** goes back to every workspace. Across workspaces, each workspace's gigs are fetched and merged (up to 1,000 per workspace, in the order you sort by; the count shows a **+** and a note at the bottom when there are more: narrow the filters, or open that workspace's table to page through all of it). A view saved there covers every workspace.
 
 ![The table view with filters (Daywalker theme)](../images/table-day.png)
 

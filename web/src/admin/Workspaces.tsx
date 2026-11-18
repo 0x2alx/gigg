@@ -141,7 +141,7 @@ export function WorkspacesPage() {
           </table>
           {visible.length === 0 && <Empty>No workspaces yet.</Empty>}
           {archivedCount > 0 && (
-            <button type="button" className="link small" onClick={() => setShowArchived((v) => !v)}>
+            <button type="button" className="link small admin-table-more" onClick={() => setShowArchived((v) => !v)}>
               {showArchived ? "Hide" : "Show"} {archivedCount} archived
             </button>
           )}

@@ -21,6 +21,7 @@ import { PlaceFilter } from "../places";
 import { parse, PASSTHROUGH, savedViewsApi, summary, toQuery, toSearch, viewHref, type SavedFilter, type SortKey, type TableFilters } from "./savedViews";
 import "./views.css";
 import { HelpButton } from "../help";
+import { useNarrow } from "../narrow";
 
 interface Sort {
   key: SortKey;
@@ -46,6 +47,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const { tree, refresh, me, savedViews, reloadSavedViews, members } = useApp();
   const [loc, navigate] = useLocation();
   const search = useSearch();
+  const narrow = useNarrow();
   const project = ws && pid ? ws.projects.find((p) => p.id === pid) : undefined;
   const scope = useMemo(() => (ws ? [ws] : tree), [ws, tree]);
   const scopeKey = scope.map((w) => w.slug).join(",");
@@ -276,6 +278,12 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     navigate(search ? `${base}?${search}` : base);
   };
 
+  // Clear filters also goes back to every workspace (the place is a filter like the others)
+  const clearAll = () => {
+    reset();
+    if (place !== "") navigate("/table");
+  };
+
   return (
     <div className="vw-page">
       <header className="page-head">
@@ -294,7 +302,6 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           </h1>
         </div>
         <div className="row vw-head-actions">
-          <PlaceFilter value={place} onChange={goPlace} tree={tree} />
           <Link href={boardHref} className="button secondary small">
             <Icon name="board" /> Board
           </Link>
@@ -303,6 +310,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
 
       <div className="vw-filters" role="search" aria-label="Filter gigs">
         <input type="search" className="vw-search" placeholder="Search titles, descriptions, comments…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search" />
+        <PlaceFilter value={place} onChange={goPlace} tree={tree} plain />
         <select value={category} onChange={(e) => setCategory(e.target.value as Category | "")} aria-label="Status category">
           <option value="">Any status</option>
           {ALL_CATEGORIES.map((c) => (
@@ -345,7 +353,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
             {k.replace("_", " ")}: {extra[k]}
           </span>
         ))}
-        <ClearFilters active={filtered} onClear={reset} />
+        <ClearFilters active={filtered || place !== ""} onClear={clearAll} />
         {canSave && (
           <button type="button" className="button secondary small vw-save" onClick={() => setSaving(true)}>
             ★ Save view
@@ -418,54 +426,96 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
               const p = projectOf(t.project_id);
               const href = gigHref(tree, t);
               const on = selected.has(t.id);
-              return (
-                <tr key={t.id} className={on ? "vw-on" : undefined} data-opens-gig="" onClick={(e) => !(e.target as HTMLElement).closest("a, button, input, label") && open(t)}>
-                  {canWrite && (
-                    <td className="vw-check">
-                      {canWriteGig(t) && <input type="checkbox" checked={on} onChange={() => toggle(t.id)} aria-label={`Select ${t.key}`} />}
-                    </td>
+              const check = canWrite && (
+                <td className="vw-check">
+                  {canWriteGig(t) && <input type="checkbox" checked={on} onChange={() => toggle(t.id)} aria-label={`Select ${t.key}`} />}
+                </td>
+              );
+              const title = (
+                <Link href={href} className="vw-title-link" onClick={(e) => (e.preventDefault(), open(t))} style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
+                  {t.title}
+                </Link>
+              );
+              const prio = t.priority > 0 && (
+                <span className="vw-prio">
+                  <PriorityIcon priority={t.priority} />
+                  {priorityNames[t.priority]}
+                </span>
+              );
+              const chips = (t.labels.length > 0 || null) && (
+                <span className="vw-chips">
+                  {t.labels.slice(0, 2).map((l) => (
+                    <LabelChip key={l.id} label={labels.find((x) => x.id === l.id) ?? l} />
+                  ))}
+                  {t.labels.length > 2 && (
+                    <span className="chip-more" data-tip={t.labels.slice(2).map((l) => l.name).join("\n")}>
+                      +{t.labels.length - 2}
+                    </span>
                   )}
+                </span>
+              );
+              const people = (size: "xs" | "s") => (
+                <span className="vw-people">
+                  {t.assignees.map((id) => {
+                    const u = users.get(id);
+                    return u ? <Avatar key={id} user={u} size={size} /> : null;
+                  })}
+                </span>
+              );
+              const due = t.due_at ? <span className={"vw-due" + (isOverdue(t) ? " overdue" : "")}>{fmtDue(t.due_at)}</span> : null;
+              const updated = (
+                <span className="muted small vw-updated" title={fmtTime(t.updated_at)}>
+                  {relTime(t.updated_at)}
+                </span>
+              );
+              const rowProps = {
+                className: on ? "vw-on" : undefined,
+                "data-opens-gig": "",
+                onClick: (e: { target: EventTarget }) => !(e.target as HTMLElement).closest("a, button, input, label") && open(t),
+              };
+              // a phone: one card in the same order on every row: title and key; status, priority,
+              // labels, due; then the place and when it changed, the assignees in the bottom-right corner
+              if (narrow) {
+                return (
+                  <tr key={t.id} {...rowProps} className={"vw-card-row" + (on ? " vw-on" : "")}>
+                    {check}
+                    <td className="vw-card">
+                      <div className="vw-card-top">
+                        <span className="vw-title">{title}</span>
+                        <span className="vw-key">{t.key}</span>
+                      </div>
+                      <div className="vw-card-meta">
+                        <StatusDot name={t.status_name} category={t.status_category} />
+                        {prio}
+                        {chips}
+                        {due}
+                      </div>
+                      <div className="vw-card-foot">
+                        <span className="vw-card-where">
+                          {!project && p && <ProjectPill project={p} />}
+                          {updated}
+                        </span>
+                        {t.assignees.length > 0 && people("s")}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              return (
+                <tr key={t.id} {...rowProps}>
+                  {check}
                   <td className="vw-nowrap vw-key">{t.key}</td>
-                  <td className="vw-title">
-                    <Link href={href} className="vw-title-link" onClick={(e) => (e.preventDefault(), open(t))} style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
-                      {t.title}
-                    </Link>
-                  </td>
+                  <td className="vw-title">{title}</td>
                   <td className="vw-nowrap">
                     <StatusDot name={t.status_name} category={t.status_category} />
                   </td>
-                  <td className="vw-nowrap">
-                    {t.priority > 0 && (
-                      <span className="vw-prio">
-                        <PriorityIcon priority={t.priority} />
-                        {priorityNames[t.priority]}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <span className="vw-chips">
-                      {t.labels.slice(0, 2).map((l) => (
-                        <LabelChip key={l.id} label={labels.find((x) => x.id === l.id) ?? l} />
-                      ))}
-                      {t.labels.length > 2 && (
-                        <span className="chip-more" data-tip={t.labels.slice(2).map((l) => l.name).join("\n")}>
-                          +{t.labels.length - 2}
-                        </span>
-                      )}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="vw-people">
-                      {t.assignees.map((id) => {
-                        const u = users.get(id);
-                        return u ? <Avatar key={id} user={u} size="xs" /> : null;
-                      })}
-                    </span>
-                  </td>
-                  <td className={"vw-nowrap vw-due" + (t.due_at && isOverdue(t) ? " overdue" : "")}>{t.due_at && fmtDue(t.due_at)}</td>
+                  <td className="vw-nowrap">{prio}</td>
+                  <td>{chips}</td>
+                  <td>{people("xs")}</td>
+                  <td className="vw-nowrap">{due}</td>
                   {!project && <td className="vw-nowrap">{p && <ProjectPill project={p} />}</td>}
-                  <td className="vw-nowrap muted small vw-updated" data-label="Updated" title={fmtTime(t.updated_at)}>
-                    {relTime(t.updated_at)}
+                  <td className="vw-nowrap" title={fmtTime(t.updated_at)}>
+                    {updated}
                   </td>
                 </tr>
               );

@@ -45,15 +45,14 @@ export function optionOf(place: Place, tree: WorkspaceTree[], projects = true): 
 }
 
 // PlaceFilter: "Everywhere", each workspace and (with projects) its projects, as one select.
-export function PlaceFilter({ value, onChange, tree, projects = true, label = "Show" }: {
-  value: Place; onChange: (v: Place) => void; tree: WorkspaceTree[]; projects?: boolean; label?: string;
+// plain: only the select, to sit in a row of other plain filters (the table's), without the "Show" label.
+export function PlaceFilter({ value, onChange, tree, projects = true, label = "Show", plain }: {
+  value: Place; onChange: (v: Place) => void; tree: WorkspaceTree[]; projects?: boolean; label?: string; plain?: boolean;
 }) {
   if (tree.length < 2 && !(projects && (tree[0]?.projects.length ?? 0) > 1)) return null;
   const shown = optionOf(value, tree, projects);
-  return (
-    <label className="bf-pick place-filter">
-      <span className="bf-pick-label" aria-hidden="true">{label}</span>
-      <select value={shown} onChange={(e) => onChange(e.target.value)} className={shown ? "active" : undefined} aria-label={label}>
+  const select = (
+      <select value={shown} onChange={(e) => onChange(e.target.value)} className={shown ? "active" : undefined} aria-label={plain ? "Workspace or project" : label}>
         <option value="">{tree.length > 1 ? "All workspaces" : "All projects"}</option>
         {tree.map((w) =>
           projects && w.projects.length > 1 ? (
@@ -72,6 +71,12 @@ export function PlaceFilter({ value, onChange, tree, projects = true, label = "S
           ),
         )}
       </select>
+  );
+  if (plain) return select;
+  return (
+    <label className="bf-pick place-filter">
+      <span className="bf-pick-label" aria-hidden="true">{label}</span>
+      {select}
     </label>
   );
 }

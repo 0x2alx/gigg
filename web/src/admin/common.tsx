@@ -45,6 +45,24 @@ export function ErrorLine({ error }: { error: string }) {
 }
 
 // ConfirmButton asks before a destructive action and shows the server's refusal in the dialog.
+// SlotLabel: a button label as wide as the widest of the labels its slot can show (Make admin / Revoke
+// admin), so a row of buttons lines up with the rows above and below it in any font. The others are
+// invisible and hidden from screen readers.
+export function SlotLabel({ show, alts }: { show: string; alts: string[] }) {
+  return (
+    <span className="slot-label">
+      <span>{show}</span>
+      {alts
+        .filter((a) => a !== show)
+        .map((a) => (
+          <span key={a} className="slot-ghost" aria-hidden="true">
+            {a}
+          </span>
+        ))}
+    </span>
+  );
+}
+
 export function ConfirmButton({
   label,
   title,

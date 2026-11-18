@@ -131,6 +131,11 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
         <PlaceFilter value={place} onChange={setPlace} tree={tree} />
         <ClearFilters active={place !== ""} onClear={() => setPlace("")} />
         {items && <span className="muted small">{shown.length === items.length ? `${items.length} recurring` : `${shown.length} of ${items.length}`}</span>}
+        {start && (
+          <button type="button" className="button small list-new" onClick={() => setEditing("new")}>
+            + New recurring gig
+          </button>
+        )}
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}
       {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No recurring gigs yet. Make one here, or with Repeat in a new gig." : "None here. Show everything to see the others."}</p>}
@@ -260,13 +265,6 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
             );
           })}
         </ul>
-      )}
-      {start && (
-        <div className="row end">
-          <button type="button" className="button" onClick={() => setEditing("new")}>
-            + New recurring gig
-          </button>
-        </div>
       )}
     </Modal>
   );

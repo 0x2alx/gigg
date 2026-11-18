@@ -1,8 +1,8 @@
 // The app bar: one row across the top that stays put while the page scrolls. The logo, the two pages
-// (Gigs, Errands); on the right New gig and New errand, the live pip, the inbox, the bell, and your
+// (Gigs, Errands); on the right "+ Gig" and "+ Errand", the inbox, the bell, and your
 // picture, which opens the account menu (the board's tools, Dashboard, Admin, Profile, Themes, Log out).
 // On a phone the pages are icons and the two New buttons fold into one "+" menu.
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { api, ApiError, canWriteIn, errandMakers, gigChoices, hasCap } from "./api";
 import { useApp } from "./App";
@@ -10,15 +10,13 @@ import { TopBell } from "./Bell";
 import { badgeCount } from "./notifications";
 import { ADMIN_TABS } from "./admin/common";
 import { viewHref } from "./views/savedViews";
-import { CATEGORY_COLOR, PRIORITY_COLOR } from "./theme";
 import { LogoMark } from "./Logo";
 import { useNarrow } from "./narrow";
 import { Avatar, MoreMenu } from "./ui";
 import { Icon } from "./icons";
-import type { LiveState } from "./live";
 
 export function AppBar({ inboxCount, onLogout }: { inboxCount: number; onLogout: () => void }) {
-  const { me, tree, live } = useApp();
+  const { me, tree } = useApp();
   const narrow = useNarrow();
   const [loc] = useLocation();
   const search = useSearch();
@@ -31,7 +29,16 @@ export function AppBar({ inboxCount, onLogout }: { inboxCount: number; onLogout:
   return (
     <header className="appbar">
       <Link href="/board" className="brand appbar-brand" aria-label="gigg: the gigs" title="gigg">
-        <LogoMark className="brand-mark" compact />
+        <span className="brand-fly">
+          <span className="fly-stars" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
+          <LogoMark className="brand-mark" compact />
+        </span>
         {!narrow && <span className="brand-word">gigg</span>}
       </Link>
       <nav className="appbar-nav" aria-label="Pages">
@@ -57,32 +64,23 @@ export function AppBar({ inboxCount, onLogout }: { inboxCount: number; onLogout:
         : (
             <>
               {canGig && (
-                <Link href={newGig} className="button appbar-button">
-                  <Icon name="plus" strokeWidth={2.2} /> New gig
+                <Link href={newGig} className="button appbar-button" aria-label="New gig" data-tip="New gig">
+                  <Icon name="plus" strokeWidth={2.2} /> Gig
                 </Link>
               )}
               {canErrand && (
-                <Link href={newErrand} className="button secondary appbar-button">
-                  <Icon name="plus" strokeWidth={2.2} /> New errand
+                <Link href={newErrand} className="button secondary appbar-button" aria-label="New errand" data-tip="New errand">
+                  <Icon name="plus" strokeWidth={2.2} /> Errand
                 </Link>
               )}
             </>
           )}
-      <span className={"live-dot live-" + live} style={live === "off" ? undefined : ({ "--live": live === "live" ? CATEGORY_COLOR.done : PRIORITY_COLOR[2] } as CSSProperties)} role="status" title={LIVE_TITLE[live]} aria-label={LIVE_TITLE[live]}>
-        <span className="live-pip" aria-hidden="true" />
-      </span>
       <InboxLink count={inboxCount} />
       <TopBell />
       <AccountMenu onLogout={onLogout} />
     </header>
   );
 }
-
-const LIVE_TITLE: Record<LiveState, string> = {
-  live: "Live updates: connected",
-  connecting: "Live updates: connecting…",
-  off: "Live updates: offline (retrying)",
-};
 
 // withParam: path?search with one more parameter.
 function withParam(path: string, search: string, key: string, value: string): string {

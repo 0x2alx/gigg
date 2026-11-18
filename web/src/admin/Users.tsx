@@ -5,7 +5,7 @@ import { useApp } from "../App";
 import { ColorPicker } from "../fields";
 import { ClearFilters, Avatar, Modal } from "../ui";
 import { adminApi, errMsg, type AdminUser } from "./adminApi";
-import { AdminPage, ConfirmButton, Empty, ErrorLine, Field, FormActions, InfoLine, TimeAgo } from "./common";
+import { AdminPage, ConfirmButton, Empty, SlotLabel, ErrorLine, Field, FormActions, InfoLine, TimeAgo } from "./common";
 import { followName, PICTURE_TYPES, pictureProblem, usernameFrom } from "./forms";
 import { PermissionsModal } from "./Permissions";
 
@@ -130,21 +130,20 @@ export function UsersPage() {
                     <button type="button" className="button secondary small" aria-label={`Edit ${u.username}`} onClick={() => setEditingId(u.id)}>
                       Edit
                     </button>
-                    {u.kind === "agent" && (
+                    {u.kind === "agent" ? (
                       <button type="button" className="button secondary small" aria-label={`Picture ${u.username}`} onClick={() => setPictureId(u.id)}>
-                        Picture
+                        <SlotLabel show="Picture" alts={["Password"]} />
+                      </button>
+                    ) : (
+                      <button type="button" className="button secondary small" aria-label={`Password ${u.username}`} onClick={() => setPwFor(u)}>
+                        <SlotLabel show="Password" alts={["Picture"]} />
                       </button>
                     )}
                     <button type="button" className="button secondary small" aria-label={`Permissions ${u.username}`} onClick={() => setPermsFor(u)}>
                       Permissions
                     </button>
-                    {u.kind === "human" && (
-                      <button type="button" className="button secondary small" aria-label={`Password ${u.username}`} onClick={() => setPwFor(u)}>
-                        Password
-                      </button>
-                    )}
                     <ConfirmButton
-                      label={u.is_admin ? "Revoke admin" : "Make admin"}
+                      label={<SlotLabel show={u.is_admin ? "Revoke admin" : "Make admin"} alts={["Revoke admin", "Make admin"]} />}
                       danger={u.is_admin}
                       title={u.is_admin ? `Revoke admin from ${u.username}?` : `Make ${u.username} an admin?`}
                       message={
@@ -158,7 +157,7 @@ export function UsersPage() {
                     />
                     {u.disabled ? (
                       <ConfirmButton
-                        label="Enable"
+                        label={<SlotLabel show="Enable" alts={["Disable"]} />}
                         danger={false}
                         title={`Enable ${u.username}?`}
                         message="They can log in and use their keys again."
@@ -167,7 +166,7 @@ export function UsersPage() {
                       />
                     ) : (
                       <ConfirmButton
-                        label="Disable"
+                        label={<SlotLabel show="Disable" alts={["Enable"]} />}
                         title={`Disable ${u.username}?`}
                         message="Their sessions and keys stop working until you enable them again. Their gigs and comments stay."
                         confirmLabel="Disable"

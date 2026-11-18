@@ -19,6 +19,8 @@ import { BUILTINS, applyTheme, findTheme, initialTheme, rememberTheme, sane, typ
 import { useNarrow } from "./narrow";
 import { setPreferredTZ } from "./recurrence";
 import { FONTS_ALLOWED_EVENT, setRemoteFonts } from "./fonts";
+import { LiveBanner } from "./LiveBanner";
+import { LaunchOverlay } from "./Launch";
 
 export interface WorkspaceTree {
   id: number;
@@ -348,6 +350,8 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
       <div className={"shell" + (narrow ? " narrow" : "")}>
         {/* one bar across the top (pages, New, messages, your account menu); the page scrolls under it */}
         <AppBar inboxCount={inboxCount} onLogout={onLogout} />
+        <LiveBanner live={live} onBack={refresh} />
+        <LaunchOverlay />
         <main className="content">
           {/* a page change fades the new page in (keyed by the section, so a gig opening on the board or a
               tab inside Admin doesn't replay it) */}

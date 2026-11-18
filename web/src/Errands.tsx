@@ -1,6 +1,7 @@
 // The Errands page: every errand in reach (commands the agents' executors run on a schedule, sandboxed),
 // failing first; filters; a side panel with the command, the run history and each run's output; the
 // editor. Errands make no gigs: their runs live here.
+import { launch } from "./Launch";
 import { usePanelOutsideClose } from "./panelClose";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -347,6 +348,7 @@ export function ErrandsPage({ open }: { open?: number }) {
           initialProject={place?.startsWith("p:") ? Number(place.slice(2)) : 0}
           onClose={() => setEditing(null)}
           onSaved={(c) => {
+            if (editing === "new") launch();
             onSaved(c);
             setEditing(null);
             navigate(`/errands/${c.id}`);

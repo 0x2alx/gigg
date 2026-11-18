@@ -94,6 +94,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const [fields, setFields] = useState<Map<number, CustomField[]>>(new Map());
   // the toast: a short message, with an Undo when the change can be taken back in one click
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
+  const [archivingCol, setArchivingCol] = useState<string | null>(null); // the Done column archiving its gigs
   const [moveErr, setMoveErr] = useState("");
   const [drag, setDrag] = useState<number | null>(null);
   const [drop, setDrop] = useState<{ col: string; index: number } | null>(null);
@@ -544,13 +545,44 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     setNewIn({ category: c.category, statusId: c.statusId });
     openNew();
   };
+  // a done gig you may archive in its project: its card gets a one-click archive, and the Done column's
+  // "Archive all" takes every such card it shows
+  const canArchiveGig = (t: Gig): boolean => {
+    const p = projOf(t.project_id);
+    return !!p && t.status_category === "done" && canWriteIn(p.ws, p.project.id) && hasCap(me, "archive_gigs", p.ws.id, p.project.id);
+  };
+  // Archive all: exactly the done gigs the column shows under the current filters, a few at a time;
+  // the toast's Undo brings them all back
+  const archiveShown = async (c: BoardColumn) => {
+    const gigs = c.gigs.filter(canArchiveGig);
+    if (gigs.length === 0) return;
+    setArchivingCol(c.key);
+    const done: Gig[] = [];
+    let failed = 0;
+    for (let i = 0; i < gigs.length; i += 4) {
+      const res = await Promise.allSettled(gigs.slice(i, i + 4).map((g) => api.archiveGig(g.id)));
+      res.forEach((r, j) => (r.status === "fulfilled" ? done.push(gigs[i + j]!) : failed++));
+    }
+    setArchivingCol(null);
+    const n = done.length;
+    const text = (n === 1 ? `Archived ${done[0]!.key}` : `Archived ${n} gigs`) + (failed ? ` (${failed} failed)` : "");
+    changed(
+      text,
+      n === 0
+        ? undefined
+        : () =>
+            Promise.allSettled(done.map((g) => api.unarchiveGig(g.id))).then((rs) => {
+              const back = rs.filter((r) => r.status === "fulfilled").length;
+              changed(back === n ? (n === 1 ? `${done[0]!.key} is back on the board` : `${n} gigs are back on the board`) : `${back} of ${n} gigs are back; unarchive the rest from each gig`);
+            }),
+    );
+  };
   const cardFor = (t: Gig, c: BoardColumn, i: number, archivedCard: boolean) => {
     const p = projOf(t.project_id);
     const b = boards.get(t.project_id);
     if (!p || !b) return null;
     const write = !archivedCard && canWriteIn(p.ws, p.project.id);
-    // done gigs get a one-click archive (the Done column's footer archives them all)
-    const archive = write && t.status_category === "done" && hasCap(me, "archive_gigs", p.ws.id, p.project.id);
+    const archive = !archivedCard && canArchiveGig(t);
     return (
       <Card
         gig={t}
@@ -735,11 +767,6 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
                 {sortOf(c) !== "manual" && <SortMenu column={c.name} sorts={sortsFor(c.category)} value={sortOf(c)} onChange={(s) => setSort(c.key, s)} />}
                 <span className="column-tools">
                   {sortOf(c) === "manual" && <SortMenu column={c.name} sorts={sortsFor(c.category)} value={sortOf(c)} onChange={(s) => setSort(c.key, s)} />}
-                  {addHere && (
-                    <button type="button" className="icon-button" aria-label={`New gig in ${c.name}`} onClick={() => addIn(c)}>
-                      <Icon name="plus" strokeWidth={2} />
-                    </button>
-                  )}
                   {!narrow && (
                     <button type="button" className="icon-button col-collapse" aria-expanded={true} aria-label={`Collapse ${c.name}: it becomes a small button above the board`} onClick={() => toggleCollapsed(c.id)}>
                       <Icon name="shrink" />
@@ -771,16 +798,36 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
                   </button>
                 )}
                 {c.category === "done" &&
-                  // Done takes no new gigs: its footer archives the done gigs instead (once: one project can
-                  // have several done columns), or stays as an empty slot of the same height so the columns
-                  // line up. The board never shows cancelled gigs, so they have no column or footer.
-                  (archiveCol === c.key && archivable.length > 0 ? (
-                    <button type="button" className="column-add" onClick={() => action("archive", "done")}>
-                      <Icon name="archive" /> Archive done
-                    </button>
-                  ) : (
-                    writable.length > 0 && <div className="column-add column-add-empty" aria-hidden="true">{"\u00a0"}</div>
-                  ))}
+                  // Done takes no new gigs: its footer archives instead. "Archive all" takes the done gigs
+                  // this column shows; "Archive done…" (once: one project can have several done columns)
+                  // opens the dialog for whole projects and by age. With neither, an empty slot of the same
+                  // height keeps the columns lined up. The board never shows cancelled gigs, so they have
+                  // no column or footer.
+                  (() => {
+                    const mine = c.gigs.filter(canArchiveGig).length;
+                    const dialog = archiveCol === c.key && archivable.length > 0;
+                    if (mine === 0 && !dialog) return writable.length > 0 && <div className="column-add column-add-empty" aria-hidden="true">{"\u00a0"}</div>;
+                    return (
+                      <div className="column-foot">
+                        {mine > 0 && (
+                          <button
+                            type="button"
+                            className="column-add"
+                            disabled={archivingCol === c.key}
+                            data-tip={`Archive the ${mine === 1 ? "done gig" : `${mine} done gigs`} shown in this column (Undo in the message)`}
+                            onClick={() => archiveShown(c)}
+                          >
+                            <Icon name="archive" /> {archivingCol === c.key ? "Archiving…" : `Archive all (${mine})`}
+                          </button>
+                        )}
+                        {dialog && (
+                          <button type="button" className="column-add" data-tip="Archive the done gigs of whole projects, or only older ones" onClick={() => action("archive", "done")}>
+                            Archive done…
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
               </div>
             </section>
           );

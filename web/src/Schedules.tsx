@@ -9,7 +9,7 @@ import { useApp, type WorkspaceTree } from "./App";
 import { optionOf, PlaceFilter, placeMatch, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { RepeatFields } from "./RepeatFields";
-import { defaultRepeat, describeRule, fmtLead, localTZ, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
+import { defaultRepeat, describeRule, fmtLead, localTZ, sameAsRule, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
 import { repeatOfSchedule, scheduleBody } from "./scheduleTiming";
 import { ClearFilters, Modal } from "./ui";
 import { HelpButton } from "./help";
@@ -89,6 +89,11 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
         <PlaceFilter value={place} onChange={setPlace} tree={tree} projects={false} />
         <ClearFilters active={place !== ""} onClear={() => setPlace("")} />
         {items && <span className="muted small">{shown.length === items.length ? `${items.length} schedules` : `${shown.length} of ${items.length}`}</span>}
+        {startWs && (
+          <button type="button" className="button small list-new" onClick={() => setEditing("new")}>
+            + New schedule
+          </button>
+        )}
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}
       {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No schedules yet." : "None here. Show everything to see the others."}</p>}
@@ -98,7 +103,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
             const sws = s.shared ? undefined : wsOf(s.workspace_id);
             const canWrite = s.shared ? me.admin : !!sws && canWriteWs(sws);
             return (
-            <li key={s.id} className="schedule">
+            <li key={s.id} className="schedule rec-card">
               <div className="schedule-top">
                 <span className="pill pill-accent"><Icon name="clock" /></span>
                 <strong className="schedule-title">{s.name}</strong>
@@ -109,14 +114,14 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                 ) : (
                   sws && tree.length > 1 && <WorkspaceBadge ws={sws} />
                 )}
-                {s.tz !== tz && <span className="pill pill-ws">{s.tz}</span>}
+                {s.tz !== tz && (
+                  <span className="rec-state">
+                    <span className="pill pill-ws">{s.tz}</span>
+                  </span>
+                )}
               </div>
-              {!s.name.startsWith(describeRule(s)) && (
-                <div className="schedule-rule">
-                  {describeRule(s)}
-                  {s.lead_minutes > 0 && <span className="muted small"> · created {fmtLead(s.lead_minutes)} early</span>}
-                </div>
-              )}
+              {/* the timing, unless the name is only the timing already */}
+              {!sameAsRule(s.name, describeRule(s)) && <div className="schedule-rule">{describeRule(s)}</div>}
               <div className="chips">
                 <span className={"pill " + (s.uses > 0 ? "pill-accent" : "pill-muted")}>
                   ⟳ {s.uses} recurring gig{s.uses === 1 ? "" : "s"}
@@ -126,7 +131,13 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                     <Icon name="clock" /> {s.errand_uses} errand{s.errand_uses === 1 ? "" : "s"}
                   </span>
                 )}
+                {s.lead_minutes > 0 && (
+                  <span className="pill pill-muted" title="Each gig is created this long before its window opens">
+                    {fmtLead(s.lead_minutes)} early
+                  </span>
+                )}
               </div>
+              <div className="rec-foot">
               {canWrite && (
                 <div className="schedule-actions">
                   {confirm === s.id ? (
@@ -158,17 +169,11 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                   )}
                 </div>
               )}
+              </div>
             </li>
             );
           })}
         </ul>
-      )}
-      {startWs && (
-        <div className="row end">
-          <button type="button" className="button" onClick={() => setEditing("new")}>
-            + New schedule
-          </button>
-        </div>
       )}
     </Modal>
   );

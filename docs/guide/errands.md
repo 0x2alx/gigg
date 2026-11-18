@@ -19,7 +19,7 @@ A run is **ok** when the command exits 0 and **failed** otherwise. It is **timed
 
 ## Making an errand
 
-**+ New errand** in the top bar asks for:
+**+ Errand** in the top bar asks for:
 
 - **Name** and **Command**. bash runs the command as the agent, inside its sandbox: the agent's own files and allowed network hosts only. Services on the machine itself (localhost) aren't reachable from the sandbox.
 - **Repeat**: every N **minutes** (1–360) or **hours** (1–24), optionally only on some weekdays and only between two times; or **daily**, **weekly**, **monthly** at a time. Times are in the errand's time zone, which defaults to yours.

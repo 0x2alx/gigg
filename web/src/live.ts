@@ -124,6 +124,12 @@ function stream(ws: { id: number; slug: string }, report: (s: LiveState) => void
   };
 }
 
+// retryLive: reopen every stream now, instead of waiting for the backoff (the banner's Retry).
+export const LIVE_RETRY_EVENT = "gigg:live-retry";
+export function retryLive(): void {
+  window.dispatchEvent(new Event(LIVE_RETRY_EVENT));
+}
+
 // useLive opens the streams for the given workspaces (first MAX_STREAMS) while mounted and
 // returns the combined connection state.
 export function useLive(workspaces: { id: number; slug: string }[]): LiveState {
@@ -146,16 +152,23 @@ export function useLive(workspaces: { id: number; slug: string }[]): LiveState {
     const onShow = (e: PageTransitionEvent) => {
       if (e.persisted) start();
     };
+    const onRetry = () => {
+      stop();
+      start();
+    };
     start();
     window.addEventListener("pagehide", onHide);
     window.addEventListener("pageshow", onShow);
+    window.addEventListener(LIVE_RETRY_EVENT, onRetry);
     return () => {
       window.removeEventListener("pagehide", onHide);
       window.removeEventListener("pageshow", onShow);
+      window.removeEventListener(LIVE_RETRY_EVENT, onRetry);
       stop();
       setStates({});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  return combine(Object.values(states));
+  // no workspace (or no EventSource): nothing to be live about, so nothing to warn about either
+  return list.length === 0 || typeof EventSource === "undefined" ? "live" : combine(Object.values(states));
 }

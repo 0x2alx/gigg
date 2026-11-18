@@ -96,6 +96,11 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
         <PlaceFilter value={place} onChange={setPlace} tree={tree} />
         <ClearFilters active={place !== ""} onClear={() => setPlace("")} />
         {items && <span className="muted small">{shown.length === items.length ? `${items.length} template${items.length === 1 ? "" : "s"}` : `${shown.length} of ${items.length}`}</span>}
+        {start && (
+          <button type="button" className="button small list-new" onClick={() => setEditing("new")}>
+            + New template
+          </button>
+        )}
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}
       {items !== null && shown.length === 0 && <p className="muted">{items.length === 0 ? "No templates yet. Save one from the new-gig form, or make one here." : "None here. Show everything to see the others."}</p>}
@@ -106,7 +111,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
             const canEdit = t.shared ? me.admin : !!tws && canEditIn(tws);
             const labels = labelsOf.get(t.workspace_id) ?? [];
             return (
-            <li key={t.id} className="schedule" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
+            <li key={t.id} className="schedule rec-card" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
               <div className="schedule-top">
                 <span className="pill pill-accent"><Icon name="template" /></span>
                 <strong className="schedule-title">{t.name}</strong>
@@ -118,9 +123,12 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                   tws && tree.length > 1 && <WorkspaceBadge ws={tws} />
                 )}
                 {t.project_id === null ? <span className="pill pill-ws">any project</span> : <span className="pill pill-key">{tws?.projects.find((p) => p.id === t.project_id)?.key ?? "?"}</span>}
-                <PriorityBadge priority={t.priority} />
+                <span className="rec-state">
+                  <PriorityBadge priority={t.priority} />
+                </span>
               </div>
-              <div className="schedule-rule">{t.title}</div>
+              {/* the title its gigs get, when it says more than the template's name */}
+              {t.title.trim().toLowerCase() !== t.name.trim().toLowerCase() && <div className="schedule-rule">{t.title}</div>}
               <div className="chips">
                 {(t.recurring ?? 0) > 0 && (
                   <span className="pill pill-accent" title="Recurring gigs that create their gigs from this template: editing it changes their future gigs">
@@ -132,11 +140,9 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                 {(t.labels ?? []).map((n) => (
                   <LabelChip key={n} label={labels.find((l) => l.name.toLowerCase() === n.toLowerCase()) ?? { id: 0, name: n, color: null }} />
                 ))}
-                {(t.assignees ?? []).map((id) => {
-                  const u = users.get(id);
-                  return u ? <Avatar key={id} user={u} /> : null;
-                })}
               </div>
+              {/* the foot: the actions on the left, who gets the gigs in the bottom-right corner */}
+              <div className="rec-foot">
               {canEdit && (
                 <div className="schedule-actions">
                   {confirm === t.id ? (
@@ -168,17 +174,19 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                   )}
                 </div>
               )}
+                {(t.assignees ?? []).length > 0 && (
+                  <span className="rec-people" aria-label="Assignees">
+                    {(t.assignees ?? []).map((id) => {
+                      const u = users.get(id);
+                      return u ? <Avatar key={id} user={u} size="s" tip={`Assigned to ${u.display_name || u.username}`} /> : null;
+                    })}
+                  </span>
+                )}
+              </div>
             </li>
             );
           })}
         </ul>
-      )}
-      {start && (
-        <div className="row end">
-          <button type="button" className="button" onClick={() => setEditing("new")}>
-            + New template
-          </button>
-        </div>
       )}
     </Modal>
   );

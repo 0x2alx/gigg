@@ -33,8 +33,8 @@ export function LogoMark({ className, title, compact }: { className?: string; ti
       <rect x="0" y="0" width="450" height="450" mask={`url(#${id})`} />
       {!compact && <path d={fin} />}
       {!compact && <path d={fin} transform={mirror} />}
-      <path d={flame} />
-      <path d={flame} transform={mirror} />
+      <path className="logo-flame" d={flame} />
+      <path className="logo-flame" d={flame} transform={mirror} />
     </svg>
   );
 }
