@@ -128,6 +128,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
   const self = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mouse = useRef(false);
   useEffect(() => () => clearTimeout(timer.current), []);
   const later = (v: boolean, ms: number) => {
     clearTimeout(timer.current);
@@ -187,9 +188,14 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`${name}: account menu`}
-        onClick={() => {
+        onPointerDown={(e) => (mouse.current = e.pointerType === "mouse")}
+        onClick={(e) => {
           clearTimeout(timer.current);
-          setOpen((o) => !o);
+          // with a mouse, hovering already opened it: the click keeps it open (and focus inside keeps it
+          // open when the pointer leaves); a tap or Enter toggles it
+          const byMouse = mouse.current && e.detail > 0;
+          mouse.current = false;
+          setOpen((o) => byMouse || !o);
         }}
       >
         <Avatar user={me.user} size="s" />
