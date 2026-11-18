@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { api, ApiError, fmtTime, canWriteIn, hasCap, priorityNames, type Board, type Category, type CustomField, type Status, type Tag, type Gig } from "./api";
+import { api, ApiError, fmtTime, canCreateGigIn, canWriteIn, gigChoices, hasCap, priorityNames, type Board, type Category, type CustomField, type Status, type Tag, type Gig } from "./api";
 import { fmtDue } from "./dates";
 import { useApp, type WorkspaceTree } from "./App";
 import {
@@ -248,10 +248,9 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   // project in view, else the one last used in view, else the first in view; with none of those
   // writable, the last used anywhere, else the first project of a workspace you can add to
   // the projects in view you can add gigs to (the role, and the Create gigs permission)
-  const canCreateIn = (w: WorkspaceTree, project: number) => canWriteIn(w, project) && hasCap(me, "create_gigs", w.id, project);
-  const writable = inScope.filter((x) => canCreateIn(x.ws, x.project.id));
+  const writable = inScope.filter((x) => canCreateGigIn(me, x.ws, x.project.id));
   // every workspace you can add to, with only the projects you can add to (the form may move the gig there)
-  const newChoices = tree.map((w) => ({ ...w, projects: w.projects.filter((p) => canCreateIn(w, p.id)) })).filter((w) => w.projects.length > 0);
+  const newChoices = gigChoices(me, tree);
   const openNew = useCallback(() => {
     const last = lastProject();
     const at = (single && writable.includes(single) ? single : undefined) ?? writable.find((x) => x.project.id === last) ?? writable[0];
@@ -274,16 +273,24 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
       openNew();
     }
   };
-  // ?new=1 (the command palette's "New gig") opens the new-gig flow
+  // ?new=1 (the top bar's New gig, the command palette) opens the new-gig flow; ?tool=… (the account
+  // menu: recurring, schedules, templates, archive, trash) opens that dialog for the projects in view
   useEffect(() => {
     const s = new URLSearchParams(search);
-    if (s.get("new") !== "1") return;
+    const isNew = s.get("new") === "1";
+    const tool = s.get("tool");
+    if (!isNew && !tool) return;
     s.delete("new");
+    s.delete("tool");
     const rest = s.toString();
     navigate(loc + (rest ? "?" + rest : ""), { replace: true });
-    setNewIn(null);
-    openNew();
-  }, [search, loc, navigate, openNew]);
+    if (tool === "trash") setTrash(true);
+    else if (tool === "archive" || tool === "recurring" || tool === "schedules" || tool === "templates") action(tool);
+    else if (isNew) {
+      setNewIn(null);
+      openNew();
+    }
+  }, [search, loc, navigate, openNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const collapseKey = single ? single.project.id : 0;
   const [collapsed, setCollapsed] = useState<number[]>(() => loadCollapsed(collapseKey));
@@ -491,8 +498,6 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     .map((id) => users.get(id))
     .filter((u): u is NonNullable<typeof u> => !!u)
     .sort((a, b) => (a.display_name || a.username).localeCompare(b.display_name || b.username));
-  const wsArchive = inScope.some((x) => canWriteIn(x.ws, x.project.id) && hasCap(me, "archive_gigs", x.ws.id, x.project.id));
-  const wsTemplates = inScope.some((x) => hasCap(me, "templates", x.ws.id));
   // the table of what's in view: the one project, the one workspace, else every workspace
   const tableHref = single ? `/w/${single.ws.slug}/p/${single.project.id}/table` : wsInScope.length === 1 ? `/w/${wsInScope[0]!.slug}/table` : "/table";
 
@@ -574,103 +579,40 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const addAt = adding === null ? null : projOf(adding);
   const addBoard = adding === null ? undefined : boards.get(adding);
 
-  // the board's less frequent actions: the "⋯" menu of the page head (on a phone also the table links)
-  const tools = (
+  // the far end of the filters row: the count, help, Board | Table and Columns | Rows
+  const viewTools = (
     <>
-      <button type="button" role="menuitem" data-tip="Gigs that come back on a schedule (a template + a schedule)" onClick={() => action("recurring")}>
-        <Icon name="refresh" />
-        Recurring
-      </button>
-      <button type="button" role="menuitem" data-tip="Timings (every day 9:00, every Friday…) that recurring gigs share" onClick={() => action("schedules")}>
-        <Icon name="clock" />
-        Schedules
-      </button>
-      {wsTemplates && (
-        <button type="button" role="menuitem" data-tip="Reusable gig contents: start a gig or a recurring gig from one" onClick={() => action("templates")}>
-          <Icon name="template" />
-          Templates
-        </button>
+      <span className="muted bf-count">
+        {gigFiltered ? `${open} of ${allOpen} open` : `${open} open gig${open === 1 ? "" : "s"}`}
+      </span>
+      <HelpButton topic="board" label="Help: the board" />
+      <div className="view-switch" role="group" aria-label="View">
+        <span className="vs-item on" aria-current="page">
+          Board
+        </span>
+        <Link href={tableHref} className="vs-item">
+          Table
+        </Link>
+      </div>
+      {!narrow && (
+        <div className="view-switch layout-switch" role="group" aria-label="Board layout">
+          <button type="button" className={"vs-item" + (rows ? "" : " on")} aria-pressed={!rows} data-tip="Statuses as columns" onClick={() => setPref("board_layout", "columns")}>
+            <Icon name="columns" />
+            <span className="sr-only">Columns</span>
+          </button>
+          <button type="button" className={"vs-item" + (rows ? " on" : "")} aria-pressed={rows} data-tip="Statuses as rows: cards run left to right" onClick={() => setPref("board_layout", "rows")}>
+            <Icon name="rows" />
+            <span className="sr-only">Rows</span>
+          </button>
+        </div>
       )}
-      {wsArchive && (
-        <button type="button" role="menuitem" data-tip="Archive the gigs in Done and Cancelled: they leave the board but stay searchable" onClick={() => action("archive")}>
-          <Icon name="archive" />
-          Archive done
-        </button>
-      )}
-      <button type="button" role="menuitem" data-tip="Deleted gigs of the projects in view: restore them from here" onClick={() => setTrash(true)}>
-        <Icon name="trash" />
-        Trash
-      </button>
     </>
   );
 
   return (
     <div className="board-page">
-      <header className="page-head">
-        <div className="head-title">
-          <h1>
-            {single ? single.project.name : "Board"}
-            <HelpButton topic="board" label="Help: the board" />
-          </h1>
-          <div className="head-sub">
-            {wsInScope.length === 1 && <WorkspaceBadge ws={wsInScope[0]!} />}
-            {single && <span className="key">{single.project.key}</span>}
-            <span className="muted">
-              {gigFiltered ? `showing ${open} of ${allOpen} open gig${allOpen === 1 ? "" : "s"}` : `${open} open gig${open === 1 ? "" : "s"}`}
-              {!single && ` · ${inScope.length} projects`}
-            </span>
-          </div>
-        </div>
-        <div className="head-actions">
-          {narrow ? (
-            <MoreMenu label="More">
-              <Link href={tableHref} role="menuitem">
-                ☰ Table
-              </Link>
-              {tools}
-            </MoreMenu>
-          ) : (
-            <div className="view-switch" role="group" aria-label="View">
-              <span className="vs-item on" aria-current="page">
-                Board
-              </span>
-              <Link href={tableHref} className="vs-item">
-                Table
-              </Link>
-            </div>
-          )}
-          {!narrow && (
-            <div className="view-switch layout-switch" role="group" aria-label="Board layout">
-              <button type="button" className={"vs-item" + (rows ? "" : " on")} aria-pressed={!rows} data-tip="Statuses as columns" onClick={() => setPref("board_layout", "columns")}>
-                <Icon name="columns" />
-                <span className="sr-only">Columns</span>
-              </button>
-              <button type="button" className={"vs-item" + (rows ? " on" : "")} aria-pressed={rows} data-tip="Statuses as rows: cards run left to right" onClick={() => setPref("board_layout", "rows")}>
-                <Icon name="rows" />
-                <span className="sr-only">Rows</span>
-              </button>
-            </div>
-          )}
-          {newChoices.length > 0 && (
-            <button
-              type="button"
-              className="button"
-              onClick={() => {
-                setNewIn(null);
-                action("new");
-              }}
-            >
-              <Icon name="plus" strokeWidth={2.2} /> New gig
-            </button>
-          )}
-          {!narrow && (
-            <MoreMenu label="More actions" icon className="head-more">
-              {tools}
-            </MoreMenu>
-          )}
-        </div>
-      </header>
-      <BoardFilters filter={filter} setFilter={setFilter} tree={tree} labelNames={labelNames} people={people} narrow={narrow} />
+      <h1 className="sr-only">{single ? single.project.name : "Gigs"}</h1>
+      <BoardFilters filter={filter} setFilter={setFilter} tree={tree} labelNames={labelNames} people={people} narrow={narrow} end={viewTools} />
       {failed.length > 0 && (
         <p className="danger small" role="alert">
           Couldn't load {failed.join(", ")}.
@@ -899,13 +841,14 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
 
 // BoardFilters: one toolbar row (search, assignee, label, priority, the archived toggle, Clear filters) and under it
 // the workspaces and projects as compact toggle chips (none on = all).
-function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
+function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end }: {
   filter: BoardFilter;
   setFilter: (f: BoardFilter) => void;
   tree: WorkspaceTree[];
   labelNames: string[];
   people: { id: number; username: string; display_name: string }[];
   narrow: boolean;
+  end?: ReactNode; // the row's far end (counts and view switches)
 }) {
   const { users, prefs, setPref } = useApp();
   // folded: one line with the filters that are on (removable), or just the Filters button. The row starts
@@ -981,6 +924,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
               Clear all
             </button>
           )}
+          {end && <div className="bf-end">{end}</div>}
         </div>
       </div>
     );
@@ -1042,6 +986,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow }: {
           Archived
         </button>
         <ClearFilters className="bf-clear" active={isFiltered(filter)} onClear={() => setFilter({ ...EMPTY_FILTER, arch: filter.arch })} />
+        {end && <div className="bf-end">{end}</div>}
       </div>
       {(tree.length > 1 || projects.length > 1) && (
         <div className="bf-row bf-scope">

@@ -1,10 +1,6 @@
-# My gigs, tables, saved views and the command palette
+# Tables, saved views and the command palette
 
-## My gigs
-
-**My gigs** lists the open gigs assigned to you across every workspace, grouped by when they're due: overdue, today, this week, later, no date.
-
-![My gigs (Nightwalker theme)](../images/my-gigs-night.png)
+Your own gigs: the board's **Filters** › **Assignee** › **Assigned to me** (or *Gigs assigned to me* in the command palette).
 
 ## The table
 
@@ -15,7 +11,7 @@
 - Sort by any column header.
 - Filter by status category, label, assignee, minimum priority, custom fields, or text (titles, descriptions and comments).
 - Select rows to act on several gigs at once: move to a status, set the priority, add a label, assign or unassign someone, or delete.
-- **Save view** keeps the current filters under a name. Saved views appear in the sidebar under **My gigs**.
+- **Save view** keeps the current filters under a name. Saved views appear in the account menu (your picture, top right).
 
 ## The command palette
 

@@ -1,10 +1,14 @@
 # The board
 
-The board shows the gigs of every workspace and project you can see, in one place. Open it from **Board**, the first and largest entry in the sidebar.
+The board shows the gigs of every workspace and project you can see, in one place. Open it from **Gigs** in the bar at the top.
 
-The sidebar is a narrow strip of icons in two panels: at the top **Board**, **Dashboard** and **My gigs** (with your saved views); at the bottom **Admin**, **Themes**, your profile and **Log out**. Point at a panel (or tab into it) and it opens over the page with its labels, without moving the page; it folds back a moment after the pointer leaves. Each panel opens on its own. The page you are on is filled with the theme's accent colour.
+The bar runs across the top of every page and stays there while the page scrolls:
 
-**Inbox** (an envelope) and **Notifications** (a bell) sit in the top-right corner of every page, each with its count, beside the live-connection dot. See [Inbox and notifications](inbox.md). On a phone the sidebar is a menu behind the button at the top left.
+- On the left, the gigg logo and the two pages: **Gigs** (this board, and its table) and **Errands**. The page you are on is filled with the theme's accent colour.
+- On the right, **+ New gig** and **+ New errand** (each shown only where you can make one), the live-connection dot, **Inbox** (an envelope) and **Notifications** (a bell), each with its count (see [Inbox and notifications](inbox.md)), and your picture.
+- Your picture opens the account menu: rest the pointer on it, or click it. It holds **Recurring**, **Schedules**, **Templates**, **Archive done** and **Trash** (described below); your saved views; **Dashboard** and **Admin** (admins only; click it for its sections); then **Profile**, **Themes** and **Log out**.
+
+On a phone the two pages are icons, and **+** holds New gig and New errand.
 
 ![The board across several workspaces (Nightwalker theme)](../images/board-all-night.png)
 
@@ -96,16 +100,18 @@ The filters live in the page address (for example `/board?ws=acme&pr=3`), so you
 
 ## The buttons at the top
 
-Next to the title (and its **?** help button) the header has three things:
+The filters row ends, on the right, with the count of open gigs, the **?** help button and two switches:
 
 - **Board | Table**: a switch between this board and the same gigs as a sortable table, with bulk actions: the project in view, the workspace in view, or every workspace. See [Views](views.md).
 - **Columns | Rows** (the two small icons next to it): the board's layout. Columns put each status side by side, as usual; rows stack the statuses top to bottom, each a lane whose cards run left to right and scroll sideways. Everything else works the same (dragging, sorting, collapsing, filters). The choice is saved with your profile; a phone always shows one column at a time.
-- **+ New gig**: opens the form right away, in the project in view (with several in view, the one you last added a gig to). The form's **Where** section moves it to any project you can add to.
-- **⋯** (More actions): the less frequent actions.
-  - **Recurring**, **Schedules**, **Templates**: see [Recurring gigs](recurring.md).
-  - **Archive done**: archives the gigs in Done and Cancelled (all of them, or those finished 7 or 30+ days ago). With several projects in view it lists them (ticked when there are up to three, unticked when more): tick the ones to clean up, or use **All projects in view**. It archives every done and cancelled gig of those projects; the assignee, label, priority and search filters don't apply. Archived gigs leave the board and lists but stay searchable, and you can unarchive them from the gig.
-  - **Trash**: the deleted gigs of the projects in view, most recently changed first, each with **Restore**, which puts it back in its column. Restoring needs the *Delete gigs* permission.
+**+ New gig** in the top bar opens the form right away, in the project in view (with several in view, the one you last added a gig to). The form's **Where** section moves it to any project you can add to.
+
+The account menu (your picture) holds the board's less frequent actions. From another page they open the board first:
+
+- **Recurring**, **Schedules**, **Templates**: see [Recurring gigs](recurring.md).
+- **Archive done**: archives the gigs in Done and Cancelled (all of them, or those finished 7 or 30+ days ago). With several projects in view it lists them (ticked when there are up to three, unticked when more): tick the ones to clean up, or use **All projects in view**. It archives every done and cancelled gig of those projects; the assignee, label, priority and search filters don't apply. Archived gigs leave the board and lists but stay searchable, and you can unarchive them from the gig.
+- **Trash**: the deleted gigs of the projects in view, most recently changed first, each with **Restore**, which puts it back in its column. Restoring needs the *Delete gigs* permission.
 
 ![The trash (Daywalker theme)](../images/trash-day.png)
 
-Recurring, Schedules and Templates list everything across your workspaces, with a **Show** filter at the top to narrow them to one workspace or project. On a phone, **⋯ More** holds the Table link and these actions, and the archived toggle sits in the **Filters** fold.
+Recurring, Schedules and Templates list everything across your workspaces, with a **Show** filter at the top to narrow them to one workspace or project. On a phone the archived toggle sits in the **Filters** fold.

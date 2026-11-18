@@ -1,6 +1,6 @@
 # Your profile
 
-Click your picture at the bottom of the sidebar (its name shows when you point at the panel).
+Point at or click your picture in the top-right corner, then **Profile**.
 
 ![The profile page (Nightwalker theme)](../images/profile-night.png)
 

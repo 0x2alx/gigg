@@ -2,8 +2,8 @@
 // failing first; filters; a side panel with the command, the run history and each run's output; the
 // editor. Errands make no gigs: their runs live here.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { useLocation } from "wouter";
-import { ApiError, fmtTime, hasCap } from "./api";
+import { useLocation, useSearch } from "wouter";
+import { ApiError, errandMakers, errandWritable, fmtTime, hasCap } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { runnerApi, type RunnerState } from "./Dashboard";
 import { PlaceFilter, placeMatch, type Place } from "./places";
@@ -65,7 +65,8 @@ const runAt = (r: ErrandRun) => r.started_at ?? r.scheduled_for ?? r.created_at;
 
 export function ErrandsPage({ open }: { open?: number }) {
   const { tree, me, users } = useApp();
-  const [, navigate] = useLocation();
+  const [loc, navigate] = useLocation();
+  const search = useSearch();
   const [items, setItems] = useState<Errand[] | null>(null);
   const [runner, setRunner] = useState<RunnerState[]>([]);
   const [err, setErr] = useState("");
@@ -106,10 +107,18 @@ export function ErrandsPage({ open }: { open?: number }) {
     const w = wsOf(ws);
     return !!w && hasCap(me, "errands", ws, project ?? undefined);
   }, [wsOf, me]);
-  const writable = useMemo(() => tree.filter((w) => canEdit(w.id) || w.projects.some((p) => canEdit(w.id, p.id))), [tree, canEdit]);
-  // making one also needs a worker: an agent makes errands for itself; giving one to an agent takes
-  // Manage the workspace (a person with only Errands changes the existing ones)
-  const makers = useMemo(() => writable.filter((w) => me.user.kind === "agent" || hasCap(me, "manage_workspace", w.id)), [writable, me]);
+  const writable = useMemo(() => errandWritable(me, tree), [tree, me]);
+  // making one also needs a worker (see errandMakers); the top bar's New errand opens it with ?new=1
+  const makers = useMemo(() => errandMakers(me, tree), [tree, me]);
+  // ?new=1 (the top bar's New errand, the command palette) opens the new-errand form once
+  useEffect(() => {
+    const s = new URLSearchParams(search);
+    if (s.get("new") !== "1") return;
+    s.delete("new");
+    const rest = s.toString();
+    navigate(loc + (rest ? "?" + rest : ""), { replace: true });
+    if (makers.length > 0) setEditing("new");
+  }, [search, loc, navigate, makers.length]);
 
   const inPlace = useMemo(() => (items ?? []).filter((c) => placeMatch(place, tree, c.workspace_id, c.project_id)), [items, place, tree]);
   const shown = useMemo(() => {
@@ -148,11 +157,6 @@ export function ErrandsPage({ open }: { open?: number }) {
           {me.admin && (
             <button type="button" className="button secondary" onClick={() => setLibrary(true)} data-tip="Errand templates every workspace can start an errand from">
               <Icon name="template" /> Shared templates
-            </button>
-          )}
-          {makers.length > 0 && (
-            <button type="button" className="button" onClick={() => setEditing("new")}>
-              <Icon name="plus" /> New errand
             </button>
           )}
         </div>

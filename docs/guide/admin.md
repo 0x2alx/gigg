@@ -1,6 +1,6 @@
 # Administration
 
-Admins see **Admin** in the sidebar. Everything here is also available through the API; the essentials (users, passwords, workspaces, members, access rules, projects, keys) through the `gigg admin` command line too.
+Admins see **Admin** in the account menu (their picture, top right); click it for its sections. Everything here is also available through the API; the essentials (users, passwords, workspaces, members, access rules, projects, keys) through the `gigg admin` command line too.
 
 ![Admin: a user's permissions (Daywalker theme)](../images/admin-permissions-day.png)
 

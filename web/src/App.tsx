@@ -1,9 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent as ReactFocusEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { setMentionUsers } from "./markdown";
-import { Link, Redirect, Route, Switch, useLocation, useSearch } from "wouter";
+import { Redirect, Route, Switch, useLocation } from "wouter";
 import { api, ApiError, SIGNED_OUT, type Me, type Project, type ProjectAccess, type ThemeState, type User } from "./api";
-import { NotificationsPage, TopBell } from "./Bell";
-import { badgeCount } from "./notifications";
+import { NotificationsPage } from "./Bell";
+import { AppBar } from "./AppBar";
 import { BoardPage } from "./Board";
 import { ErrandsPage } from "./Errands";
 import { DashboardPage } from "./Dashboard";
@@ -12,16 +12,11 @@ import { countsChange, onActivity, treeChange, useLive, type LiveState } from ".
 import { ProfilePage } from "./Profile";
 import { ThemesPage } from "./Themes";
 import { AdminRoutes } from "./admin/AdminRoutes";
-import { ADMIN_TABS } from "./admin/common";
 import { CommandPalette } from "./views/CommandPalette";
-import { MyGigs } from "./views/MyGigs";
 import { TableView } from "./views/TableView";
-import { savedViewsApi, viewHref, type SavedFilter } from "./views/savedViews";
-import { BUILTINS, CATEGORY_COLOR, PRIORITY_COLOR, applyTheme, findTheme, initialTheme, rememberTheme, sane, type Theme } from "./theme";
-import { LogoMark } from "./Logo";
+import { savedViewsApi, type SavedFilter } from "./views/savedViews";
+import { BUILTINS, applyTheme, findTheme, initialTheme, rememberTheme, sane, type Theme } from "./theme";
 import { useNarrow } from "./narrow";
-import { Avatar } from "./ui";
-import { Icon } from "./icons";
 import { setPreferredTZ } from "./recurrence";
 import { FONTS_ALLOWED_EVENT, setRemoteFonts } from "./fonts";
 
@@ -191,19 +186,8 @@ function Login({ onDone, ended }: { onDone: () => void; ended?: boolean }) {
 
 function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   const [loc] = useLocation();
-  // phones: the sidebar is a drawer behind a top bar; it closes on navigation, a tap outside or Esc
   const narrow = useNarrow();
-  const [drawer, setDrawer] = useState(false);
   const prefSaves = useRef(new Map<string, Promise<unknown>>());
-  useEffect(() => setDrawer(false), [loc, narrow]);
-  useEffect(() => {
-    if (!drawer) return;
-    const on = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDrawer(false);
-    };
-    window.addEventListener("keydown", on);
-    return () => window.removeEventListener("keydown", on);
-  }, [drawer]);
   const [me, setMe] = useState<Me>(initialMe);
   const [tree, setTree] = useState<WorkspaceTree[] | null>(null);
   const [users, setUsers] = useState<Map<number, User>>(new Map());
@@ -356,100 +340,15 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
     () => (tree ? { me, tree, users, members, refresh, prefs, setPref, themes, savedViews, reloadSavedViews, live } : null),
     [me, tree, users, members, refresh, prefs, setPref, themes, savedViews, reloadSavedViews, live],
   );
-  const [logoutFailed, setLogoutFailed] = useState(false);
   if (!ctx) return <div className="center muted">Loading…</div>;
 
   const first = ctx.tree.find((w) => w.projects.length > 0);
-  // only a logout the server took (or a session already over) shows the login page: after a network
-  // failure the session is still valid, so say so instead of looking logged out
-  const logout = () => {
-    setLogoutFailed(false);
-    api.logout().then(onLogout, (e: unknown) => {
-      if (e instanceof ApiError && e.status === 401) onLogout();
-      else setLogoutFailed(true);
-    });
-  };
-
-  const inAdmin = loc === "/admin" || loc.startsWith("/admin/");
   return (
     <Ctx.Provider value={ctx}>
-      <div className={"shell" + (narrow ? " narrow" : "") + (drawer ? " drawer-open" : "")}>
-        {narrow && drawer && <div className="drawer-backdrop" onClick={() => setDrawer(false)} aria-hidden="true" />}
-        {/* wide screens: a rail of icons; each of its two panels opens over the page on its own while the
-            mouse (or the keyboard focus) is on it. Phones: a drawer with every label. */}
-        <aside id="sidebar" className="sidebar" aria-label="Navigation" inert={narrow && !drawer ? true : undefined}>
-          <div className="side-top">
-            <Link href="/" className="brand" aria-label="gigg home" title="gigg">
-              <LogoMark className="brand-mark" compact />
-              {narrow && <span className="brand-word">gigg</span>}
-            </Link>
-            {narrow && (
-              <button type="button" className="icon-button collapse" onClick={() => setDrawer(false)} aria-label="Close the menu">
-                <Icon name="x" />
-              </button>
-            )}
-          </div>
-          <SidePanel as="nav" label="Pages" hover={!narrow}>
-            <NavLink href="/board" prefix icon={<Icon name="board" />} label="Board" className="nav-primary" />
-            <NavLink href="/dashboard" icon={<Icon name="dashboard" />} label="Dashboard" />
-            <NavLink href="/my" icon={<Icon name="check" />} label="My gigs" />
-            <NavLink href="/errands" prefix icon={<Icon name="clock" />} label="Errands" />
-            {savedViews.length > 0 && (
-              <div className="nav-sub" role="group" aria-label="Saved views">
-                {savedViews.map((v) => (
-                  <SavedViewLink key={v.id} href={viewHref(ctx.tree, v, me.user.id)} label={v.name} title={savedViewTitle(v, ctx.tree)} />
-                ))}
-              </div>
-            )}
-          </SidePanel>
-          <SidePanel as="div" label="Settings and account" hover={!narrow} className="side-bottom">
-            {me.admin && <NavLink href="/admin" icon={<Icon name="settings" />} label="Admin" />}
-            {me.admin && inAdmin && (
-              <div className="nav-sub" role="group" aria-label="Admin sections">
-                {ADMIN_TABS.map((t) => (
-                  <NavLink key={t.href} href={"/admin" + t.href} prefix icon={<Icon name={t.icon} />} label={t.label} />
-                ))}
-              </div>
-            )}
-            <NavLink href="/themes" icon={<Icon name="theme" />} label="Themes" />
-            <NavLink href="/profile" icon={<Avatar user={me.user} size="xs" />} label={me.user.display_name || me.user.username} />
-            <button type="button" className={"nav-item" + (logoutFailed ? " danger" : "")} onClick={logout}>
-              <span className="nav-icon" aria-hidden="true">
-                <Icon name="logout" />
-              </span>
-              <span className="nav-label" role={logoutFailed ? "alert" : undefined}>
-                {logoutFailed ? "Couldn't log out: try again" : "Log out"}
-              </span>
-            </button>
-          </SidePanel>
-        </aside>
+      <div className={"shell" + (narrow ? " narrow" : "")}>
+        {/* one bar across the top (pages, New, messages, your account menu); the page scrolls under it */}
+        <AppBar inboxCount={inboxCount} onLogout={onLogout} />
         <main className="content">
-          {/* the top bar: messages in the top-right corner (inbox, notifications, the live pip); on a phone
-              also the menu button, the brand and you */}
-          <header className="topbar">
-            {narrow && (
-              <>
-                <button type="button" className="icon-button topbar-menu" onClick={() => setDrawer(true)} aria-label="Open the menu" aria-expanded={drawer} aria-controls="sidebar">
-                  <Icon name="menu" />
-                </button>
-                <Link href="/" className="brand topbar-brand" aria-label="gigg home">
-                  <LogoMark className="brand-mark" compact />
-                  <span className="brand-word">gigg</span>
-                </Link>
-              </>
-            )}
-            <span className="grow" />
-            <span className={"live-dot live-" + live} style={live === "off" ? undefined : ({ "--live": live === "live" ? CATEGORY_COLOR.done : PRIORITY_COLOR[2] } as CSSProperties)} role="status" title={LIVE_TITLE[live]} aria-label={LIVE_TITLE[live]}>
-              <span className="live-pip" aria-hidden="true" />
-            </span>
-            <InboxLink count={inboxCount} />
-            <TopBell />
-            {narrow && (
-              <Link href="/profile" className="topbar-me" aria-label="Profile" title="Profile">
-                <Avatar user={me.user} size="xs" />
-              </Link>
-            )}
-          </header>
           {/* a page change fades the new page in (keyed by the section, so a gig opening on the board or a
               tab inside Admin doesn't replay it) */}
           <div className="page-anim" key={loc.split("/")[1] ?? ""}>
@@ -474,8 +373,9 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
             <Route path="/admin" nest>
               <AdminRoutes />
             </Route>
+            {/* "My gigs" of before: the board's "Assigned to me" */}
             <Route path="/my">
-              <MyGigs />
+              <Redirect replace to="/board?a=me" />
             </Route>
             <Route path="/w/:ws/p/:pid/table">{(params) => <TableView ws={params.ws} pid={Number(params.pid)} />}</Route>
             <Route path="/w/:ws/table">{(params) => <TableView ws={params.ws} />}</Route>
@@ -500,141 +400,4 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
       </div>
     </Ctx.Provider>
   );
-}
-
-const LIVE_TITLE: Record<LiveState, string> = {
-  live: "Live updates: connected",
-  connecting: "Live updates: connecting…",
-  off: "Live updates: offline (retrying)",
-};
-
-function savedViewTitle(v: SavedFilter, tree: WorkspaceTree[]): string {
-  const ws = tree.find((w) => w.id === v.workspace_id);
-  return `Saved view: ${v.name}${ws && tree.length > 1 ? ` (${ws.name})` : ""}`;
-}
-
-// SavedViewLink: like NavLink, but active only when the search matches too.
-function SavedViewLink({ href, label, title }: { href: string; label: string; title: string }) {
-  const [loc] = useLocation();
-  const search = useSearch();
-  const active = loc + (search ? "?" + search : "") === href;
-  return (
-    <Link href={href} className={"nav-item" + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title}>
-      <span className="nav-icon" aria-hidden="true">
-        <Icon name="star" />
-      </span>
-      <span className="nav-label">{label}</span>
-    </Link>
-  );
-}
-
-function NavLink({ href, children, prefix, icon, label, title, className }: {
-  href: string; children?: ReactNode; prefix?: boolean; icon: ReactNode; label: string; title?: string; className?: string;
-}) {
-  const [loc] = useLocation();
-  const active = prefix ? loc === href || loc.startsWith(href + "/") : loc === href;
-  return (
-    <Link href={href} className={"nav-item" + (className ? " " + className : "") + (active ? " selected" : "")} aria-current={active ? "page" : undefined} title={title}>
-      <span className="nav-icon" aria-hidden="true">{icon}</span>
-      <span className="nav-label">{label}</span>
-      {children}
-    </Link>
-  );
-}
-
-// InboxLink: the top bar's envelope, to the inbox (gigs waiting for a human) with their count.
-function InboxLink({ count }: { count: number }) {
-  const [loc] = useLocation();
-  const label = count ? `Inbox, ${count} waiting` : "Inbox";
-  return (
-    <Link href="/inbox" className={"icon-button topbar-icon" + (loc === "/inbox" ? " on" : "")} aria-label={label} title={label} aria-current={loc === "/inbox" ? "page" : undefined}>
-      <Icon name="mail" />
-      {count > 0 && <span className="count count-alert">{badgeCount(count)}</span>}
-    </Link>
-  );
-}
-
-// SidePanel: one of the rail's two panels. With `hover` (wide screens) it folds to its icons and opens
-// over the page while the mouse is on it (after a short pause, so passing over doesn't flash it) or
-// while the keyboard works in it; it folds back a little after the mouse leaves. Each panel on its own.
-// On a touch screen (a tablet: wide, but no hover) the first tap opens it instead of following the
-// icon, a tap on an entry then goes there and folds it, and a tap outside folds it.
-function SidePanel({ as: Tag, label, hover, className, children }: { as: "nav" | "div"; label: string; hover: boolean; className?: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  useEffect(() => {
-    if (!hover) {
-      clearTimeout(timer.current);
-      setOpen(false);
-    }
-  }, [hover]);
-  const later = (v: boolean, ms: number) => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setOpen(v), ms);
-  };
-  const self = useRef<HTMLElement>(null);
-  const touch = useRef(false); // the last press on it was a finger or a pen
-  useEffect(() => {
-    if (!open || !hover) return;
-    const out = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse" && !self.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", out);
-    return () => document.removeEventListener("pointerdown", out);
-  }, [open, hover]);
-  const handlers = hover
-    ? {
-        // only a real mouse opens it (a tap on a touch screen just goes to the page)
-        onPointerEnter: (e: ReactPointerEvent<HTMLElement>) => {
-          if (e.pointerType === "mouse") later(true, OPEN_MS);
-        },
-        // the mouse leaving doesn't fold it while the keyboard is working in it
-        onPointerLeave: (e: ReactPointerEvent<HTMLElement>) => {
-          if (e.pointerType !== "mouse") return; // a finger lifting "leaves" too; taps fold it (see above)
-          const f = document.activeElement;
-          if (f && e.currentTarget.contains(f) && f.matches(":focus-visible")) return;
-          later(false, CLOSE_MS);
-        },
-        // keyboard focus opens it (focus put back by a dialog or a popover isn't someone reaching for the menu)
-        onFocus: (e: ReactFocusEvent<HTMLElement>) => {
-          if (e.target instanceof HTMLElement && e.target.matches(":focus-visible") && !modalOpen()) later(true, 0);
-        },
-        onBlur: (e: ReactFocusEvent<HTMLElement>) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null) && !e.currentTarget.matches(":hover")) later(false, 150);
-        },
-        onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
-          touch.current = e.pointerType !== "mouse";
-        },
-        onClickCapture: (e: ReactMouseEvent<HTMLElement>) => {
-          if (!touch.current) return;
-          if (!open) {
-            e.preventDefault(); // the first tap opens the panel, it doesn't follow the icon
-            e.stopPropagation();
-            clearTimeout(timer.current);
-            setOpen(true);
-          } else if ((e.target as Element).closest("a, button")) later(false, 0);
-        },
-        onKeyDown: (e: ReactKeyboardEvent<HTMLElement>) => {
-          if (e.key === "Escape" && open) {
-            e.preventDefault(); // the gig panel closes on an Esc nobody else handled
-            e.stopPropagation();
-            clearTimeout(timer.current);
-            setOpen(false);
-          }
-        },
-      }
-    : {};
-  return (
-    <Tag ref={self as never} className={"side-panel" + (className ? " " + className : "") + (hover ? (open ? " open" : " folded") : "")} aria-label={label} {...(Tag === "div" ? { role: "group" } : {})} {...handlers}>
-      {children}
-    </Tag>
-  );
-}
-const OPEN_MS = 120;
-const CLOSE_MS = 450;
-
-// modalOpen: a dialog is up (focus moving behind it, by Tab, isn't someone reaching for the menu)
-function modalOpen(): boolean {
-  return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
 }

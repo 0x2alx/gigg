@@ -167,7 +167,7 @@ function Palette({ onClose }: { onClose: () => void }) {
     // 4. commands
     const cmds: Item[] = [];
     if (boardHref) cmds.push({ id: "c-new", group: "Commands", icon: "+", label: "New gig", hint: <Kbd>board</Kbd>, run: () => go(`${boardHref}?new=1`) });
-    cmds.push({ id: "c-my", group: "Commands", icon: "☑", label: "My gigs", run: () => go("/my") });
+    cmds.push({ id: "c-my", group: "Commands", icon: "☑", label: "Gigs assigned to me", run: () => go("/board?a=me") });
     cmds.push({ id: "c-inbox", group: "Commands", icon: "✉", label: "Inbox", run: () => go("/inbox") });
     cmds.push({ id: "c-notif", group: "Commands", icon: "🔔", label: "Notifications", run: () => go("/notifications") });
     if (tableWs)

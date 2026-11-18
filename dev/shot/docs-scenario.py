@@ -17,7 +17,7 @@ def click_text(sel, text):
 
 
 def page(path, wait, shot, settle=1800, **kw):
-    # wait for the live connection too, so the sidebar's footer says Live rather than Connecting
+    # wait for the live connection too, so the top bar's dot says Live rather than Connecting
     s = [{"goto": path}, {"wait": wait}, {"wait": settle}, {"wait": ".live-dot.live-live"}, {"wait": 300}]
     if kw.get("el"):
         s.append({"eval": "(() => { document.querySelector(%s).scrollIntoView({ block: 'center' }); return true; })()" % json.dumps(kw["el"]), "expect": True})
@@ -61,7 +61,6 @@ steps = [
     {"wait": 700},
     {"shot": "recurring-night", "el": "[role=dialog]"},
     *page("/dashboard", ".dash-card", "dashboard-night"),
-    *page("/my", "main, .vw-list-row, h1", "my-gigs-night"),
     {"goto": "/board"},
     {"wait": ".board"},
     {"eval": "(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true })); return true; })()", "expect": True},

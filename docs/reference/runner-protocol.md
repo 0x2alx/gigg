@@ -131,7 +131,7 @@ A gig is eligible when all of these hold:
 
 Eligible gigs are ordered by: `always_run` first, then higher `priority`, then earliest `due_at` (gigs
 without one last), then the claimer's own workspace (the one it owns) before others, then project
-position (the sidebar's order), status position, position in the column, and id. The first one is
+position (the projects' order), status position, position in the column, and id. The first one is
 claimed.
 
 Each gig belongs to a project whose description (`GET /projects/{id}`, `description_md`) says what it

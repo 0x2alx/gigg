@@ -1,6 +1,6 @@
 # Themes
 
-**Themes** in the sidebar changes how gigg looks for you. The choice is saved on the server, so it follows you to other browsers.
+**Themes** in the account menu (your picture, top right) changes how gigg looks for you. The choice is saved on the server, so it follows you to other browsers.
 
 ![The themes page (Daywalker theme)](../images/themes-day.png)
 
@@ -24,7 +24,7 @@ Besides the colours, font, text size, corners and border width, the editor has f
 - **Buttons and badges**: *Follow the corners* (the theme's corner size) or *Pill* (fully round buttons, fields, chips and badges).
 - **Board columns**: the colour of the board's columns. *Auto* (**A**) takes a step between the background and the cards.
 - **Column borders**: an outline around each column (at least 1 px, even with a border width of 0), or none (**∅**). When **Board columns** has a colour of its own, the contrast check also covers the secondary text on it and whether each status chip still stands out from it, and its **Fix** adjusts the column colour. The preview shows a column with two status chips and a card.
-- **Logo**: the colour of the gigg ship at the top of the sidebar. *Auto* (**A**) uses the accent. The preview at the top of the editor shows it.
+- **Logo**: the colour of the gigg ship at the top left. *Auto* (**A**) uses the accent. The preview at the top of the editor shows it.
 
-Cards use the theme's **Borders** colour and **Border width**, so changing those shows on the board. The sidebar panels have no outline.
+Cards use the theme's **Borders** colour and **Border width**, so changing those shows on the board.
 

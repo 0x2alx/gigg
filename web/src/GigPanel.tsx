@@ -48,7 +48,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
   const [runs, setRuns] = useState<Run[]>([]);
   const [err, setErr] = useState("");
   const [schedule, setSchedule] = useState<Recurrence | "gone" | null>(null);
-  // full: the panel covers the whole view next to the sidebar (remembered per browser)
+  // full: the panel covers the whole view under the app bar (remembered per browser)
   const [full, setFull] = useState(() => {
     try {
       return localStorage.getItem(FULL_KEY) === "1";
@@ -210,7 +210,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
     const outside = (t: EventTarget | null) => {
       const panel = panelRef.current;
       if (!panel || !(t instanceof Element) || !t.isConnected || panel.contains(t)) return false;
-      return !t.closest('.modal-backdrop, [role="dialog"], [aria-modal="true"], .bell-pop, .menu, .mention-list, .toast, .sidebar, [data-opens-gig]');
+      return !t.closest('.modal-backdrop, [role="dialog"], [aria-modal="true"], .bell-pop, .menu, .mention-list, .toast, .appbar, [data-opens-gig]');
     };
     const onDown = (e: PointerEvent) => {
       down = e.button === 0 && !document.querySelector('[aria-modal="true"]') && outside(e.target) ? window.location.pathname : null;

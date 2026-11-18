@@ -146,25 +146,6 @@
    "full": false
   },
   {
-   "goto": "/my"
-  },
-  {
-   "wait": "main, .vw-list-row, h1"
-  },
-  {
-   "wait": 1800
-  },
-  {
-   "wait": ".live-dot.live-live"
-  },
-  {
-   "wait": 300
-  },
-  {
-   "shot": "my-gigs-night",
-   "full": false
-  },
-  {
    "goto": "/board"
   },
   {

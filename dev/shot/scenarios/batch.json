@@ -97,7 +97,7 @@
       "expect": true
     },
     {
-      "eval": "(async () => { document.querySelector('.tp-expand').click(); await new Promise(r => setTimeout(r, 300)); const p = document.querySelector('aside.panel'); const side = document.querySelector('.sidebar').getBoundingClientRect().right; const ok = p.classList.contains('panel-full') && Math.abs(p.getBoundingClientRect().left - side) < 2 && document.querySelector('.tp-side').getBoundingClientRect().top < document.querySelector('.comments').getBoundingClientRect().bottom; return ok; })()",
+      "eval": "(async () => { document.querySelector('.tp-expand').click(); await new Promise(r => setTimeout(r, 300)); const p = document.querySelector('aside.panel'); const side = 0; const ok = p.classList.contains('panel-full') && Math.abs(p.getBoundingClientRect().left - side) < 2 && document.querySelector('.tp-side').getBoundingClientRect().top < document.querySelector('.comments').getBoundingClientRect().bottom; return ok; })()",
       "expect": true
     },
     {

@@ -52,7 +52,7 @@
    "expect": true
   },
   {
-   "click": ".topbar-menu"
+   "click": ".account-button"
   },
   {
    "wait": 400
@@ -65,13 +65,13 @@
    "expect": true
   },
   {
-   "eval": "document.querySelector('.drawer-backdrop').click(), true"
+   "eval": "document.querySelector('.account-button').click(), true"
   },
   {
    "wait": 300
   },
   {
-   "eval": "!document.querySelector('.drawer-open') && getComputedStyle(document.querySelector('.sidebar')).visibility === 'hidden'",
+   "eval": "!document.querySelector('.account-menu')",
    "expect": true
   },
   {
@@ -180,7 +180,7 @@
    "expect": true
   },
   {
-   "goto": "/my"
+   "goto": "/board?a=me"
   },
   {
    "wait": 800

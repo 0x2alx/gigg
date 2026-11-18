@@ -4,7 +4,7 @@ A gig belongs to one project of one workspace. Its key (for example `GIG-12`) is
 
 ## Creating a gig
 
-Click **New gig** on the board. You can also press **Ctrl+K** (⌘K on a Mac) and choose "New gig".
+Click **+ New gig** in the top bar. You can also press **Ctrl+K** (⌘K on a Mac) and choose "New gig".
 
 ![The new gig form (Nightwalker theme)](../images/gig-new-night.png)
 

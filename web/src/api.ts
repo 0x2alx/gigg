@@ -88,6 +88,28 @@ export const canWriteIn = (ws: { role?: string; whole?: boolean; access?: Projec
   return ws.role !== "viewer" && ws.role !== "consumer";
 };
 
+// The places you can make things in, for every screen that offers a "New" button (one rule each).
+type Place = { id: number; role?: string; whole?: boolean; access?: ProjectAccess[]; projects: { id: number }[] };
+type Caps = Pick<Me, "capabilities" | "workspaces" | "admin" | "user">;
+
+// canCreateGigIn: new gigs need Create gigs and Edit gigs there.
+export const canCreateGigIn = (me: Caps, w: Place, project: number) => canWriteIn(w, project) && hasCap(me, "create_gigs", w.id, project);
+
+// gigChoices: every workspace you can add a gig to, with only the projects you can add to.
+export function gigChoices<W extends Place>(me: Caps, tree: W[]): W[] {
+  return tree.map((w) => ({ ...w, projects: w.projects.filter((p) => canCreateGigIn(me, w, p.id)) })).filter((w) => w.projects.length > 0);
+}
+
+// errandWritable: workspaces where you may change errands (Errands for the whole workspace or one of its
+// projects); errandMakers: those where you may also make one. An errand needs a worker: an agent makes
+// errands for itself; giving one to an agent takes Manage the workspace.
+export function errandWritable<W extends Place>(me: Caps, tree: W[]): W[] {
+  return tree.filter((w) => hasCap(me, "errands", w.id) || w.projects.some((p) => hasCap(me, "errands", w.id, p.id)));
+}
+export function errandMakers<W extends Place>(me: Caps, tree: W[]): W[] {
+  return errandWritable(me, tree).filter((w) => me.user.kind === "agent" || hasCap(me, "manage_workspace", w.id));
+}
+
 export interface Project {
   id: number;
   workspace_id: number;
