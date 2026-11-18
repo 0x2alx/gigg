@@ -50,7 +50,9 @@ const puppeteer = require("puppeteer-core");
           // one element (with a margin), e.g. a dialog or a section
           const box = await (await page.waitForSelector(step.el, { timeout: 10000 })).boundingBox();
           const m = step.margin ?? 12;
-          await page.screenshot({ path: path.join(outDir, step.shot + ".png"), clip: { x: Math.max(0, box.x - m), y: Math.max(0, box.y - m), width: box.width + 2 * m, height: box.height + 2 * m } });
+          await page.screenshot({ path: path.join(outDir, step.shot + ".png"), clip: { x: Math.max(0, box.x - m), y: Math.max(0, box.y - m), width: box.width + 2 * m, height: box.height + 2 * m },
+            // as it is on screen: capturing beyond the viewport resizes the page, and a scrolled panel jumps
+            captureBeyondViewport: false });
         } else if (step.shot) await page.screenshot({ path: path.join(outDir, step.shot + ".png"), fullPage: step.full !== false });
         else if (step.dom) {
           fs.writeFileSync(path.join(outDir, step.dom + ".html"), await page.content());

@@ -34,7 +34,7 @@
    "wait": 6000
   },
   {
-   "eval": "(() => { fetch('/api/v1/me', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preferences: { board_filters: null } }) }); return true; })()",
+   "eval": "(() => { fetch('/api/v1/me', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preferences: { board_filters: null, board_filter: null } }) }); return true; })()",
    "expect": true
   },
   {
@@ -80,7 +80,7 @@
    "wait": ".board .gig-card"
   },
   {
-   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions button\")].find(x => x.textContent.includes(\"New gig\")); if (!b) return false; b.click(); return true; })()",
+   "eval": "(() => { const b = [...document.querySelectorAll(\".appbar a\")].find(x => x.textContent.includes(\"New gig\")); if (!b) return false; b.click(); return true; })()",
    "expect": true
   },
   {
@@ -100,21 +100,7 @@
    "full": false
   },
   {
-   "goto": "/board?p=3"
-  },
-  {
-   "wait": ".board"
-  },
-  {
-   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions .head-more > button\")].find(x => x.textContent.includes(\"\\u22ef\")); if (!b) return false; b.click(); return true; })()",
-   "expect": true
-  },
-  {
-   "wait": 200
-  },
-  {
-   "eval": "(() => { const b = [...document.querySelectorAll(\".head-more .menu button\")].find(x => x.textContent.includes(\"Recurring\")); if (!b) return false; b.click(); return true; })()",
-   "expect": true
+   "goto": "/board?p=3&tool=recurring"
   },
   {
    "wait": "[role=dialog] .rec-row, [role=dialog] li, [role=dialog] article"
@@ -216,7 +202,7 @@
    "wait": ".board"
   },
   {
-   "click": "h1 .help-button"
+   "click": ".bf-end .help-button"
   },
   {
    "wait": ".help-body"
@@ -259,7 +245,7 @@
    "full": false
   },
   {
-   "goto": "/board/p/1/t/PLT-1"
+   "goto": "/board/p/1/g/PLT-1"
   },
   {
    "wait": "aside.panel .tp-body"
@@ -278,7 +264,7 @@
    "full": false
   },
   {
-   "goto": "/board/p/1/t/PLT-4"
+   "goto": "/board/p/1/g/PLT-4"
   },
   {
    "wait": "section[aria-label='Agent run']"
@@ -287,7 +273,7 @@
    "wait": 1500
   },
   {
-   "eval": "(() => { document.querySelector(\"section[aria-label='Agent run']\").scrollIntoView({ block: 'start' }); return true; })()",
+   "eval": "(() => { document.querySelector(\"section[aria-label='Agent run']\").scrollIntoView({ block: 'center', behavior: 'instant' }); return true; })()",
    "expect": true
   },
   {
@@ -295,8 +281,8 @@
   },
   {
    "shot": "agent-run-day",
-   "el": "aside.panel",
-   "margin": 0
+   "el": "section[aria-label='Agent run']",
+   "margin": 8
   },
   {
    "goto": "/inbox"
@@ -400,21 +386,7 @@
    "full": false
   },
   {
-   "goto": "/board"
-  },
-  {
-   "wait": ".board .gig-card"
-  },
-  {
-   "eval": "(() => { const b = [...document.querySelectorAll(\".head-actions .head-more > button\")].find(x => x.textContent.includes(\"\\u22ef\")); if (!b) return false; b.click(); return true; })()",
-   "expect": true
-  },
-  {
-   "wait": 200
-  },
-  {
-   "eval": "(() => { const b = [...document.querySelectorAll(\".head-more .menu button\")].find(x => x.textContent.includes(\"Trash\")); if (!b) return false; b.click(); return true; })()",
-   "expect": true
+   "goto": "/board?tool=trash"
   },
   {
    "wait": ".trash-item"
