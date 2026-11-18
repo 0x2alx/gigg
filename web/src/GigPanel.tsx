@@ -49,23 +49,17 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
   const [runs, setRuns] = useState<Run[]>([]);
   const [err, setErr] = useState("");
   const [schedule, setSchedule] = useState<Recurrence | "gone" | null>(null);
-  // full: the panel covers the whole view under the app bar (remembered per browser)
-  const [full, setFull] = useState(() => {
+  // full: the panel covers the whole view under the app bar. Every open starts as the side panel
+  // (it slides in, and a click beside it closes it); the expand button widens this one only.
+  const [full, setFull] = useState(false);
+  const toggleFull = () => setFull((f) => !f);
+  useEffect(() => {
     try {
-      return localStorage.getItem(FULL_KEY) === "1";
+      localStorage.removeItem(FULL_KEY); // the choice older versions kept per browser
     } catch {
-      return false;
+      /* storage unavailable: nothing kept */
     }
-  });
-  const toggleFull = () =>
-    setFull((f) => {
-      try {
-        localStorage.setItem(FULL_KEY, f ? "0" : "1");
-      } catch {
-        /* storage unavailable: the choice lasts for this page */
-      }
-      return !f;
-    });
+  }, []);
 
   const shownId = useRef<number | null>(null); // the gig on screen, so a new one never shows the last one's runs
   // the gig asked for now: a slow answer for the previous one (after a quick switch) is dropped

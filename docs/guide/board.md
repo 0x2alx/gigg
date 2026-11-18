@@ -26,7 +26,7 @@ Each column header shows the column's name on a label filled with its colour, wi
 - **+**: a new gig in this column. The form starts in this column's status; if you move the gig to another project in the form, it starts in that project's first status of the same stage.
 - **Collapse** (two arrows pointing in): the column leaves the board and becomes a small button above it, with its name and count. Click the button to bring the column back. The board remembers collapsed columns per browser. You can drop a card on a collapsed column's button too.
 
-Each column also ends with **+ New gig**, except Done: when it holds gigs it ends with **Archive done** instead, which opens the archive dialog for done gigs only (see **Archive done** below). Cancelled gigs never show on the board; **⋯ → Archive done** archives them too. On a phone, the columns are tabs above the cards.
+A done card shows an archive button in its bottom corner when you point at it (always, on a touch screen): one click archives that gig, and the message that follows has **Undo**. Each column also ends with **+ New gig**, except Done: when it holds gigs it ends with **Archive done** instead, which opens the archive dialog for done gigs only (see **Archive done** below). Cancelled gigs never show on the board; **⋯ → Archive done** archives them too. On a phone, the columns are tabs above the cards.
 
 ### Agent activity
 

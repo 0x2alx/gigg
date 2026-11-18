@@ -92,7 +92,8 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const [failed, setFailed] = useState<string[]>([]);
   const [archived, setArchived] = useState<Gig[]>([]);
   const [fields, setFields] = useState<Map<number, CustomField[]>>(new Map());
-  const [toast, setToast] = useState("");
+  // the toast: a short message, with an Undo when the change can be taken back in one click
+  const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [moveErr, setMoveErr] = useState("");
   const [drag, setDrag] = useState<number | null>(null);
   const [drop, setDrop] = useState<{ col: string; index: number } | null>(null);
@@ -232,14 +233,14 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(""), 4000);
+    const t = setTimeout(() => setToast(null), toast.undo ? 6000 : 4000);
     return () => clearTimeout(t);
   }, [toast]);
   const changed = useCallback(
-    (message?: string) => {
+    (message?: string, undo?: () => void) => {
       load();
       refresh();
-      if (message) setToast(message);
+      if (message) setToast({ text: message, undo });
     },
     [load, refresh],
   );
@@ -548,6 +549,8 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     const b = boards.get(t.project_id);
     if (!p || !b) return null;
     const write = !archivedCard && canWriteIn(p.ws, p.project.id);
+    // done gigs get a one-click archive (the Done column's footer archives them all)
+    const archive = write && t.status_category === "done" && hasCap(me, "archive_gigs", p.ws.id, p.project.id);
     return (
       <Card
         gig={t}
@@ -556,6 +559,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
         showWs={wsInScope.length > 1}
         labels={b.labels}
         canWrite={write}
+        canArchive={archive}
         canReorder={write && c.statusId !== undefined && manualIn(c)}
         statusLabel={c.statusId === undefined && t.status_name !== c.name ? t.status_name : undefined}
         dragging={t.id === drag}
@@ -832,7 +836,20 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
       )}
       {toast && (
         <div className="toast" role="status">
-          {toast}
+          {toast.text}
+          {toast.undo && (
+            <button
+              type="button"
+              className="toast-undo"
+              onClick={() => {
+                const undo = toast.undo;
+                setToast(null);
+                undo?.();
+              }}
+            >
+              Undo
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1301,13 +1318,14 @@ function StageIcon({ category, color }: { category: Category; color: string }) {
   );
 }
 
-function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusLabel, dragging, first, last, onDragStart, onDragEnd, onReorder, onOpen, onChanged, fields }: {
+function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReorder, statusLabel, dragging, first, last, onDragStart, onDragEnd, onReorder, onOpen, onChanged, fields }: {
   gig: Gig;
   statuses: Status[];
   ws: WorkspaceTree;
   showWs: boolean; // several workspaces in view: name the gig's workspace
   labels: Tag[];
   canWrite: boolean;
+  canArchive: boolean; // a done gig you may archive: the card shows a one-click Archive
   canReorder: boolean; // a manual order exists (one project in view)
   statusLabel?: string; // the gig's own status, when the column (a category) is named otherwise
   dragging: boolean;
@@ -1317,7 +1335,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusL
   onDragEnd: () => void;
   onReorder: (where: "top" | "up" | "down" | "bottom") => void;
   onOpen: () => void;
-  onChanged: () => void;
+  onChanged: (message?: string, undo?: () => void) => void;
   fields?: CustomField[];
 }) {
   const { users } = useApp();
@@ -1385,6 +1403,25 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusL
   const worker = run ? users.get(run.worker_user_id) : undefined;
   const asker = gig.question ? users.get(gig.question.author_id) : undefined;
   const [retrying, setRetrying] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const archive = () => {
+    setArchiving(true);
+    setErr("");
+    api
+      .archiveGig(gig.id)
+      .then(() =>
+        onChanged(`Archived ${gig.key}`, () =>
+          api
+            .unarchiveGig(gig.id)
+            .then(() => onChanged(`${gig.key} is back on the board`))
+            .catch((e: unknown) => onChanged(`Couldn't unarchive ${gig.key}: ${e instanceof ApiError ? e.message : "try again from the gig"}`)),
+        ),
+      )
+      .catch((e: unknown) => {
+        setErr(e instanceof ApiError ? e.message : "Archive failed.");
+        setArchiving(false);
+      });
+  };
   // the button's name replaces its contents for screen readers: say the agent state there too
   const cardLabel = [
     `${gig.key} ${gig.title}`,
@@ -1556,6 +1593,18 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canReorder, statusL
             </button>
           )}
         </div>
+      )}
+      {canArchive && !gig.archived_at && (
+        <button
+          type="button"
+          className="icon-button card-archive"
+          disabled={archiving}
+          onClick={archive}
+          aria-label={`Archive ${gig.key}`}
+          data-tip="Archive: off the board and lists, still searchable (Undo in the message that follows)"
+        >
+          <Icon name="archive" />
+        </button>
       )}
       {canWrite && (
         <div className="card-menu" ref={ref}>

@@ -26,7 +26,7 @@ Everything you add is saved when you click **Create gig** (or **Save**): the sub
 
 ## The gig panel
 
-Click a card to open its panel. Its top line shows the workspace (its owner's picture and name, in its colour), the gig's key, its status and its badges. The expand button (two diagonal arrows, top right) widens it, and the close button (×) or Esc closes it. Every field saves when you change it.
+Click a card to open its panel. Its top line shows the workspace (its owner's picture and name, in its colour), the gig's key, its status and its badges. It opens beside the board; the expand button (two diagonal arrows, top right) widens it to the full view for that gig only. The close button (×), Esc or a click on the board beside it closes it. Every field saves when you change it.
 
 ![A gig's panel (Daywalker theme)](../images/gig-panel-day.png)
 
@@ -73,7 +73,7 @@ A gig can have a window: it may only be started between its start time and **Win
 
 ## Archiving and deleting
 
-- **Archive** (at the bottom of the panel, or **Archive done** on the board): the gig leaves the board and lists, stays searchable, and can be unarchived. An archived gig no longer blocks anything (as a dependency or a **blocks parent** subgig).
+- **Archive** (at the bottom of the panel, the archive button on a done card, or **Archive done** on the board): the gig leaves the board and lists, stays searchable, and can be unarchived. An archived gig no longer blocks anything (as a dependency or a **blocks parent** subgig).
 - **Auto-archive** (in **Details**): the gig archives itself this long after it's done or cancelled (1 hour to 30 days; **never** by default). Set it on a template or a recurring gig and every gig it makes gets it. gigg checks once a minute.
 - **Delete** moves the gig to the trash. **Trash** on the board lists the deleted gigs of the projects in view, with **Restore**. A deleted gig opened from a link shows **Restore** too.
 - Every change is recorded with its old and new values: the API's gig activity (`GET /gigs/{id}/activity`) and, for admins, **Admin → Audit**.
