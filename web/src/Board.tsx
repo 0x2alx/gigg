@@ -867,6 +867,8 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
   }, [text, setFilter]);
   const wsShown = filter.ws.length ? tree.filter((w) => filter.ws.includes(w.slug)) : tree;
   const projects = wsShown.flatMap((w) => w.projects.map((p) => ({ w, p })));
+  // the workspace and project chips; open, the view tools end their row (the fields row is full)
+  const scopeRow = tree.length > 1 || projects.length > 1;
   const toggleWs = (slug: string) => {
     const next = filter.ws.includes(slug) ? filter.ws.filter((s) => s !== slug) : [...filter.ws, slug];
     const all = next.length === tree.length;
@@ -883,7 +885,11 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
       const w = tree.find((x) => x.slug === slug);
       return w && { name: w.name, color: colorFor(w.slug, w.color) };
     },
-    project: (id) => tree.flatMap((w) => w.projects).find((p) => p.id === id)?.name,
+    project: (id) => {
+      const w = tree.find((x) => x.projects.some((p) => p.id === id));
+      const p = w?.projects.find((x) => x.id === id);
+      return p && w && { name: p.name, color: colorFor(w.slug, w.color) };
+    },
     user: (id) => {
       const u = users.get(id);
       return u && (u.display_name || u.username);
@@ -986,9 +992,9 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
           Archived
         </button>
         <ClearFilters className="bf-clear" active={isFiltered(filter)} onClear={() => setFilter({ ...EMPTY_FILTER, arch: filter.arch })} />
-        {end && <div className="bf-end">{end}</div>}
+        {end && !scopeRow && <div className="bf-end">{end}</div>}
       </div>
-      {(tree.length > 1 || projects.length > 1) && (
+      {scopeRow && (
         <div className="bf-row bf-scope">
           {tree.length > 1 && (
             <div className="bf-group" role="group" aria-label="Workspaces">
@@ -1039,8 +1045,9 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
                   <button
                     key={p.id}
                     type="button"
-                    className={"bf-chip" + (on ? " on" : "")}
+                    className={"bf-chip bf-ws" + (on ? " on" : "")}
                     aria-pressed={on}
+                    style={{ "--c": colorFor(w.slug, w.color) } as CSSProperties}
                     data-tip={`${w.name} / ${p.name} (${p.key})\nOne project shown: its own columns and manual order`}
                     onClick={() => toggleP(p.id)}
                   >
@@ -1051,6 +1058,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
               })}
             </div>
           )}
+          {end && <div className="bf-end">{end}</div>}
         </div>
       )}
     </div>

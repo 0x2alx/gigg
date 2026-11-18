@@ -8,8 +8,14 @@
   saved views, Dashboard, Admin (with its sections), Profile, Themes, Log out. The board's own header
   is gone: its count, help and the Board | Table and Columns | Rows switches end the filters row.
   The **My gigs** page is gone (`/my` opens the board filtered to "Assigned to me").
-- Board: rows are 12% wider in the Rows layout; card text is a step smaller; the gig form has more
+- Board: rows are 12% wider in the Rows layout; card text is two steps smaller; the gig form has more
   room between its rows.
+- Pages use the window's full width (a thin edge on each side).
+- The workspace and project chips follow the theme's shape (round with Pill, otherwise a step
+  rounder than buttons) and glow in their workspace's colour, a project in its workspace's; so do
+  the removable filters of the folded row. The view switches stay at the right end of the filters:
+  on the chips row when the filters are open.
+- A click outside the errand panel closes it, as it does the gig panel (one shared hook).
 - **Someone given only some projects of a workspace** no longer reads the workspace's description,
   the members who see none of those projects (nor others' project rows), labels not used in those
   projects, the runner's caps, usage and errand counts (only whether runs are paused), or errand

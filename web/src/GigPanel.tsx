@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { usePanelOutsideClose } from "./panelClose";
 import { api, ApiError, fmtTime, hasCap, resumeCommand, type Comment, type CustomField, type Recurrence, type Run, type Status, type Tag, type Gig, type User } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { assignable } from "./fields";
@@ -201,34 +202,8 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
     return () => document.removeEventListener("keydown", esc);
   }, [flashDirty, close]);
 
-  // A click on the board outside the panel closes it, like ✕. Not when the press started inside
-  // (drag-select), not in modals, popovers or menus, not when the click opened something else (the
-  // URL changed: another gig, another page; or a table row, which opens another gig in place),
-  // and not while a field holds unsaved text.
-  useEffect(() => {
-    let down: string | null = null;
-    const outside = (t: EventTarget | null) => {
-      const panel = panelRef.current;
-      if (!panel || !(t instanceof Element) || !t.isConnected || panel.contains(t)) return false;
-      return !t.closest('.modal-backdrop, [role="dialog"], [aria-modal="true"], .bell-pop, .menu, .mention-list, .toast, .appbar, [data-opens-gig]');
-    };
-    const onDown = (e: PointerEvent) => {
-      down = e.button === 0 && !document.querySelector('[aria-modal="true"]') && outside(e.target) ? window.location.pathname : null;
-    };
-    const onClick = (e: MouseEvent) => {
-      const path = down;
-      down = null;
-      if (path === null || e.button !== 0 || !outside(e.target) || window.location.pathname !== path) return;
-      if (flashDirty()) return;
-      close();
-    };
-    document.addEventListener("pointerdown", onDown, true);
-    document.addEventListener("click", onClick);
-    return () => {
-      document.removeEventListener("pointerdown", onDown, true);
-      document.removeEventListener("click", onClick);
-    };
-  }, [flashDirty, close]);
+  // a click outside closes it, like ✕ (not while a field holds unsaved text)
+  usePanelOutsideClose(panelRef, close, flashDirty);
 
   // Focus: the panel takes focus when it opens or shows another gig (keyboard users land in it);
   // on close, focus goes back to what had it before (the card), if that is still on the page.

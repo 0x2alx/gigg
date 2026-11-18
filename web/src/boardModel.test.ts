@@ -71,7 +71,7 @@ describe("board columns", () => {
 describe("activeFilters", () => {
   const names = {
     ws: (s: string) => (s === "acme" ? { name: "Acme", color: "#E5484D" } : undefined),
-    project: (id: number) => (id === 7 ? "Platform" : undefined),
+    project: (id: number) => (id === 7 ? { name: "Platform" } : undefined),
     user: (id: number) => (id === 3 ? "Sam" : undefined),
     priority: (n: number) => ["None", "Low", "Medium", "High", "Urgent"][n]!,
   };

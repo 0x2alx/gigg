@@ -194,7 +194,9 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
   border-radius: 999px; padding: 0 0.3rem; font-variant-numeric: tabular-nums;
 }
 
-.content { flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: var(--sp-6) var(--sp-7); position: relative; }
+/* pages use the window's full width: a thin edge on each side (about 0.5% of it), the bar's edge the same */
+:root { --page-px: clamp(0.35rem, 0.5vw, 0.75rem); }
+.content { flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: var(--sp-6) var(--page-px); position: relative; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--sp-6); margin-bottom: var(--sp-6); }
 .crumb { color: var(--muted); font-size: 0.8rem; }
 
@@ -302,7 +304,7 @@ a.pulse-item:hover { color: var(--text); }
 /* a card: hairline border, a coloured stripe only when the gig has a colour, a shadow only while dragged */
 .gig-card {
   /* card text a step smaller than the page's: every size inside reads these */
-  --fs-xs: 0.7rem; --fs-sm: 0.76rem; --fs-base: 0.83rem; --fs-md: 0.9rem;
+  --fs-xs: 0.66rem; --fs-sm: 0.72rem; --fs-base: 0.79rem; --fs-md: 0.85rem;
   position: relative;
   background: var(--surface);
   border: max(1px, var(--border-w)) solid var(--edge); /* at least 1px: blocked, missed and archived show on it */
@@ -1333,20 +1335,26 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 }
 .bf-toggle:hover { background: color-mix(in srgb, var(--text) 6%, var(--surface)); }
 .bf-toggle.on { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: var(--accent); }
-.bf-clear { margin-left: auto; padding: 0 0.5rem; }
-/* the row's far end: the count, help, Board | Table, Columns | Rows */
-.bf-end { margin-left: auto; display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; justify-content: flex-end; }
-.bf-clear + .bf-end { margin-left: var(--sp-4); }
+.bf-clear { padding: 0 0.5rem; }
+/* the row's far end: the count, help, Board | Table, Columns | Rows. It takes the rest of the row and
+   sits at its right edge, also when it wraps onto a line of its own */
+.bf-end { flex: 1 0 auto; margin-left: var(--sp-4); display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; justify-content: flex-end; }
 .bf-count { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* workspace and project chips: small, quiet, selected = a tint */
+/* workspace and project chips: small, selected = a tint. Corners a step rounder than buttons (round with
+   the theme's pill shape); a workspace's chip and its projects' chips glow in the workspace colour */
 .bf-chip {
   display: inline-flex; align-items: center; gap: 0.3rem; font: inherit; font-size: var(--fs-sm); line-height: 1; cursor: pointer;
-  height: 1.67rem; padding: 0 0.6rem; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted);
+  height: 1.67rem; padding: 0 0.6rem; border-radius: var(--radius-l); border: 1px solid var(--line); background: transparent; color: var(--muted);
 }
 .bf-chip:hover { border-color: var(--line-strong); color: var(--text); }
 .bf-chip.on { background: var(--selected); color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
-.bf-ws { --c: var(--muted); border-color: color-mix(in srgb, var(--c) 40%, var(--line)); }
-.bf-ws.on { background: color-mix(in srgb, var(--c) 20%, var(--surface)); border-color: var(--c); }
+.bf-ws, .bf-active-c {
+  border-color: color-mix(in srgb, var(--c) 70%, var(--line));
+  box-shadow: 0 0 0.5rem color-mix(in srgb, var(--c) 55%, transparent);
+}
+.bf-ws { --c: var(--muted); }
+.bf-ws:hover { border-color: var(--c); box-shadow: 0 0 0.6rem color-mix(in srgb, var(--c) 60%, transparent); }
+.bf-ws.on { background: color-mix(in srgb, var(--c) 20%, var(--surface)); border-color: var(--c); box-shadow: 0 0 0.6rem color-mix(in srgb, var(--c) 65%, transparent); }
 .bf-chip .avatar-xs { width: 1.45rem; height: 1.45rem; font-size: 0.56rem; border-width: 0; }
 /* Filters: the fold button leads the row; folded, the filters that are on follow it as removable chips */
 .bf-fold {
@@ -1362,7 +1370,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .bf-active {
   --c: var(--accent);
   display: inline-flex; align-items: center; gap: 0.3rem; height: 1.67rem; padding: 0 0.15rem 0 0.6rem; font-size: var(--fs-sm);
-  border-radius: 999px; border: 1px solid color-mix(in srgb, var(--c) 55%, var(--line)); background: color-mix(in srgb, var(--c) 14%, var(--surface)); color: var(--text);
+  border-radius: var(--radius-l); border: 1px solid color-mix(in srgb, var(--c) 55%, var(--line)); background: color-mix(in srgb, var(--c) 14%, var(--surface)); color: var(--text);
 }
 .bf-active-x {
   display: inline-grid; place-items: center; width: 1.3rem; height: 1.3rem; padding: 0; border: 0; border-radius: 999px;
@@ -1502,7 +1510,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .appbar {
   flex: none; position: relative; z-index: 40; /* over the gig panel (30), under popovers (45) */
   display: flex; align-items: center; gap: var(--sp-3); height: var(--topbar-h);
-  padding: 0 var(--sp-7) 0 var(--sp-6); background: var(--bg); border-bottom: 1px solid var(--line);
+  padding: 0 var(--page-px); background: var(--bg); border-bottom: 1px solid var(--line);
 }
 .appbar-brand { padding: 0 var(--sp-3) 0 0; }
 .appbar-nav { display: flex; align-items: center; gap: var(--sp-2); margin-left: var(--sp-4); }

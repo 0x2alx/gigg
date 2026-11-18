@@ -68,14 +68,17 @@ export interface ActiveFilter {
 
 export function activeFilters(
   f: BoardFilter,
-  names: { ws: (slug: string) => { name: string; color?: string } | undefined; project: (id: number) => string | undefined; user: (id: number) => string | undefined; priority: (n: number) => string },
+  names: { ws: (slug: string) => { name: string; color?: string } | undefined; project: (id: number) => { name: string; color?: string } | undefined; user: (id: number) => string | undefined; priority: (n: number) => string },
 ): ActiveFilter[] {
   const out: ActiveFilter[] = [];
   for (const slug of f.ws) {
     const w = names.ws(slug);
     out.push({ key: "ws:" + slug, label: w?.name ?? slug, color: w?.color, without: { ...f, ws: f.ws.filter((s) => s !== slug) } });
   }
-  for (const id of f.p) out.push({ key: "p:" + id, label: names.project(id) ?? `Project ${id}`, without: { ...f, p: f.p.filter((x) => x !== id) } });
+  for (const id of f.p) {
+    const p = names.project(id);
+    out.push({ key: "p:" + id, label: p?.name ?? `Project ${id}`, color: p?.color, without: { ...f, p: f.p.filter((x) => x !== id) } });
+  }
   if (f.q) out.push({ key: "q", label: `“${f.q}”`, without: { ...f, q: "" } });
   if (f.a) {
     const who = f.a === "me" ? "Assigned to me" : f.a === "none" ? "Unassigned" : `Assigned to ${names.user(Number(f.a)) ?? "someone"}`;

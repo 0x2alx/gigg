@@ -1,6 +1,7 @@
 // The Errands page: every errand in reach (commands the agents' executors run on a schedule, sandboxed),
 // failing first; filters; a side panel with the command, the run history and each run's output; the
 // editor. Errands make no gigs: their runs live here.
+import { usePanelOutsideClose } from "./panelClose";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useLocation, useSearch } from "wouter";
 import { ApiError, errandMakers, errandWritable, fmtTime, hasCap } from "./api";
@@ -382,6 +383,7 @@ function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChan
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't load the runs."));
   }, [c.id, lastId, lastStatus]);
   useEffect(() => panelRef.current?.focus(), []);
+  usePanelOutsideClose(panelRef, onClose);
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === "Escape" && !document.querySelector("[role='dialog']") && onClose();
     window.addEventListener("keydown", k);
