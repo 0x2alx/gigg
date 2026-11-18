@@ -1645,6 +1645,12 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .modal-full .tm-form { flex: 1; }
 @media (min-width: 721px) { .modal-full .tm-foot { bottom: calc(-1 * var(--sp-7)); } } /* the dialog scrolls itself: stick over its bottom padding */
 .modal-full .tm-foot { margin-top: auto; } /* a short form: the footer stays at the bottom of the full view */
+/* a long form in the dialog scrolls inside it too: stuck to the backdrop instead, the footer stopped
+   short of the window's edge (the backdrop's bottom padding) and the form showed through below it */
+@media (min-width: 721px) {
+  .modal:has(> .tm-form):not(.modal-full) { max-height: calc(100dvh - 8vh - 1rem); overflow-y: auto; }
+  .modal:has(> .tm-form) .tm-foot { bottom: calc(-1 * var(--sp-7)); }
+}
 @media (max-width: 720px) {
   .tp-box { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
   /* the phone sheet's padding: 0.9rem, 1rem + the safe area at the bottom */
@@ -1695,7 +1701,10 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .errand-row:hover, .errand-row.on { background: var(--hover); }
 .errand-row.errand-failing td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 .errand-row.errand-paused { color: var(--muted); }
-.errand-name-cell { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); min-width: 14rem; }
+/* cells stay table cells (a flex cell drops out of the row's height, and its border no longer lines up):
+   the flex layouts sit on a wrapper inside them */
+.errand-name-cell { min-width: 14rem; }
+.errand-name-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .errand-name { font-weight: var(--weight-strong); color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
 .errand-name:hover { text-decoration: underline; }
 .errand-state { display: inline-flex; align-items: center; gap: 0.35rem; font-size: var(--fs-sm); color: var(--c); font-weight: var(--weight-strong); white-space: nowrap; }
@@ -1703,7 +1712,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .errand-name-cell .errand-state { width: 4.6rem; }
 .errand-sched { white-space: nowrap; }
 .errand-worker { white-space: nowrap; }
-.errand-worker, .errand-worker-name { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.errand-worker-name, dd.errand-worker { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .errand-last { white-space: nowrap; }
 .errand-last-v > * + * { margin-left: var(--sp-3); }
 .errand-run-status { font-size: var(--fs-sm); font-weight: var(--weight-strong); white-space: nowrap; }
@@ -1722,7 +1731,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
   .errand-table td[data-label] { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); }
   .errand-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: var(--fs-sm); }
   .errand-table td[data-label] > * { grid-column: 2; }
-  .errand-table td.errand-name-cell { display: flex; min-width: 0; margin-bottom: var(--sp-2); }
+  .errand-table td.errand-name-cell { min-width: 0; margin-bottom: var(--sp-2); }
   .errand-sched { white-space: normal; }
   .errand-row.errand-failing td:first-child { box-shadow: none; }
   .errand-row.errand-failing { box-shadow: inset 3px 0 0 var(--danger); }

@@ -237,6 +237,7 @@ export function ErrandsPage({ open }: { open?: number }) {
                 return (
                   <tr key={c.id} className={"errand-row errand-" + st.cls + (open === c.id ? " on" : "")} onClick={() => navigate(`/errands/${c.id}`)}>
                     <td className="errand-name-cell">
+                      <div className="errand-name-wrap">
                       <span className="errand-state" style={{ "--c": st.color } as CSSProperties} data-tip={st.tip}>
                         <span className="dot" aria-hidden="true" />
                         <span className="errand-state-text">{st.text}</span>
@@ -258,6 +259,7 @@ export function ErrandsPage({ open }: { open?: number }) {
                         </span>
                       )}
                       {ws && tree.length > 1 && <WorkspaceBadge ws={ws} />}
+                      </div>
                     </td>
                     <td className="errand-sched" data-label="Schedule">
                       {schedText(c, tz)}

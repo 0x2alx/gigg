@@ -20,6 +20,10 @@
   longer every later one (the choice older versions kept per browser is cleared).
 - Done cards get a one-click archive button (bottom left, before **Done …**). The message that
   follows has **Undo**.
+- Errands table: the row borders line up again (two cells were flex boxes, which drop out of the
+  row's height; the flex layouts now sit inside the cells).
+- The gig form dialog scrolls inside itself when it's taller than the window, so its footer sits
+  on its bottom edge; before, the form showed through a strip below the footer.
 - **Someone given only some projects of a workspace** no longer reads the workspace's description,
   the members who see none of those projects (nor others' project rows), labels not used in those
   projects, the runner's caps, usage and errand counts (only whether runs are paused), or errand
