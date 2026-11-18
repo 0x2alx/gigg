@@ -779,6 +779,15 @@ label.check input { width: auto; accent-color: var(--accent); }
 .schedule-rule { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; color: var(--text); font-size: 0.9rem; }
 .schedule .chips { margin: 0; align-items: center; }
 .schedule-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+/* a recurring gig's card: title, place and state on top (the state at the right end), the rule, its
+   facts, then a foot with the actions on the left and the assignees in the bottom-right corner */
+.rec-card .schedule-top { gap: var(--sp-2) var(--sp-3); }
+.rec-card .schedule-title { font-size: var(--fs-md); }
+.rec-state { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-2); }
+.rec-card .schedule-rule { color: var(--muted); font-size: var(--fs-sm); margin-top: calc(-1 * var(--sp-2)); }
+.rec-foot { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--sp-3) var(--sp-4); }
+.rec-foot:not(:has(.schedule-actions)) { justify-content: flex-end; }
+.rec-people { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-2); }
 .rec-delete { display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem; } /* the delete confirm: question, the "also delete" ticks, the buttons */
 .schedule-ref { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .schedule-ref .link { padding: 0; text-align: left; overflow-wrap: anywhere; }
@@ -1411,6 +1420,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; color: var(--muted);
   font: inherit; font-size: var(--fs-xs); font-weight: var(--weight-strong); line-height: 1;
 }
+.help-button .ico { font-size: 0.9rem; display: block; }
 .help-button:hover, .help-button:focus-visible { color: var(--accent); border-color: var(--accent); }
 h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } /* every page title: the same gap before its help and count */
 .help-body { max-height: min(70vh, 40rem); overflow-y: auto; font-size: 0.92rem; line-height: 1.5; }
@@ -1711,6 +1721,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .errand-state .dot { background: var(--c); }
 .errand-name-cell .errand-state { width: 4.6rem; }
 .errand-sched { white-space: nowrap; }
+.errand-ws, .errand-proj { white-space: nowrap; }
 .errand-worker { white-space: nowrap; }
 .errand-worker-name, dd.errand-worker { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .errand-last { white-space: nowrap; }
@@ -1730,7 +1741,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
   .errand-table td + td { margin-top: var(--sp-2); }
   .errand-table td[data-label] { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); align-items: center; column-gap: var(--sp-3); }
   .errand-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: var(--fs-sm); }
-  .errand-table td[data-label] > * { grid-column: 2; }
+  .errand-table td[data-label] > * { grid-column: 2; justify-self: start; } /* a badge keeps its own width */
   .errand-table td.errand-name-cell { min-width: 0; margin-bottom: var(--sp-2); }
   .errand-sched { white-space: normal; }
   .errand-row.errand-failing td:first-child { box-shadow: none; }

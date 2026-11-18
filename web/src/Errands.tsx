@@ -223,6 +223,8 @@ export function ErrandsPage({ open }: { open?: number }) {
             <thead>
               <tr>
                 <th>Errand</th>
+                {tree.length > 1 && <th>Workspace</th>}
+                <th>Project</th>
                 <th>Schedule</th>
                 <th>Agent</th>
                 <th>Last run</th>
@@ -234,6 +236,7 @@ export function ErrandsPage({ open }: { open?: number }) {
                 const st = stateOf(c);
                 const ws = wsOf(c.workspace_id);
                 const worker = users.get(c.worker_id);
+                const proj = ws?.projects.find((p) => p.id === c.project_id);
                 return (
                   <tr key={c.id} className={"errand-row errand-" + st.cls + (open === c.id ? " on" : "")} onClick={() => navigate(`/errands/${c.id}`)}>
                     <td className="errand-name-cell">
@@ -258,8 +261,15 @@ export function ErrandsPage({ open }: { open?: number }) {
                           no sandbox
                         </span>
                       )}
-                      {ws && tree.length > 1 && <WorkspaceBadge ws={ws} />}
                       </div>
+                    </td>
+                    {tree.length > 1 && (
+                      <td className="errand-ws" data-label="Workspace">
+                        {ws ? <WorkspaceBadge ws={ws} /> : <span className="muted">?</span>}
+                      </td>
+                    )}
+                    <td className="errand-proj" data-label="Project">
+                      {proj ? proj.name : <span className="muted">none</span>}
                     </td>
                     <td className="errand-sched" data-label="Schedule">
                       {schedText(c, tz)}

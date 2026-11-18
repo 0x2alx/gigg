@@ -3,6 +3,8 @@ import {
   clock,
   defaultRepeat,
   describeRule,
+  fmtLead,
+  sameAsRule,
   durText,
   fmtInstant,
   fmtWallWindow,
@@ -23,6 +25,20 @@ import {
 const NOW = Date.UTC(2026, 10, 12, 15, 0);
 const base: Rule = { freq: "daily", interval: 1, weekdays: null, month_day: null, tz: "UTC", window_start: "09:00", window_minutes: 120, starts_on: NOW };
 const fmt = (r: Rule, n = 3) => previewOccurrences(r, NOW, n).map((ms) => fmtWallWindow(ms, r.window_minutes));
+
+describe("fmtLead and sameAsRule", () => {
+  it("shortens the lead time", () => {
+    expect(fmtLead(45)).toBe("45 min");
+    expect(fmtLead(960)).toBe("16 h");
+    expect(fmtLead(90)).toBe("1 h 30 min");
+    expect(fmtLead(2880)).toBe("2 d");
+  });
+  it("treats a name that only repeats the timing as the rule", () => {
+    expect(sameAsRule("Every day 08:00-09:30", "Every day 08:00–09:30")).toBe(true);
+    expect(sameAsRule("Every day 09:20–11:20, 960 min early", "Every day 09:20–11:20")).toBe(true);
+    expect(sameAsRule("Backup window", "Every day 08:00–09:30")).toBe(false);
+  });
+});
 
 describe("describeRule", () => {
   it("reads like a sentence", () => {

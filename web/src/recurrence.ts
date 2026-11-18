@@ -119,6 +119,21 @@ export function describeRule(r: Pick<Rule, "freq" | "interval" | "weekdays" | "m
   return `${s} ${windowText(r.window_start, r.window_minutes)}`;
 }
 
+// fmtLead: how early a gig is created, short: "45 min", "16 h", "1 h 30 min", "2 d".
+export function fmtLead(min: number): string {
+  if (min < 60) return `${min} min`;
+  if (min % 1440 === 0) return `${min / 1440} d`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+// sameAsRule: a schedule's name that only repeats its timing ("Every day 08:00-09:30", or with
+// ", 60 min early" after it): not worth showing again under the rule. Dashes, spaces and case aside.
+export function sameAsRule(name: string, rule: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/,?\s*\d+\s*min(utes)? early$/, "").replace(/[\u2012-\u2015-]/g, "-").replace(/\s+/g, " ").trim();
+  return norm(name) === norm(rule);
+}
+
 // ---- wall clock: dates as "fake UTC" ms, so calendar math ignores the browser's zone
 
 interface Wall {

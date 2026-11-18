@@ -3,6 +3,7 @@
 // are left out (they live next to the docs, not in the app).
 import { lazy, Suspense, useState } from "react";
 import { Modal } from "./ui";
+import { Icon } from "./icons";
 
 // the renderer loads with the first help dialog (it needs the DOM, and most pages never open help)
 const Markdown = lazy(() => import("./markdown").then((m) => ({ default: m.Markdown })));
@@ -32,7 +33,7 @@ export function HelpButton({ topic, label }: { topic: HelpTopic; label?: string 
   return (
     <>
       <button type="button" className="help-button" data-tip={label ?? "Help for this section"} aria-label={label ?? "Help for this section"} onClick={() => setOpen(true)}>
-        ?
+        <Icon name="help" strokeWidth={2.4} />
       </button>
       {page && (
         <Modal title={`? ${page.title}`} onClose={() => setOpen(false)} wide>

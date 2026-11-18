@@ -41,7 +41,7 @@ Instance admins can make a template or a schedule **shared**: it belongs to no w
 
 ## Templates
 
-**Recurring**, **Schedules** and **Templates** (in the board's **⋯** menu) list everything across your workspaces, each row with its workspace and project. **Show** at the top narrows the list to one workspace or one project; a project also shows its workspace's templates for every project.
+**Recurring**, **Schedules** and **Templates** (in the account menu) list everything across your workspaces, each row with its workspace and project. A recurring gig's card shows its title, place and priority on top, then its timing and facts (next gig, how many it made, how early each is created); its actions sit at the bottom left and the pictures of who gets its gigs at the bottom right. **Show** at the top narrows the list to one workspace or one project; a project also shows its workspace's templates for every project.
 
 **Templates** lists the templates. You can create one there, edit it, or start a gig from it. A template can be limited to one project or usable in all projects of its workspace. Shared templates (see above) are listed once, under any **Show** choice.
 

@@ -6,7 +6,7 @@ Use an errand for checks and housekeeping that need no thinking: is the disk ful
 
 ## The Errands page
 
-**Errands** in the top bar lists every errand you can see. Failing errands come first. Each row shows the errand's state (**failing**, **ok**, **new** or **paused**), its schedule, the agent that runs it, its last run and when it runs next. **Failing** and **Paused** at the top narrow the list.
+**Errands** in the top bar lists every errand you can see. Failing errands come first. Each row shows the errand's state (**failing**, **ok**, **new** or **paused**), its workspace (when you see more than one) and project, its schedule, the agent that runs it, its last run and when it runs next. **Failing** and **Paused** at the top narrow the list.
 
 Click an errand to open its panel:
 

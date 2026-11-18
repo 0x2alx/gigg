@@ -9,7 +9,7 @@ import { useApp, type WorkspaceTree } from "./App";
 import { optionOf, PlaceFilter, placeMatch, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { RepeatFields } from "./RepeatFields";
-import { defaultRepeat, describeRule, localTZ, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
+import { defaultRepeat, describeRule, fmtLead, localTZ, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
 import { repeatOfSchedule, scheduleBody } from "./scheduleTiming";
 import { ClearFilters, Modal } from "./ui";
 import { HelpButton } from "./help";
@@ -114,7 +114,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
               {!s.name.startsWith(describeRule(s)) && (
                 <div className="schedule-rule">
                   {describeRule(s)}
-                  {s.lead_minutes > 0 && <span className="muted small"> · created {s.lead_minutes} min early</span>}
+                  {s.lead_minutes > 0 && <span className="muted small"> · created {fmtLead(s.lead_minutes)} early</span>}
                 </div>
               )}
               <div className="chips">

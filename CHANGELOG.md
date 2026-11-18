@@ -22,6 +22,12 @@
   follows has **Undo**.
 - Errands table: the row borders line up again (two cells were flex boxes, which drop out of the
   row's height; the flex layouts now sit inside the cells).
+- Recurring gigs: the cards are rebalanced. Title, place and priority (at the right) on top, the
+  timing, the facts, then the actions at the bottom left and the assignees' pictures at the bottom
+  right. A schedule named after its own timing no longer repeats it (dashes and "N min early"
+  aside), and lead times read "16 h early" instead of "960 min early" (Schedules too).
+- Errands table: the workspace (when you see several) and the project get columns of their own.
+- The round help buttons draw their "?" as an icon, centred whatever the theme's font.
 - The gig form dialog scrolls inside itself when it's taller than the window, so its footer sits
   on its bottom edge; before, the form showed through a strip below the footer.
 - **Someone given only some projects of a workspace** no longer reads the workspace's description,

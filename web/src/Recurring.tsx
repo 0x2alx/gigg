@@ -5,7 +5,7 @@ import { api, ApiError, fmtDate, canWriteIn, hasCap, recurrenceBody, type Recurr
 import { useApp } from "./App";
 import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
-import { describeRule, fmtInstant, localTZ } from "./recurrence";
+import { describeRule, fmtInstant, fmtLead, localTZ, sameAsRule } from "./recurrence";
 import { GigModal } from "./GigModal";
 import { SCHEDULE_COLOR } from "./theme";
 import { ClearFilters, Avatar, LabelChip, Modal, Pill, PriorityBadge } from "./ui";
@@ -141,7 +141,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
             const canWrite = !!rws && canWriteIn(rws) && hasCap(me, "recurring_gigs", rws.id);
             const labels = labelsOf.get(r.workspace_id) ?? [];
             return (
-            <li key={r.id} data-schedule={r.id} className={"schedule" + (r.id === highlight ? " flash highlighted" : "") + (r.paused ? " paused" : "")} style={r.color ? ({ "--row-c": r.color } as CSSProperties) : undefined}>
+            <li key={r.id} data-schedule={r.id} className={"schedule rec-card" + (r.id === highlight ? " flash highlighted" : "") + (r.paused ? " paused" : "")} style={r.color ? ({ "--row-c": r.color } as CSSProperties) : undefined}>
               <div className="schedule-top">
                 <Pill color={SCHEDULE_COLOR} title="Recurring">
                   ⟳
@@ -149,9 +149,11 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                 <strong className="schedule-title">{r.title}</strong>
                 {rws && tree.length > 1 && <WorkspaceBadge ws={rws} />}
                 <span className="pill pill-key">{rws?.projects.find((p) => p.id === r.project_id)?.key ?? "?"}</span>
-                {r.paused && <span className="pill pill-danger">paused</span>}
-                {!r.next_at && <span className="pill pill-muted">finished</span>}
-                <PriorityBadge priority={r.priority} />
+                <span className="rec-state">
+                  {r.paused && <span className="pill pill-danger">paused</span>}
+                  {!r.next_at && <span className="pill pill-muted">finished</span>}
+                  <PriorityBadge priority={r.priority} />
+                </span>
               </div>
               <div className="schedule-rule">
                 {describeRule(r)}
@@ -170,10 +172,14 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                   </span>
                 )}
                 {r.ends_on && <span className="pill pill-muted">until {fmtDate(r.ends_on)}</span>}
-                {r.lead_minutes > 0 && <span className="pill pill-muted">{r.lead_minutes} min early</span>}
+                {r.lead_minutes > 0 && (
+                  <span className="pill pill-muted" title="Each gig is created this long before its window opens">
+                    {fmtLead(r.lead_minutes)} early
+                  </span>
+                )}
                 {r.overlap === "create" && <span className="pill pill-muted">overlap</span>}
                 {/* the schedule, unless it is just the rule shown above (a schedule named after its timing, used once) */}
-                {(r.schedule_name !== describeRule(r) || r.schedule_uses > 1) && (
+                {(!sameAsRule(r.schedule_name, describeRule(r)) || r.schedule_uses > 1) && (
                   <span className="pill pill-muted" title="The schedule (timing) it runs on">
                     <Icon name="clock" /> {r.schedule_name}
                     {r.schedule_uses > 1 ? ` · ×${r.schedule_uses}` : ""}
@@ -189,11 +195,9 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                 {(r.labels ?? []).map((n) => (
                   <LabelChip key={n} label={labels.find((l) => l.name.toLowerCase() === n.toLowerCase()) ?? { id: 0, name: n, color: null }} />
                 ))}
-                {(r.assignees ?? []).map((id) => {
-                  const u = users.get(id);
-                  return u ? <Avatar key={id} user={u} /> : null;
-                })}
               </div>
+              {/* the foot: the actions on the left, who gets the gigs in the bottom-right corner */}
+              <div className="rec-foot">
               {canWrite && (
                 <div className="schedule-actions">
                   {confirm === r.id ? (
@@ -243,6 +247,15 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                   )}
                 </div>
               )}
+                {(r.assignees ?? []).length > 0 && (
+                  <span className="rec-people" aria-label="Assignees">
+                    {(r.assignees ?? []).map((id) => {
+                      const u = users.get(id);
+                      return u ? <Avatar key={id} user={u} size="s" tip={`Assigned to ${u.display_name || u.username}`} /> : null;
+                    })}
+                  </span>
+                )}
+              </div>
             </li>
             );
           })}

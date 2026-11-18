@@ -190,6 +190,14 @@ const P: Record<string, ReactNode> = {
       <circle cx="12" cy="16.3" r="1.1" fill="currentColor" stroke="none" />
     </>
   ),
+  // a question mark alone, centred in the box (for the round help buttons: a typed "?" sits where
+  // each theme's font puts it, often off centre)
+  help: (
+    <>
+      <path d="M9.2 8.4a2.8 2.8 0 0 1 5.6 1c0 1.9-2.8 2.4-2.8 4.3" />
+      <circle cx="12" cy="17.5" r="1.25" fill="currentColor" stroke="none" />
+    </>
+  ),
   question: (
     <>
       <circle cx="12" cy="12" r="9" />
