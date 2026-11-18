@@ -294,6 +294,28 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 }
 .column-add:hover, .column-add:focus-visible { color: var(--text); background: var(--hover); }
 .column-add-empty { visibility: hidden; pointer-events: none; }
+/* rows: each status is a lane across the page, its name on the left and its cards running left to
+   right (the lane scrolls sideways, not the page) */
+.board.board-rows { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }
+.board-rows .column { flex-direction: row; align-items: stretch; container: none; }
+.board-rows .column-head {
+  flex: none; width: 11rem; flex-direction: column; align-items: flex-start; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) 0.75rem; border-right: max(1px, var(--border-w)) solid var(--lane-border);
+}
+.board-rows .column-title { max-width: 100%; }
+.board-rows .column-tools { margin-left: 0; }
+.board-rows .cards {
+  flex: 1 1 auto; min-width: 0; flex-direction: row; align-items: flex-start; overflow-x: auto;
+  padding: var(--sp-3); scroll-padding-inline: var(--sp-3); overscroll-behavior-x: contain;
+}
+.board-rows .card-slot { flex: none; width: 16.5rem; }
+.board-rows .card-slot > .drop-line { top: 0; bottom: 0; left: calc(var(--card-gap) / -2 - 1.5px); right: auto; width: 3px; height: auto; }
+.board-rows .cards > .drop-line { flex: none; align-self: stretch; width: 3px; height: auto; margin: 0 0 0 calc(var(--card-gap) / -2); }
+.board-rows .empty { align-self: center; padding: var(--sp-3) var(--sp-4); }
+.board-rows .column-add { flex: none; align-self: center; margin-top: 0; white-space: nowrap; }
+.board-rows .column-add-empty { display: none; }
+.layout-switch .vs-item { display: inline-flex; align-items: center; padding-inline: 0.5rem; font-size: 1rem; }
+
 /* collapsed columns: small chips above the board (stage, name, count); click one to bring the column back */
 .collapsed-row { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: 0 0 var(--sp-4); }
 .collapsed-chip {

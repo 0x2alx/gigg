@@ -99,6 +99,7 @@ The filters live in the page address (for example `/board?ws=acme&pr=3`), so you
 Next to the title (and its **?** help button) the header has three things:
 
 - **Board | Table**: a switch between this board and the same gigs as a sortable table, with bulk actions: the project in view, the workspace in view, or every workspace. See [Views](views.md).
+- **Columns | Rows** (the two small icons next to it): the board's layout. Columns put each status side by side, as usual; rows stack the statuses top to bottom, each a lane whose cards run left to right and scroll sideways. Everything else works the same (dragging, sorting, collapsing, filters). The choice is saved with your profile; a phone always shows one column at a time.
 - **+ New gig**: opens the form right away, in the project in view (with several in view, the one you last added a gig to). The form's **Where** section moves it to any project you can add to.
 - **⋯** (More actions): the less frequent actions.
   - **Recurring**, **Schedules**, **Templates**: see [Recurring gigs](recurring.md).

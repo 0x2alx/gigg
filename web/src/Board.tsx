@@ -108,6 +108,8 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const [timings, setTimings] = useState(false);
   const [trash, setTrash] = useState(false);
   const narrow = useNarrow();
+  // the layout (wide screens; a phone shows one column at a time): statuses as columns, or as rows
+  const rows = !narrow && prefs.board_layout === "rows";
 
   // the boards to load: the projects in view, plus the open gig's project
   const wantKey = [...scopeIds, ...(gigPid && !scopeIds.includes(gigPid) ? [gigPid] : [])].join(",");
@@ -508,7 +510,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
       const cards = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-gig-id]")].filter((el) => Number(el.dataset.gigId) !== drag);
       index = cards.findIndex((el) => {
         const r = el.getBoundingClientRect();
-        return e.clientY < r.top + r.height / 2;
+        return rows ? e.clientX < r.left + r.width / 2 : e.clientY < r.top + r.height / 2; // rows: cards run left to right
       });
       if (index < 0) index = cards.length;
     }
@@ -637,6 +639,18 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
               </Link>
             </div>
           )}
+          {!narrow && (
+            <div className="view-switch layout-switch" role="group" aria-label="Board layout">
+              <button type="button" className={"vs-item" + (rows ? "" : " on")} aria-pressed={!rows} data-tip="Statuses as columns" onClick={() => setPref("board_layout", "columns")}>
+                <Icon name="columns" />
+                <span className="sr-only">Columns</span>
+              </button>
+              <button type="button" className={"vs-item" + (rows ? " on" : "")} aria-pressed={rows} data-tip="Statuses as rows: cards run left to right" onClick={() => setPref("board_layout", "rows")}>
+                <Icon name="rows" />
+                <span className="sr-only">Rows</span>
+              </button>
+            </div>
+          )}
           {newChoices.length > 0 && (
             <button
               type="button"
@@ -745,7 +759,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
         </div>
       )}
       {openCols.length === 0 && closedCols.length > 0 && <p className="muted">Every column is collapsed: click one above to show it.</p>}
-      <div className="board" ref={boardRef} style={{ gridTemplateColumns: `repeat(${Math.max(1, openCols.length)}, minmax(0, 1fr))` }}>
+      <div className={"board" + (rows ? " board-rows" : "")} ref={boardRef} style={rows ? undefined : { gridTemplateColumns: `repeat(${Math.max(1, openCols.length)}, minmax(0, 1fr))` }}>
         {openCols.map((c) => {
           const others = c.gigs.filter((t) => t.id !== drag);
           const line = drop?.col === c.key ? drop.index : -1;

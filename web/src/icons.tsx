@@ -4,6 +4,19 @@
 import type { ReactNode } from "react";
 
 const P: Record<string, ReactNode> = {
+  // the board's two layouts: statuses as columns, or as rows
+  columns: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <path d="M9 4v16M15 4v16" />
+    </>
+  ),
+  rows: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <path d="M3 9.5h18M3 14.5h18" />
+    </>
+  ),
   board: (
     <>
       <rect x="3" y="3" width="18" height="18" rx="2.5" />
