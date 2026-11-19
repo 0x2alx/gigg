@@ -13,7 +13,9 @@ The logo is a delta starship whose hull has three kanban columns cut into it, wi
 | `svg/logo-mark.svg`, `png/logo-mark-*.png` | Ship only on transparent (sidebar, login page, README) |
 | `svg/logo-mark-light.svg`, `svg/icon-light.svg` | Light-theme versions (darker violet hull) |
 | `svg/logo-mono.svg` | Single colour in `currentColor`, so the app can tint it with the theme accent |
-| `png/banner-1600x400.png` | Wordmark banner (README header, repo social) |
+| `svg/logo-wordmark.svg`, `png/logo-wordmark.png` | Ship + wordmark on transparent, for dark pages (README header in dark mode) |
+| `svg/logo-wordmark-light.svg`, `png/logo-wordmark-light.png` | The same for light pages: darker hull, violet wordmark (README header in light mode) |
+| `png/banner-1600x400.png` | Wordmark banner on the dark backdrop with the grid |
 | `png/og-image-1200x630.png` | Link preview (Open Graph / Twitter card) |
 
 **Palette:** `#100318` background, `#BE5CFF` violet, `#E040FB` magenta, `#FFC107` amber, plus `#F4EFE6` and `#7B2FC0` for the light versions.

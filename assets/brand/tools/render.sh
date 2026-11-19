@@ -16,6 +16,8 @@ r logo-mark-light 512 logo-mark-light-512.png
 r logo-mono-violet 512 logo-mono-512.png
 rsvg-convert -w 1600 -h 400 $S/banner.svg -o $P/banner-1600x400.png
 rsvg-convert -w 1200 -h 630 $S/og-image.svg -o $P/og-image-1200x630.png
+rsvg-convert -w 1365 -h 510 $S/logo-wordmark.svg -o $P/logo-wordmark.png
+rsvg-convert -w 1365 -h 510 $S/logo-wordmark-light.svg -o $P/logo-wordmark-light.png
 # a contact sheet to review everything at once
 magick montage -background '#2a2a2a' -geometry 220x220+12+12 -tile 6x \
   $P/icon-512.png $P/maskable-512.png $P/icon-light-512.png $P/logo-mark-512.png $P/logo-mark-light-512.png $P/logo-mono-512.png \

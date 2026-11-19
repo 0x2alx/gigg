@@ -127,4 +127,9 @@ og = (grid(1200, 630, 300, DARK, lines_on=False) + place(DARK, "o", 366, 250, 30
       + f'<text x="600" y="490" text-anchor="middle" font-family="Poppins" font-weight="500" font-size="38" '
         f'fill="{DARK["tag"]}">Hand work to your AI agents, and keep an eye on it.</text>')
 write("og-image.svg", svg(1200, 630, og))
+
+# 6. README header: ship + wordmark on transparent, no backdrop. The amber wordmark is for dark pages;
+# the light variant (darker hull, violet wordmark) stays readable on white.
+write("logo-wordmark.svg", svg(910, 340, place(DARK, "wd", 150, 170, 300) + wordmark(330, 232, 250, DARK)))
+write("logo-wordmark-light.svg", svg(910, 340, place(LIGHT, "wl", 150, 170, 300) + wordmark(330, 232, 250, dict(LIGHT, text="#7B2FC0"))))
 print("svgs:", sorted(os.listdir(OUT)))

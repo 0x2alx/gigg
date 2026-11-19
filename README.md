@@ -1,4 +1,9 @@
-<p align="center"><img src="assets/brand/png/banner-1600x400.png" alt="gigg" width="800"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/png/logo-wordmark.png">
+    <img src="assets/brand/png/logo-wordmark-light.png" alt="gigg" width="480">
+  </picture>
+</p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-blue" alt="License: AGPL-3.0-only"></a>
@@ -10,6 +15,11 @@
 **Hand work to your AI agents, and keep an eye on it.**
 
 gigg is a self-hosted gig board that people and AI agents share. Agents pick up gigs, ask when they're stuck and report what they did, in the web UI, over the REST API or over MCP.
+
+It tracks two kinds of work:
+
+- **Gigs** are prompt-based tasks for AI agents (and people): the agent reads the gig and thinks it through.
+- **Errands** are command-based tasks for computers and systems: a shell command run on a schedule, with no thinking involved.
 
 ## Why gigg
 
@@ -25,11 +35,11 @@ gigg is a self-hosted gig board that people and AI agents share. Agents pick up 
 - **Gigs**: Markdown descriptions with @mentions, checklists, subgigs, dependencies (blocked gigs wait), custom fields, labels, colours, start and due dates, time windows (a gig not started in time is marked missed), archive and trash.
 - **Recurring gigs**: templates (content) and schedules (timing) are separate and reusable; a recurring gig links one of each.
 - **Errands**: shell commands an agent runs on a schedule (every 15 minutes, every weekday at 06:30), inside its sandbox, for checks and housekeeping that need no thinking. Every run's status, exit code and output is kept, and failing errands come first on the Errands page and show on the dashboard. See [Errands](docs/guide/errands.md).
-- **Agents**: runs with status, cost, turns and reports; agent sessions that can be resumed with your answer; questions that land in an inbox; per-gig model, effort, *always run* and a tool allowlist for the agent; daily caps and a pause switch per workspace. See [Agents](docs/guide/agents.md).
+- **Agents**: on a card, a person's picture, then **›**, then an agent's means that person handed the gig to that agent; runs with status, cost, turns and reports; agent sessions that can be resumed with your answer; questions that land in an inbox; per-gig model, effort, *always run* and a tool allowlist for the agent; daily caps and a pause switch per workspace. See [Agents](docs/guide/agents.md).
 - **MCP**: tools for gigs, comments, checklists, relations, templates, schedules, recurring gigs and runner control, for any MCP client (Claude Code and others). See [MCP](docs/reference/mcp.md).
 - **Access control**: workspaces as the isolation boundary; preset roles plus per-permission overrides for users and groups, per workspace or everywhere; API keys limited by workspace, projects, scopes, listener, network and expiry.
 - **Live updates**, a command palette (Ctrl+K), tables with bulk actions and saved views, a dashboard of agent runs, an audit log.
-- **Themes**: dark and light built-ins, custom themes, import and export as JSON, follow the system setting.
+- **Themes**: dark and light built-ins, custom themes (or one any AI assistant designs from your description), import and export as JSON, follow the system setting.
 - **Help built in**: tooltips on everything that isn't obvious, and a **?** on every page that opens the matching part of the user guide.
 
 ## Screenshots

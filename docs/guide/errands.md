@@ -1,8 +1,8 @@
 # Errands
 
-An **errand** is a shell command an agent runs on a schedule: every 5 minutes, every hour between 09:00 and 17:00, every day at 03:30. It runs in the agent's sandbox, and each run's result is kept on the **Errands** page. Errands make no gigs.
+An **errand** is a command-based task: a shell command an agent runs on a schedule, with no thinking involved: every 5 minutes, every hour between 09:00 and 17:00, every day at 03:30. It runs in the agent's sandbox, and each run's result is kept on the **Errands** page. Errands make no gigs.
 
-Use an errand for checks and housekeeping that need no thinking: is the disk full, did the backup run, is a service answering. Use a [recurring gig](recurring.md) when the agent should actually work on something.
+Use an errand for checks and housekeeping that need no thinking: is the disk full, did the backup run, is a service answering. When the agent should read, decide and work on something, that's a [gig](gigs.md) (a [recurring gig](recurring.md) if it comes back on a schedule).
 
 ## The Errands page
 

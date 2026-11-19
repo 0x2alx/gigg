@@ -1,5 +1,7 @@
 # Gigs
 
+A **gig** is a prompt-based task: work for an AI agent (or a person) to read and think through, like "find out why the login test is flaky and fix it". For a command a computer simply runs on a schedule, with no thinking involved, use an [errand](errands.md).
+
 A gig belongs to one project of one workspace. Its key (for example `GIG-12`) is the project's key plus a number. When a gig moves to another project it gets a new key, and the old key keeps working as an alias.
 
 ## Creating a gig
