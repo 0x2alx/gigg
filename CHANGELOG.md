@@ -7,6 +7,8 @@
 - Docs: the README opens with a transparent logo (light and dark variants) and tells gigs
   (prompt-based, for agents to think through) from errands (commands run on a schedule); the themes
   guide covers **Make with AI**.
+- Brand: the wordmark and the link preview's tagline are set in Anta (SIL OFL), bolder, with the
+  wordmark centred on the ship; the banner, the link preview and the README header follow.
 
 ## 0.1.0 (2026-11-19)
 

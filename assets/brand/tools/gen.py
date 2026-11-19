@@ -94,7 +94,16 @@ f16 = (f'<rect width="16" height="16" rx="3" fill="{DARK["bg"]}"/>'
        f'<rect x="3.5" y="12.5" width="1.5" height="2.5" fill="{DARK["text"]}"/><rect x="11" y="12.5" width="1.5" height="2.5" fill="{DARK["text"]}"/>')
 write("favicon-16.svg", svg(16, 16, f16))
 
-# 5. Banner and social preview: perspective grid, ship + "gigg" wordmark (Poppins Bold).
+# 5. Banner, social preview and README header: ship + "gigg" wordmark in Anta (SIL OFL). Anta has one
+# weight, so the wordmark and the tagline get an outline in their own colour (a faux bold). The word is
+# centred on the ship by its measured ink box (the i's dot to the g's tail), not by its baseline.
+from PIL import ImageFont  # noqa: E402
+
+ANTA = "/usr/share/fonts/anta/Anta_400Regular.ttf"
+TAGLINE = "Hand work to your AI agents, and keep an eye on it."
+SHIP_H, SHIP_W, SHIP_GAP = 300, 260, 50
+
+
 def grid(w, h, horizon, c, lines_on=True):
     vx = w / 2
     lines = []
@@ -115,21 +124,46 @@ def grid(w, h, horizon, c, lines_on=True):
             + (f'<g stroke="{c["grid"]}" stroke-width="1.6" mask="url(#gridfade)">{"".join(lines)}</g>' if lines_on else ""))
 
 
-def wordmark(x, baseline, size, c):
-    return (f'<text x="{x}" y="{baseline}" font-family="Poppins" font-weight="700" font-size="{size}" '
-            f'letter-spacing="-{size * 0.02:.1f}" fill="{c["text"]}">gigg</text>')
+def ink(size, text, spacing=0.0):
+    """The text's ink box relative to the left end of its baseline: (x0, top, x1, bottom)."""
+    x0, y0, x1, y1 = ImageFont.truetype(ANTA, size).getbbox(text, anchor="ls")
+    return x0, y0, x1 - spacing * size * (len(text) - 1), y1
 
 
-write("banner.svg", svg(1600, 400, grid(1600, 400, 250, DARK) + place(DARK, "b", 470, 200, 300) + wordmark(650, 262, 250, DARK)))
-# social preview: the glow without the grid; ship + wordmark centred (ship ~260 wide, 50 gap, wordmark ~2.2 x
-# size wide), the README's tagline centred under them
-og = (grid(1200, 630, 300, DARK, lines_on=False) + place(DARK, "o", 366, 250, 300) + wordmark(546, 250, 190, DARK)
-      + f'<text x="600" y="490" text-anchor="middle" font-family="Poppins" font-weight="500" font-size="38" '
-        f'fill="{DARK["tag"]}">Hand work to your AI agents, and keep an eye on it.</text>')
-write("og-image.svg", svg(1200, 630, og))
+def bold(fill, size, k):
+    return f'fill="{fill}" stroke="{fill}" stroke-width="{size * k:.2f}" stroke-linejoin="round"'
+
+
+def lockup(c, uid, cx, cy, word_fill, max_w):
+    """Ship + wordmark centred on (cx, cy): the word's ink 70% of the ship's height (narrower if it must)."""
+    size = 200
+    while True:
+        x0, y0, x1, y1 = ink(size, "gigg", 0.02)
+        if y1 - y0 >= 0.7 * SHIP_H or x1 - x0 > max_w:
+            break
+        size += 2
+    while x1 - x0 > max_w:
+        size -= 2
+        x0, y0, x1, y1 = ink(size, "gigg", 0.02)
+    left = cx - (SHIP_W + SHIP_GAP + x1 - x0) / 2
+    return (place(c, uid, left + SHIP_W / 2, cy, SHIP_H)
+            + f'<text x="{left + SHIP_W + SHIP_GAP - x0:.1f}" y="{cy - (y0 + y1) / 2:.1f}" font-family="Anta" '
+              f'font-size="{size}" letter-spacing="-{size * 0.02:.1f}" {bold(word_fill, size, 0.035)}>gigg</text>')
+
+
+def tagline(cx, top, size, c):
+    _, y0, _, _ = ink(size, TAGLINE)
+    return (f'<text x="{cx}" y="{top - y0:.1f}" text-anchor="middle" font-family="Anta" font-size="{size}" '
+            f'{bold(c["tag"], size, 0.045)}>{TAGLINE}</text>')
+
+
+write("banner.svg", svg(1600, 400, grid(1600, 400, 250, DARK) + lockup(DARK, "b", 800, 200, DARK["text"], 900)))
+# social preview: the glow without the grid; ship + wordmark, the README's tagline 55 px under the flames
+write("og-image.svg", svg(1200, 630, grid(1200, 630, 275, DARK, lines_on=False) + lockup(DARK, "o", 600, 275, DARK["text"], 750)
+                          + tagline(600, 275 + SHIP_H / 2 + 55, 40, DARK)))
 
 # 6. README header: ship + wordmark on transparent, no backdrop. The amber wordmark is for dark pages;
 # the light variant (darker hull, violet wordmark) stays readable on white.
-write("logo-wordmark.svg", svg(910, 340, place(DARK, "wd", 150, 170, 300) + wordmark(330, 232, 250, DARK)))
-write("logo-wordmark-light.svg", svg(910, 340, place(LIGHT, "wl", 150, 170, 300) + wordmark(330, 232, 250, dict(LIGHT, text="#7B2FC0"))))
+write("logo-wordmark.svg", svg(910, 340, lockup(DARK, "wd", 455, 170, DARK["text"], 560)))
+write("logo-wordmark-light.svg", svg(910, 340, lockup(LIGHT, "wl", 455, 170, "#7B2FC0", 560)))
 print("svgs:", sorted(os.listdir(OUT)))

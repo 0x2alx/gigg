@@ -20,7 +20,7 @@ The logo is a delta starship whose hull has three kanban columns cut into it, wi
 
 **Palette:** `#100318` background, `#BE5CFF` violet, `#E040FB` magenta, `#FFC107` amber, plus `#F4EFE6` and `#7B2FC0` for the light versions.
 
-**Wordmark font:** Poppins Bold (SIL Open Font License). The banner and OG SVGs use it as live text, so render them where Poppins is installed. The tools image installs it.
+**Wordmark font:** Anta (SIL Open Font License), for the wordmark and the tagline. It has one weight, so both get an outline in their own colour as a faux bold. The banner, OG and README-header SVGs use it as live text, so render them where Anta is installed; the tools image installs it, and gen.py measures it to centre the wordmark on the ship.
 
 ## Regenerating
 
