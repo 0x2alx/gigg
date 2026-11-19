@@ -72,7 +72,7 @@ A card shows what its agent is doing, as a small badge in the top row and, for s
 
 The progress bar and note appear when the agent reports progress (the `report_progress` MCP tool or the runner's progress call) and update live. Archived cards show no agent state. Collapsing a column moves the keyboard focus to its button above the board, and expanding it moves the focus back to the column's name.
 
-The avatars at the bottom right are the people assigned to the gig, overlapping. When there is no assignee, the creator is shown; when a person handed the gig to an agent, the creator appears as a smaller picture before the agent. Hover an avatar to see who created the gig and who it is assigned to. Agents have square-ish avatars.
+The avatars at the bottom right are the people assigned to the gig, overlapping. When there is no assignee, the creator is shown. When a person handed the gig to an agent, the person's picture comes first, then **›**, then the agent's: hover either one to read it as a sentence, for example "Dana Rivera handed this gig to Scout". Hover any other avatar to see who it is assigned to and who created the gig. Agents have square-ish avatars.
 
 ## Moving gigs
 

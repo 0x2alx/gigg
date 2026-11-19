@@ -1429,7 +1429,10 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
   // who: the assignees, stacked; the creator only when there are no assignees, or a person handed the gig to an agent
   const handOff = !!creator && creator.kind !== "agent" && assignees.some((u) => u.kind === "agent");
   const createdBy = creator ? `Created by ${nameOf(creator)}` : "";
-  const assigneeTip = (u: { username: string; display_name: string; kind: string }) => `Assigned to ${nameOf(u)}${u.kind === "agent" ? " (agent)" : ""}${createdBy ? `\n${createdBy}` : ""}`;
+  // a hand-off reads as one sentence on both pictures: "Dana Rivera handed this gig to Scout"
+  const handedTo = handOff && creator ? `${nameOf(creator)} handed this gig to ${assignees.map(nameOf).join(", ")}` : "";
+  const assigneeTip = (u: { username: string; display_name: string; kind: string }) =>
+    handedTo || `Assigned to ${nameOf(u)}${u.kind === "agent" ? " (agent)" : ""}${createdBy ? `\n${createdBy}` : ""}`;
   const done = gig.status_category === "done" ? gig.done_at : null;
   const state = cardState(gig);
   const run = gig.last_run;
@@ -1577,8 +1580,12 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
             <span className="people">
               {(assignees.length === 0 || handOff) && creator && (
                 <span className="creator">
-                  <Avatar user={creator} size="xs" tip={`${createdBy}${assignees.length ? " → assigned to " + assignees.map(nameOf).join(", ") : " (unassigned)"}`} />
-                  {assignees.length > 0 && <Icon name="chevron-right" strokeWidth={2.2} />}
+                  <Avatar user={creator} size="xs" tip={handedTo || `${createdBy} (unassigned)`} />
+                  {assignees.length > 0 && (
+                    <span className="handoff-mark" title={handedTo}>
+                      <Icon name="chevron-right" strokeWidth={2.2} />
+                    </span>
+                  )}
                 </span>
               )}
               {assignees.map((u) => (

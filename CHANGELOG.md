@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Cards: when a person handed a gig to an agent, hovering the person's picture, the **›** or the
+  agent's picture reads it as one sentence ("Dana Rivera handed this gig to Scout").
+- Docs: the README opens with a transparent logo (light and dark variants) and tells gigs
+  (prompt-based, for agents to think through) from errands (commands run on a schedule); the themes
+  guide covers **Make with AI**.
+
 ## 0.1.0 (2026-11-19)
 
 The first public release.

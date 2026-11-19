@@ -481,6 +481,7 @@ a.pulse-item:hover { color: var(--text); }
 .gig-card:hover .people .avatar, .gig-card:focus-within .people .avatar { border-color: color-mix(in srgb, var(--text) 3%, var(--surface)); }
 .people .avatar + .avatar { margin-left: -0.3rem; }
 .people .creator { display: inline-flex; align-items: center; gap: 0.1rem; margin-right: 0.1rem; color: var(--muted); font-size: 0.8rem; }
+.people .handoff-mark { display: inline-flex; }
 /* quiet facts: icon and number in muted text, no box */
 .meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.6rem; flex: 1 1 auto; min-width: 0; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .meta:empty { display: none; }
