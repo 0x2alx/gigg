@@ -425,6 +425,7 @@ in [access.md](access.md).
 Gig list filters: `project` (workspace list only), `status`, `category`, `label`, `priority_min`,
 `assignee`, `created_by`, `q` (text in titles, descriptions and comments), `due_before`,
 `updated_since`, `include_deleted`, `deleted`, `archived` (`only` or `include`), `parent`, `blocked`,
+`recurring` (`hide` leaves out the gigs a recurring gig made, `only` keeps just those; default all),
 `sort` (`board`, or a comma list of `priority`, `due`, `created`, `updated`, `number`, `title`, each
 optionally prefixed with `-` for descending), `limit`, `cursor`.
 

@@ -942,7 +942,7 @@ func SavedFilters(ctx context.Context, q Q, user int64) ([]*SavedFilter, error) 
 }
 
 var filterKeys = map[string]bool{"q": true, "category": true, "status": true, "label": true, "priority_min": true, "assignee": true,
-	"created_by": true, "due_before": true, "sort": true, "project": true, "archived": true, "blocked": true, "mine": true}
+	"created_by": true, "due_before": true, "sort": true, "project": true, "archived": true, "blocked": true, "recurring": true, "mine": true}
 
 // SaveFilter creates (ID 0) or replaces one of the user's views.
 func SaveFilter(ctx context.Context, q Q, user int64, f *SavedFilter) (*SavedFilter, error) {

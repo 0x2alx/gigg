@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Filters: **Recurring** on the board and in the table: every gig, **Hide recurring** (the gigs a
+  recurring gig made) or **Only recurring**. It is kept in the page address, in the board's
+  remembered filter and in saved views; the gig list API and the MCP `list_gigs` tool take
+  `recurring=hide|only`.
 - Gig panel: the **Checklist** section opens on its own when the gig has items, and stays folded
   when it has none; switching to another gig starts from that gig's checklist. The new-gig form and
   the template editor do the same, and picking a template with a checklist opens it.

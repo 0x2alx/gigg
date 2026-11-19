@@ -9,7 +9,7 @@ Your own gigs: the board's **Filters** › **Assignee** › **Assigned to me** (
 ![The table view with filters (Daywalker theme)](../images/table-day.png)
 
 - Sort by any column header.
-- Filter by status category, label, assignee, minimum priority, custom fields, or text (titles, descriptions and comments).
+- Filter by status category, label, assignee, minimum priority, recurring (hide the gigs a recurring gig made, or show only those), custom fields, or text (titles, descriptions and comments).
 - Select rows to act on several gigs at once: move to a status, set the priority, add a label, assign or unassign someone, or delete.
 - **Save view** keeps the current filters under a name. Saved views appear in the account menu (your picture, top right).
 

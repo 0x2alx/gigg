@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Category, Project, Gig } from "./api";
 import type { WorkspaceTree } from "./App";
-import { activeFilters, categoryColumns, EMPTY_FILTER, filterQuery, matches, moveToCategory, parseFilter, scope, statusColumns } from "./boardModel";
+import { activeFilters, categoryColumns, EMPTY_FILTER, filterQuery, matches, moveToCategory, parseFilter, recurringMatches, scope, statusColumns } from "./boardModel";
 
 const gig = (id: number, x: Partial<Gig> = {}): Gig =>
   ({ id, key: `K-${id}`, title: `gig ${id}`, description_md: "", priority: 0, due_at: null, assignees: [], labels: [], status_id: 0, status_name: "", status_category: "todo", ...x }) as Gig;
@@ -41,6 +41,34 @@ describe("board filter", () => {
     expect(matches(t, { ...EMPTY_FILTER, a: "8" }, 7)).toBe(false);
     expect(matches(t, { ...EMPTY_FILTER, l: "ops", pr: 3, q: "BRIEF" }, 7)).toBe(true);
     expect(matches(t, { ...EMPTY_FILTER, pr: 4 }, 7)).toBe(false);
+  });
+});
+
+describe("recurring filter", () => {
+  const oneOff = gig(1);
+  const made = gig(2, { recurrence_id: 9 });
+  it("all, hide and only", () => {
+    expect([oneOff, made].map((t) => recurringMatches(t, ""))).toEqual([true, true]);
+    expect([oneOff, made].map((t) => recurringMatches(t, "hide"))).toEqual([true, false]);
+    expect([oneOff, made].map((t) => recurringMatches(t, "only"))).toEqual([false, true]);
+    expect(recurringMatches(gig(3, { recurrence_id: null }), "only")).toBe(false);
+  });
+  it("is part of the board filter, kept in the URL and in the saved board_filter", () => {
+    const f = { ...EMPTY_FILTER, l: "ops", rec: "hide" as const };
+    // the board saves filterQuery() as the account's board_filter and restores it with parseFilter()
+    const saved = filterQuery(f);
+    expect(saved).toBe("?l=ops&recurring=hide");
+    expect(parseFilter(saved)).toEqual(f);
+    expect(parseFilter("?recurring=only").rec).toBe("only");
+    expect(parseFilter("?recurring=sometimes").rec).toBe("");
+    expect(matches(made, { ...EMPTY_FILTER, rec: "hide" }, 7)).toBe(false);
+    expect(matches(made, { ...EMPTY_FILTER, rec: "only" }, 7)).toBe(true);
+  });
+  it("shows as a chip that takes it off", () => {
+    const names = { ws: () => undefined, project: () => undefined, user: () => undefined, priority: (n: number) => String(n) };
+    const chips = activeFilters({ ...EMPTY_FILTER, rec: "only" }, names);
+    expect(chips.map((c) => [c.key, c.label])).toEqual([["recurring", "Only recurring"]]);
+    expect(chips[0]!.without).toEqual(EMPTY_FILTER);
   });
 });
 

@@ -25,6 +25,14 @@ describe("toQuery", () => {
       blocked: "true",
     });
   });
+  it("stores the recurring filter as the list API's recurring key", () => {
+    expect(toQuery(f({ recurring: "hide" }))).toEqual({ recurring: "hide" });
+    expect(parse({ recurring: "only" }).filters.recurring).toBe("only");
+    expect(parse({ recurring: "bogus" }).filters.recurring).toBe("");
+    expect(summary({ recurring: "hide" })).toEqual(["recurring hidden"]);
+    const x = f({ recurring: "only", label: "ops" });
+    expect(parse(new URLSearchParams(toSearch(x))).filters).toEqual(x);
+  });
   it("never stores include-done (no server key)", () => {
     expect(toQuery(f({ includeDone: true }))).toEqual({});
     expect(toSearch(f({ includeDone: true }))).toBe("done=1");

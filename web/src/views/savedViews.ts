@@ -4,6 +4,7 @@ import type { Category } from "../api";
 import type { WorkspaceTree } from "../App";
 import { call } from "../http";
 import { ALL_CATEGORIES } from "./viewsApi";
+import { RECURRING_CHOICES, parseRecurring, type RecurringFilter } from "../boardModel";
 
 export interface SavedFilter {
   id: number;
@@ -28,6 +29,7 @@ export interface TableFilters {
   label: string;
   assignee: number;
   prioMin: number;
+  recurring: RecurringFilter; // gigs a recurring gig made: "" all, "hide", "only"
   sort: { key: SortKey; desc: boolean };
   includeDone: boolean; // client-side only: no server key, so it lives in the URL (done=1) but isn't saved
   extra: Record<string, string>; // allowed keys the table has no control for, passed through to the list call
@@ -39,6 +41,7 @@ export const DEFAULT_FILTERS: TableFilters = {
   label: "",
   assignee: 0,
   prioMin: 0,
+  recurring: "",
   sort: { key: "updated", desc: true },
   includeDone: false,
   extra: {},
@@ -58,6 +61,7 @@ export function toQuery(f: TableFilters, project?: number): Record<string, strin
   if (f.label) o.label = f.label;
   if (f.assignee) o.assignee = String(f.assignee);
   if (f.prioMin) o.priority_min = String(f.prioMin);
+  if (f.recurring) o.recurring = f.recurring;
   if (!isDefaultSort(f.sort)) o.sort = sortStr(f.sort);
   if (project) o.project = String(project);
   for (const k of PASSTHROUGH) if (f.extra[k]) o[k] = f.extra[k]!;
@@ -85,6 +89,7 @@ export function parse(src: Record<string, string> | URLSearchParams, meId?: numb
   else if (meId && /^(1|true|yes)$/i.test(get("mine"))) f.assignee = meId;
   const pm = Number(get("priority_min"));
   if (Number.isInteger(pm) && pm >= 1 && pm <= 4) f.prioMin = pm;
+  f.recurring = parseRecurring(get("recurring"));
   const s = /^(-?)([a-z]+)$/.exec(get("sort"));
   if (s && (SORT_KEYS as string[]).includes(s[2]!)) f.sort = { key: s[2] as SortKey, desc: s[1] === "-" };
   f.includeDone = get("done") === "1";
@@ -116,6 +121,8 @@ export function summary(query: Record<string, string>): string[] {
   if (query.category) out.push(query.category);
   if (query.label) out.push(`#${query.label}`);
   if (query.priority_min) out.push(`priority ≥ ${query.priority_min}`);
+  const rec = RECURRING_CHOICES.find((c) => c.value && c.value === query.recurring);
+  if (rec) out.push(rec.chip.toLowerCase());
   if (query.assignee || query.mine) out.push("assignee");
   for (const k of PASSTHROUGH) if (query[k]) out.push(`${k.replace("_", " ")} ${query[k]}`);
   return out;

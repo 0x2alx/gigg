@@ -89,6 +89,7 @@ The toolbar above the columns narrows the board, in one row:
 - **Search**: text in the key, title or description.
 - **Assignee**: anyone, assigned to you, unassigned, or a person.
 - **Label** and **Priority** (a minimum: "High or higher"). A filter that is on is tinted.
+- **Recurring**: every gig (the default), **Hide recurring** (leaves out the gigs a [recurring gig](recurring.md) made), or **Only recurring** (just those).
 - **Archived**: a toggle that shows archived gigs, greyed out, in their columns.
 - **Clear filters**: resets everything except the archived toggle; greyed out while nothing is filtered. Every page with filters has one (the table, the recurring gigs, templates and schedules lists, the admin users list and audit log).
 

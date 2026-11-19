@@ -320,6 +320,7 @@ type GigFilter struct {
 	Archived       string // "" = hide archived, "only", "include"
 	ParentID       *int64 // subgigs of this gig
 	BlockedOnly    bool   // only gigs with an open blocker
+	Recurring      string // "" = all, "hide" = no gig a recurring gig made, "only" = only those
 	SearchComments bool   // q also matches comment text (only for callers who may read comments)
 	Sort           string // board (default), -priority, due, created, -updated, ...
 	Limit          int
@@ -473,6 +474,12 @@ func ListGigs(ctx context.Context, q Q, f GigFilter) ([]*Gig, bool, error) {
 	}
 	if f.BlockedOnly {
 		where = append(where, blockedCond)
+	}
+	switch f.Recurring {
+	case "hide":
+		where = append(where, "t.recurrence_id IS NULL")
+	case "only":
+		where = append(where, "t.recurrence_id IS NOT NULL")
 	}
 	if f.StatusID != nil {
 		where, args = append(where, "t.status_id = ?"), append(args, *f.StatusID)

@@ -30,7 +30,7 @@ import { GigModal, lastProject } from "./GigModal";
 import { GigPanel } from "./GigPanel";
 import { backTo, relTime, viewsApi } from "./views/viewsApi";
 import { CATEGORY_COLOR, colorFor, readableOn } from "./theme";
-import { ClearFilters, Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, GigBadges, WorkspaceChip, reducedMotion } from "./ui";
+import { ClearFilters, Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, GigBadges, RecurringSelect, WorkspaceChip, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
@@ -459,12 +459,12 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const countOpen = (cols: BoardColumn[]) => cols.filter((c) => c.category !== "done").reduce((n, c) => n + c.gigs.length, 0);
   const open = countOpen(columns);
   // with a gig filter (assignee, label, priority, search) on, the count says how many of all match
-  const gigFiltered = !!(filter.a || filter.l || filter.pr || filter.q);
+  const gigFiltered = !!(filter.a || filter.l || filter.pr || filter.q || filter.rec);
   const allOpen = !gigFiltered
     ? open
     : countOpen(
         (() => {
-          const f: BoardFilter = { ...filter, a: "", l: "", pr: 0, q: "" };
+          const f: BoardFilter = { ...filter, a: "", l: "", pr: 0, q: "", rec: "" };
           return single
             ? boards.get(single.project.id)
               ? statusColumns(boards.get(single.project.id)!, f, me_)
@@ -1032,6 +1032,10 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
               </option>
             ))}
           </select>
+        </label>
+        <label className="bf-pick">
+          <span className="bf-pick-label" aria-hidden="true">Recurring</span>
+          <RecurringSelect className={sel(filter.rec)} value={filter.rec} onChange={(rec) => setFilter({ ...filter, rec })} />
         </label>
         <button
           type="button"

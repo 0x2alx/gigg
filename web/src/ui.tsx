@@ -8,6 +8,7 @@ import { cardChips } from "./items";
 import { windowBadge } from "./recurrence";
 import { CATEGORY_COLOR, PRIORITY_COLOR, SCHEDULE_COLOR, WINDOW_OPEN_COLOR, colorFor, readableOn } from "./theme";
 import { Icon } from "./icons";
+import { RECURRING_CHOICES, parseRecurring, type RecurringFilter } from "./boardModel";
 
 // ClearFilters: the one "Clear filters" button of every filtered list. Always there, so the bar
 // doesn't jump; greyed out while nothing is filtered.
@@ -16,6 +17,20 @@ export function ClearFilters({ active, onClear, className }: { active: boolean; 
     <button type="button" className={"link small clear-filters" + (className ? " " + className : "")} disabled={!active} onClick={onClear} title={active ? "Show everything again" : "Nothing is filtered"}>
       <Icon name="x" /> Clear filters
     </button>
+  );
+}
+
+// RecurringSelect: the one picker of the recurring filter (board and table): every gig, hide the gigs
+// a recurring gig made, or only those.
+export function RecurringSelect({ value, onChange, className }: { value: RecurringFilter; onChange: (v: RecurringFilter) => void; className?: string }) {
+  return (
+    <select className={className} aria-label="Recurring gigs" value={value} onChange={(e) => onChange(parseRecurring(e.target.value))}>
+      {RECURRING_CHOICES.map((c) => (
+        <option key={c.value} value={c.value}>
+          {c.label}
+        </option>
+      ))}
+    </select>
   );
 }
 

@@ -21,6 +21,7 @@ export interface GigQuery {
   category?: Category | "";
   label?: string;
   priority_min?: number;
+  recurring?: "" | "hide" | "only";
   assignee?: number;
   created_by?: number;
   q?: string;

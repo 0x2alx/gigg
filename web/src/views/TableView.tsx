@@ -11,7 +11,7 @@ import { RecurringModal } from "../Recurring";
 import { useApp, type WorkspaceTree } from "../App";
 import { assignable } from "../fields";
 import { CATEGORY_COLOR, colorFor } from "../theme";
-import { ClearFilters, Avatar, LabelChip, Modal, PriorityIcon, StatusDot } from "../ui";
+import { ClearFilters, Avatar, LabelChip, Modal, PriorityIcon, RecurringSelect, StatusDot } from "../ui";
 import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
 import { CATEGORY_LABEL } from "../boardModel";
@@ -67,13 +67,14 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const [label, setLabel] = useState(initial.label);
   const [assignee, setAssignee] = useState(initial.assignee);
   const [prioMin, setPrioMin] = useState(initial.prioMin);
+  const [recFilter, setRecFilter] = useState(initial.recurring);
   const [includeDone, setIncludeDone] = useState(initial.includeDone);
   const [extra, setExtra] = useState<Record<string, string>>(initial.extra);
   const [saving, setSaving] = useState(false);
 
   const filters = useMemo<TableFilters>(
-    () => ({ q, category, label, assignee, prioMin, sort, includeDone, extra }),
-    [q, category, label, assignee, prioMin, sort, includeDone, extra],
+    () => ({ q, category, label, assignee, prioMin, recurring: recFilter, sort, includeDone, extra }),
+    [q, category, label, assignee, prioMin, recFilter, sort, includeDone, extra],
   );
   const written = useRef(search);
   // URL -> state when the search changes from outside (a saved view, back/forward)
@@ -88,6 +89,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     setLabel(f.label);
     setAssignee(f.assignee);
     setPrioMin(f.prioMin);
+    setRecFilter(f.recurring);
     setIncludeDone(f.includeDone);
     setExtra(f.extra);
   }, [search, me.user.id]);
@@ -158,11 +160,12 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
       label,
       assignee,
       priority_min: prioMin,
+      recurring: recFilter,
       q,
       sort: (sort.desc ? "-" : "") + sort.key,
       limit: PAGE,
     }),
-    [pid, category, label, assignee, prioMin, q, sort, extra],
+    [pid, category, label, assignee, prioMin, recFilter, q, sort, extra],
   );
 
   const loadSeq = useRef(0);
@@ -251,13 +254,14 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     });
 
   const clickSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, desc: !s.desc } : { key, desc: key === "updated" || key === "created" || key === "priority" }));
-  const filtered = text !== "" || category !== "" || label !== "" || assignee !== 0 || prioMin !== 0 || Object.keys(extra).length > 0;
+  const filtered = text !== "" || category !== "" || label !== "" || assignee !== 0 || prioMin !== 0 || recFilter !== "" || Object.keys(extra).length > 0;
   const reset = () => {
     setText("");
     setCategory("");
     setLabel("");
     setAssignee(0);
     setPrioMin(0);
+    setRecFilter("");
     setExtra({});
   };
   const views = savedViews.filter((v) => v.workspace_id === null || (ws ? v.workspace_id === ws.id : false));
@@ -344,6 +348,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
             </option>
           ))}
         </select>
+        <RecurringSelect value={recFilter} onChange={setRecFilter} />
         <label className="vw-toggle">
           <input type="checkbox" checked={includeDone} onChange={(e) => setIncludeDone(e.target.checked)} disabled={category !== ""} />
           Include done

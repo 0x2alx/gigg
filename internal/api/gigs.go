@@ -76,11 +76,12 @@ type gigListIn struct {
 	Archived       string `query:"archived" enum:"only,include," doc:"Archived gigs are hidden unless only or include"`
 	Parent         int64  `query:"parent" doc:"Only subgigs of this gig id"`
 	Blocked        bool   `query:"blocked" doc:"Only gigs with an open blocker"`
+	Recurring      string `query:"recurring" enum:"hide,only," doc:"Gigs a recurring gig made: hide hides them, only shows only them (default: all)"`
 }
 
 func (in *gigListIn) filter(ws int64) (store.GigFilter, error) {
 	f := store.GigFilter{WorkspaceID: ws, Category: in.Category, Label: in.Label, Q: in.Q, IncludeDeleted: in.IncludeDeleted,
-		OnlyDeleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Archived: in.Archived, BlockedOnly: in.Blocked}
+		OnlyDeleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Archived: in.Archived, BlockedOnly: in.Blocked, Recurring: in.Recurring}
 	if in.Parent != 0 {
 		f.ParentID = &in.Parent
 	}
@@ -146,6 +147,7 @@ type wsGigsIn struct {
 	Archived       string `query:"archived" enum:"only,include," doc:"Archived gigs are hidden unless only or include"`
 	Parent         int64  `query:"parent" doc:"Only subgigs of this gig id"`
 	Blocked        bool   `query:"blocked" doc:"Only gigs with an open blocker"`
+	Recurring      string `query:"recurring" enum:"hide,only," doc:"Gigs a recurring gig made: hide hides them, only shows only them (default: all)"`
 }
 
 type projectGigsIn struct {
@@ -167,14 +169,15 @@ type projectGigsIn struct {
 	Archived       string `query:"archived" enum:"only,include," doc:"Archived gigs are hidden unless only or include"`
 	Parent         int64  `query:"parent" doc:"Only subgigs of this gig id"`
 	Blocked        bool   `query:"blocked" doc:"Only gigs with an open blocker"`
+	Recurring      string `query:"recurring" enum:"hide,only," doc:"Gigs a recurring gig made: hide hides them, only shows only them (default: all)"`
 }
 
 func (in *wsGigsIn) list() *gigListIn {
-	return &gigListIn{Status: in.Status, Category: in.Category, Label: in.Label, PriorityMin: in.PriorityMin, Assignee: in.Assignee, CreatedBy: in.CreatedBy, Q: in.Q, DueBefore: in.DueBefore, UpdatedSince: in.UpdatedSince, IncludeDeleted: in.IncludeDeleted, Deleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Cursor: in.Cursor, Archived: in.Archived, Parent: in.Parent, Blocked: in.Blocked}
+	return &gigListIn{Status: in.Status, Category: in.Category, Label: in.Label, PriorityMin: in.PriorityMin, Assignee: in.Assignee, CreatedBy: in.CreatedBy, Q: in.Q, DueBefore: in.DueBefore, UpdatedSince: in.UpdatedSince, IncludeDeleted: in.IncludeDeleted, Deleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Cursor: in.Cursor, Archived: in.Archived, Parent: in.Parent, Blocked: in.Blocked, Recurring: in.Recurring}
 }
 
 func (in *projectGigsIn) list() *gigListIn {
-	return &gigListIn{Status: in.Status, Category: in.Category, Label: in.Label, PriorityMin: in.PriorityMin, Assignee: in.Assignee, CreatedBy: in.CreatedBy, Q: in.Q, DueBefore: in.DueBefore, UpdatedSince: in.UpdatedSince, IncludeDeleted: in.IncludeDeleted, Deleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Cursor: in.Cursor, Archived: in.Archived, Parent: in.Parent, Blocked: in.Blocked}
+	return &gigListIn{Status: in.Status, Category: in.Category, Label: in.Label, PriorityMin: in.PriorityMin, Assignee: in.Assignee, CreatedBy: in.CreatedBy, Q: in.Q, DueBefore: in.DueBefore, UpdatedSince: in.UpdatedSince, IncludeDeleted: in.IncludeDeleted, Deleted: in.Deleted, Sort: in.Sort, Limit: in.Limit, Cursor: in.Cursor, Archived: in.Archived, Parent: in.Parent, Blocked: in.Blocked, Recurring: in.Recurring}
 }
 
 // RelationIn is a dependency a new gig starts with.

@@ -68,6 +68,16 @@ func TestWorkItems(t *testing.T) {
 	if code, out, _ := e.req("GET", "/workspaces/scout/gigs?blocked=true", "", scout); code != 200 || !strings.Contains(string(out), bk) {
 		t.Fatalf("blocked filter: %d %s", code, out)
 	}
+	// the recurring filter: a one-off gig shows with hide, not with only; other values are refused
+	if code, out, _ := e.req("GET", "/workspaces/scout/gigs?recurring=hide", "", scout); code != 200 || !strings.Contains(string(out), bk) {
+		t.Fatalf("recurring=hide: %d %s", code, out)
+	}
+	if code, out, _ := e.req("GET", "/workspaces/scout/gigs?recurring=only", "", scout); code != 200 || strings.Contains(string(out), bk) {
+		t.Fatalf("recurring=only: %d %s", code, out)
+	}
+	if code, _, _ := e.req("GET", "/workspaces/scout/gigs?recurring=sometimes", "", scout); code != 422 {
+		t.Fatalf("recurring=sometimes: %d", code)
+	}
 
 	// checklist: tick, move, delete; counts follow
 	code, out, _ = e.req("GET", "/gigs/"+ak+"/checklist", "", scout)
@@ -162,7 +172,7 @@ func TestWorkItems(t *testing.T) {
 	if code, _, _ := e.req("POST", "/me/filters", `{"name":"Everywhere","query":{"priority_min":"3"}}`, scout); code != 404 {
 		t.Fatalf("a workspace-bound key saved a cross-workspace filter: %d", code)
 	}
-	code, out, _ = e.req("POST", "/me/filters", fmt.Sprintf(`{"workspace_id":%d,"name":"Urgent","query":{"priority_min":"3"}}`, e.ids["scout.ws"]), scout)
+	code, out, _ = e.req("POST", "/me/filters", fmt.Sprintf(`{"workspace_id":%d,"name":"Urgent","query":{"priority_min":"3","recurring":"hide"}}`, e.ids["scout.ws"]), scout)
 	e.ok(code, out, 201)
 	if _, out, _ := e.req("GET", "/me/filters", "", ada); strings.Contains(string(out), "Urgent") {
 		t.Fatal("ada sees scout's filter")

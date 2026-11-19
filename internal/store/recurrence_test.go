@@ -251,3 +251,40 @@ func TestNextOccurrenceMidnightDST(t *testing.T) {
 	}
 	eq(t, got, "2026-09-05 09:00", "2026-09-06 09:00", "2026-09-07 09:00", "2026-09-08 09:00")
 }
+
+// The recurring filter: "hide" leaves out the gigs a recurring gig made, "only" keeps just those.
+func TestListGigsRecurringFilter(t *testing.T) {
+	f := newFixture(t)
+	start := ny(t, "2026-11-12 00:00")
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := CreateRecurrence(f.ctx, tx, f.a, &Recurrence{ProjectID: f.p1.ID, Title: "Morning check", Freq: "daily", TZ: "America/New_York",
+			WindowStart: "09:00", WindowMinutes: 120, LeadMinutes: 30, StartsOn: start, MaxCount: i64(4)})
+		if err != nil {
+			return err
+		}
+		_, err = CreateGig(f.ctx, tx, f.a, NewGig{ProjectID: f.p1.ID, Title: "One-off"})
+		return err
+	}))
+	if res, err := f.s.Housekeeping(f.ctx, ny(t, "2026-11-12 08:30")); err != nil || res.Created != 1 {
+		t.Fatalf("occurrence: %+v %v", res, err)
+	}
+	titles := func(mode string) []string {
+		t.Helper()
+		gigs, _, err := ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID, Recurring: mode, Sort: "number"})
+		must(t, err)
+		out := []string{}
+		for _, g := range gigs {
+			out = append(out, g.Title)
+		}
+		return out
+	}
+	if got := titles(""); len(got) != 2 {
+		t.Fatalf("all: %v", got)
+	}
+	if got := titles("hide"); len(got) != 1 || got[0] != "One-off" {
+		t.Fatalf("hide: %v", got)
+	}
+	if got := titles("only"); len(got) != 1 || got[0] != "Morning check" {
+		t.Fatalf("only: %v", got)
+	}
+}

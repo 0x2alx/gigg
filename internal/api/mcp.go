@@ -122,6 +122,7 @@ type (
 		Archived    string `json:"archived,omitempty" jsonschema:"only or include (archived gigs are hidden by default)"`
 		Parent      int64  `json:"parent,omitempty" jsonschema:"Only subgigs of this gig id"`
 		Blocked     bool   `json:"blocked,omitempty" jsonschema:"Only gigs with an open blocker"`
+		Recurring   string `json:"recurring,omitempty" jsonschema:"Gigs a recurring gig made: hide or only (default: all)"`
 	}
 	gigArg struct {
 		Gig string `json:"gig" jsonschema:"Gig id or key, e.g. GIG-12"`
@@ -368,7 +369,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				if in.Blocked {
 					q.Set("blocked", "true")
 				}
-				for k, v := range map[string]string{"category": in.Category, "label": in.Label, "q": in.Q, "sort": in.Sort, "cursor": in.Cursor, "archived": in.Archived} {
+				for k, v := range map[string]string{"category": in.Category, "label": in.Label, "q": in.Q, "sort": in.Sort, "cursor": in.Cursor, "archived": in.Archived, "recurring": in.Recurring} {
 					if v != "" {
 						q.Set(k, v)
 					}

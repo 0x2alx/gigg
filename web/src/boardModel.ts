@@ -14,6 +14,17 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   cancelled: "Cancelled",
 };
 
+// The recurring filter, one rule for the board, the table and the list API's `recurring`: "" every
+// gig, "hide" leaves out the gigs a recurring gig made (recurrence_id set), "only" shows just those.
+export type RecurringFilter = "" | "hide" | "only";
+export const RECURRING_CHOICES: { value: RecurringFilter; label: string; chip: string }[] = [
+  { value: "", label: "Recurring or not", chip: "" },
+  { value: "hide", label: "Hide recurring", chip: "Recurring hidden" },
+  { value: "only", label: "Only recurring", chip: "Only recurring" },
+];
+export const parseRecurring = (v: string | null | undefined): RecurringFilter => (v === "hide" || v === "only" ? v : "");
+export const recurringMatches = (t: Pick<Gig, "recurrence_id">, r: RecurringFilter): boolean => r === "" || (r === "only") === (t.recurrence_id != null);
+
 export interface BoardFilter {
   ws: string[]; // workspace slugs; empty = every workspace
   p: number[]; // project ids; empty = every project of the chosen workspaces
@@ -21,10 +32,11 @@ export interface BoardFilter {
   l: string; // label name ("" any)
   pr: number; // minimum priority (0 = any)
   q: string; // text in the key, title or description
+  rec: RecurringFilter; // gigs a recurring gig made: "" all, "hide", "only" (URL key "recurring")
   arch: boolean; // archived gigs shown too
 }
 
-export const EMPTY_FILTER: BoardFilter = { ws: [], p: [], a: "", l: "", pr: 0, q: "", arch: false };
+export const EMPTY_FILTER: BoardFilter = { ws: [], p: [], a: "", l: "", pr: 0, q: "", rec: "", arch: false };
 
 export function parseFilter(search: string): BoardFilter {
   const s = new URLSearchParams(search);
@@ -37,6 +49,7 @@ export function parseFilter(search: string): BoardFilter {
     l: s.get("l") ?? "",
     pr: Number.isInteger(pr) && pr >= 0 && pr <= 4 ? pr : 0,
     q: s.get("q") ?? "",
+    rec: parseRecurring(s.get("recurring")),
     arch: s.get("arch") === "1",
   };
 }
@@ -50,6 +63,7 @@ export function filterQuery(f: BoardFilter): string {
   if (f.l) s.set("l", f.l);
   if (f.pr) s.set("pr", String(f.pr));
   if (f.q) s.set("q", f.q);
+  if (f.rec) s.set("recurring", f.rec);
   if (f.arch) s.set("arch", "1");
   const q = s.toString();
   return q ? "?" + q : "";
@@ -86,6 +100,7 @@ export function activeFilters(
   }
   if (f.l) out.push({ key: "l", label: `Label: ${f.l}`, without: { ...f, l: "" } });
   if (f.pr) out.push({ key: "pr", label: f.pr === 4 ? names.priority(4) : `${names.priority(f.pr)} or higher`, without: { ...f, pr: 0 } });
+  if (f.rec) out.push({ key: "recurring", label: RECURRING_CHOICES.find((c) => c.value === f.rec)!.chip, without: { ...f, rec: "" } });
   if (f.arch) out.push({ key: "arch", label: "Archived shown", without: { ...f, arch: false } });
   return out;
 }
@@ -113,6 +128,7 @@ export function matches(t: Gig, f: BoardFilter, me: number): boolean {
   if (/^\d+$/.test(f.a) && !t.assignees.includes(Number(f.a))) return false;
   if (f.l && !t.labels.some((l) => l.name.toLowerCase() === f.l.toLowerCase())) return false;
   if (f.pr && t.priority < f.pr) return false;
+  if (!recurringMatches(t, f.rec)) return false;
   if (f.q) {
     const q = f.q.toLowerCase();
     if (!t.key.toLowerCase().includes(q) && !t.title.toLowerCase().includes(q) && !(t.description_md ?? "").toLowerCase().includes(q)) return false;
