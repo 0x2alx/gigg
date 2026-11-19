@@ -327,8 +327,9 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .col-archive { flex: none; white-space: nowrap; }
 .column-tools > .col-archive { align-self: center; margin-right: 0.2rem; }
 .col-archive-n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-/* a narrow column keeps the name readable: the button shrinks to its icon and count */
-@container col (max-width: 15rem) { .col-archive-label { display: none; } }
+/* a narrow column keeps the name readable: the button shrinks to its icon and count (in px: themes
+   change the root font size, and the header's parts don't all follow it) */
+@container col (max-width: 320px) { .col-archive-label { display: none; } }
 /* rows: each status is a lane across the page, its name on the left and its cards running left to
    right (the lane scrolls sideways, not the page) */
 .board.board-rows { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }

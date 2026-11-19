@@ -54,9 +54,6 @@
    "wait": 1800
   },
   {
-   "wait": ".live-dot.live-live"
-  },
-  {
    "wait": 300
   },
   {
@@ -122,9 +119,6 @@
    "wait": 1800
   },
   {
-   "wait": ".live-dot.live-live"
-  },
-  {
    "wait": 300
   },
   {
@@ -167,9 +161,6 @@
    "wait": 1800
   },
   {
-   "wait": ".live-dot.live-live"
-  },
-  {
    "wait": 300
   },
   {
@@ -184,9 +175,6 @@
   },
   {
    "wait": 1800
-  },
-  {
-   "wait": ".live-dot.live-live"
   },
   {
    "wait": 300
@@ -235,9 +223,6 @@
    "wait": 1800
   },
   {
-   "wait": ".live-dot.live-live"
-  },
-  {
    "wait": 300
   },
   {
@@ -252,9 +237,6 @@
   },
   {
    "wait": 1200
-  },
-  {
-   "wait": ".live-dot.live-live"
   },
   {
    "wait": 300
@@ -294,9 +276,6 @@
    "wait": 1800
   },
   {
-   "wait": ".live-dot.live-live"
-  },
-  {
    "wait": 300
   },
   {
@@ -313,9 +292,6 @@
    "wait": 1800
   },
   {
-   "wait": ".live-dot.live-live"
-  },
-  {
    "wait": 300
   },
   {
@@ -330,9 +306,6 @@
   },
   {
    "wait": 1800
-  },
-  {
-   "wait": ".live-dot.live-live"
   },
   {
    "wait": 300
@@ -412,9 +385,6 @@
   },
   {
    "wait": 1800
-  },
-  {
-   "wait": ".live-dot.live-live"
   },
   {
    "wait": 300

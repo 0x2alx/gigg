@@ -4,7 +4,8 @@
 
 - Board: **+ New gig** sits after a column's last card and scrolls with it; it no longer stays
   pinned over the cards at the bottom of the window. The Done column's **Archive all** moves to its
-  header, left of the sort button (on a narrow column, just the icon and count). Every column's
+  header, left of the sort button (on a column under 320 px wide, just the icon and count, so the
+  column's name stays whole in every theme). Every column's
   header keeps its tools at the right in the same order: Archive all (Done), sort, collapse; a
   sorted column no longer moves its sort button next to the title (it shows lit instead).
 - Admin, Users: Flags is the last column and takes the spare width, so the flags stay on one line.

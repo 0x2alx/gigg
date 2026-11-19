@@ -17,8 +17,7 @@ def click_text(sel, text):
 
 
 def page(path, wait, shot, settle=1800, **kw):
-    # wait for the live connection too, so the top bar's dot says Live rather than Connecting
-    s = [{"goto": path}, {"wait": wait}, {"wait": settle}, {"wait": ".live-dot.live-live"}, {"wait": 300}]
+    s = [{"goto": path}, {"wait": wait}, {"wait": settle}, {"wait": 300}]
     if kw.get("el"):
         s.append({"eval": "(() => { document.querySelector(%s).scrollIntoView({ block: 'center' }); return true; })()" % json.dumps(kw["el"]), "expect": True})
         s.append({"wait": 400})
