@@ -95,7 +95,7 @@ f16 = (f'<rect width="16" height="16" rx="3" fill="{DARK["bg"]}"/>'
 write("favicon-16.svg", svg(16, 16, f16))
 
 # 5. Banner and social preview: perspective grid, ship + "gigg" wordmark (Poppins Bold).
-def grid(w, h, horizon, c):
+def grid(w, h, horizon, c, lines_on=True):
     vx = w / 2
     lines = []
     for i in range(-14, 15):
@@ -112,7 +112,7 @@ def grid(w, h, horizon, c):
             f'<radialGradient id="haze" cx="0.5" cy="{horizon / h:.3f}" r="0.6"><stop offset="0" stop-color="{c["border"]}" '
             f'stop-opacity="0.22"/><stop offset="1" stop-color="{c["border"]}" stop-opacity="0"/></radialGradient></defs>'
             f'<rect width="{w}" height="{h}" fill="{c["bg"]}"/><rect width="{w}" height="{h}" fill="url(#haze)"/>'
-            f'<g stroke="{c["grid"]}" stroke-width="1.6" mask="url(#gridfade)">{"".join(lines)}</g>')
+            + (f'<g stroke="{c["grid"]}" stroke-width="1.6" mask="url(#gridfade)">{"".join(lines)}</g>' if lines_on else ""))
 
 
 def wordmark(x, baseline, size, c):
@@ -121,9 +121,10 @@ def wordmark(x, baseline, size, c):
 
 
 write("banner.svg", svg(1600, 400, grid(1600, 400, 250, DARK) + place(DARK, "b", 470, 200, 300) + wordmark(650, 262, 250, DARK)))
-# group = ship (~260 wide) + 50 gap + wordmark (~2.2 x size wide), centred horizontally
-og = (grid(1200, 630, 430, DARK) + place(DARK, "o", 366, 300, 300) + wordmark(546, 300, 190, DARK)
-      + f'<text x="552" y="420" font-family="Poppins" font-weight="500" font-size="30" fill="{DARK["tag"]}">'
-        f'a task board for humans and agents</text>')
+# social preview: the glow without the grid; ship + wordmark centred (ship ~260 wide, 50 gap, wordmark ~2.2 x
+# size wide), the README's tagline centred under them
+og = (grid(1200, 630, 300, DARK, lines_on=False) + place(DARK, "o", 366, 250, 300) + wordmark(546, 250, 190, DARK)
+      + f'<text x="600" y="490" text-anchor="middle" font-family="Poppins" font-weight="500" font-size="38" '
+        f'fill="{DARK["tag"]}">Hand work to your AI agents, and keep an eye on it.</text>')
 write("og-image.svg", svg(1200, 630, og))
 print("svgs:", sorted(os.listdir(OUT)))
