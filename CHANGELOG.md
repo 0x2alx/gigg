@@ -1,131 +1,24 @@
 # Changelog
 
-## Unreleased
-
-- Board: **+ New gig** sits after a column's last card and scrolls with it; it no longer stays
-  pinned over the cards at the bottom of the window. The Done column's **Archive all** moves to its
-  header, left of the sort button (on a column under 320 px wide, just the icon and count, so the
-  column's name stays whole in every theme). Every column's
-  header keeps its tools at the right in the same order: Archive all (Done), sort, collapse; a
-  sorted column no longer moves its sort button next to the title (it shows lit instead).
-- Admin, Users: Flags is the last column and takes the spare width, so the flags stay on one line.
-- API: a `PUT` takes the body its `GET` returned, edited: read-only fields (id, version, counts,
-  joined names) are ignored instead of each refused; unknown fields still fail. An unknown field's
-  error names the one it likely meant (`status_id`: did you mean `status`?) and the detail lists
-  what the body takes. The recurring-gig `template_id` and `schedule_id` docs now say a shared
-  template or schedule works too.
-- The launch: the lead ship is 15% bigger and the escorts take a random size (and place, a little)
-  on every launch, the bigger ones brighter.
-- The Done column's Archive all button follows the theme's button shape.
-- Admin: the Workspaces and Users tables size each column to its content with the same gap after
-  it; the buttons take the rest at the right edge (the spare width no longer lands between columns).
-- Shared errand templates: **+ New shared template** is at the top, and the Shared badge at the
-  right end of each card's title row, as in the other lists.
-- The live dot is gone: when live updates have
-  been lost for 30 seconds, a bar under the top bar says so, with Retry now, until they are back.
-- The logo flies while the pointer is on the top bar (a bob, star streaks, both engines lit), and
-  creating a gig or an errand plays a short launch: a big ship and a dozen small ones hover with
-  stars streaking past, then take off. Clicks go through; it is skipped for "reduce motion", and
-  Profile has a switch for it. (The logo's right engine flame was drawn on the left.)
-- Done column: a small **Archive all (N)** archives the done gigs it shows under the current
-  filters, with Undo (Archive done stays in the account menu). Columns lose their header **+** (the
-  same as **+ New gig** at their foot, which now stays in view while a long column scrolls past);
-  their sort and collapse icons always show. With Archived on, archived gigs come first in their
-  column.
-- Schedules and Templates cards take the Recurring layout (actions at the bottom left, assignees at
-  the bottom right); on all three the badges sit at the right end of the title row, the workspace
-  (or Shared) last, so only the text moves; all three dialogs put **+ New …** at the top. A
-  template's title no longer repeats its name.
-- The Archive done dialog lines up the workspace, key and name of its project rows in columns.
-- The table: the workspace picker is a filter like the others (Clear filters resets it), and on a
-  phone each row is a card of one shape: title and key, then status, priority, labels and due, then
-  the project and the update time, the assignees at the bottom right.
-- Admin: the Users buttons line up across rows (each slot as wide as its longest label); the
-  Workspaces "Show N archived" is small and in line with the first column (`.link.small` keeps its
-  size now).
-- Phones: the gig and errand panels start under the top bar, so their close button shows; menus
-  stay inside the window (a column's sort menu ran off the right edge).
-- **A top bar replaces the sidebar**: the logo, **Gigs** and **Errands** on the left; **+ New gig**,
-  **+ New errand**, the live dot, Inbox, Notifications and your picture on the right. Your picture
-  opens the account menu (on hover or click): Recurring, Schedules, Templates, Archive done, Trash,
-  saved views, Dashboard, Admin (with its sections), Profile, Themes, Log out. The board's own header
-  is gone: its count, help and the Board | Table and Columns | Rows switches end the filters row.
-  The **My gigs** page is gone (`/my` opens the board filtered to "Assigned to me").
-- Board: rows are 12% wider in the Rows layout; card text is two steps smaller; the gig form has more
-  room between its rows.
-- Pages use the window's full width (a thin edge on each side).
-- The workspace and project chips follow the theme's shape (round with Pill, otherwise a step
-  rounder than buttons) and glow in their workspace's colour, a project in its workspace's; so do
-  the removable filters of the folded row. The view switches stay at the right end of the filters:
-  on the chips row when the filters are open.
-- A click outside the errand panel closes it, as it does the gig panel (one shared hook).
-- The gig panel always opens beside the board again: the expand button widens that gig only, no
-  longer every later one (the choice older versions kept per browser is cleared).
-- Done cards get a one-click archive button (bottom left, before **Done …**). The message that
-  follows has **Undo**.
-- Errands table: the row borders line up again (two cells were flex boxes, which drop out of the
-  row's height; the flex layouts now sit inside the cells).
-- Recurring gigs: the cards are rebalanced. Title, place and priority (at the right) on top, the
-  timing, the facts, then the actions at the bottom left and the assignees' pictures at the bottom
-  right. A schedule named after its own timing no longer repeats it (dashes and "N min early"
-  aside), and lead times read "16 h early" instead of "960 min early" (Schedules too).
-- Errands table: the workspace (when you see several) and the project get columns of their own.
-- The round help buttons draw their "?" as an icon, centred whatever the theme's font.
-- The gig form dialog scrolls inside itself when it's taller than the window, so its footer sits
-  on its bottom edge; before, the form showed through a strip below the footer.
-- **Someone given only some projects of a workspace** no longer reads the workspace's description,
-  the members who see none of those projects (nor others' project rows), labels not used in those
-  projects, the runner's caps, usage and errand counts (only whether runs are paused), or errand
-  templates (shared ones included) that no errand of those projects uses.
-- A project's access rules apply only in its own workspace, whatever a caller asks.
-
-- **Gigs and errands**: tasks are now **gigs** and crons are **errands**, everywhere: the UI, the
-  API (`/gigs`, `/errands`, `gigs:read` ...), MCP tools (`create_gig`, `list_errands` ...),
-  permissions (`create_gigs` ...), the database and the docs. Migration 0013 renames the tables and
-  the names stored in data (key scopes, permission overrides, activity, allowed tool lists). Old
-  `/board/p/<id>/t/<key>` and `/crons` links redirect. Clients using the old API paths or MCP tool
-  names need updating.
-- An agent's errand executor needs only view and `errands:run`: running your own errands isn't
-  managing them, so an errand can be given to an agent without the Errands permission.
-- MCP hides `create_gig`, `clone_gig` and `create_from_template` from a key whose user may not
-  create gigs.
-- `gigg admin deny`, and `each` as a target of `allow`/`deny` (every rule the user has); both
-  refuse unknown permission names.
-- MCP `create_gig` and `update_gig` take `assignees` (usernames or user ids); `update_gig`
-  clears them with `clear: ["assignees"]`.
-- **Errands**: shell commands an agent runs on a schedule (every N minutes or hours, optionally on
-  some weekdays between two times, or daily, weekly, monthly), in its sandbox, with a run history,
-  each run's output and no gigs. An **Errands** page lists them, failing first, with a panel for
-  runs and output and an editor. The permissions `errands` and `errand_unsandboxed`, the key scopes
-  `errands:read`, `errands:output`, `errands:write` and `errands:run`, API endpoints and MCP tools. The
-  executor that runs them is outside gigg (the server still never runs commands).
-- **Pause runs** has two boxes, gig runs and errand runs; the Dashboard shows each workspace's errands
-  and how many are failing.
-- Schedules take `minutes` and `hours` timings (for errands only).
-- `gigg admin allow <user> <workspace|all> <permission>...` adds permissions to a user's rule and keeps
-  the rest (`access` replaces the rule).
-
-- Dialogs opened from a table row (archive, make admin, revoke…) inherited the cell's right
-  alignment and no-wrap, so titles sat on the right and text ran past the edge. Dialogs now render
-  at the top of the page.
-- Audit log: the API key badge shows the key's name (its id in the tooltip) and lines up with the
-  actor.
-
-## 0.1.0 (2026-11-16)
+## 0.1.0 (2026-11-19)
 
 The first public release.
 
-- **A board** for tasks across workspaces and projects, with filters, manual order, tables with bulk
-  actions, saved views, live updates and a command palette.
-- **Tasks**: Markdown with @mentions, checklists, subtasks, dependencies, custom fields, labels,
-  dates and time windows, archive and trash.
-- **Recurring tasks** built from reusable templates and schedules.
+- **A board** for gigs across workspaces and projects: columns or rows, filters kept in the URL,
+  manual order and per-column sorting, archive and trash, live updates, a command palette (Ctrl+K),
+  tables with bulk actions and saved views. It works on a phone too.
+- **Gigs**: Markdown with @mentions, checklists, subgigs, dependencies, custom fields, labels,
+  colours, start and due dates, time windows, assignees.
+- **Recurring gigs** built from reusable templates and schedules, per workspace or shared.
 - **Agents** as ordinary users. They get runs with status, cost and reports, resumable sessions,
-  questions in an inbox, and per-task model, effort, *always run* and tool allowlists. Each
-  workspace has daily caps and a pause switch.
+  questions in an inbox, and per-gig model, effort, *always run* and tool allowlists. Each
+  workspace has daily caps and a pause switch, and the dashboard shows their runs.
+- **Errands**: shell commands an agent runs on a schedule in its sandbox, with a run history and
+  each run's output. The executor that runs them is outside gigg: the server never runs commands.
 - **The same features three ways:** the web UI, a REST API with an OpenAPI document, and MCP.
-- **Access control**: workspaces, roles, per-permission overrides for users and groups, and API
-  keys limited by workspace, project, scope, listener, network and expiry.
+- **Access control**: workspaces, preset roles, per-permission overrides for users and groups (per
+  workspace, per project or everywhere), and API keys limited by workspace, project, scope,
+  listener, network and expiry.
 - **One binary** with SQLite: HTTPS, an optional second listener for agents, nightly backups and
   snapshots before migrations.
-- **Themes**, built-in help and an audit log.
+- **Themes** (built-in and your own), built-in help and an audit log.
