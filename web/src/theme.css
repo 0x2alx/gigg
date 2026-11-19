@@ -377,6 +377,8 @@ a.pulse-item:hover { color: var(--text); }
 .gig-card {
   /* card text a step smaller than the page's: every size inside reads these */
   --fs-xs: 0.66rem; --fs-sm: 0.72rem; --fs-base: 0.79rem; --fs-md: 0.85rem;
+  /* the card's box: padding, the top line's row height, the ⋯ button and its inset (phones: bigger) */
+  --card-pad-y: 0.6rem; --card-pad-r: 0.7rem; --card-line: 1.3rem; --card-menu: 1.6rem; --card-menu-inset: 0.25rem;
   position: relative;
   background: var(--surface);
   border: max(1px, var(--border-w)) solid var(--edge); /* at least 1px: blocked, missed and archived show on it */
@@ -388,18 +390,19 @@ a.pulse-item:hover { color: var(--text); }
 .gig-card.dragging { box-shadow: var(--shadow-pop), inset 3px 0 0 var(--card-c, transparent); }
 .card-open {
   display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit;
-  padding: 0.6rem 0.7rem 0.6rem 0.8rem; cursor: pointer; border-radius: var(--radius-m);
+  padding: var(--card-pad-y) var(--card-pad-r) var(--card-pad-y) 0.8rem; cursor: pointer; border-radius: var(--radius-m);
 }
-.card-top { display: flex; gap: 0.1rem 0.5rem; align-items: center; flex-wrap: wrap; min-height: 1.3rem; }
+/* the top line: the main cell wraps (priority, run state, workspace, ...); the key has the first row to
+   itself at the right, a fixed --card-line tall, and the ⋯ (absolute, below) is centred on that same row */
+.card-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: var(--card-line) auto; column-gap: 0.5rem; }
+.card-top-main { grid-row: 1 / span 2; display: flex; gap: 0.1rem 0.5rem; align-items: center; flex-wrap: wrap; min-width: 0; }
+/* a strut: the main cell's first line is at least --card-line tall, so its items share the key's middle */
+.card-top-main::before { content: ""; height: var(--card-line); margin-right: -0.5rem; }
 .key { font-size: var(--fs-sm); color: var(--muted); font-weight: var(--weight-body); font-variant-numeric: tabular-nums; }
-/* the key sits top right, small and monospaced; the card's ⋯ takes its place on hover */
-.card-key { margin-left: auto; font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.01em; }
-.gig-card:has(> .card-menu):hover .card-key, .gig-card:has(> .card-menu):focus-within .card-key { visibility: hidden; }
-/* touch screens: the ⋯ is always there, so the key moves left of it instead */
-@media (hover: none) {
-  .gig-card:has(> .card-menu) .card-top { padding-right: 1.6rem; }
-  .gig-card:has(> .card-menu):hover .card-key, .gig-card:has(> .card-menu):focus-within .card-key { visibility: visible; }
-}
+/* the key sits top right, small and monospaced, always visible; a card with a ⋯ keeps the ⋯'s slot free
+   right of it (the ⋯ fades in on hover, the key never moves) */
+.card-key { grid-column: 2; grid-row: 1; align-self: center; font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.01em; }
+.gig-card:has(> .card-menu) .card-top { padding-right: calc(var(--card-menu) + var(--card-menu-inset) - var(--card-pad-r) + var(--sp-2)); }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 /* the agent state of a card: a small uppercase badge in the state's colour */
 .run-badge {
@@ -488,8 +491,9 @@ a.pulse-item:hover { color: var(--text); }
 .meta-item { white-space: nowrap; display: inline-flex; align-items: center; gap: 0.25rem; }
 .meta-done { color: var(--text); }
 .meta-overdue { color: var(--danger); font-weight: var(--weight-strong); }
-.card-menu { position: absolute; top: 0.25rem; right: 0.25rem; transition: opacity 0.12s ease-out; }
-.card-menu > .icon-button { width: 1.6rem; height: 1.6rem; padding: 0; }
+/* the ⋯: top right, its middle on the middle of the key's row (card padding + half the row) */
+.card-menu { position: absolute; top: calc(var(--card-pad-y) + (var(--card-line) - var(--card-menu)) / 2); right: var(--card-menu-inset); transition: opacity 0.12s ease-out; }
+.card-menu > .icon-button { width: var(--card-menu); height: var(--card-menu); padding: 0; }
 /* the card's menu button shows on hover and keyboard focus (it stays in the tab order), and always on touch screens */
 .gig-card:not(:hover):not(:focus-within) .card-menu:not(:has(.menu)) { opacity: 0; }
 @media (hover: none) { .gig-card .card-menu { opacity: 1 !important; } }
@@ -1340,8 +1344,8 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
   .narrow .vw-table td:empty { display: none; }
   .narrow .vw-table td.vw-check { width: auto; padding-right: 0.2rem; }
   /* thumbs: bigger targets for the small icon buttons, and 16px fields so phones don't zoom on focus */
-  .card-menu > .icon-button, .panel .icon-button, .chip-x { min-width: 2.2rem; min-height: 2.2rem; }
-  .card-top { min-height: 2rem; padding-right: 2.4rem; }
+  .panel .icon-button, .chip-x { min-width: 2.2rem; min-height: 2.2rem; }
+  .gig-card { --card-line: 2rem; --card-menu: 2.2rem; }
   input, select, textarea, .bf-fields select, .bf-fields input { font-size: max(16px, 1em); }
 }
 

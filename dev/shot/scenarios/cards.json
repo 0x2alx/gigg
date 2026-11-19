@@ -1,0 +1,196 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  1440,
+  900
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({title: 'Only a key here', priority: 0})})).status)()",
+   "expect": 201
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'daywalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "hover": ".gig-card.state-queued .card-title"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible' && getComputedStyle(c.querySelector('.card-menu')).opacity === '1')(document.querySelector('.gig-card:hover'))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "shot": "cards-desk-day",
+   "full": false
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "hover": ".gig-card.state-queued .card-title"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible' && getComputedStyle(c.querySelector('.card-menu')).opacity === '1')(document.querySelector('.gig-card:hover'))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "shot": "cards-phone-day",
+   "full": false
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'nightwalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "hover": ".gig-card.state-queued .card-title"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible' && getComputedStyle(c.querySelector('.card-menu')).opacity === '1')(document.querySelector('.gig-card:hover'))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "shot": "cards-desk-night",
+   "full": false
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "hover": ".gig-card.state-queued .card-title"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible' && getComputedStyle(c.querySelector('.card-menu')).opacity === '1')(document.querySelector('.gig-card:hover'))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "shot": "cards-phone-night",
+   "full": false
+  }
+ ]
+}

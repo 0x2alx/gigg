@@ -1496,7 +1496,10 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
       onDragEnd={onDragEnd}
     >
       <button type="button" className="card-open" onClick={onOpen} aria-label={cardLabel}>
+        {/* the top line: a grid with the key in its own cell on the first line, level with the ⋯ beside
+            it, so the key never hides or wraps away; everything else wraps in the main cell */}
         <div className="card-top">
+          <div className="card-top-main">
           <PriorityIcon priority={gig.priority} />
           {state && (
             <span className={"run-badge run-" + state.kind} data-tip={state.tip}>
@@ -1505,7 +1508,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
               {running && run && <span className="mono">· {elapsed(now - run.started_at)}</span>}
             </span>
           )}
-          {/* with a run state, the workspace and the key always start the next line (never just the key) */}
+          {/* with a run state, the workspace starts the next line */}
           {state && showWs && <span className="card-break" aria-hidden="true" />}
           {showWs && <WorkspaceChip ws={ws} />}
           {statusLabel && (
@@ -1518,6 +1521,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
               <Icon name="archive" /> archived
             </span>
           )}
+          </div>
           <span className="pill pill-key card-key">{gig.key}</span>
         </div>
         <div className="card-title">{gig.title}</div>

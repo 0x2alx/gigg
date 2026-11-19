@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Cards: the gig's key stays visible on hover (the **⋯** has its own slot beside it, as on touch
+  screens), and the **⋯** sits level with the key at every width, text size and border setting.
 - Filters: **Recurring** on the board and in the table: every gig, **Hide recurring** (the gigs a
   recurring gig made) or **Only recurring**. It is kept in the page address, in the board's
   remembered filter and in saved views; the gig list API and the MCP `list_gigs` tool take
