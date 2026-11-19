@@ -1866,7 +1866,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 }
 .errand-run-head:disabled { cursor: default; opacity: 1; }
 .errand-run-head:not(:disabled):hover { background: var(--hover); }
-.errand-run-head .errand-run-status { width: 6.5rem; flex: none; }
+.errand-run-head .errand-run-status { min-width: 6.5rem; flex: none; } /* grows for "failed · exit 28" rather than run into the time */
 .errand-run-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .errand-run-meta { margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .errand-run-chev { flex: none; color: var(--muted); }
