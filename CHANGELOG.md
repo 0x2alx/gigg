@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Board: **+ New gig** sits after a column's last card and scrolls with it; it no longer stays
+  pinned over the cards at the bottom of the window. The Done column's **Archive all** moves to its
+  header, left of the sort button (on a narrow column, just the icon and count).
+- Admin, Users: Flags is the last column and takes the spare width, so the flags stay on one line.
 - API: a `PUT` takes the body its `GET` returned, edited: read-only fields (id, version, counts,
   joined names) are ignored instead of each refused; unknown fields still fail. An unknown field's
   error names the one it likely meant (`status_id`: did you mean `status`?) and the detail lists

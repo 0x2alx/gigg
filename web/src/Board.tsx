@@ -547,6 +547,28 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     const p = projOf(t.project_id);
     return !!p && t.status_category === "done" && canWriteIn(p.ws, p.project.id) && hasCap(me, "archive_gigs", p.ws.id, p.project.id);
   };
+  // Done takes no new gigs: its header carries "Archive all", for the done gigs this column shows and
+  // nothing else ("Archive done" in the account menu works on whole projects and by age). The board
+  // never shows cancelled gigs, so they have no column or button.
+  const archiveAll = (c: BoardColumn) => {
+    if (c.category !== "done") return null;
+    const mine = c.gigs.filter(canArchiveGig).length;
+    if (mine === 0) return null;
+    return (
+      <button
+        type="button"
+        className="pill-button col-archive"
+        disabled={archivingCol === c.key}
+        aria-label={`Archive all ${mine} done gig${mine === 1 ? "" : "s"} shown in ${c.name}`}
+        data-tip={`Archive the ${mine === 1 ? "done gig" : `${mine} done gigs`} shown in this column (Undo in the message)`}
+        onClick={() => archiveShown(c)}
+      >
+        <Icon name="archive" />
+        <span className="col-archive-label">{archivingCol === c.key ? "Archiving…" : "Archive all"}</span>
+        <span className="col-archive-n">{mine}</span>
+      </button>
+    );
+  };
   // Archive all: exactly the done gigs the column shows under the current filters, a few at a time;
   // the toast's Undo brings them all back
   const archiveShown = async (c: BoardColumn) => {
@@ -760,8 +782,10 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
                     {c.gigs.length}
                   </span>
                 </h2>
+                {sortOf(c) !== "manual" && archiveAll(c)}
                 {sortOf(c) !== "manual" && <SortMenu column={c.name} sorts={sortsFor(c.category)} value={sortOf(c)} onChange={(s) => setSort(c.key, s)} />}
                 <span className="column-tools">
+                  {sortOf(c) === "manual" && archiveAll(c)}
                   {sortOf(c) === "manual" && <SortMenu column={c.name} sorts={sortsFor(c.category)} value={sortOf(c)} onChange={(s) => setSort(c.key, s)} />}
                   {!narrow && (
                     <button type="button" className="icon-button col-collapse" aria-expanded={true} aria-label={`Collapse ${c.name}: it becomes a small button above the board`} onClick={() => toggleCollapsed(c.id)}>
@@ -794,30 +818,6 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
                     <Icon name="plus" strokeWidth={2} /> New gig
                   </button>
                 )}
-                {c.category === "done" &&
-                  // Done takes no new gigs: its footer archives the done gigs this column shows, nothing
-                  // else ("Archive done" in the account menu works on whole projects and by age). With none,
-                  // an empty slot of the same height keeps the columns lined up. The board never shows
-                  // cancelled gigs, so they have no column or footer.
-                  (() => {
-                    const mine = c.gigs.filter(canArchiveGig).length;
-                    if (mine === 0) return writable.length > 0 && <div className="column-add column-add-empty" aria-hidden="true">{"\u00a0"}</div>;
-                    return (
-                      <div className="column-foot">
-                        {mine > 0 && (
-                          <button
-                            type="button"
-                            className="pill-button"
-                            disabled={archivingCol === c.key}
-                            data-tip={`Archive the ${mine === 1 ? "done gig" : `${mine} done gigs`} shown in this column (Undo in the message)`}
-                            onClick={() => archiveShown(c)}
-                          >
-                            <Icon name="archive" /> {archivingCol === c.key ? "Archiving…" : `Archive all (${mine})`}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })()}
               </div>
             </section>
           );

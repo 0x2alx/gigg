@@ -97,8 +97,8 @@ export function UsersPage() {
               <tr>
                 <th>User</th>
                 <th>Kind</th>
-                <th>Flags</th>
                 <th>Last login</th>
+                <th className="admin-grow">Flags</th>
                 <th aria-label="Actions" />
               </tr>
             </thead>
@@ -118,14 +118,14 @@ export function UsersPage() {
                     </span>
                   </td>
                   <td>{u.kind === "agent" ? <span className="pill pill-agent">agent</span> : <span className="pill pill-muted">human</span>}</td>
-                  <td>
+                  <td className="small admin-lastlogin" data-label="Last login">{u.kind === "agent" ? <span className="muted">n/a</span> : <TimeAgo ms={u.last_login_at} />}</td>
+                  <td className="admin-grow">
                     <span className="chips admin-flags">
                       {u.is_admin && <span className="pill pill-accent">admin</span>}
                       {u.disabled && <span className="pill pill-danger">disabled</span>}
                       {u.id === me.user.id && <span className="pill pill-ws">you</span>}
                     </span>
                   </td>
-                  <td className="small admin-lastlogin" data-label="Last login">{u.kind === "agent" ? <span className="muted">n/a</span> : <TimeAgo ms={u.last_login_at} />}</td>
                   <td className="admin-actions">
                     <button type="button" className="button secondary small" aria-label={`Edit ${u.username}`} onClick={() => setEditingId(u.id)}>
                       Edit

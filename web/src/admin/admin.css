@@ -61,11 +61,14 @@
 .admin-actions > * { margin-left: 0.3rem; }
 .admin-actions a.button { text-decoration: none; }
 /* a list table with an actions column: each data column as wide as its content with the same gap after
-   it, the actions column takes the rest, its buttons at the right edge (left to auto layout, the spare
+   it, the actions column (or an .admin-grow one) takes the rest, its buttons at the right edge (left to auto layout, the spare
    width spreads by content length and the columns land unevenly) */
 @media (min-width: 721px) {
   .admin-fit th, .admin-fit td { width: 1%; white-space: nowrap; padding-right: var(--sp-7); }
   .admin-fit th:last-child, .admin-fit td:last-child { width: auto; padding-right: var(--sp-5); }
+  /* or a chosen column takes the rest (Users' flags, so they stay on one line), the buttons only their width */
+  .admin-fit .admin-grow { width: auto; white-space: normal; }
+  .admin-fit .admin-grow ~ :last-child { width: 1%; }
   .admin-fit .admin-user-text > .small { max-width: 26rem; overflow: hidden; text-overflow: ellipsis; }
 }
 .admin-nowrap { white-space: nowrap; }
