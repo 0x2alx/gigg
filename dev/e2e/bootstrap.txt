@@ -7,4 +7,4 @@ workspace-add scout Scout
 member scout scout member
 status-rename scout waiting "Needs review"
 project-add scout gigg gigg GIG
-key-add -user scout -workspace scout -name runner -scopes workspace:read,gigs:read,gigs:write,comments:read,comments:write,runs:write,profile:write -listeners internal -out /s/scout.token
+key-add -user scout -reach scout -name runner -scopes workspace:read,gigs:read,gigs:write,gigs:work,comments:read,comments:write,runs:write,profile:write -listeners internal -out /s/scout.token

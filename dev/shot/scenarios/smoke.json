@@ -1,0 +1,29 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [1440, 900],
+ "steps": [
+  {"wait": 3000},
+  {"goto": "/"},
+  {"wait": "input[autocomplete=username]"},
+  {"type": ["input[autocomplete=username]", "ada"]},
+  {"type": ["input[autocomplete=current-password]", "gigg-dev-password"]},
+  {"press": "Enter"},
+  {"wait": ".board"},
+  {"wait": 1500},
+  {"eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth", "expect": true},
+  {"eval": "document.querySelectorAll('button.card-open').length > 0", "expect": true},
+  {"shot": "board", "full": false},
+  {"click": "button.card-open"},
+  {"wait": "aside.panel"},
+  {"wait": 800},
+  {"eval": "(p => p.scrollWidth <= p.clientWidth + 1)(document.querySelector('aside.panel'))", "expect": true},
+  {"shot": "gig-panel", "full": false},
+  {"press": "Escape"},
+  {"viewport": [390, 844]},
+  {"goto": "/board"},
+  {"wait": ".board"},
+  {"wait": 1500},
+  {"eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth", "expect": true},
+  {"shot": "board-phone", "full": false}
+ ]
+}

@@ -9,4 +9,5 @@ sync:
 	mkdir -p $(DEST)
 	rsync -a --delete --exclude .git --exclude .claude --exclude .mcp.json --exclude node_modules \
 	  --exclude /out --exclude /scratch --include 'web/dist/.keep' --exclude 'web/dist/*' $(SRC)/ $(DEST)/
-	chmod -R a+rX $(DEST)
+	# node_modules may belong to a container's user (npm ci ran there): leave it alone
+	find $(DEST) -path $(DEST)/web/node_modules -prune -o -exec chmod a+rX {} +

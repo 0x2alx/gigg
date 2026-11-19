@@ -78,5 +78,7 @@ podman run --rm --network gigg-dev -v "$PWD/dev/shot":/shot:ro -v "$PWD/out":/ou
   node /shot/run.js /shot/scenarios/batch.json /out/shots/batch
 ```
 
-`batch.json` (desktop) and `mobile.json` (phone width) are the regression scenarios. The
+`smoke.json` is the quick check (sign in, the board, a gig's panel, phone width; it needs one gig,
+which `dev/e2e.sh` leaves behind). `batch.json` (desktop) and `mobile.json` (phone width) are the
+longer regression scenarios; they predate the top bar and need updating before they pass again. The
 documentation's screenshots come from a demo instance; see `dev/demo/README.md`.
