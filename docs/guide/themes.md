@@ -11,6 +11,16 @@
 
 Data colours (labels, statuses, priorities, workspaces, people) keep their hues in every theme. Their text colour is picked for contrast.
 
+## Make a theme with AI
+
+**✨ Make with AI** (next to **New theme**) lets any AI assistant design a theme for you, without gigg calling one:
+
+1. Describe the theme you want, for example "warm sunset colours, rounded corners, a techy font, bigger text".
+2. **Copy full prompt** and paste it into your assistant. The prompt explains the theme format, the colour roles, the fonts and the contrast minimums, and includes your current theme, so whatever the answer leaves out stays as it is.
+3. Paste the assistant's whole answer back and click **Use this theme**. gigg finds the JSON in it, saves the theme under **Your themes** and switches to it.
+
+![Make a theme with AI (Nightwalker theme)](../images/theme-ai-night.png)
+
 ## Fonts
 
 The 20 fonts in the editor come with gigg, so a page never contacts Google on its own. **More Google fonts…** takes any other Google Fonts family by its exact name, but only after you press **Load from Google Fonts**: from then on this browser loads such fonts from Google, which sees your IP address. Until then, a theme with such a font shows your system font, and the Themes page offers the same button. An admin can turn Google Fonts off for the whole server (`GIGG_REMOTE_FONTS=off`).

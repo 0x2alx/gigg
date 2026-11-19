@@ -211,6 +211,38 @@
    "margin": 0
   },
   {
+   "goto": "/themes"
+  },
+  {
+   "wait": "h1"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll(\"button\")].find(x => x.textContent.includes(\"Make with AI\")); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "[role=dialog] textarea"
+  },
+  {
+   "type": [
+    "[role=dialog] textarea",
+    "Warm sunset colours, rounded corners, a techy font, slightly bigger text."
+   ]
+  },
+  {
+   "wait": 500
+  },
+  {
+   "shot": "theme-ai-night",
+   "el": "[role=dialog]"
+  },
+  {
+   "press": "Escape"
+  },
+  {
    "goto": "/profile"
   },
   {

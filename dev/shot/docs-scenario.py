@@ -73,6 +73,16 @@ steps = [
     {"wait": 2500},
     # the palette alone, empty: its placeholder says what it takes, and the list shows what it offers
     {"shot": "palette-night", "el": ".cp", "margin": 0},
+    # Themes > Make with AI, with a description typed in
+    {"goto": "/themes"},
+    {"wait": "h1"},
+    {"wait": 1200},
+    click_text("button", "Make with AI"),
+    {"wait": "[role=dialog] textarea"},
+    {"type": ["[role=dialog] textarea", "Warm sunset colours, rounded corners, a techy font, slightly bigger text."]},
+    {"wait": 500},
+    {"shot": "theme-ai-night", "el": "[role=dialog]"},
+    {"press": "Escape"},
     *page("/profile", ".profile", "profile-night"),
     *page("/admin/workspaces/1", "form[aria-label='Workspace settings']", "admin-workspace-night"),
     {"goto": "/board"},
