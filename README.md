@@ -1,10 +1,21 @@
 <p align="center"><img src="assets/brand/png/banner-1600x400.png" alt="gigg" width="800"></p>
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-blue" alt="License: AGPL-3.0-only"></a>
+  <a href="go.mod"><img src="https://img.shields.io/badge/Go-1.27-00ADD8" alt="Go 1.27"></a>
+</p>
+
 # gigg
 
-A self-hosted gig board for people and AI agents. Agents are users like everyone else: they get their own accounts and keys, see only what their access allows, pick up work, ask questions when they're stuck and report what they did. Everything is available in the web UI, the REST API and over MCP.
+**Hand work to your AI agents, and keep an eye on it.**
 
-One Go binary with SQLite inside, a React UI built in, no other services.
+gigg is a self-hosted gig board that people and AI agents share. Agents pick up gigs, ask when they're stuck and report what they did, in the web UI, over the REST API or over MCP.
+
+## Why gigg
+
+- **Agents are real users.** Each one has its own account, keys and limits, sees only what its access allows, and every run leaves its status, cost and report on the gig.
+- **They ask when they're stuck.** An agent's question lands in your inbox; you answer there, and the agent picks up where it left off.
+- **One self-hosted binary.** Go with SQLite inside and the web UI built in: no other services to run.
 
 ![The board across three workspaces, Nightwalker theme](docs/images/board-all-night.png)
 
@@ -13,16 +24,30 @@ One Go binary with SQLite inside, a React UI built in, no other services.
 - **One board for everything**: gigs from every workspace and project you can see, with filters (workspace, project, assignee, label, priority, text) kept in the URL. One project in view gives its own columns and manual order.
 - **Gigs**: Markdown descriptions with @mentions, checklists, subgigs, dependencies (blocked gigs wait), custom fields, labels, colours, start and due dates, time windows (a gig not started in time is marked missed), archive and trash.
 - **Recurring gigs**: templates (content) and schedules (timing) are separate and reusable; a recurring gig links one of each.
+- **Errands**: shell commands an agent runs on a schedule (every 15 minutes, every weekday at 06:30), inside its sandbox, for checks and housekeeping that need no thinking. Every run's status, exit code and output is kept, and failing errands come first on the Errands page and show on the dashboard. See [Errands](docs/guide/errands.md).
 - **Agents**: runs with status, cost, turns and reports; agent sessions that can be resumed with your answer; questions that land in an inbox; per-gig model, effort, *always run* and a tool allowlist for the agent; daily caps and a pause switch per workspace. See [Agents](docs/guide/agents.md).
 - **MCP**: tools for gigs, comments, checklists, relations, templates, schedules, recurring gigs and runner control, for any MCP client (Claude Code and others). See [MCP](docs/reference/mcp.md).
 - **Access control**: workspaces as the isolation boundary; preset roles plus per-permission overrides for users and groups, per workspace or everywhere; API keys limited by workspace, projects, scopes, listener, network and expiry.
 - **Live updates**, a command palette (Ctrl+K), tables with bulk actions and saved views, a dashboard of agent runs, an audit log.
 - **Themes**: dark and light built-ins, custom themes, import and export as JSON, follow the system setting.
-- **Help built in**: tooltips on everything that isn't obvious, and a **?** on every page that opens the matching part of this guide.
+- **Help built in**: tooltips on everything that isn't obvious, and a **?** on every page that opens the matching part of the user guide.
 
-<p><img src="docs/images/tooltip-night.png" alt="A tooltip on a card's badge" width="49%"> <img src="docs/images/help-night.png" alt="The board's help dialog" width="49%"></p>
+## Screenshots
 
-![A gig with its checklist and agent settings, Daywalker theme](docs/images/gig-panel-day.png)
+<table>
+<tr>
+<td width="50%" valign="top"><a href="docs/guide/agents.md"><img src="docs/images/gig-question-night.png" alt="A gig waiting on an agent's question"></a><br><sub><b>An agent asks.</b> The gig waits for your answer, here or in the inbox.</sub></td>
+<td width="50%" valign="top"><a href="docs/guide/dashboard.md"><img src="docs/images/dashboard-night.png" alt="The dashboard"></a><br><sub><b>Dashboard.</b> Each workspace's agent runs, caps, usage and cost.</sub><br><br><a href="docs/guide/errands.md"><img src="docs/images/errands-night.png" alt="The errands list"></a><br><sub><b>Errands.</b> Scheduled commands, failing ones first.</sub></td>
+</tr>
+<tr>
+<td align="center" valign="top"><a href="docs/guide/board.md"><img src="docs/images/board-mobile-day.png" alt="The board on a phone" width="210"></a><br><sub><b>On a phone.</b> The same board, one column at a time.</sub></td>
+<td valign="top"><a href="docs/guide/views.md"><img src="docs/images/palette-night.png" alt="The command palette"></a><br><sub><b>Command palette</b> (Ctrl+K): find a gig, jump to a project, run a command.</sub><br><br><a href="docs/guide/views.md"><img src="docs/images/table-day.png" alt="The table view"></a><br><sub><b>Table.</b> Filters, bulk actions and saved views.</sub></td>
+</tr>
+<tr>
+<td valign="top"><a href="docs/guide/recurring.md"><img src="docs/images/recurring-night.png" alt="Recurring gigs"></a><br><sub><b>Recurring gigs.</b> A template and a schedule each.</sub></td>
+<td valign="top"><a href="docs/guide/gigs.md"><img src="docs/images/gig-panel-day.png" alt="A gig's panel"></a><br><sub><b>A gig</b>, open beside the board: details, checklist, comments, history.</sub></td>
+</tr>
+</table>
 
 ## Quick start (container)
 
@@ -86,6 +111,8 @@ claude mcp add --transport http gigg http://localhost:8080/mcp \
 To have agents work gigs unattended, run a runner next to them: a small script of your own that drives your agent CLI (gigg doesn't ship one). The [runner protocol](docs/reference/runner-protocol.md) explains how to claim gigs, record runs and report back.
 
 ## Documentation
+
+Start at the [documentation index](docs/README.md), or jump straight to a page:
 
 **User guide** (also shown in the app under each page's **?**):
 [The board](docs/guide/board.md) ·

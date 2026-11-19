@@ -21,7 +21,7 @@ def page(path, wait, shot, settle=1800, **kw):
     if kw.get("el"):
         s.append({"eval": "(() => { document.querySelector(%s).scrollIntoView({ block: 'center' }); return true; })()" % json.dumps(kw["el"]), "expect": True})
         s.append({"wait": 400})
-        s.append({"shot": shot, "el": kw["el"]})
+        s.append({"shot": shot, "el": kw["el"], **({"margin": kw["margin"]} if "margin" in kw else {})})
     else:
         s.append({"shot": shot, "full": False})
     return s
@@ -56,14 +56,23 @@ steps = [
     {"wait": "[role=dialog] .rec-row, [role=dialog] li, [role=dialog] article"},
     {"wait": 700},
     {"shot": "recurring-night", "el": "[role=dialog]"},
+    # the dashboard's cards fill a narrower window: the shot shows them without the empty half
+    {"viewport": [1100, 560]},
     *page("/dashboard", ".dash-card", "dashboard-night"),
+    {"viewport": [1440, 900]},
+    # the errands list (one failing, one paused), in a window as tall as the list
+    {"viewport": [1440, 420]},
+    *page("/errands", ".errand-table", "errands-night"),
+    {"viewport": [1440, 900]},
+    # a gig waiting on an agent's question: its panel
+    *page("/board/p/1/g/PLT-5", "aside.panel .tp-body", "gig-question-night", settle=1200, el="aside.panel", margin=0),
     {"goto": "/board"},
     {"wait": ".board"},
     {"eval": "(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true })); return true; })()", "expect": True},
     {"wait": "input[aria-label=Command]"},
-    {"type": ["input[aria-label=Command]", "rate"]},
-    {"wait": 700},
-    {"shot": "palette-night", "full": False},
+    {"wait": 2500},
+    # the palette alone, empty: its placeholder says what it takes, and the list shows what it offers
+    {"shot": "palette-night", "el": ".cp", "margin": 0},
     *page("/profile", ".profile", "profile-night"),
     *page("/admin/workspaces/1", "form[aria-label='Workspace settings']", "admin-workspace-night"),
     {"goto": "/board"},

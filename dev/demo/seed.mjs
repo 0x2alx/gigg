@@ -1,7 +1,7 @@
 // Fills a fresh demo instance (bootstrapped with dev/demo/bootstrap.txt) with believable gigs for the
 // documentation's screenshots: workspaces with colours, labels, priorities, due dates, checklists,
-// dependencies, a custom field, agent runs with costs, a question waiting for a person, mentions and
-// recurring gigs. Generic names only.
+// dependencies, a custom field, agent runs with costs, a question waiting for a person, mentions,
+// recurring gigs and errands. Generic names only.
 //
 //   node seed.mjs <base URL of the internal listener, e.g. http://gigg-demo:8080> <dir with the *.token files>
 import { readFileSync } from "node:fs";
@@ -128,4 +128,20 @@ await dana("POST", `/projects/${projects.HOM}/recurrences`, {
   title: "Water the plants", freq: "weekly", weekdays: [1, 4], tz: "UTC", window_start: "08:00", window_minutes: 720, priority: 1, assignees: [users.sam],
 });
 
-console.log(`seeded ${Object.keys(gigs).length} gigs`);
+// Errands (made by Dana, run by Scout's executor): two ok, one failing, one paused
+const errands = {};
+for (const [name, command, rule, extra] of [
+  ["Disk space check", "df -P / | awk 'NR==2 { exit ($5+0 > 90) }'", { freq: "minutes", interval: 15 }],
+  ["Backup freshness", "find /backups -name '*.sql.gz' -mmin -1500 | grep -q .", { freq: "daily", window_start: "06:30" }],
+  ["API health check", "curl -fsS --max-time 10 https://api.example.com/healthz", { freq: "minutes", interval: 5, window_start: "07:00", window_minutes: 840, weekdays: [1, 2, 3, 4, 5] }],
+  ["Rotate old logs", "find ~/logs -name '*.log' -mtime +14 -delete", { freq: "weekly", weekdays: [7], window_start: "03:00" }, { paused: true }],
+]) errands[name] = await dana("POST", "/workspaces/acme/errands", { name, command, rule: { tz: "UTC", ...rule }, worker: "scout", ...extra });
+for (const name of ["Disk space check", "Backup freshness", "API health check"]) await dana("POST", `/errands/${errands[name].id}/run-now`);
+const finish = {
+  "Disk space check": { status: "ok", exit_code: 0, duration_ms: 40, output_tail: "" },
+  "Backup freshness": { status: "ok", exit_code: 0, duration_ms: 310, output_tail: "" },
+  "API health check": { status: "failed", exit_code: 28, duration_ms: 10012, output_tail: "curl: (28) Connection timed out after 10001 milliseconds\n" },
+};
+for (const c of (await scout("POST", "/workspaces/acme/errands/claim")).items) await scout("POST", `/errand-runs/${c.run_id}/finish`, finish[c.name]);
+
+console.log(`seeded ${Object.keys(gigs).length} gigs, ${Object.keys(errands).length} errands`);

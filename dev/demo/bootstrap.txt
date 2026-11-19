@@ -18,11 +18,12 @@ member acme scout member
 member acme atlas member
 member scout scout member
 member home sam member
+access scout acme member errands=allow
 access scout scout member always_run=allow
 project-add acme platform Platform PLT
 project-add acme website Website WEB
 project-add scout research Research RES
 project-add home house Household HOM
-key-add -user dana -name seed -scopes workspace:read,workspace:write,gigs:read,gigs:write,gigs:work,gigs:delete,comments:read,comments:write,runs:write,projects:write -listeners internal -out /s/dana.token
+key-add -user dana -name seed -scopes workspace:read,workspace:write,gigs:read,gigs:write,gigs:work,gigs:delete,comments:read,comments:write,runs:write,projects:write,errands:read,errands:write -listeners internal -out /s/dana.token
 key-add -user sam -name seed -scopes workspace:read,gigs:read,gigs:write,gigs:work,comments:read,comments:write -listeners internal -out /s/sam.token
-key-add -user scout -name runner -scopes workspace:read,gigs:read,gigs:write,gigs:work,comments:read,comments:write,runs:write -listeners internal -out /s/scout.token
+key-add -user scout -name runner -scopes workspace:read,gigs:read,gigs:write,gigs:work,comments:read,comments:write,runs:write,errands:run -listeners internal -out /s/scout.token

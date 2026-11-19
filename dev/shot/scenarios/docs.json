@@ -110,6 +110,12 @@
    "el": "[role=dialog]"
   },
   {
+   "viewport": [
+    1100,
+    560
+   ]
+  },
+  {
    "goto": "/dashboard"
   },
   {
@@ -126,6 +132,64 @@
    "full": false
   },
   {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "viewport": [
+    1440,
+    420
+   ]
+  },
+  {
+   "goto": "/errands"
+  },
+  {
+   "wait": ".errand-table"
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "errands-night",
+   "full": false
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "goto": "/board/p/1/g/PLT-5"
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "(() => { document.querySelector(\"aside.panel\").scrollIntoView({ block: 'center' }); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 400
+  },
+  {
+   "shot": "gig-question-night",
+   "el": "aside.panel",
+   "margin": 0
+  },
+  {
    "goto": "/board"
   },
   {
@@ -139,17 +203,12 @@
    "wait": "input[aria-label=Command]"
   },
   {
-   "type": [
-    "input[aria-label=Command]",
-    "rate"
-   ]
-  },
-  {
-   "wait": 700
+   "wait": 2500
   },
   {
    "shot": "palette-night",
-   "full": false
+   "el": ".cp",
+   "margin": 0
   },
   {
    "goto": "/profile"
