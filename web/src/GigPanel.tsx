@@ -406,7 +406,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
         }
         leftSecs={
           <>
-            <ChecklistSection gig={gig} canEdit={can("edit_gigs")} onGig={onGig} />
+            <ChecklistSection key={gig.id} gig={gig} canEdit={can("edit_gigs")} onGig={onGig} />
             <SubgigsSection gig={gig} wsId={ws.id} canCreate={can("create_gigs") && !gig.deleted} canEdit={can("edit_gigs") && !gig.deleted} assignable={candidates.map((u) => u.id)} onOpen={onMoved} onGig={onGig} onChanged={onChanged} />
           </>
         }

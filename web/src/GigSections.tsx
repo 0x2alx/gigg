@@ -253,6 +253,12 @@ function ChecklistBox({ rows, canEdit, checkable, busy, err, onToggle, onEdit, o
 
 const focusMoved = (key: string, dir: -1 | 1) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-check="${key}"] .ck-${dir < 0 ? "up" : "down"}`)?.focus());
 
+// A checklist section starts open when it has items, and folded when it has none (the user can still
+// fold or open it by hand). The gig panel keys the section on the gig, so switching gigs starts over.
+export function checklistStartsOpen(count: number | null | undefined): boolean {
+  return (count ?? 0) > 0;
+}
+
 export function ChecklistSection({ gig, canEdit, onGig }: { gig: Gig; canEdit: boolean; onGig: (t: Gig) => void }) {
   const [items, setItems] = useState<ChecklistItem[] | null>(null);
   const [err, setErr] = useState("");
@@ -286,7 +292,7 @@ export function ChecklistSection({ gig, canEdit, onGig }: { gig: Gig; canEdit: b
   if (!canEdit && total === 0) return null;
   return (
     <Section
-      defaultOpen={false}
+      defaultOpen={checklistStartsOpen(gig.checklist_total)}
       label="Checklist"
       title="Checklist"
       icon="checklist"
@@ -336,8 +342,9 @@ export function ChecklistSection({ gig, canEdit, onGig }: { gig: Gig; canEdit: b
   );
 }
 
-// ChecklistDraft: the checklist of a gig (or template) not saved yet.
-export function ChecklistDraft({ items, onChange, note }: { items: string[]; onChange: (v: string[]) => void; note?: string }) {
+// ChecklistDraft: the checklist of a gig (or template) not saved yet. It starts open when it already
+// has items; openOn opens it again when the form fills it from outside (a template picked).
+export function ChecklistDraft({ items, onChange, note, openOn = 0 }: { items: string[]; onChange: (v: string[]) => void; note?: string; openOn?: number }) {
   // stable keys for the rows, so an item being edited keeps its box while others move
   const ids = useRef<string[]>([]);
   const seq = useRef(0);
@@ -350,7 +357,7 @@ export function ChecklistDraft({ items, onChange, note }: { items: string[]; onC
     onChange(xs);
   };
   return (
-    <Section defaultOpen={false} label="Checklist" title="Checklist" icon="checklist" badges={items.length > 0 && <span className="tsec-count">{items.length}</span>}>
+    <Section defaultOpen={checklistStartsOpen(items.length)} openOn={openOn} label="Checklist" title="Checklist" icon="checklist" badges={items.length > 0 && <span className="tsec-count">{items.length}</span>}>
       {note && <p className="muted small tsec-note">{note}</p>}
       <ChecklistBox
         rows={items.map((text, i) => ({ key: ids.current[i]!, text, done: false }))}

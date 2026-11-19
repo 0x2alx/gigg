@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Gig panel: the **Checklist** section opens on its own when the gig has items, and stays folded
+  when it has none; switching to another gig starts from that gig's checklist. The new-gig form and
+  the template editor do the same, and picking a template with a checklist opens it.
 - Cards: when a person handed a gig to an agent, hovering the person's picture, the **›** or the
   agent's picture reads it as one sentence ("Dana Rivera handed this gig to Scout").
 - Docs: the README opens with a transparent logo (light and dark variants) and tells gigs

@@ -49,6 +49,8 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   // a shared template (every workspace's): instance admins choose it for a new one; an existing one keeps its scope
   const [shared, setShared] = useState(!!tpl?.shared);
   const [checklist, setChecklist] = useState<string[]>(schedule?.checklist ?? tpl?.checklist ?? []);
+  // bumped when a picked template fills the checklist, so its section opens to show the items
+  const [checklistFilled, setChecklistFilled] = useState(0);
   const [subgigs, setSubgigs] = useState<TemplateSubgig[]>(normSubs(schedule?.subgigs ?? tpl?.subgigs ?? []));
   const [deps, setDeps] = useState<DraftDep[]>([]);
   const [custom, setCustom] = useState<Record<string, unknown>>(schedule?.custom ?? tpl?.custom ?? {});
@@ -254,6 +256,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     setColor(t.color);
     setRun(runFrom(t));
     setChecklist(t.checklist ?? []);
+    if (t.checklist?.length) setChecklistFilled((n) => n + 1);
     setSubgigs(normSubs(t.subgigs ?? []));
     setCustom(t.custom ?? {});
   };
@@ -518,7 +521,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           }
           leftSecs={
             <>
-              <ChecklistDraft items={checklist} onChange={setChecklist} note={repeating ? "Every gig it creates gets this checklist." : tplMode ? "Every gig made from the template gets this checklist." : undefined} />
+              <ChecklistDraft items={checklist} onChange={setChecklist} openOn={checklistFilled} note={repeating ? "Every gig it creates gets this checklist." : tplMode ? "Every gig made from the template gets this checklist." : undefined} />
               <SubgigsDraft
                 items={subgigs}
                 onChange={setSubgigs}
