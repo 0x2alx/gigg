@@ -3,7 +3,7 @@ import clumsy from "../../testdata/themes/clumsy-clanker.json";
 import daywalker from "../../testdata/themes/daywalker.json";
 import nightwalker from "../../testdata/themes/nightwalker.json";
 import petty from "../../testdata/themes/petty-officer.json";
-import { BUILTINS, contrastProblems, findTheme, firstJSON, fixFor, fromObject, importText, nearestPassing, parseColour, ratio, sane, themeJSON, type Theme } from "./theme";
+import { BUILTINS, SCHEDULE_COLOR, contrastProblems, recurringLook, findTheme, firstJSON, fixFor, fromObject, importText, nearestPassing, parseColour, ratio, sane, themeJSON, type Theme } from "./theme";
 
 const current = BUILTINS[1]!;
 const byName = (n: string) => BUILTINS.find((t) => t.name.toLowerCase() === n.toLowerCase() || t.id === n.toLowerCase()) ?? findTheme(n);
@@ -137,5 +137,22 @@ describe("gigg extras (control shape, board columns)", () => {
     expect(bad.laneColor).toBeUndefined();
     expect(notes.some((n) => n.includes("laneColor"))).toBe(true);
     expect(themeJSON({ ...findTheme("nightwalker")! })).not.toContain("lane");
+  });
+});
+
+describe("recurring cards (recurringLook)", () => {
+  it("every built-in theme: the badge text reads at 4.5:1, and the card is tinted", () => {
+    for (const t of BUILTINS) {
+      const r = recurringLook(t);
+      expect(ratio(r.text, r.badge), t.id).toBeGreaterThanOrEqual(4.5);
+      expect(r.card.toLowerCase(), t.id).not.toBe(t.surface.toLowerCase());
+      expect(r.cardHover.toLowerCase(), t.id).not.toBe(r.card.toLowerCase());
+    }
+  });
+  it("the hue is the recurring colour; dark themes glow stronger", () => {
+    const day = recurringLook(byName("daywalker")!);
+    const night = recurringLook(byName("nightwalker")!);
+    expect(day.glow.startsWith(SCHEDULE_COLOR)).toBe(true);
+    expect(parseInt(night.glow.slice(7), 16)).toBeGreaterThan(parseInt(day.glow.slice(7), 16));
   });
 });

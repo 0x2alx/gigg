@@ -37,6 +37,10 @@
    "expect": 201
   },
   {
+   "eval": "(async () => { const at = new Date(Date.now() + 30 * 60000); const hm = String(at.getUTCHours()).padStart(2, '0') + ':' + String(at.getUTCMinutes()).padStart(2, '0'); const r = await fetch('/api/v1/projects/1/recurrences', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({title: 'Inbox triage', priority: 1, assignees: [1], freq: 'daily', tz: 'UTC', window_start: hm, window_minutes: 120, lead_minutes: 60})}); await new Promise(ok => setTimeout(ok, 3000)); return r.status; })()",
+   "expect": 201
+  },
+  {
    "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'daywalker', match_system: false})})).status)()",
    "expect": 204
   },
@@ -57,6 +61,10 @@
   },
   {
    "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => !!c.querySelector('.card-top .rec-badge') && !c.querySelector('.card-foot .pill') && getComputedStyle(c).backgroundColor !== getComputedStyle(document.querySelector('.gig-card:not(.recurring):not(:hover)')).backgroundColor))([...document.querySelectorAll('.gig-card.recurring')].filter(c => c.offsetParent))",
    "expect": true
   },
   {
@@ -94,6 +102,10 @@
   },
   {
    "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => !!c.querySelector('.card-top .rec-badge') && !c.querySelector('.card-foot .pill') && getComputedStyle(c).backgroundColor !== getComputedStyle(document.querySelector('.gig-card:not(.recurring):not(:hover)')).backgroundColor))([...document.querySelectorAll('.gig-card.recurring')].filter(c => c.offsetParent))",
    "expect": true
   },
   {
@@ -138,6 +150,10 @@
    "expect": true
   },
   {
+   "eval": "(cs => cs.length > 0 && cs.every(c => !!c.querySelector('.card-top .rec-badge') && !c.querySelector('.card-foot .pill') && getComputedStyle(c).backgroundColor !== getComputedStyle(document.querySelector('.gig-card:not(.recurring):not(:hover)')).backgroundColor))([...document.querySelectorAll('.gig-card.recurring')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
    "hover": ".gig-card.state-queued .card-title"
   },
   {
@@ -172,6 +188,10 @@
   },
   {
    "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => !!c.querySelector('.card-top .rec-badge') && !c.querySelector('.card-foot .pill') && getComputedStyle(c).backgroundColor !== getComputedStyle(document.querySelector('.gig-card:not(.recurring):not(:hover)')).backgroundColor))([...document.querySelectorAll('.gig-card.recurring')].filter(c => c.offsetParent))",
    "expect": true
   },
   {

@@ -1483,7 +1483,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
   };
   return (
     <article
-      className={"gig-card" + (state ? " state-" + state.kind : "") + (dragging ? " dragging" : "") + (gig.missed_at ? " missed" : "") + (gig.archived_at ? " archived" : "") + (gig.blocked_by ? " blocked" : "") + (gig.color ? " colored" : "")}
+      className={"gig-card" + (gig.recurrence_id ? " recurring" : "") + (state ? " state-" + state.kind : "") + (dragging ? " dragging" : "") + (gig.missed_at ? " missed" : "") + (gig.archived_at ? " archived" : "") + (gig.blocked_by ? " blocked" : "") + (gig.color ? " colored" : "")}
       style={gig.color ? ({ "--card-c": gig.color } as CSSProperties) : undefined}
       data-gig-id={gig.id}
       draggable={canWrite}
@@ -1501,6 +1501,12 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
         <div className="card-top">
           <div className="card-top-main">
           <PriorityIcon priority={gig.priority} />
+          {!!gig.recurrence_id && (
+            <span className="rec-badge" data-tip="Made by a recurring gig">
+              <Icon name="refresh" strokeWidth={2.4} />
+              Recurring
+            </span>
+          )}
           {state && (
             <span className={"run-badge run-" + state.kind} data-tip={state.tip}>
               {running ? <span className="pulse-dot" aria-hidden="true" /> : <Icon name={STATE_ICON[state.kind]} />}

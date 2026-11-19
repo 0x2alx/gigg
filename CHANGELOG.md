@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Cards: a gig a recurring gig made stands out: a glowing purple **Recurring** badge on its top
+  line, and a purple-tinted card and border. The hue is the same in every theme, the strength follows
+  the theme, and the badge text reads at 4.5:1 in every built-in theme. The small ↻ pill in the card's
+  foot is gone (the gig panel keeps it).
 - Cards: the gig's key stays visible on hover (the **⋯** has its own slot beside it, as on touch
   screens), and the **⋯** sits level with the key at every width, text size and border setting.
 - Filters: **Recurring** on the board and in the table: every gig, **Hide recurring** (the gigs a

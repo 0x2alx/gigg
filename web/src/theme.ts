@@ -208,6 +208,13 @@ export function applyTheme(t: Theme): void {
   set("--weight-heading", String(WEIGHTS[t.fontWeight][1]));
   set("--weight-strong", String(strongWeight(t.fontWeight)));
   set("--badge-mix", `${badgeTextShare(t)}%`);
+  const rec = recurringLook(t);
+  set("--rec-card", rec.card);
+  set("--rec-card-hover", rec.cardHover);
+  set("--rec-edge", rec.edge);
+  set("--rec-badge", rec.badge);
+  set("--rec-text", rec.text);
+  set("--rec-glow", rec.glow);
   s.fontSize = `${t.textScalePct}%`;
   s.colorScheme = t.dark ? "dark" : "light";
 }
@@ -264,6 +271,26 @@ export const PRIORITY_COLOR = ["", "#0090FF", "#FFC53D", "#F76B15", "#E5484D"];
 // Recurring gigs: the schedule badge, and a gig's time window while it is open.
 export const SCHEDULE_COLOR = "#8E4EC6";
 export const WINDOW_OPEN_COLOR = "#F76B15";
+
+// Recurring cards (a gig a recurring gig made): the card takes a tint of SCHEDULE_COLOR and its top
+// line a solid, glowing "Recurring" badge. The hue is the same in every theme (it means "recurring"
+// across gigg); the rest follows the theme: dark themes get a stronger tint, a slightly deeper badge
+// and a stronger glow, and the badge text is whichever of white, the theme's text or its surface reads
+// best on the badge (at least 4.5:1 in every built-in theme; the tests check).
+export type RecurringLook = { card: string; cardHover: string; edge: string; badge: string; text: string; glow: string };
+export function recurringLook(t: Pick<Theme, "dark" | "surface" | "border" | "text">): RecurringLook {
+  const c = SCHEDULE_COLOR;
+  const badge = t.dark ? mix(c, t.surface, 0.12) : c;
+  const text = ["#FFFFFF", t.text, t.surface].reduce((best, x) => (ratio(x, badge) > ratio(best, badge) ? x : best));
+  return {
+    card: mix(t.surface, c, t.dark ? 0.15 : 0.1),
+    cardHover: mix(t.surface, c, t.dark ? 0.2 : 0.14),
+    edge: mix(t.border, c, t.dark ? 0.75 : 0.6),
+    badge,
+    text,
+    glow: c + (t.dark ? "CC" : "8C"), // 80% / 55% opacity
+  };
+}
 
 // every colour the app picks by itself for a badge (labels, workspaces and users by name, statuses, priorities, schedule, window)
 export const DATA_COLORS: string[] = [...new Set([...PALETTE, ...Object.values(CATEGORY_COLOR), ...PRIORITY_COLOR.slice(1), SCHEDULE_COLOR, WINDOW_OPEN_COLOR])];

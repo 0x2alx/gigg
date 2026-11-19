@@ -342,7 +342,8 @@ export function GigBadges({ gig, now = Date.now(), items, fields }: {
             {c.text}
           </Pill>
         ))}
-      {!!gig.recurrence_id && (
+      {/* a card says "Recurring" on its top line instead (Board's rec-badge) */}
+      {!!gig.recurrence_id && !items && (
         <Pill color={SCHEDULE_COLOR} title="Made by a recurring gig">
           <Icon name="refresh" />
         </Pill>

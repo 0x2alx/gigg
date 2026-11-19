@@ -388,6 +388,19 @@ a.pulse-item:hover { color: var(--text); }
 }
 .gig-card:hover, .gig-card:focus-within { border-color: var(--edge-hover); background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
 .gig-card.dragging { box-shadow: var(--shadow-pop), inset 3px 0 0 var(--card-c, transparent); }
+/* a gig a recurring gig made: a tinted card and a glowing "Recurring" badge on its top line; the
+   colours come from theme.ts recurringLook (one hue, strengths per theme). Run states, blocked,
+   missed and archived, further down, still win on the border. */
+.gig-card.recurring { background: var(--rec-card); border-color: var(--rec-edge); }
+.gig-card.recurring:hover, .gig-card.recurring:focus-within { background: var(--rec-card-hover); border-color: var(--rec-edge); }
+.rec-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem; flex: none;
+  padding: 0.08rem 0.45rem; border-radius: 999px;
+  background: var(--rec-badge); color: var(--rec-text);
+  font-size: var(--fs-xs); font-weight: var(--weight-strong); letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.3;
+  box-shadow: 0 0 0 1px var(--rec-glow), 0 0 0.65rem 0.12rem var(--rec-glow);
+}
+.rec-badge .ico { width: 0.95em; height: 0.95em; }
 .card-open {
   display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit;
   padding: var(--card-pad-y) var(--card-pad-r) var(--card-pad-y) 0.8rem; cursor: pointer; border-radius: var(--radius-m);
