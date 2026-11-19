@@ -301,7 +301,7 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .column-tools { margin-left: auto; display: inline-flex; gap: 0.1rem; transition: opacity 0.12s ease-out; }
 .column-tools .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
 .column-tools .icon-button:hover { color: var(--text); }
-/* a column's sort: an icon among the tools, lit and always shown beside the title once the column is sorted */
+/* a column's sort: an icon among the tools at the right (after Archive all, before collapse), lit once the column is sorted */
 .col-sort .menu { min-width: 13rem; }
 .col-sort > .icon-button { width: 1.7rem; height: 1.7rem; padding: 0; color: var(--muted); font-size: 0.95rem; }
 .col-sort.on > .icon-button { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: var(--radius-s); }
@@ -329,8 +329,6 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .col-archive-n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 /* a narrow column keeps the name readable: the button shrinks to its icon and count */
 @container col (max-width: 15rem) { .col-archive-label { display: none; } }
-/* sorted, the sort and the button sit beside the title, so they shrink sooner */
-@container col (max-width: 21rem) { .column-head > .col-archive .col-archive-label { display: none; } }
 /* rows: each status is a lane across the page, its name on the left and its cards running left to
    right (the lane scrolls sideways, not the page) */
 .board.board-rows { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }

@@ -782,11 +782,9 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
                     {c.gigs.length}
                   </span>
                 </h2>
-                {sortOf(c) !== "manual" && archiveAll(c)}
-                {sortOf(c) !== "manual" && <SortMenu column={c.name} sorts={sortsFor(c.category)} value={sortOf(c)} onChange={(s) => setSort(c.key, s)} />}
                 <span className="column-tools">
-                  {sortOf(c) === "manual" && archiveAll(c)}
-                  {sortOf(c) === "manual" && <SortMenu column={c.name} sorts={sortsFor(c.category)} value={sortOf(c)} onChange={(s) => setSort(c.key, s)} />}
+                  {archiveAll(c)}
+                  <SortMenu column={c.name} sorts={sortsFor(c.category)} value={sortOf(c)} onChange={(s) => setSort(c.key, s)} />
                   {!narrow && (
                     <button type="button" className="icon-button col-collapse" aria-expanded={true} aria-label={`Collapse ${c.name}: it becomes a small button above the board`} onClick={() => toggleCollapsed(c.id)}>
                       <Icon name="shrink" />
@@ -1301,8 +1299,8 @@ function useNow(every: number): number {
 
 // StageIcon: a column's stage as a small ring in its colour: dashed (backlog), empty (to do),
 // half full (doing), with a pause bar (waiting), filled with a check (done), crossed (cancelled).
-// SortMenu: a column's sort, as an icon button with a drop-down of the orders it offers. Sorted columns
-// show it lit, beside the title.
+// SortMenu: a column's sort, as an icon button with a drop-down of the orders it offers. It stays in
+// the column's tools at the right; a sorted column shows it lit.
 function SortMenu({ column, sorts, value, onChange }: { column: string; sorts: ColumnSort[]; value: ColumnSort; onChange: (s: ColumnSort) => void }) {
   const on = value !== "manual";
   return (
