@@ -34,7 +34,7 @@ A run is **ok** when the command exits 0 and **failed** otherwise. It is **timed
 
 When an errand starts failing, or recovers, the agent's executor also posts an alert.
 
-**Shared templates** (with the *Shared library* permission, at the top of the Errands page) lists the shared errand templates every workspace can start an errand from, with how many errands use each. A shared template without the sandbox still runs sandboxed for an errand made by someone without the *No-sandbox errands* permission (it gets its own sandboxed copy).
+**Shared templates** (with the *Shared library* permission, at the top of the Errands page) lists the shared errand templates every workspace can start an errand from, with how many errands use each. An errand's panel has **Make its template shared…** (and **Make its schedule shared…**) for holders of Shared library: it turns the workspace's errand template into a shared one and merges the identical copies, as described in [Recurring gigs](recurring.md#make-shared). A shared template without the sandbox still runs sandboxed for an errand made by someone without the *No-sandbox errands* permission (it gets its own sandboxed copy).
 
 ## Without the sandbox
 

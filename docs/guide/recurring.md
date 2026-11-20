@@ -39,6 +39,24 @@ Holders of the **Shared library** permission (given on an all-workspaces rule; i
 - Before such a save, gigg asks: **Leave the shared library?** names what the recurring gig leaves. **Save anyway** makes the copies; **Cancel** goes back to the form as you left it.
 - Editing a shared template or schedule (Shared library) changes it for every recurring gig that uses it, in every workspace.
 
+### Make shared
+
+Identical templates and schedules pile up when each workspace makes its own. With Shared library, **Make shared…** on a workspace's template or schedule (in **Templates** and **Schedules**; on an errand's panel for its errand template or schedule) does the clean-up in one step: it makes the shared item, moves every recurring gig and errand that uses the item or one of its identical copies to it, and deletes the item and the copies. The dialog first shows the plan: the copies it found (workspace and name), what moves, and any copy it leaves alone. **Make shared** then runs it, in one go: it all happens or nothing does.
+
+What counts as identical (the name, the workspace and the dates never do):
+
+- **Schedules**: the whole timing (frequency, interval, days, month day, time zone, window start and length, create-early).
+- **Templates**: the project it is limited to, title, description, priority, colour, labels, checklist, subgigs, custom field values, followers, model, effort, always-run, tool allowlist, auto-archive and run timeout. The assignees don't count: a recurring gig that took them from its template keeps them as its own.
+- **Errand templates**: the notes, command, timeout, output setting and sandbox setting.
+
+Things to know:
+
+- A template limited to a project, or holding custom field values or followers, can't be shared (a shared template has none of them): clear them first.
+- A copy in a workspace where you can't delete it by hand (for a schedule: Recurring gigs, and Errands when errands use it; for a template: Templates; for an errand template: Errands) is left alone and listed as skipped. Its users stay on it.
+- The settings with a permission of their own, in the item or in what moves onto a shared schedule (always-run, tool allowlists, run timeouts, no-sandbox), need that permission on the all-workspaces level, as for any shared item.
+- Two recurring gigs of one project that would end up with the same template and schedule once merged stop the move; delete or change one first.
+- The audit log shows the new item, each recurring gig or errand that moved, and each deletion.
+
 ## Templates
 
 **Recurring**, **Schedules** and **Templates** (in the account menu) list everything across your workspaces, each row with its workspace and project. A recurring gig's card shows its title, place and priority on top, then its timing and facts (next gig, how many it made, how early each is created); its actions sit at the bottom left and the pictures of who gets its gigs at the bottom right. **Show** at the top narrows the list to one workspace or one project; a project also shows its workspace's templates for every project.

@@ -472,6 +472,7 @@ Markdown cut to 280 characters).
 | PUT | `/templates/{id}` | Replace a template. |
 | DELETE | `/templates/{id}` | Delete a template. |
 | POST | `/templates/{id}/use` | Create a gig from a template. |
+| POST | `/templates/{id}/make-shared` | Make a workspace gig template shared: see [Make shared](#make-shared). |
 
 ### recurrence
 
@@ -487,6 +488,7 @@ Markdown cut to 280 characters).
 | GET | `/schedules/{id}` | A schedule. |
 | PUT | `/schedules/{id}` | Replace a schedule (every recurring gig and errand on it follows; with errands on it, this also needs `errands`). |
 | DELETE | `/schedules/{id}` | Delete a schedule no recurring gig or errand uses. |
+| POST | `/schedules/{id}/make-shared` | Make a workspace schedule shared: see [Make shared](#make-shared). |
 
 ### errands
 
@@ -513,6 +515,7 @@ an errand's worker needs `manage_workspace`; its failure gig, the worker or `man
 | GET | `/errand-runs/{id}` | One run; `output_tail` only with `errands:output`. |
 | GET, POST | `/workspaces/{ws}/errand-templates` | Errand templates. |
 | GET, PUT, DELETE | `/errand-templates/{id}` | An errand template (delete: none uses it). |
+| POST | `/errand-templates/{id}/make-shared` | Make a workspace errand template shared: see [Make shared](#make-shared). |
 | POST | `/workspaces/{ws}/errands/claim` | The executor (view and `errands:run`, own errands only; no Errands permission needed): start due runs, at most `limit` (optional body; its free slots), the rest stay due. Returns `items` (run id, command, timeout, output, unsandboxed, `command_set_by`, `unsandboxed_set_by`) and `paused`. Older missed slots are recorded as `missed`; a slot while the previous run is going as `skipped`. |
 | POST | `/errands/claim` | The same over every workspace and project in reach, own workspace first: `items`, `paused` (true only when every workspace is) and `paused_workspaces` (slugs skipped). |
 | POST | `/errand-runs/{id}/finish` | The executor reports a run: `status` `ok`/`failed`/`timeout`, `exit_code`, `duration_ms`, `output_tail` (last 64 KiB, cut on a character boundary if longer; dropped for `host` output), `output_bytes`, `error`. Returns whether the errand became failing or recovered. |
@@ -538,6 +541,48 @@ See [runner-protocol.md](runner-protocol.md) for how these fit together.
 | PATCH | `/workspaces/{ws}/runner` | Change a workspace's gig caps (admin). |
 | POST | `/runner/pause` | Pause new gig runs and errand runs in some or all workspaces (admin, or `pause_runs`); `gigs`/`errands` (default true) pick the boxes. Errands stay paused until resumed. |
 | POST | `/runner/resume` | Lift the pause (admin, or `pause_runs`); `gigs`/`errands` as above. |
+
+### Make shared
+
+`POST /schedules/{id}/make-shared`, `POST /templates/{id}/make-shared` and
+`POST /errand-templates/{id}/make-shared` turn a workspace's item into a shared one in one transaction
+and merge its identical copies into it. Body: `{"dry_run": true}` returns the plan and changes nothing;
+without it (or `false`) the move is made and the same shape comes back with `shared` filled in.
+
+```json
+{
+  "kind": "schedule", "dry_run": true, "new_name": "Mornings",
+  "source":  {"id": 12, "workspace_id": 1, "workspace": "Atlas", "name": "Mornings", "recurring_gigs": 1, "errands": 0},
+  "copies":  [{"id": 15, "workspace_id": 2, "workspace": "Meridian", "name": "Mornings B", "recurring_gigs": 2, "errands": 1}],
+  "skipped": [{"id": 19, "workspace_id": 3, "workspace": "Scout", "name": "Mornings", "reason": "no Recurring gigs permission in Scout", "recurring_gigs": 0, "errands": 0}],
+  "users":   [{"kind": "recurring_gig", "id": 7, "workspace_id": 1, "workspace": "Atlas", "label": "Weekly review · Mornings", "from": 12}],
+  "moved": 4, "deleted": 2
+}
+```
+
+- It creates the shared item from the source's content, repoints every live recurring gig and errand
+  that uses the source or a copy to it (a gig template: only recurring gigs; an errand template: only
+  errands; a schedule: both), then deletes the source and the copies. A copy that is skipped stays, with
+  its users.
+- **Identical** means equal content; the id, workspace, name, timestamps, creator and version never
+  count. Schedule: every timing field. Gig template: project, title, description, priority, colour,
+  labels, checklist, subgigs, custom values, followers, model, effort, `always_run`, `allowed_tools`
+  (order ignored), auto-archive and run timeout (not the assignees: a recurring gig keeps the assignees
+  it took from its template, as its own). Errand template: description, command, timeout, output and
+  `unsandboxed`.
+- The caller needs `shared_library` and, on a key, the `library:write` scope (as for
+  `POST /shared/...`; a dry run needs them too). For the source it needs what deleting it needs in its
+  workspace (403 otherwise), and for each copy the same: a copy it lacks that for is listed under
+  `skipped` with the `reason` and left alone. The risky settings of the new shared item (`always_run`,
+  `allowed_tools`, a run timeout, `errand_unsandboxed`; for a schedule, those of every recurring gig and
+  errand that moves onto it) need their permission on the all-workspaces level, as when making a shared
+  item by hand.
+- 422: the item is shared already, or (gig templates) it has a project, custom values or followers, which
+  a shared template cannot hold. 409: two recurring gigs of one project would end up with the same
+  template and schedule.
+- The audit log gets the shared item's create, each moved recurring gig's or errand's `updated` diff,
+  each `deleted`, and one `<kind>.made_shared` row on the shared item listing the source and the merged
+  copies.
 
 ### admin
 

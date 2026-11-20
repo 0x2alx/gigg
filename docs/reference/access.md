@@ -171,6 +171,11 @@ takes `shared_library`, which only counts on the all-workspaces level:
   shared schedule is retimed. A workspace's grants don't count for the library;
 - through a key, the key must not be limited to some places and must carry `library:write`.
 
+**Make shared** (`POST .../make-shared`, see the API reference) takes the same: `shared_library` and the
+`library:write` scope, the permissions the risky settings need on the all-workspaces level, and, for the
+source and for each identical copy it merges, what deleting that item takes in its workspace. A copy in
+a workspace where the caller lacks that is left alone and reported as skipped.
+
 Instance admins hold it, like every permission. A no-sandbox errand made from a shared errand template
 still runs in a workspace only while whoever turned the sandbox off holds `errand_unsandboxed` there.
 

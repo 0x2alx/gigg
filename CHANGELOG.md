@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Make shared: **Make shared…** on a workspace's schedule, gig template or errand template (Shared
+  library) makes the shared item and merges the identical copies in one step. The dialog shows the plan
+  first: the copies it found, the recurring gigs and errands that move, the copies it leaves alone (a
+  workspace where you can't delete them) and why; **Make shared** then moves every user to the shared
+  item and deletes the source and the copies, all in one transaction, with an audit row for each create,
+  repoint and delete. API: `POST /schedules/{id}/make-shared`, `/templates/{id}/make-shared` and
+  `/errand-templates/{id}/make-shared` (`dry_run` returns the plan). The risky settings (always-run, tool
+  allowlists, run timeouts, no-sandbox) need their permission on the all-workspaces level, as for any
+  shared item. Errand templates and errand schedules are shared from the errand's panel.
 - Board filters: the rows of workspace and project chips are replaced by a **Where** button in the toolbar (a searchable tree of workspaces with their projects, its face naming the selection, and a project called "Main" shown as "Workspace / Main") and one short row of shortcut chips: a chip per project not called "Main", and a removable chip for each other picked item. The URL keys are unchanged, but the picks now add up: the board shows every project of the picked workspaces plus the picked projects, so a pick can span workspaces (before, a project outside the picked workspaces was ignored).
 - Import JSON and Copy as JSON: schedules, gig templates, errand templates, gigs, errands and recurring gigs (shared ones too, with the Shared library permission) copy as JSON and import from pasted JSON or a file, one object or a list (up to 100, 1 MB). The preview shows what will be made, where, and skips rows that don't resolve (a wrong kind, a missing field, an unknown username, a template or schedule name that matches nothing); Create then makes each object through the normal create call, so validation and permissions are the forms' own, and shows the result per row. One list can hold schedules, templates and the recurring gigs that name them: rows are created in dependency order (schedules, templates, then what uses them, then gigs), and a name from the same list resolves to the row just made. Ids, workspaces and `created_*` in the JSON are ignored. A refused request now names the field (`window_start: ...`) instead of just "validation failed". See the new [import guide](docs/guide/import-export.md).
 - Board cards: an amber bolt pill marks an Always run gig (also in the gig panel), and the robot badge on a card now shows for any gig with an agent run, its tooltip giving the last run's outcome, the worker and when.
