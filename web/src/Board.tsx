@@ -1658,7 +1658,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
             )}
             {(run || gig.session_id) && !running && (
               <span className="meta-item" data-tip={run ? runWorkedTip(run, worker ? nameOf(worker) : "", Date.now()) : "An agent has worked on it: it has an agent session (see Runs in the gig)"}>
-                <Icon name="bot" />
+                <Icon name="bot" className="meta-bot" />
               </span>
             )}
             {gig.cost_usd_total > 0 && (

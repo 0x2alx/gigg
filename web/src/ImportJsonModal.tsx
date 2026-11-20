@@ -221,9 +221,13 @@ export function ImportJsonModal({ kinds, initialPlace = "", onClose, onDone }: {
             setFileNote("");
           }}
         />
-        <div className="row">
-          <input ref={fileRef} type="file" accept=".json,application/json,text/plain" aria-label="JSON file" disabled={busy} onChange={(e) => readFile(e.target.files?.[0])} />
-          {fileNote && <span className="muted small">{fileNote}</span>}
+        <div className="row import-file">
+          {/* a visually hidden file input inside a label styled as a secondary button: the keyboard reaches the input, the label shows its focus */}
+          <label className={"button secondary import-pick" + (busy ? " disabled" : "")}>
+            Choose file
+            <input ref={fileRef} className="sr-only" type="file" accept=".json,application/json,text/plain" aria-label="JSON file" disabled={busy} onChange={(e) => readFile(e.target.files?.[0])} />
+          </label>
+          <span className="muted small import-file-note">{fileNote || "No file chosen"}</span>
         </div>
         {parsed?.error && (
           <p className="danger" role="alert">

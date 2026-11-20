@@ -1931,7 +1931,7 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .errand-actions { margin: 0 0 var(--sp-5); gap: var(--sp-3); align-items: center; }
 .errand-props { margin-top: var(--sp-4); }
 .make-shared-list { list-style: none; margin: 0 0 var(--sp-3); padding: 0; display: grid; gap: var(--sp-2); }
-.make-shared-list li { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--radius-s, 6px); overflow-wrap: anywhere; }
+.make-shared-list li { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--line-strong); border-radius: var(--radius-s, 6px); overflow-wrap: anywhere; }
 .errand-h { font-size: var(--fs-base); margin: var(--sp-6) 0 var(--sp-3); }
 .errand-cmd, .errand-out {
   margin: 0; padding: var(--sp-4); background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-m);
@@ -2048,10 +2048,11 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 
 /* Import JSON: the paste box, then one row per object with where it goes and what became of it */
 .import { display: flex; flex-direction: column; gap: var(--sp-4); }
+.import p { margin: 0; }
 .import-text { width: 100%; font-family: var(--mono, ui-monospace, monospace); font-size: var(--fs-sm); }
 .import-head { font-size: var(--fs-md); display: flex; align-items: baseline; gap: var(--sp-3); margin: 0; }
 .import-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); max-height: 40vh; overflow-y: auto; }
-.import-row { border: 1px solid var(--border); border-radius: var(--radius-m); padding: var(--sp-3) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
+.import-row { border: 1px solid var(--line-strong); border-radius: var(--radius-m); padding: var(--sp-3) var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
 .import-row.bad { border-color: var(--danger); }
 .import-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .import-name { flex: 1; min-width: 8rem; overflow-wrap: anywhere; }
@@ -2059,4 +2060,30 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .import-note { overflow-wrap: anywhere; }
 @media (max-width: 720px) {
   .import-text, .import-line select { font-size: max(16px, 1em); }
+}
+
+/* the Import dialog's file picker: a secondary button with the chosen name next to it */
+.import-file { align-items: center; }
+.import-pick { flex-direction: row; font-size: var(--fs-sm); min-height: 1.67rem; padding: 0 0.55rem; }
+.import-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.import-pick.disabled { opacity: 0.55; cursor: not-allowed; }
+.import-file-note { min-width: 0; overflow-wrap: anywhere; }
+/* the robot's glyph fills less of its 24-unit box than the comment bubble does: a step bigger to match */
+.meta-item .meta-bot { width: 1.2em; height: 1.2em; margin: -0.1em; }
+
+/* phones: 40px to tap, and the card actions in an even grid */
+@media (max-width: 720px) {
+  .schedule-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); width: 100%; }
+  .schedule-actions > span { grid-column: 1 / -1; }
+  .schedule-actions > .button:last-of-type:nth-of-type(odd) { grid-column: 1 / -1; }
+  .schedule-actions .button.small { min-height: 40px; }
+  .wp-row { min-height: 40px; }
+  .wp-head input, .bf-fields .wp-head input, .wp-all { height: 40px; }
+  .modal-head > .icon-button, .modal-head > .modal-expand { width: 40px; height: 40px; }
+  .modal-head .help-button { position: relative; }
+  .modal-head .help-button::after { content: ""; position: absolute; inset: -9px; }
+  /* the board's Clear filters is just its icon: with the wider themes' type, three controls plus the label no longer fit one row */
+  .bf-clear .clear-label { display: none; }
+  .bf-clear { position: relative; padding: 0 0.4rem; }
+  .bf-clear::after { content: ""; position: absolute; inset: -6px -4px; }
 }

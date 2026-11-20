@@ -14,8 +14,8 @@ import { FLAG_FILTERS, parseFlag, type FlagFilter, type FlagKey } from "./boardM
 // doesn't jump; greyed out while nothing is filtered.
 export function ClearFilters({ active, onClear, className }: { active: boolean; onClear: () => void; className?: string }) {
   return (
-    <button type="button" className={"link small clear-filters" + (className ? " " + className : "")} disabled={!active} onClick={onClear} title={active ? "Show everything again" : "Nothing is filtered"}>
-      <Icon name="x" /> Clear filters
+    <button type="button" className={"link small clear-filters" + (className ? " " + className : "")} disabled={!active} onClick={onClear} aria-label="Clear filters" title={active ? "Show everything again" : "Nothing is filtered"}>
+      <Icon name="x" /> <span className="clear-label">Clear filters</span>
     </button>
   );
 }

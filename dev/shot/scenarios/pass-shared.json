@@ -1,0 +1,83 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  390,
+  844
+ ],
+ "waitUntil": "domcontentloaded",
+ "steps": [
+  {
+   "wait": 2000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/board?tool=schedules"
+  },
+  {
+   "wait": "ul.schedules"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "click": "button[aria-label='Make Mornings A shared']"
+  },
+  {
+   "wait": ".make-shared [role=status]"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll('.make-shared button')].find(x => x.textContent.trim() === 'Make shared'); b.click(); return true; })()"
+  },
+  {
+   "wait": ".toast"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "[...document.querySelectorAll('li.schedule')].filter(li => li.querySelector('.pill-shared')).map(li => [li.querySelector('.schedule-title').textContent, [...li.querySelectorAll('.schedule-actions button')].map(b => b.textContent.trim() + ':' + Math.round(b.getBoundingClientRect().top) + ':' + Math.round(b.getBoundingClientRect().width))])"
+  },
+  {
+   "eval": "(l => { const e = [...document.querySelectorAll('li.schedule')].find(li => li.querySelector('.pill-shared')); e.scrollIntoView({block:'center'}); return true; })()"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "shared-three-buttons-390",
+   "full": false
+  }
+ ]
+}

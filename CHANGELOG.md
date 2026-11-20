@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Phone and dark-mode polish: the Import JSON file picker is a button with the chosen name beside it; on phones the Schedules, Templates and Recurring actions sit in an even grid and the Where picker rows, those actions and dialog close buttons are 40 px to tap; the board's Clear filters is just its icon there (it no longer drops to its own row in the wider themes); the Import preview and Make shared lists have a visible border in dark themes; the robot badge on a card is as big as the other foot icons.
 - Make shared: **Make shared…** on a workspace's schedule, gig template or errand template (Shared
   library) makes the shared item and merges the identical copies in one step. The dialog shows the plan
   first: the copies it found, the recurring gigs and errands that move, the copies it leaves alone (a

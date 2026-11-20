@@ -82,5 +82,10 @@ podman run --rm --network gigg-dev -v "$PWD/dev/shot":/shot:ro -v "$PWD/out":/ou
 which `dev/e2e.sh` leaves behind). `cards.json` checks the cards (the key in the top right corner, the gear and a done card's
 archive button always shown at the foot's start and level with its row within 1 px, a recurring card's badge and tint) at both widths in both built-in themes, and the **More filters** panel on the board and the table (it fits the window, the always-run filter works and is counted); run it on a fresh `e2e.sh` instance, since it adds gigs. `batch.json` (desktop) and `mobile.json` (phone width) are the
 longer regression scenarios (the gig panel, collapsed columns, live updates, the pages at phone width); they pass against the
-current UI, on a fresh `e2e.sh` instance since they add gigs. The
+current UI, on a fresh `e2e.sh` instance since they add gigs. `pass-extra.json` is the combined visual pass: it seeds workspaces, schedules, templates and an errand, then shoots the board
+(bolt pill, robot badge and its tooltip), the Where panel and shortcut row, the Schedules and Templates action rows, the Import JSON
+and Make shared dialogs and the errand panel, at 1440 and 390 px in both built-in themes, and logs button sizes and
+overflow checks (read `log.json`). `pass-shared.json` makes one schedule shared and shoots its three-button action row at phone width (run it after `pass-extra`). `pass-metrics.json` takes tall shots of the Metrics page in the same four combinations. Run both
+on a fresh `e2e.sh` instance (the metrics shots want its run); the pages load with `domcontentloaded`, since several workspaces keep
+their event streams open. The
 documentation's screenshots come from a demo instance; see `dev/demo/README.md`.
