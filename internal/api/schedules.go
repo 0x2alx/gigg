@@ -46,14 +46,20 @@ func (a *API) schedule(ctx context.Context, p *access.Principal, id int64) (*sto
 	return s, nil
 }
 
-// sharedScheduleWrite: a shared schedule is made, changed and deleted with Shared library (sharedWrite).
-func sharedScheduleWrite(p *access.Principal) error { return sharedWrite(p) }
+// sharedScheduleWrite: a shared schedule is made, changed and deleted with Shared library and gigs:write
+// (sharedWrite).
+func sharedScheduleWrite(p *access.Principal) error { return sharedWrite(p, "gigs:write") }
 
 // retimeGuards: retiming a schedule retimes every recurring gig and errand on it, so an always-run
 // recurring gig (or one with a tool allowlist) on it needs those permissions, as editing that recurring
 // gig would, and a no-sandbox errand on it needs No-sandbox errands. ws 0 (a shared schedule): on the
-// all-workspaces level.
+// all-workspaces level. Any errand on it also needs Errands (and the errands:write scope) at that level.
 func (a *API) retimeGuards(ctx context.Context, p *access.Principal, ws int64, s *store.Schedule) error {
+	if s.ErrandUses > 0 { // retiming a schedule retimes its errands too
+		if err := require(p, ws, "errands", "errands:write"); err != nil {
+			return err
+		}
+	}
 	always, tools, err := store.ScheduleGuards(ctx, a.st.R, s.ID)
 	if err != nil {
 		return err
@@ -269,11 +275,6 @@ func (a *API) registerSchedules() {
 		}
 		if a.scheduleUsedOutside(ctx, p, s.WorkspaceID, s.ID) {
 			return nil, errForbidden("This schedule is used outside the projects this key reaches.")
-		}
-		if s.ErrandUses > 0 { // retiming a schedule retimes its errands too
-			if err := require(p, s.WorkspaceID, "errands", "errands:write"); err != nil {
-				return nil, err
-			}
 		}
 		if err := a.retimeGuards(ctx, p, s.WorkspaceID, s); err != nil {
 			return nil, err

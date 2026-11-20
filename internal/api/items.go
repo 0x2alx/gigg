@@ -122,11 +122,13 @@ func readIn(p *access.Principal, ws int64, scope string) error {
 
 // sharedWrite: the shared library (gig templates, schedules, errand templates) is made, changed and
 // deleted by holders of Shared library on the all-workspaces level (instance admins hold it), through a
-// session or a key not limited to some places, with the library:write scope. The settings that have a
-// permission of their own are checked on that level too (allowed(p, 0, ...)).
-func sharedWrite(p *access.Principal) error {
+// session or a key not limited to some places, with the library:write scope and the scope of the kind
+// (gigs:write for gig templates and schedules, errands:write for errand templates): library:write widens
+// where the key may act, never what it may do. The settings that have a permission of their own are
+// checked on that level too (allowed(p, 0, ...)).
+func sharedWrite(p *access.Principal, scope string) error {
 	if p.Library() {
-		return nil
+		return need(p, scope)
 	}
 	if p.Allowed(0, "shared_library") {
 		return errForbidden("This key lacks the library:write scope.")
@@ -572,7 +574,7 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if err := sharedWrite(p); err != nil {
+		if err := sharedWrite(p, "gigs:write"); err != nil {
 			return nil, err
 		}
 		if err := alwaysRunChange(p, 0, false, in.Body.AlwaysRun); err != nil {
@@ -623,7 +625,7 @@ func (a *API) registerItems() {
 			return nil, err
 		}
 		if t.Shared {
-			if err := sharedWrite(p); err != nil {
+			if err := sharedWrite(p, "gigs:write"); err != nil {
 				return nil, err
 			}
 		} else {
@@ -673,7 +675,7 @@ func (a *API) registerItems() {
 			return nil, err
 		}
 		if t.Shared {
-			if err := sharedWrite(p); err != nil {
+			if err := sharedWrite(p, "gigs:write"); err != nil {
 				return nil, err
 			}
 			return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteTemplate(ctx, tx, p.Actor(), t) })

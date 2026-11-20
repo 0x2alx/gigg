@@ -145,10 +145,10 @@ func (a *API) errandRefs(ctx context.Context, p *access.Principal, ws, template,
 	return nil
 }
 
-// sharedErrandEdit: a shared errand template is saved by a holder of Shared library (sharedWrite); what
-// else they may do to it (no sandbox, timeouts, output) is their permissions on the all-workspaces level.
+// sharedErrandEdit: a shared errand template is saved by a holder of Shared library with errands:write
+// (sharedWrite); what else they may do to it (no sandbox, timeouts, output) is their permissions on the all-workspaces level.
 func sharedErrandEdit(p *access.Principal) (store.ErrandEdit, error) {
-	if err := sharedWrite(p); err != nil {
+	if err := sharedWrite(p, "errands:write"); err != nil {
 		return store.ErrandEdit{}, err
 	}
 	return store.ErrandEdit{CanUnsandbox: p.Allowed(0, "errand_unsandboxed"), CanManage: p.Allowed(0, access.Manager),

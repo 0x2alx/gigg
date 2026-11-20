@@ -154,9 +154,17 @@ func (a *API) shareRisks(ctx context.Context, q store.Q, p *access.Principal, ki
 	return nil
 }
 
+// shareScope is the scope of the kind that sharedWrite asks next to library:write.
+func shareScope(kind string) string {
+	if kind == store.ShareErrandTemplate {
+		return "errands:write"
+	}
+	return "gigs:write"
+}
+
 // makeShared runs the plan (dry run) or the move, in one transaction.
 func (a *API) makeShared(ctx context.Context, p *access.Principal, kind string, id int64, dry bool) (*sharePlanOut, error) {
-	if err := sharedWrite(p); err != nil {
+	if err := sharedWrite(p, shareScope(kind)); err != nil {
 		return nil, err
 	}
 	if dry {
