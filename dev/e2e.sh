@@ -40,6 +40,9 @@ code=$(curl -s -H "$H" -H "$K" -H "$J" -H "Accept: application/json, text/event-
 check "MCP initialize over loopback" '[ "$code" = 200 ] && jq -e ".result.serverInfo.name == \"gigg\"" /tmp/m >/dev/null'
 list='{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 check "MCP lists tools, no delete_gig" 'curl -s -H "$H" -H "$K" -H "$J" -H "Accept: application/json, text/event-stream" -d "$list" http://gigg-dev:8080/mcp | jq -e "[.result.tools[].name] | (index(\"create_gig\") != null) and (index(\"delete_gig\") == null)" >/dev/null'
+check "MCP lists make_shared and import_json (not the errand template tool: no errands:write)" 'curl -s -H "$H" -H "$K" -H "$J" -H "Accept: application/json, text/event-stream" -d "$list" http://gigg-dev:8080/mcp | jq -e "[.result.tools[].name] | (index(\"make_shared\") != null) and (index(\"import_json\") != null) and (index(\"save_errand_template\") == null)" >/dev/null'
+imp=$(jq -nc '{jsonrpc:"2.0",id:3,method:"tools/call",params:{name:"import_json",arguments:{dry_run:true,json:[{kind:"recurring",template:"Weekly",schedule:"Mornings"},{kind:"template",name:"Weekly",title:"Report"},{kind:"schedule",name:"Mornings",freq:"daily"}]}}}')
+check "MCP import_json dry run: three rows ready, nothing made" 'curl -s -H "$H" -H "$K" -H "$J" -H "Accept: application/json, text/event-stream" -d "$imp" http://gigg-dev:8080/mcp | jq -e "(.result.content[0].text | fromjson) | .dry_run and .ready == 3 and .made == 0" >/dev/null'
 check "MCP without a key: 401" '[ "$(curl -s -H "$H" -H "$J" -o /dev/null -w "%{http_code}" -d "$init" http://gigg-dev:8080/mcp)" = 401 ]'
 code=$(curl -s $CA -b $jar -o /tmp/mx -w '%{http_code}' "$MAIN/metrics?bucket=week")
 check "metrics: gigs, a run and its cost counted" '[ "$code" = 200 ] && jq -e ".totals.gigs_created >= 1 and .totals.runs >= 1 and .totals.cost_usd >= 0.44 and (.buckets | length) >= 5" /tmp/mx >/dev/null'
