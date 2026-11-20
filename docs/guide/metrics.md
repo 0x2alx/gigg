@@ -1,5 +1,7 @@
 # Metrics
 
+![The metrics page (Daywalker theme)](../images/metrics-day.png)
+
 **Metrics** (account menu, under Dashboard) shows what was done over a period: gigs created and done, how long they took, agent runs by outcome, cost and tokens, errand runs and recurring gigs that were on time. It reads the same data as the rest of the app, and you see only the workspaces and projects you can see anywhere else; admins see everything.
 
 ## Picking what to look at

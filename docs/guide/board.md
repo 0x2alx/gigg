@@ -83,7 +83,7 @@ The avatars at the bottom right are the people assigned to the gig, overlapping.
 
 ## Filters
 
-![Filters: one workspace, a label and a priority (Daywalker theme)](../images/board-filters-day.png)
+![Filters: one workspace and a minimum priority (Daywalker theme)](../images/board-filters-day.png)
 
 The toolbar above the columns narrows the board, in one row:
 

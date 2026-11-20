@@ -54,7 +54,7 @@ It tracks two kinds of work:
 <td valign="top"><a href="docs/guide/views.md"><img src="docs/images/palette-night.png" alt="The command palette"></a><br><sub><b>Command palette</b> (Ctrl+K): find a gig, jump to a project, run a command.</sub><br><br><a href="docs/guide/views.md"><img src="docs/images/table-day.png" alt="The table view"></a><br><sub><b>Table.</b> Filters, bulk actions and saved views.</sub></td>
 </tr>
 <tr>
-<td valign="top"><a href="docs/guide/recurring.md"><img src="docs/images/recurring-night.png" alt="Recurring gigs"></a><br><sub><b>Recurring gigs.</b> A template and a schedule each.</sub></td>
+<td valign="top"><a href="docs/guide/recurring.md"><img src="docs/images/recurring-night.png" alt="Recurring gigs"></a><br><sub><b>Recurring gigs.</b> A template and a schedule each.</sub><br><br><a href="docs/guide/metrics.md"><img src="docs/images/metrics-day.png" alt="The metrics page"></a><br><sub><b>Metrics.</b> What was done over a period: gigs, agent runs, cost, errands.</sub></td>
 <td valign="top"><a href="docs/guide/gigs.md"><img src="docs/images/gig-panel-day.png" alt="A gig's panel"></a><br><sub><b>A gig</b>, open beside the board: details, checklist, comments, history.</sub></td>
 </tr>
 </table>

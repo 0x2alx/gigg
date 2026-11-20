@@ -61,16 +61,6 @@
    "full": false
   },
   {
-   "hover": ".gig-card .run-badge"
-  },
-  {
-   "wait": 800
-  },
-  {
-   "shot": "tooltip-night",
-   "full": false
-  },
-  {
    "goto": "/board?p=1"
   },
   {
@@ -275,25 +265,6 @@
    "full": false
   },
   {
-   "goto": "/board"
-  },
-  {
-   "wait": ".board"
-  },
-  {
-   "click": ".bf-end .help-button"
-  },
-  {
-   "wait": ".help-body"
-  },
-  {
-   "wait": 900
-  },
-  {
-   "shot": "help-night",
-   "full": false
-  },
-  {
    "eval": "(async () => { const r = await fetch('/api/v1/me/themes-selection', { method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({ selected_id: 'daywalker', match_system: false }) }); return r.status; })()",
    "expect": 204
   },
@@ -371,6 +342,26 @@
   },
   {
    "shot": "inbox-day",
+   "full": false
+  },
+  {
+   "goto": "/metrics"
+  },
+  {
+   "wait": ".mx-tiles"
+  },
+  {
+   "wait": ".mx-chart svg"
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll(\"button\")].find(x => x.textContent.includes(\"7 days\")); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 1800
+  },
+  {
+   "shot": "metrics-day",
    "full": false
   },
   {

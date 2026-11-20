@@ -41,9 +41,6 @@ steps = [
     # ---- Nightwalker
     theme("nightwalker"),
     *page("/board", ".board .gig-card", "board-all-night"),
-    {"hover": ".gig-card .run-badge"},
-    {"wait": 800},
-    {"shot": "tooltip-night", "full": False},
     {"goto": "/board?p=1"},
     {"wait": ".board .gig-card"},
     click_text(".appbar a", "New gig"),
@@ -85,12 +82,6 @@ steps = [
     {"press": "Escape"},
     *page("/profile", ".profile", "profile-night"),
     *page("/admin/workspaces/1", "form[aria-label='Workspace settings']", "admin-workspace-night"),
-    {"goto": "/board"},
-    {"wait": ".board"},
-    {"click": ".bf-end .help-button"},
-    {"wait": ".help-body"},
-    {"wait": 900},
-    {"shot": "help-night", "full": False},
     # ---- Daywalker
     theme("daywalker"),
     # the filter row starts folded: open it for the filters screenshot (saved on the account, so a reload keeps it)
@@ -107,6 +98,14 @@ steps = [
     {"wait": 400},
     {"shot": "agent-run-day", "el": "section[aria-label='Agent run']", "margin": 8},
     *page("/inbox", ".inbox", "inbox-day"),
+    # the metrics page: wait for the tiles and the first chart to draw
+    {"goto": "/metrics"},
+    {"wait": ".mx-tiles"},
+    {"wait": ".mx-chart svg"},
+    # the demo's gigs were all made today: a week's range gives their bars some width
+    click_text("button", "7 days"),
+    {"wait": 1800},
+    {"shot": "metrics-day", "full": False},
     *page("/table", "table", "table-day"),
     *page("/themes", "h1", "themes-day"),
     {"goto": "/admin/users"},
