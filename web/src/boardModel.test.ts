@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Category, Project, Gig } from "./api";
 import type { WorkspaceTree } from "./App";
-import { activeFilters, alwaysRunMatches, categoryColumns, EMPTY_FILTER, filterQuery, isMainProject, matches, moveToCategory, parseFilter, placeName, recurringMatches, removablePlaces, scope, shortcutProjects, statusColumns, whereLabel, whereTree } from "./boardModel";
+import { activeFilters, isFiltered, alwaysRunMatches, categoryColumns, EMPTY_FILTER, filterQuery, isMainProject, matches, moveToCategory, parseFilter, placeName, recurringMatches, removablePlaces, scope, shortcutProjects, statusColumns, whereLabel, whereTree } from "./boardModel";
 
 const gig = (id: number, x: Partial<Gig> = {}): Gig =>
   ({ id, key: `K-${id}`, title: `gig ${id}`, description_md: "", priority: 0, due_at: null, assignees: [], labels: [], status_id: 0, status_name: "", status_category: "todo", ...x }) as Gig;
@@ -26,6 +26,11 @@ describe("board filter", () => {
     expect(parseFilter(filterQuery(f))).toEqual(f);
     expect(filterQuery(EMPTY_FILTER)).toBe("");
     expect(parseFilter("?p=x,0,4&pr=9")).toEqual({ ...EMPTY_FILTER, p: [4] });
+  });
+  it("counts the archived toggle as a filter, so Clear filters has something to clear", () => {
+    expect(isFiltered(EMPTY_FILTER)).toBe(false);
+    expect(isFiltered({ ...EMPTY_FILTER, arch: true })).toBe(true);
+    expect(isFiltered({ ...EMPTY_FILTER, q: "x" })).toBe(true);
   });
   it("scopes to the picked workspaces plus the picked projects", () => {
     const ids = (f: Partial<typeof EMPTY_FILTER>) => scope(tree, { ...EMPTY_FILTER, ...f }).map((x) => x.project.id);

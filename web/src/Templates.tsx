@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { api, ApiError, canShare, canWriteIn, hasCap, type Tag, type Template } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
-import { WorkspaceBadge } from "./WorkspaceBadge";
 import { GigModal } from "./GigModal";
 import { ClearFilters, Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
@@ -146,7 +145,12 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                       Shared
                     </span>
                   ) : (
-                    tws && tree.length > 1 && <WorkspaceBadge ws={tws} />
+                    tws && (
+                      <span className="pill pill-muted" title={`Only in ${tws.name}${t.project_id === null ? "" : ` / ${tws.projects.find((p) => p.id === t.project_id)?.name ?? "?"}`}`}>
+                        {tws.name}
+                        {t.project_id !== null && ` / ${tws.projects.find((p) => p.id === t.project_id)?.name ?? "?"}`}
+                      </span>
+                    )
                   )}
                 </span>
               </div>

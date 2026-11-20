@@ -30,7 +30,7 @@ You can also pick an existing **template** and an existing **schedule** in the s
 
 ## Shared templates and schedules
 
-Holders of the **Shared library** permission (given on an all-workspaces rule; instance admins hold it) can make a template or a schedule **shared**: it belongs to no workspace and every workspace sees it, marked **Shared**, in the lists and in the template and schedule pickers. Only they change or delete it (see [access.md](../reference/access.md#the-shared-library)).
+Holders of the **Shared library** permission (given on an all-workspaces rule; instance admins hold it) can make a template or a schedule **shared**: it belongs to no workspace and every workspace sees it, marked **Shared**, in the lists (a template or schedule of one workspace carries a quiet tag with that workspace, and its project for a project-only template) and in the template and schedule pickers. Only they change or delete it (see [access.md](../reference/access.md#the-shared-library)).
 
 - A new template's **Scope** row (Shared library only) chooses **This workspace** or **Shared: every workspace**. A shared template is for any project and has no assignees or custom field values: those belong to each workspace.
 - A new schedule's **Workspace** list offers **Shared: every workspace** with Shared library.

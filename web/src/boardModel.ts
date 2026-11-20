@@ -98,7 +98,8 @@ export function filterQuery(f: BoardFilter): string {
   return q ? "?" + q : "";
 }
 
-export const isFiltered = (f: BoardFilter) => filterQuery({ ...f, arch: false }) !== "";
+// isFiltered: anything narrows or widens the board from its default, "Show archived gigs" included
+export const isFiltered = (f: BoardFilter) => filterQuery(f) !== "";
 
 // ActiveFilter: one filter that is on, as a removable chip of the folded filter row; `without` is the
 // filter with just this one taken off.

@@ -12,7 +12,7 @@ Each page that lists these things has an **Import JSON** button next to its **Ne
 | **Schedules** (account menu) | schedules |
 | **Templates** (account menu) | gig templates |
 | **Recurring** (account menu) | recurring gigs, and the schedules and gig templates they use |
-| **Import gigs** (account menu) | gigs |
+| **Import JSON** (account menu) | everything you may make: gigs, recurring gigs, gig templates, schedules, errands and errand templates, in one list |
 | **Errands** page | errands and errand templates |
 
 1. Paste the JSON, or choose a `.json` file. It may hold one object or a list, up to 100 objects and

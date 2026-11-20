@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Templates and Schedules: a template or schedule that belongs to one workspace now always carries a quiet tag naming it (and the project, for a project-only template), so it is plain which ones are per workspace and which are **Shared** (before, the tag showed only with several workspaces).
+- The account menu's **Import gigs** is now **Import JSON**: it takes every kind you may create (gigs, recurring gigs, gig templates, schedules, errands, errand templates) in one list. It still only creates.
+- Board: **Clear filters** also unticks **Show archived gigs**, is active when only that box is ticked, and the More filters count includes the box.
 - Phone and dark-mode polish: the Import JSON file picker is a button with the chosen name beside it; on phones the Schedules, Templates and Recurring actions sit in an even grid and the Where picker rows, those actions and dialog close buttons are 40 px to tap; the board's Clear filters is just its icon there (it no longer drops to its own row in the wider themes); the Import preview and Make shared lists have a visible border in dark themes; the robot badge on a card is as big as the other foot icons.
 - Make shared: **Make shared…** on a workspace's schedule, gig template or errand template (Shared
   library) makes the shared item and merges the identical copies in one step. The dialog shows the plan

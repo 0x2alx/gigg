@@ -30,7 +30,7 @@ import { setMentionUsers } from "./markdown";
 import { RecurringModal } from "./Recurring";
 import { SchedulesModal } from "./Schedules";
 import { TemplatesModal } from "./Templates";
-import { copyJson, ImportJsonModal } from "./ImportJsonModal";
+import { copyJson, ImportJsonModal, importKinds } from "./ImportJsonModal";
 import { GigModal, lastProject } from "./GigModal";
 import { GigPanel } from "./GigPanel";
 import { backTo, relTime, viewsApi } from "./views/viewsApi";
@@ -115,6 +115,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const [archiveDone, setArchiveDone] = useState<{ ids: number[]; category?: "done" | "cancelled" } | null>(null);
   const [timings, setTimings] = useState(false);
   const [importing, setImporting] = useState(false);
+  const importKindList = useMemo(() => importKinds(tree, me), [tree, me]);
   const [trash, setTrash] = useState(false);
   const narrow = useNarrow();
   // the layout (wide screens; a phone shows one column at a time): statuses as columns, or as rows
@@ -848,7 +849,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
       )}
       {recurring && <RecurringModal highlight={recurring.highlight} onClose={() => setRecurring(null)} onChanged={changed} />}
       {timings && <SchedulesModal onClose={() => setTimings(false)} onChanged={changed} />}
-      {importing && <ImportJsonModal kinds={["gig"]} initialPlace={single ? `p:${single.project.id}` : ""} onClose={() => setImporting(false)} onDone={changed} />}
+      {importing && <ImportJsonModal kinds={importKindList} initialPlace={single ? `p:${single.project.id}` : ""} onClose={() => setImporting(false)} onDone={changed} />}
       {templates && <TemplatesModal onClose={() => setTemplates(false)} onChanged={changed} />}
       {archiveDone !== null && (
         <ArchiveDoneModal
@@ -1005,7 +1006,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
           <input type="search" aria-label="Search gigs" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
         </span>
         {choose && <WherePicker tree={tree} filter={filter} users={users} onWs={toggleWs} onProject={toggleP} onAll={() => setFilter({ ...filter, ws: [], p: [] })} />}
-        <MoreFilters count={[filter.a, filter.l, filter.pr, filter.rec, filter.run].filter(Boolean).length}>
+        <MoreFilters count={[filter.a, filter.l, filter.pr, filter.rec, filter.run, filter.arch].filter(Boolean).length}>
           <FilterField label="Assignee">
             <AssigneeSelect special people={people} className={sel(filter.a)} value={filter.a} onChange={(a) => setFilter({ ...filter, a })} />
           </FilterField>
@@ -1028,7 +1029,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
             </span>
           </FilterField>
         </MoreFilters>
-        <ClearFilters className="bf-clear" active={isFiltered(filter)} onClear={() => setFilter({ ...EMPTY_FILTER, arch: filter.arch })} />
+        <ClearFilters className="bf-clear" active={isFiltered(filter)} onClear={() => setFilter(EMPTY_FILTER)} />
         {end && !shortcutRow && <div className="bf-end">{end}</div>}
       </div>
       {shortcutRow && (

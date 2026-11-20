@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { api, ApiError, canShare, canWriteIn, hasCap, isGigSchedule, type GigSchedule as Schedule } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { optionOf, PlaceFilter, placeMatch, type Place } from "./places";
-import { WorkspaceBadge } from "./WorkspaceBadge";
 import { RepeatFields } from "./RepeatFields";
 import { defaultRepeat, describeRule, fmtLead, localTZ, sameAsRule, repeatProblem, repeatRule, type RepeatState } from "./recurrence";
 import { repeatOfSchedule, scheduleBody } from "./scheduleTiming";
@@ -136,7 +135,11 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                       Shared
                     </span>
                   ) : (
-                    sws && tree.length > 1 && <WorkspaceBadge ws={sws} />
+                    sws && (
+                      <span className="pill pill-muted" title={`Only in ${sws.name}`}>
+                        {sws.name}
+                      </span>
+                    )
                   )}
                 </span>
               </div>

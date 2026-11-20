@@ -69,6 +69,12 @@ export function importTargets(kind: Kind, tree: WorkspaceTree[], me: ReturnType<
   }
 }
 
+// importKinds: every kind the signed-in account may make somewhere (the account menu's Import JSON).
+export const IMPORT_KINDS: Kind[] = ["gig", "recurring_gig", "gig_template", "schedule", "errand", "errand_template"];
+export function importKinds(tree: WorkspaceTree[], me: ReturnType<typeof useApp>["me"]): Kind[] {
+  return IMPORT_KINDS.filter((k) => importTargets(k, tree, me).length > 0);
+}
+
 // createOne: the page's own create call for this kind.
 function createOne(kind: Kind, t: Target, body: Obj): Promise<unknown> {
   switch (kind) {

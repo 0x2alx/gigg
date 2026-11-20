@@ -82,4 +82,4 @@ A gig can have a window: it may only be started between its start time and **Win
 
 ## Copy and import as JSON
 
-A card's menu (the gear) has **Copy as JSON**, and the account menu has **Import gigs**: paste JSON or choose a file to make one or several gigs in a project. See [Import JSON and Copy as JSON](import-export.md).
+A card's menu (the gear) has **Copy as JSON**, and the account menu has **Import JSON**: paste JSON or choose a file to make gigs, templates, schedules, errands and recurring gigs (whatever you may create). It only ever creates. See [Import JSON and Copy as JSON](import-export.md).

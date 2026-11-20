@@ -88,13 +88,13 @@ The avatars at the bottom right are the people assigned to the gig, overlapping.
 The toolbar above the columns narrows the board, in one row:
 
 - **Search**: text in the key, title or description.
-- **More filters**: one button that opens the other filters; its count says how many of them are on (not counting **Show archived gigs**), and a filter that is on is tinted in it. The table has the same button.
+- **More filters**: one button that opens the other filters; its count says how many of them are on (**Show archived gigs** included), and a filter that is on is tinted in it. The table has the same button.
   - **Assignee**: anyone, assigned to you, unassigned, or a person.
   - **Label** and **Priority** (a minimum: "High or higher").
   - **Recurring**: every gig (the default), **Hide recurring** (leaves out the gigs a [recurring gig](recurring.md) made), or **Only recurring** (just those).
   - **Always run**: every gig (the default), **Hide always run** or **Only always run** (the gigs worked whatever the usage budget; see [agents](agents.md)).
   - **Archived**: **Show archived gigs** shows them too, greyed out, in their columns.
-- **Clear filters**: resets everything except **Show archived gigs**; greyed out while nothing is filtered. Every page with filters has one (the table, the recurring gigs, templates and schedules lists, the admin users list and audit log).
+- **Clear filters**: resets everything, **Show archived gigs** included; greyed out while nothing is filtered and active when only that box is ticked. Every page with filters has one (the table, the recurring gigs, templates and schedules lists, the admin users list and audit log).
 
 **Where** (shown when there is more than one workspace or project): picks what the board shows. Its panel has a search box and a tree of every workspace, each as a checkbox row (its owner's picture, or a colour dot) with its projects indented under it. Picks add up: tick a workspace to show all of its projects, tick a project to show just that project, and mix them freely, so "all of Atlas plus the Scripts project of Meridian" is two ticks. A project of a ticked workspace shows as ticked and greyed out, since it is already in; untick the workspace and the project goes back to its own state. The search matches workspace and project names, and a project that matches keeps its workspace in view. **All** clears the choice; nothing ticked shows everything. The button says what is picked: **Where: All**, one name such as **Where: gigg**, or **Where: 3 places**. A project called "Main" is written **Workspace / Main**, since several workspaces have one. With a single workspace the panel lists just its projects. With exactly one project in view the board shows that project's own columns and manual order; with several, one column per status category.
 

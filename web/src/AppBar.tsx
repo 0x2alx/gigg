@@ -4,6 +4,7 @@
 // On a phone the pages are icons and the two New buttons fold into one "+" menu.
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Link, useLocation, useSearch } from "wouter";
+import { importKinds } from "./ImportJsonModal";
 import { api, ApiError, canShare, canWriteIn, errandMakers, gigChoices, hasCap } from "./api";
 import { useApp } from "./App";
 import { TopBell } from "./Bell";
@@ -168,7 +169,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
   const onBoard = loc === "/board" || loc.startsWith("/board/");
   const tool = (t: string) => (onBoard ? withParam(loc, search, "tool", t) : `/board?tool=${t}`);
   const anyTemplates = canShare(me) || tree.some((w) => hasCap(me, "templates", w.id));
-  const canGig = gigChoices(me, tree).length > 0;
+  const canImport = importKinds(tree, me).length > 0;
   const anyArchive = tree.some((w) => w.projects.some((p) => canWriteIn(w, p.id) && hasCap(me, "archive_gigs", w.id, p.id)));
   const name = me.user.display_name || me.user.username;
 
@@ -212,7 +213,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
             <MenuLink href={tool("recurring")} icon="refresh" label="Recurring" tip="Gigs that come back on a schedule (a template + a schedule)" />
             <MenuLink href={tool("schedules")} icon="clock" label="Schedules" tip="Timings (every day 9:00, every Friday…) that recurring gigs share" />
             {anyTemplates && <MenuLink href={tool("templates")} icon="template" label="Templates" tip="Reusable gig contents: start a gig or a recurring gig from one" />}
-            {canGig && <MenuLink href={tool("import")} icon="copy" label="Import gigs" tip="Make gigs from pasted JSON or a file" />}
+            {canImport && <MenuLink href={tool("import")} icon="copy" label="Import JSON" tip="Make gigs, templates, schedules, errands and recurring gigs from pasted JSON or a file" />}
             {anyArchive && <MenuLink href={tool("archive")} icon="archive" label="Archive done" tip="Archive the gigs in Done and Cancelled: they leave the board but stay searchable" />}
             <MenuLink href={tool("trash")} icon="trash" label="Trash" tip="Deleted gigs: restore them from here" />
           </MenuSection>
