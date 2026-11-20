@@ -552,6 +552,7 @@ optional `expect_copies` (a list of ids, the `copies` of the plan the caller rev
 that plan: when the copies computed inside the transaction are others (a copy appeared, or one was
 skipped or stopped being identical), nothing happens and the answer is 409 (`the copies changed; review
 the plan again`). An empty list expects no copies; omitted, nothing is compared. A dry run ignores it.
+The MCP tool `make_shared` wraps these calls: it plans by default and only confirms with `expect_copies`.
 
 ```json
 {

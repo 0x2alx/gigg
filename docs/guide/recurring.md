@@ -41,7 +41,7 @@ Holders of the **Shared library** permission (given on an all-workspaces rule; i
 
 ### Make shared
 
-Identical templates and schedules pile up when each workspace makes its own. With Shared library, **Make shared…** on a workspace's template or schedule (in **Templates** and **Schedules**; on an errand's panel for its errand template or schedule) does the clean-up in one step: it makes the shared item, moves every recurring gig and errand that uses the item or one of its identical copies to it, and deletes the item and the copies. The dialog first shows the plan: the copies it found (workspace and name), what moves, and any copy it leaves alone. **Make shared** then runs it, in one go: it all happens or nothing does.
+Identical templates and schedules pile up when each workspace makes its own. With Shared library, **Make shared…** on a workspace's template or schedule (in **Templates** and **Schedules**; on an errand's panel for its errand template or schedule) does the clean-up in one step: it makes the shared item, moves every recurring gig and errand that uses the item or one of its identical copies to it, and deletes the item and the copies. The dialog first shows the plan: the copies it found (workspace and name), what moves, and any copy it leaves alone. **Make shared** then runs it, in one go: it all happens or nothing does. Agents use the `make_shared` MCP tool, which shows the plan first (a dry run, the default) and only confirms with the copies that plan listed.
 
 What counts as identical (the name, the workspace and the dates never do):
 

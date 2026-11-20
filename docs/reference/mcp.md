@@ -101,7 +101,9 @@ There are no MCP tools for claiming gigs or recording runs; runners use the REST
 | `archive_gig` | `gigs:write`, `archive_gigs` anywhere | `gig`, `restore?` | Archives a gig, or unarchives it with `restore: true`. |
 | `follow_gig` | `gigs:read` | `gig`, `unfollow?` | Follows a gig (or stops): its reports, questions, failed runs and missed windows ring your bell as your bell preferences allow. `create_gig` and `update_gig` take `followers` (usernames) to set other people's. |
 | `create_from_template` | `gigs:write`, `create_gigs` anywhere | `template`, `project`, `title?` | Creates a gig from a template. |
-| `save_template` | `gigs:write`, `templates` anywhere | `workspace?`, `id?` (replace), `project_id?`, `name`, `title`, `description_md?`, `priority?`, `labels?`, `assignees?`, `followers?` (user ids; on replace, omit to keep), `checklist?`, `subgigs?` (`{title, blocks_parent?}` each), `custom?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` | Creates a template, or replaces template `id`. Gigs made from it get its subgigs. |
+| `save_template` | `gigs:write`, `templates` anywhere (`shared: true`: Shared library and `library:write`, see below) | `workspace?`, `id?` (replace), `shared?`, `project_id?`, `name`, `title`, `description_md?`, `priority?`, `labels?`, `assignees?`, `followers?` (user ids; on replace, omit to keep), `checklist?`, `subgigs?` (`{title, blocks_parent?}` each), `custom?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` | Creates a template, or replaces template `id` (a shared one too, under the shared-library checks). `shared: true` creates a shared template (every workspace can use it) instead of the workspace's. Gigs made from it get its subgigs. |
+| `make_shared` | `gigs:write` or `errands:write` (the kind's scope), `library:write`, Shared library | `kind` (`schedule`, `template`, `errand_template`), `id`, `dry_run?` (default **true**), `expect_copies?` | Makes a workspace's item shared and merges its identical copies (see [Make shared](api.md#make-shared)). The default only returns the plan: the shared item, the `copies` it found, the ones it `skipped` and why, the recurring gigs and errands that would move. To do it, call again with `dry_run: false` and `expect_copies` set to the plan's `copies[].id` (`[]` when it listed none): if the copies are others by then, nothing happens (409), so an agent can't merge blindly. Same permission checks as `POST .../make-shared` (it is that call). |
+| `import_json` | `gigs:write` or `errands:write`; each row needs what its own create call needs | `json` (a list or one object, as JSON or text), `workspace?`, `project?`, `shared?`, `dry_run?` | Creates many things from JSON, as the web UI's [Import JSON](../guide/import-export.md) does: one list can mix kinds `gig`, `template`, `schedule`, `errand_template`, `errand` and `recurring`, in the format of that guide. See below. |
 | `delete_gig` | `gigs:delete` | `gig` | Moves a gig to the trash. |
 | `restore_gig` | `gigs:delete` | `gig` | Restores a gig from the trash. |
 | `add_comment` | `comments:write` | `gig`, `body_md`, `kind?` (`comment`, `report`, `question`) | Comments on a gig. |
@@ -114,7 +116,7 @@ There are no MCP tools for claiming gigs or recording runs; runners use the REST
 | `create_recurring` | `gigs:write`, `recurring_gigs` anywhere | `project`, content (`title`, `description_md`, `priority`, `labels`, `assignees`, `checklist`, `subgigs`, `model`, `effort`, `always_run`, `allowed_tools`) or `template_id`; timing (`freq` `daily`/`weekly`/`monthly`, `interval`, `weekdays` 1=Mon..7=Sun, `month_day` 1-31 or -1, `tz`, `window_start` HH:MM, `window_minutes`, `lead_minutes`) or `schedule_id`; `ends_on?`, `max_count?`, `overlap?` (`skip`/`create`), `paused?` | Creates a recurring gig. Content given here is saved as a new template; timing reuses an identical schedule or makes one. |
 | `update_recurring` | same | `id` plus any of the above | Changes a recurring gig; omitted fields stay. `template_id`/`schedule_id` switch; content and timing fields edit the shared template/schedule in place. `ends_on`/`max_count` of 0 clear them. |
 | `delete_recurring` | same | `id`, `also_template?`, `also_schedule?` | Stops a recurring gig. Its gigs stay; its template and schedule too, unless asked (refused while another recurring gig uses them). |
-| `save_schedule` | `gigs:write`, `recurring_gigs` anywhere | `id?`, `workspace?`, `name?`, `freq`, `interval?`, `weekdays?`, `month_day?`, `tz?`, `window_start?`, `window_minutes?`, `lead_minutes?` | Makes a schedule, or changes schedule `id` (omitted fields stay); every recurring gig on it follows. |
+| `save_schedule` | `gigs:write`, `recurring_gigs` anywhere (`shared: true`: Shared library and `library:write`) | `id?`, `workspace?`, `shared?`, `name?`, `freq`, `interval?`, `weekdays?`, `month_day?`, `tz?`, `window_start?`, `window_minutes?`, `lead_minutes?` | Makes a schedule, or changes schedule `id` (omitted fields stay; a shared one too, under the shared-library checks); every recurring gig on it follows. `shared: true` makes a shared schedule. |
 | `delete_schedule` | same | `id` | Deletes a schedule no recurring gig uses. |
 
 Defaults for timing: every 1 period, window from 00:00 for 1440 minutes, and the zone of your time zone preference (else the instance default, `GIGG_DEFAULT_TZ`).
@@ -136,10 +138,49 @@ Defaults for timing: every 1 period, window from 00:00 for 1440 minutes, and the
 | `list_errand_runs` | `errands:read` | `id`, `before?`, `limit?` | Its runs, newest first. |
 | `get_errand_run` | `errands:read` | `id` | One run, with its output tail when the key has `errands:output`. |
 | `list_errand_templates` | `errands:read` | `workspace?` | Errand templates. |
+| `save_errand_template` | `errands:write`, `errands` anywhere (`shared: true`: Shared library and `library:write`) | `id?` (change), `workspace?`, `shared?`, `name`, `command`, `description_md?`, `timeout_s?`, `output?`, `unsandboxed?` | Makes an errand template, or changes template `id` (omitted fields stay; every errand using it changes). `shared: true` makes a shared one. |
 | `save_errand` | `errands:write`, `errands` anywhere | `id?` (change), `workspace?`, `template_id?` or `name`, `command`, `description_md?`, `timeout_s?`, `output?` (`gigg`/`host`), `unsandboxed?`, `project?` (the project it belongs to: who sees it sees the errand; its failure gigs land there; default the workspace's first); `schedule_id?` or `freq` (`minutes`/`hours`/`daily`/`weekly`/`monthly`), `interval?`, `weekdays?`, `month_day?`, `tz?`, `at?` (HH:MM), `for_minutes?` (minutes/hours: how long ticking lasts each day); `worker?`, `on_failure_gig?`, `paused?` | Makes an errand, or changes one (omitted fields stay). |
 | `pause_errand` | same | `id`, `resume?` | Pauses or resumes an errand. |
 | `run_errand_now` | same | `id` | Runs it once at the executor's next poll. |
 | `delete_errand` | same | `id` | Deletes an errand. |
+
+### Shared library through MCP
+
+`shared: true` on `save_template`, `save_schedule` and `save_errand_template` calls `POST /shared/templates`,
+`/shared/schedules` and `/shared/errand-templates`; `make_shared` calls the `make-shared` endpoints. The
+checks are the REST ones: the Shared library permission on the all-workspaces level, a key that isn't
+limited to some places and carries `library:write` **and** the scope of the kind (`gigs:write` for gig
+templates and schedules, `errands:write` for errand templates); otherwise the answer is a 403 naming what
+is missing. See [Access](access.md).
+
+### import_json
+
+`json` is the list (or a single object), either as a JSON value or as text; up to 100 objects and 1 MB.
+`workspace` is where everything goes (default: your key's workspace); `project` is the project of gigs,
+recurring gigs and errands (default: the workspace's first for gigs and recurring gigs), and the project a
+gig template is limited to. `shared: true` makes the schedules, gig templates and errand templates shared
+(Shared library, as above). `dry_run: true` validates and returns the plan without creating anything; the
+create calls decide permissions and caps, so a row can be ready in a dry run and still fail.
+
+Rows are made in dependency order (schedules, then templates, then recurring gigs and errands, then
+gigs). A recurring gig's `template` and `schedule` name an item of the same list first, else one in the
+workspace or shared; people are usernames. Each row goes through its normal create call with your key's
+permissions and scopes, and the answer lists every row:
+
+```json
+{"dry_run": false, "made": 2, "failed": 1, "skipped": 1,
+ "results": [
+  {"row": 0, "kind": "schedule", "name": "Mornings", "status": "made", "id": 12},
+  {"row": 1, "kind": "gig", "name": "Check the backups", "status": "made", "id": 301, "key": "OPS-14", "ignored": ["id"]},
+  {"row": 2, "kind": "gig_template", "name": "Report", "status": "failed", "message": "..."},
+  {"row": 3, "kind": "recurring_gig", "name": "Report", "status": "skipped", "message": "template 'Report' wasn't created"}]}
+```
+
+`made` has the `id` (and the `key` of a gig); `failed` means the create call refused the row, the others
+still go through; `skipped` means it wasn't tried: a problem found beforehand (a wrong kind, a missing
+field, an unknown username, a name that matches nothing) or a row it needs wasn't made. In a dry run the
+good rows are `ready`. A list that isn't JSON, is empty, holds more than 100 objects or is over 1 MB is
+refused as a whole.
 
 `model`, `effort`, `always_run` and `allowed_tools` are described in
 [runner-protocol.md](runner-protocol.md#gig-run-settings). Setting or changing `always_run` needs the

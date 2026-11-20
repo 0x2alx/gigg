@@ -65,3 +65,16 @@ preview.
 - A gig has **Copy as JSON** in the menu (the gear) of its card.
 
 The text goes to the clipboard in the format above, and imports as it is.
+
+## From an agent: `import_json`
+
+The same import is an MCP tool, `import_json` (and any client can do the same with the create calls
+one by one). It takes the JSON as above (the kinds may be written `gig`, `template`, `schedule`,
+`errand_template`, `errand`, `recurring`, or with the names used here), a `workspace` and an optional
+`project` instead of the place picker, and optionally `shared` (schedules, templates and errand
+templates go to the shared library) and `dry_run` (validate and show the plan, create nothing). It
+makes rows in the same order, resolves names the same way (a recurring gig's `template` and `schedule`
+can name rows of the same list), creates only, never changes or deletes, and answers per row: made
+(with the id, or the key of a gig), failed (with the message the form would have given; the others go
+through) or skipped (with the reason: a problem found beforehand, or a row it needs wasn't made).
+Permissions are those of the key; see the [MCP reference](../reference/mcp.md#import_json).
