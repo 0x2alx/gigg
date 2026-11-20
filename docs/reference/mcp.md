@@ -83,6 +83,7 @@ There are no MCP tools for claiming gigs or recording runs; runners use the REST
 | `changes` | `gigs:read` | `workspace?`, `after_id?` (id or `latest`), `limit?` (default 100, max 500) | Activity after an id, oldest first; pass `next_after_id` back as `after_id`. The API also requires `workspace:read` and `comments:read`. |
 | `notifications` | `gigs:read` | `unread?`, `limit?` | Your notifications: mentions, assignments, questions, missed windows. |
 | `runner_status` | `gigs:read` | none | Per workspace: gig caps, pause state, last 24 hours of agent work. |
+| `get_metrics` | `gigs:read` | `from?`, `to?` (`YYYY-MM-DD`, default the last 30 days), `bucket?` (`day`, `week`, `month`), `tz?`, `workspace?`, `project?`, `assignee?` (id or `@username`), `worker_kind?` (`human`, `agent`) | Per bucket and in total, up to 400 days: gigs created, done, cancelled and archived, median cycle time, agent runs by outcome, duration, cost and tokens (and by agent, model and project), errand runs, recurring gigs on time or missed. Only what you may see counts. Same as `GET /metrics`. |
 
 ### Writing gigs
 

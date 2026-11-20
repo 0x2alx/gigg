@@ -584,6 +584,26 @@ without it (or `false`) the move is made and the same shape comes back with `sha
   each `deleted`, and one `<kind>.made_shared` row on the shared item listing the source and the merged
   copies.
 
+### metrics
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/metrics` | Counts, times, cost and tokens per bucket and in total, over the workspaces and projects in reach. |
+
+Query parameters, all optional:
+
+| Parameter | Meaning |
+|---|---|
+| `from`, `to` | First and last day, `YYYY-MM-DD` in `tz`, both included. Default: the 30 days ending today. At most 400 days. |
+| `bucket` | `day` (default), `week` (Monday first) or `month`. |
+| `tz` | IANA time zone that cuts the days. Default: your `timezone` preference, else the instance default. |
+| `workspace` | Only this workspace (id or slug). |
+| `project` | Only this project (id). Errand runs, which belong to the workspace, are then left out. |
+| `assignee` | A user (id or username). Gigs: assigned to them. Agent runs and errand runs: done by them. |
+| `worker_kind` | `human` or `agent`: the same, for every user of that kind. |
+
+The response has `buckets` (each with `date` (the local day it starts on), `start` and `end` in unix ms, clipped to the range), `totals`, and `by_agent`, `by_model` and `by_project` (runs, cost and tokens, most expensive first, at most 50 rows). Every bucket and the totals carry the same figures: `gigs_created`, `gigs_done`, `gigs_cancelled` (gigs moved into a cancelled status, from the activity log), `gigs_archived`, `runs` and `runs_done`, `runs_needs_human`, `runs_error`, `runs_timeout`, `runs_interrupted`, `runs_parked`, `runs_running`, `run_ms`, `cost_usd`, `tokens_in`, `tokens_out`, `tokens_cache`, `errand_runs`, `errand_ok`, `errand_failed`, `errand_timeout`, `errand_missed`, `errand_skipped`, `errand_ms`, `errand_output_bytes`, `recurring_on_time`, `recurring_missed` and `cycle_median_ms` (median time from created to done of the gigs done in the bucket). The totals add `open_now`, `run_avg_ms` and the `success_rate`, `failure_rate`, `timeout_rate` and `interrupted_rate` of the runs that ended. Needs `gigs:read`; errand runs also need `errands:read` and a view of the whole workspace. Time spent in Doing is not reported.
+
 ### admin
 
 | Method | Path | Purpose |

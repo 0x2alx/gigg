@@ -13,6 +13,7 @@ How to use gigg in the web UI. The same pages open in the app from the **?** on 
 - [Import and copy as JSON](guide/import-export.md): copy schedules, templates, recurring gigs, gigs and errands as JSON; import them from pasted JSON or a file.
 - [Errands](guide/errands.md): command-based tasks, shell commands an agent runs on a schedule, and their runs.
 - [The dashboard](guide/dashboard.md): each workspace's agent runs, caps, usage and cost, and pausing runs.
+- [Metrics](guide/metrics.md): gigs done, cycle time, agent runs, cost and tokens, and errands over a period, in numbers and small charts.
 - [Inbox and notifications](guide/inbox.md): agents' questions waiting for you, mentions and other news.
 - [Tables, saved views and the command palette](guide/views.md): lists with bulk actions, views you keep, and Ctrl+K.
 - [Themes](guide/themes.md): the built-in themes, your own, one an AI assistant makes for you, and importing and exporting them.

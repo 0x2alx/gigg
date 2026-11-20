@@ -131,6 +131,7 @@ Start at the [documentation index](docs/README.md), or jump straight to a page:
 [Recurring gigs](docs/guide/recurring.md) ·
 [Errands](docs/guide/errands.md) ·
 [Dashboard](docs/guide/dashboard.md) ·
+[Metrics](docs/guide/metrics.md) ·
 [Inbox and notifications](docs/guide/inbox.md) ·
 [Views](docs/guide/views.md) ·
 [Themes](docs/guide/themes.md) ·
