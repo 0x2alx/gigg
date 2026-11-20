@@ -25,7 +25,8 @@ import (
 // shared item.
 
 type makeSharedBody struct {
-	DryRun bool `json:"dry_run,omitempty" doc:"Only return the plan: the shared item, the copies found (and skipped), the users that would move. Nothing changes"`
+	DryRun       bool    `json:"dry_run,omitempty" doc:"Only return the plan: the shared item, the copies found (and skipped), the users that would move. Nothing changes"`
+	ExpectCopies []int64 `json:"expect_copies,omitempty" doc:"The ids of the copies the reviewed plan listed. When given and the plan computed now lists others, nothing happens and the answer is 409 (an empty list expects no copies)"`
 }
 
 type sharePlanOut struct {
@@ -234,7 +235,8 @@ func shareScope(kind string) string {
 	return "gigs:write"
 }
 
-// makeShared runs the plan (dry run) or the move, in one transaction.
+// makeShared runs the plan (dry run) or the move, in one transaction. A move that names expect_copies
+// goes ahead only when the copies planned inside the transaction are exactly those.
 func (a *API) makeShared(ctx context.Context, p *access.Principal, kind string, id int64, body makeSharedBody) (*sharePlanOut, error) {
 	if err := sharedWrite(p, shareScope(kind)); err != nil {
 		return nil, err
@@ -254,6 +256,9 @@ func (a *API) makeShared(ctx context.Context, p *access.Principal, kind string, 
 		if plan, copyIDs, err = a.sharePlan(ctx, tx, p, kind, id); err != nil {
 			return err
 		}
+		if body.ExpectCopies != nil && !sameIDs(body.ExpectCopies, copyIDs) {
+			return fail(409, "conflict", "The copies changed; review the plan again.")
+		}
 		plan.Shared, err = store.ShareApply(ctx, tx, p.Actor(), kind, id, copyIDs)
 		return err
 	})
@@ -261,6 +266,14 @@ func (a *API) makeShared(ctx context.Context, p *access.Principal, kind string, 
 		return nil, err
 	}
 	return &sharePlanOut{plan}, nil
+}
+
+// sameIDs: the two lists hold the same ids, in any order.
+func sameIDs(a, b []int64) bool {
+	x, y := slices.Clone(a), slices.Clone(b)
+	slices.Sort(x)
+	slices.Sort(y)
+	return slices.Equal(slices.Compact(x), y)
 }
 
 func (a *API) registerMakeShared() {
