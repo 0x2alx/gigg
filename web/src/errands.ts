@@ -118,6 +118,7 @@ export const errandApi = {
   run: (id: number) => call<ErrandRun>("GET", `/errand-runs/${id}`),
   templates: (ws: string | number) => call<{ items: ErrandTemplate[] }>("GET", `/workspaces/${ws}/errand-templates`),
   sharedTemplates: () => call<{ items: ErrandTemplate[] }>("GET", `/shared/errand-templates`),
+  createTemplate: (ws: string | number, body: ErrandTemplateBody) => call<ErrandTemplate>("POST", `/workspaces/${ws}/errand-templates`, body),
   createSharedTemplate: (body: ErrandTemplateBody) => call<ErrandTemplate>("POST", `/shared/errand-templates`, body),
   putTemplate: (id: number, body: ErrandTemplateBody, version?: number) => call<ErrandTemplate>("PUT", `/errand-templates/${id}`, body, version),
   removeTemplate: (id: number) => call<void>("DELETE", `/errand-templates/${id}`),

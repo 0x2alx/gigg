@@ -14,6 +14,7 @@ import { RfRow } from "./RepeatFields";
 import { WEEKDAYS, localTZ, ordinal } from "./recurrence";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
+import { copyJson, ImportJsonModal, importTargets } from "./ImportJsonModal";
 import { Avatar, ClearFilters, ConfirmModal, Modal } from "./ui";
 import { PRIORITY_COLOR } from "./theme";
 import {
@@ -77,6 +78,7 @@ export function ErrandsPage({ open }: { open?: number }) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Errand | "new" | null>(null);
   const [library, setLibrary] = useState(false); // the shared errand templates (Shared library)
+  const [importing, setImporting] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   const wsKey = tree.map((w) => w.id).join(",");
@@ -156,6 +158,11 @@ export function ErrandsPage({ open }: { open?: number }) {
           <p className="muted small">Commands the agents run on a schedule, in their sandbox. Each run is recorded here; errands make no gigs.</p>
         </div>
         <div className="row">
+          {importTargets("errand", tree, me).length + importTargets("errand_template", tree, me).length > 0 && (
+            <button type="button" className="button secondary" onClick={() => setImporting(true)} data-tip="Make errands or errand templates from pasted JSON or a file">
+              <Icon name="copy" /> Import JSON
+            </button>
+          )}
           {canShare(me) && (
             <button type="button" className="button secondary" onClick={() => setLibrary(true)} data-tip="Errand templates every workspace can start an errand from">
               <Icon name="template" /> Shared templates
@@ -339,6 +346,14 @@ export function ErrandsPage({ open }: { open?: number }) {
           <p className="muted">This errand doesn't exist, or you can't see it.</p>
         </aside>
       )}
+      {importing && (
+        <ImportJsonModal
+          kinds={["errand", "errand_template"]}
+          initialPlace={place}
+          onClose={() => setImporting(false)}
+          onDone={() => load()}
+        />
+      )}
       {library && <SharedTemplates ws={writable[0] ?? tree[0]!} onClose={() => setLibrary(false)} />}
       {editing && (editing !== "new" || makers.length > 0) && (
         <ErrandEditor
@@ -376,6 +391,7 @@ function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChan
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [copied, setCopied] = useState("");
   const panelRef = useRef<HTMLElement>(null);
   const st = stateOf(c);
   const setter = c.unsandboxed_set_by !== null ? users.get(c.unsandboxed_set_by) : undefined;
@@ -430,11 +446,25 @@ function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChan
           {st.text}
         </span>
         <span className="grow" />
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Copy as JSON"
+          data-tip="Copy as JSON"
+          onClick={() => copyJson("errand", c, users).then((m) => (setErr(""), setCopied(m)), (e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't copy."))}
+        >
+          <Icon name="copy" />
+        </button>
         <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
           <Icon name="x" />
         </button>
       </div>
       <h2 className="panel-title">{c.name}</h2>
+      {copied && (
+        <p className="muted small" role="status">
+          {copied}
+        </p>
+      )}
       {canEdit && (
         <div className="row wrap errand-actions">
           <button type="button" className="button small" disabled={busy || c.run_now_at !== null || startLocked} onClick={() => act(errandApi.runNow(c.id))} data-tip={startLocked ? lockTip : "Runs once at the agent's next poll (within about a minute), whatever the schedule"}>
@@ -593,6 +623,8 @@ const UNIT: Record<ErrandFreq, [string, string]> = {
 // SharedTemplates: the shared errand templates (Shared library): list, new, edit, delete. Each is
 // edited in the errand editor (its command half).
 function SharedTemplates({ ws, onClose }: { ws: WorkspaceTree; onClose: () => void }) {
+  const { users } = useApp();
+  const [copied, setCopied] = useState("");
   const [items, setItems] = useState<ErrandTemplate[] | null>(null);
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState<ErrandTemplate | "new" | null>(null);
@@ -641,6 +673,11 @@ function SharedTemplates({ ws, onClose }: { ws: WorkspaceTree; onClose: () => vo
           + New shared template
         </button>
       </div>
+      {copied && (
+        <p className="muted small" role="status">
+          {copied}
+        </p>
+      )}
       {items === null && !err && <p className="muted">Loading…</p>}
       {items?.length === 0 && <p className="muted">No shared errand templates yet.</p>}
       {!!items?.length && (
@@ -677,6 +714,14 @@ function SharedTemplates({ ws, onClose }: { ws: WorkspaceTree; onClose: () => vo
                   </>
                 ) : (
                   <>
+                    <button
+                      type="button"
+                      className="button secondary small"
+                      onClick={() => copyJson("errand_template", t, users).then((m) => (setErr(""), setCopied(m)), (e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't copy."))}
+                      aria-label={`Copy ${t.name} as JSON`}
+                    >
+                      <Icon name="copy" /> Copy JSON
+                    </button>
                     <button type="button" className="button secondary small" onClick={() => setEditing(t)} aria-label={`Edit ${t.name}`}>
                       <Icon name="pencil" /> Edit
                     </button>

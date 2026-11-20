@@ -11,6 +11,7 @@ import { GigModal } from "./GigModal";
 import { ClearFilters, Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
+import { copyJson, ImportJsonModal, importTargets } from "./ImportJsonModal";
 
 
 export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
@@ -25,6 +26,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState<Template | "new" | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
   const closeEdit = useCallback(() => setEditing(null), []);
 
   const wsKey = tree.map((w) => w.id).join(",");
@@ -65,6 +67,19 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't delete the template."));
   };
 
+  const copy = (t: Template) => copyJson("gig_template", t, users).then(onChanged, (e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't copy."));
+  if (importing)
+    return (
+      <ImportJsonModal
+        kinds={["gig_template"]}
+        initialPlace={place}
+        onClose={() => setImporting(false)}
+        onDone={(msg) => {
+          load();
+          onChanged(msg);
+        }}
+      />
+    );
   // a shared template is edited in the first workspace the editor may edit (for its labels and members)
   const editWs = editing && editing !== "new" ? (editing.shared ? (editable[0] ?? tree[0]) : wsOf(editing.workspace_id)) : undefined;
   if (editing && (editing === "new" ? start : editWs)) {
@@ -100,6 +115,11 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
         {start && (
           <button type="button" className="button small list-new" onClick={() => setEditing("new")}>
             + New template
+          </button>
+        )}
+        {importTargets("gig_template", tree, me).length > 0 && (
+          <button type="button" className={"button secondary small" + (start ? "" : " list-new")} onClick={() => setImporting(true)}>
+            Import JSON
           </button>
         )}
       </div>
@@ -144,9 +164,8 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
               </div>
               {/* the foot: the actions on the left, who gets the gigs in the bottom-right corner */}
               <div className="rec-foot">
-              {canEdit && (
                 <div className="schedule-actions">
-                  {confirm === t.id ? (
+                  {canEdit && confirm === t.id ? (
                     <>
                       <span className="small">Delete this template? Gigs made from it stay.</span>
                       <button type="button" className="button danger-button small" onClick={() => remove(t)}>
@@ -158,23 +177,29 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                     </>
                   ) : (
                     <>
-                      <button type="button" className="button secondary small" onClick={() => setEditing(t)} aria-label={`Edit ${t.name}`}>
-                        <Icon name="pencil" /> Edit
+                      <button type="button" className="button secondary small" onClick={() => void copy(t)} aria-label={`Copy ${t.name} as JSON`}>
+                        <Icon name="copy" /> Copy JSON
                       </button>
-                      <button
-                        type="button"
-                        className="button danger-button small"
-                        onClick={() => setConfirm(t.id)}
-                        disabled={(t.recurring ?? 0) > 0}
-                        title={(t.recurring ?? 0) > 0 ? "Recurring gigs use this template: delete them or give them another template first" : undefined}
-                        aria-label={`Delete ${t.name}`}
-                      >
-                        <Icon name="trash" /> Delete
-                      </button>
+                      {canEdit && (
+                        <>
+                          <button type="button" className="button secondary small" onClick={() => setEditing(t)} aria-label={`Edit ${t.name}`}>
+                            <Icon name="pencil" /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="button danger-button small"
+                            onClick={() => setConfirm(t.id)}
+                            disabled={(t.recurring ?? 0) > 0}
+                            title={(t.recurring ?? 0) > 0 ? "Recurring gigs use this template: delete them or give them another template first" : undefined}
+                            aria-label={`Delete ${t.name}`}
+                          >
+                            <Icon name="trash" /> Delete
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
-              )}
                 {(t.assignees ?? []).length > 0 && (
                   <span className="rec-people" aria-label="Assignees">
                     {(t.assignees ?? []).map((id) => {

@@ -11,6 +11,7 @@ import { SCHEDULE_COLOR } from "./theme";
 import { ClearFilters, Avatar, LabelChip, Modal, Pill, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
+import { copyJson, ImportJsonModal, importTargets } from "./ImportJsonModal";
 
 
 export function RecurringModal({ initialPlace = "", highlight, onClose, onChanged }: {
@@ -26,6 +27,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState<Recurrence | "new" | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
   // the confirm's "also delete" ticks (start unticked each time it opens)
   const [also, setAlso] = useState<{ template: boolean; schedule: boolean }>({ template: false, schedule: false });
   const askDelete = (id: number) => {
@@ -99,6 +101,19 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
       .finally(() => setBusy(null));
   };
 
+  const copy = (r: Recurrence) => copyJson("recurring_gig", r, users).then(onChanged, (e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't copy."));
+  if (importing)
+    return (
+      <ImportJsonModal
+        kinds={["recurring_gig"]}
+        initialPlace={place}
+        onClose={() => setImporting(false)}
+        onDone={(msg) => {
+          load();
+          onChanged(msg);
+        }}
+      />
+    );
   const editWs = editing && editing !== "new" ? wsOf(editing.workspace_id) : undefined;
   if (editing && (editing === "new" ? start : editWs)) {
     return (
@@ -134,6 +149,11 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
         {start && (
           <button type="button" className="button small list-new" onClick={() => setEditing("new")}>
             + New recurring gig
+          </button>
+        )}
+        {importTargets("recurring_gig", tree, me).length > 0 && (
+          <button type="button" className={"button secondary small" + (start ? "" : " list-new")} onClick={() => setImporting(true)}>
+            Import JSON
           </button>
         )}
       </div>
@@ -203,9 +223,8 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
               </div>
               {/* the foot: the actions on the left, who gets the gigs in the bottom-right corner */}
               <div className="rec-foot">
-              {canWrite && (
                 <div className="schedule-actions">
-                  {confirm === r.id ? (
+                  {canWrite && confirm === r.id ? (
                     <div className="rec-delete">
                       <span className="small">Delete this recurring gig? The gigs it already made stay.</span>
                       {/* its template and schedule can go too, when no other recurring gig uses them */}
@@ -238,6 +257,11 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                     </div>
                   ) : (
                     <>
+                      <button type="button" className="button secondary small" onClick={() => void copy(r)} aria-label={`Copy ${r.title} as JSON`}>
+                        <Icon name="copy" /> Copy JSON
+                      </button>
+                      {canWrite && (
+                        <>
                       <button type="button" className="button secondary small" disabled={busy === r.id} onClick={() => togglePause(r)} aria-label={`${r.paused ? "Resume" : "Pause"} ${r.title}`}>
                         <Icon name={r.paused ? "play" : "pause"} />
                         {r.paused ? "Resume" : "Pause"}
@@ -248,10 +272,11 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                       <button type="button" className="button danger-button small" onClick={() => askDelete(r.id)} aria-label={`Delete ${r.title}`}>
                         <Icon name="trash" /> Delete
                       </button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
-              )}
                 {(r.assignees ?? []).length > 0 && (
                   <span className="rec-people" aria-label="Assignees">
                     {(r.assignees ?? []).map((id) => {

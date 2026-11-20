@@ -30,6 +30,7 @@ import { setMentionUsers } from "./markdown";
 import { RecurringModal } from "./Recurring";
 import { SchedulesModal } from "./Schedules";
 import { TemplatesModal } from "./Templates";
+import { copyJson, ImportJsonModal } from "./ImportJsonModal";
 import { GigModal, lastProject } from "./GigModal";
 import { GigPanel } from "./GigPanel";
 import { backTo, relTime, viewsApi } from "./views/viewsApi";
@@ -45,7 +46,7 @@ import { cardState, elapsed, runWorkedTip, plainText } from "./cardState";
 
 const openStatuses = (b: Board): Status[] => b.statuses.filter((s) => s.category !== "cancelled");
 
-type BoardAction = "new" | "recurring" | "templates" | "schedules" | "archive";
+type BoardAction = "new" | "recurring" | "templates" | "schedules" | "archive" | "import";
 
 // BoardPage: one board over every workspace and project in reach, narrowed by the filter in the URL
 // (/board?ws=..&p=..&a=..&l=..&pr=..&q=..&arch=1). One project in view: its own status columns and
@@ -113,6 +114,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   // the archive dialog: the projects ticked to start with, and which finished gigs (both when unset)
   const [archiveDone, setArchiveDone] = useState<{ ids: number[]; category?: "done" | "cancelled" } | null>(null);
   const [timings, setTimings] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [trash, setTrash] = useState(false);
   const narrow = useNarrow();
   // the layout (wide screens; a phone shows one column at a time): statuses as columns, or as rows
@@ -275,6 +277,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     } else if (what === "schedules") setTimings(true);
     else if (what === "recurring") setRecurring({});
     else if (what === "templates") setTemplates(true);
+    else if (what === "import") setImporting(true);
     else {
       setNewIn(null);
       openNew();
@@ -292,7 +295,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     const rest = s.toString();
     navigate(loc + (rest ? "?" + rest : ""), { replace: true });
     if (tool === "trash") setTrash(true);
-    else if (tool === "archive" || tool === "recurring" || tool === "schedules" || tool === "templates") action(tool);
+    else if (tool === "archive" || tool === "recurring" || tool === "schedules" || tool === "templates" || tool === "import") action(tool);
     else if (isNew) {
       setNewIn(null);
       openNew();
@@ -845,6 +848,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
       )}
       {recurring && <RecurringModal highlight={recurring.highlight} onClose={() => setRecurring(null)} onChanged={changed} />}
       {timings && <SchedulesModal onClose={() => setTimings(false)} onChanged={changed} />}
+      {importing && <ImportJsonModal kinds={["gig"]} initialPlace={single ? `p:${single.project.id}` : ""} onClose={() => setImporting(false)} onDone={changed} />}
       {templates && <TemplatesModal onClose={() => setTemplates(false)} onChanged={changed} />}
       {archiveDone !== null && (
         <ArchiveDoneModal
@@ -1497,6 +1501,17 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
                   </button>
                 </>
               )}
+              <div className="menu-label">Copy</div>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(false);
+                  copyJson("gig", gig, users).then((m) => onChanged(m), (e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't copy."));
+                }}
+              >
+                <Icon name="copy" /> Copy as JSON
+              </button>
               <div className="menu-label">Move to</div>
               {statuses
                 .filter((s) => s.id !== gig.status_id)

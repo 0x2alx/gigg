@@ -14,6 +14,7 @@ import { repeatOfSchedule, scheduleBody } from "./scheduleTiming";
 import { ClearFilters, Modal } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
+import { copyJson, ImportJsonModal, importTargets } from "./ImportJsonModal";
 
 
 export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
@@ -21,12 +22,13 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
   onClose: () => void;
   onChanged: (message?: string) => void;
 }) {
-  const { tree, me } = useApp();
+  const { tree, me, users } = useApp();
   const [items, setItems] = useState<Schedule[] | null>(null);
   const [place, setPlace] = useState<Place>(() => optionOf(initialPlace, tree, false));
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState<Schedule | "new" | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
   const closeEdit = useCallback(() => setEditing(null), []);
   const wsKey = tree.map((w) => w.id).join(",");
   const loadSeq = useRef(0);
@@ -60,6 +62,19 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't delete the schedule."));
   };
 
+  const copy = (s: Schedule) => copyJson("schedule", s, users).then(onChanged, (e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't copy."));
+  if (importing)
+    return (
+      <ImportJsonModal
+        kinds={["schedule"]}
+        initialPlace={place}
+        onClose={() => setImporting(false)}
+        onDone={(msg) => {
+          load();
+          onChanged(msg);
+        }}
+      />
+    );
   const editWs = editing && editing !== "new" ? (editing.shared ? (writable[0] ?? tree[0]) : wsOf(editing.workspace_id)) : startWs;
   if (editing && editWs) {
     return (
@@ -92,6 +107,11 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
         {startWs && (
           <button type="button" className="button small list-new" onClick={() => setEditing("new")}>
             + New schedule
+          </button>
+        )}
+        {importTargets("schedule", tree, me).length > 0 && (
+          <button type="button" className={"button secondary small" + (startWs ? "" : " list-new")} onClick={() => setImporting(true)}>
+            Import JSON
           </button>
         )}
       </div>
@@ -136,9 +156,8 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                 )}
               </div>
               <div className="rec-foot">
-              {canWrite && (
                 <div className="schedule-actions">
-                  {confirm === s.id ? (
+                  {canWrite && confirm === s.id ? (
                     <>
                       <span className="small">Delete this schedule?</span>
                       <button type="button" className="button danger-button small" onClick={() => remove(s)}>
@@ -150,23 +169,29 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                     </>
                   ) : (
                     <>
-                      <button type="button" className="button secondary small" onClick={() => setEditing(s)} aria-label={`Edit ${s.name}`}>
-                        <Icon name="pencil" /> Edit
+                      <button type="button" className="button secondary small" onClick={() => void copy(s)} aria-label={`Copy ${s.name} as JSON`}>
+                        <Icon name="copy" /> Copy JSON
                       </button>
-                      <button
-                        type="button"
-                        className="button danger-button small"
-                        onClick={() => setConfirm(s.id)}
-                        disabled={s.uses > 0 || !!s.errand_uses}
-                        title={s.uses > 0 || s.errand_uses ? "Recurring gigs or errands use this schedule: delete them or give them another schedule first" : undefined}
-                        aria-label={`Delete ${s.name}`}
-                      >
-                        <Icon name="trash" /> Delete
-                      </button>
+                      {canWrite && (
+                        <>
+                          <button type="button" className="button secondary small" onClick={() => setEditing(s)} aria-label={`Edit ${s.name}`}>
+                            <Icon name="pencil" /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="button danger-button small"
+                            onClick={() => setConfirm(s.id)}
+                            disabled={s.uses > 0 || !!s.errand_uses}
+                            title={s.uses > 0 || s.errand_uses ? "Recurring gigs or errands use this schedule: delete them or give them another schedule first" : undefined}
+                            aria-label={`Delete ${s.name}`}
+                          >
+                            <Icon name="trash" /> Delete
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
-              )}
               </div>
             </li>
             );
