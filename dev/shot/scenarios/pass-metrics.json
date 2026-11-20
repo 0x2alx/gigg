@@ -1,0 +1,145 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  1440,
+  900
+ ],
+ "waitUntil": "domcontentloaded",
+ "steps": [
+  {
+   "wait": 2000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'daywalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    1440,
+    1500
+   ]
+  },
+  {
+   "goto": "/metrics"
+  },
+  {
+   "wait": ".mx-tiles"
+  },
+  {
+   "wait": ".mx-chart svg"
+  },
+  {
+   "wait": 900
+  },
+  {
+   "eval": "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+  },
+  {
+   "shot": "metrics-tall-day-1440",
+   "full": false
+  },
+  {
+   "viewport": [
+    390,
+    2300
+   ]
+  },
+  {
+   "goto": "/metrics"
+  },
+  {
+   "wait": ".mx-tiles"
+  },
+  {
+   "wait": ".mx-chart svg"
+  },
+  {
+   "wait": 900
+  },
+  {
+   "eval": "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+  },
+  {
+   "shot": "metrics-tall-day-390",
+   "full": false
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'nightwalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    1440,
+    1500
+   ]
+  },
+  {
+   "goto": "/metrics"
+  },
+  {
+   "wait": ".mx-tiles"
+  },
+  {
+   "wait": ".mx-chart svg"
+  },
+  {
+   "wait": 900
+  },
+  {
+   "eval": "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+  },
+  {
+   "shot": "metrics-tall-night-1440",
+   "full": false
+  },
+  {
+   "viewport": [
+    390,
+    2300
+   ]
+  },
+  {
+   "goto": "/metrics"
+  },
+  {
+   "wait": ".mx-tiles"
+  },
+  {
+   "wait": ".mx-chart svg"
+  },
+  {
+   "wait": 900
+  },
+  {
+   "eval": "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+  },
+  {
+   "shot": "metrics-tall-night-390",
+   "full": false
+  }
+ ]
+}
