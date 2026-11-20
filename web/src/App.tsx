@@ -7,6 +7,7 @@ import { AppBar } from "./AppBar";
 import { BoardPage } from "./Board";
 import { ErrandsPage } from "./Errands";
 import { DashboardPage } from "./Dashboard";
+import { MetricsPage } from "./Metrics";
 import { InboxPage } from "./Inbox";
 import { countsChange, onActivity, treeChange, useLive, type LiveState } from "./live";
 import { ProfilePage } from "./Profile";
@@ -359,6 +360,9 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
           <Switch>
             <Route path="/dashboard">
               <DashboardPage />
+            </Route>
+            <Route path="/metrics">
+              <MetricsPage />
             </Route>
             <Route path="/inbox">
               <InboxPage />

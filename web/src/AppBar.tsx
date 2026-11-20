@@ -225,6 +225,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
           )}
           <MenuSection>
             <MenuLink href="/dashboard" icon="dashboard" label="Dashboard" />
+            <MenuLink href="/metrics" icon="chart" label="Metrics" tip="Gigs done, agent runs, cost and errands over a period" />
             {me.admin && (
               <>
                 <button type="button" role="menuitem" aria-expanded={adminOpen} className={"account-item" + (loc.startsWith("/admin") ? " on" : "")} onClick={(e) => (e.stopPropagation(), setAdminOpen((o) => !o))}>

@@ -41,5 +41,9 @@ check "MCP initialize over loopback" '[ "$code" = 200 ] && jq -e ".result.server
 list='{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 check "MCP lists tools, no delete_gig" 'curl -s -H "$H" -H "$K" -H "$J" -H "Accept: application/json, text/event-stream" -d "$list" http://gigg-dev:8080/mcp | jq -e "[.result.tools[].name] | (index(\"create_gig\") != null) and (index(\"delete_gig\") == null)" >/dev/null'
 check "MCP without a key: 401" '[ "$(curl -s -H "$H" -H "$J" -o /dev/null -w "%{http_code}" -d "$init" http://gigg-dev:8080/mcp)" = 401 ]'
+code=$(curl -s $CA -b $jar -o /tmp/mx -w '%{http_code}' "$MAIN/metrics?bucket=week")
+check "metrics: gigs, a run and its cost counted" '[ "$code" = 200 ] && jq -e ".totals.gigs_created >= 1 and .totals.runs >= 1 and .totals.cost_usd >= 0.44 and (.buckets | length) >= 5" /tmp/mx >/dev/null'
+check "metrics: the runner's key reads it on internal" '[ "$(curl -s -H "$H" -H "$K" -o /dev/null -w "%{http_code}" "$INT/metrics")" = 200 ]'
+check "metrics: a range over 400 days is refused" '[ "$(curl -s $CA -b $jar -o /dev/null -w "%{http_code}" "$MAIN/metrics?from=2020-01-01&to=2026-01-01")" = 422 ]'
 check "OpenAPI served" 'curl -s -H "$H" $INT/openapi.json | jq -e ".paths[\"/gigs/{id}/move\"]" >/dev/null'
 echo "--- $pass passed, $fail failed"

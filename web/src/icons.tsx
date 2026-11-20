@@ -31,6 +31,12 @@ const P: Record<string, ReactNode> = {
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
     </>
   ),
+  chart: (
+    <>
+      <path d="M3 3v18h18" />
+      <path d="M8 17v-5M13 17V7M18 17v-8" />
+    </>
+  ),
   inbox: (
     <>
       <path d="M22 12h-6l-2 3h-4l-2-3H2" />

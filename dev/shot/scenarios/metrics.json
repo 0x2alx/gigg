@@ -1,0 +1,206 @@
+{
+ "base": "https://gigg-dev:8443",
+ "waitUntil": "domcontentloaded",
+ "viewport": [
+  1440,
+  900
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "goto": "/metrics"
+  },
+  {
+   "wait": ".mx-tiles"
+  },
+  {
+   "wait": ".mx-chart svg"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "[...document.querySelectorAll('.mx-tile-value')].filter(e => !/^(0|\\$0|\u2013|0%)$/.test(e.textContent.trim())).length >= 3",
+   "expect": true
+  },
+  {
+   "eval": "(() => { const t = [...document.querySelectorAll('.mx-tile')].find(e => e.textContent.startsWith('Agent runs')); return !!t && Number(t.querySelector('.mx-tile-value').textContent.replace(/,/g, '')) > 0; })()",
+   "expect": true
+  },
+  {
+   "eval": "document.querySelectorAll('.mx-chart svg rect[style]').length > 0",
+   "expect": true
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+   "expect": true
+  },
+  {
+   "shot": "metrics-day-wide",
+   "full": true
+  },
+  {
+   "eval": "[...document.querySelectorAll('.vs-item')].find(b => b.textContent === 'Week').click()"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "document.querySelectorAll('.mx-chart')[0].querySelectorAll('.mx-hit').length <= 6",
+   "expect": true
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+   "expect": true
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+   "expect": true
+  },
+  {
+   "eval": "[...document.querySelectorAll('.mx-card, .mx-tile')].every(e => e.getBoundingClientRect().right <= window.innerWidth + 1)",
+   "expect": true
+  },
+  {
+   "shot": "metrics-week-phone",
+   "full": true
+  },
+  {
+   "eval": "[...document.querySelectorAll('.vs-item')].find(b => b.textContent === 'Day').click()"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+   "expect": true
+  },
+  {
+   "shot": "metrics-day-phone",
+   "full": true
+  },
+  {
+   "eval": "(async () => { const r = await fetch('/api/v1/me/themes-selection', { method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({ selected_id: 'nightwalker', match_system: false }) }); return r.status; })()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "goto": "/metrics"
+  },
+  {
+   "wait": ".mx-chart svg"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+   "expect": true
+  },
+  {
+   "shot": "metrics-night-wide",
+   "full": true
+  },
+  {
+   "viewport": [
+    1440,
+    2200
+   ]
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "metrics-night-wide-tall",
+   "full": false
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+   "expect": true
+  },
+  {
+   "shot": "metrics-night-phone",
+   "full": true
+  },
+  {
+   "viewport": [
+    390,
+    2600
+   ]
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+   "expect": true
+  },
+  {
+   "eval": "[...document.querySelectorAll('.mx-card, .mx-tile, .mx-table-wrap')].every(e => e.getBoundingClientRect().right <= window.innerWidth + 1)",
+   "expect": true
+  },
+  {
+   "shot": "metrics-night-phone-tall",
+   "full": false
+  },
+  {
+   "eval": "(async () => { const r = await fetch('/api/v1/me/themes-selection', { method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({ selected_id: 'daywalker', match_system: false }) }); return r.status; })()",
+   "expect": 204
+  }
+ ]
+}
