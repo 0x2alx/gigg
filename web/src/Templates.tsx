@@ -12,6 +12,7 @@ import { ClearFilters, Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 import { copyJson, ImportJsonModal, importTargets } from "./ImportJsonModal";
+import { MakeSharedDialog } from "./MakeSharedDialog";
 
 
 export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
@@ -27,6 +28,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
   const [editing, setEditing] = useState<Template | "new" | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
+  const [sharing, setSharing] = useState<Template | null>(null); // Make shared…
   const closeEdit = useCallback(() => setEditing(null), []);
 
   const wsKey = tree.map((w) => w.id).join(",");
@@ -179,6 +181,23 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                     <>
                       <button type="button" className="button secondary small" onClick={() => void copy(t)} aria-label={`Copy ${t.name} as JSON`}>
                         <Icon name="copy" /> Copy JSON
+                      <button type="button" className="button secondary small" onClick={() => setEditing(t)} aria-label={`Edit ${t.name}`}>
+                        <Icon name="pencil" /> Edit
+                      </button>
+                      {!t.shared && canShare(me) && (
+                        <button type="button" className="button secondary small" onClick={() => setSharing(t)} aria-label={`Make ${t.name} shared`}>
+                          <Icon name="share" /> Make shared…
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="button danger-button small"
+                        onClick={() => setConfirm(t.id)}
+                        disabled={(t.recurring ?? 0) > 0}
+                        title={(t.recurring ?? 0) > 0 ? "Recurring gigs use this template: delete them or give them another template first" : undefined}
+                        aria-label={`Delete ${t.name}`}
+                      >
+                        <Icon name="trash" /> Delete
                       </button>
                       {canEdit && (
                         <>
@@ -213,6 +232,18 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
             );
           })}
         </ul>
+      )}
+      {sharing && (
+        <MakeSharedDialog
+          kind="template"
+          id={sharing.id}
+          name={sharing.name}
+          onClose={() => setSharing(null)}
+          onDone={(msg) => {
+            load();
+            onChanged(msg);
+          }}
+        />
       )}
     </Modal>
   );

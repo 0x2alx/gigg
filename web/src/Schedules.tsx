@@ -15,6 +15,7 @@ import { ClearFilters, Modal } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 import { copyJson, ImportJsonModal, importTargets } from "./ImportJsonModal";
+import { MakeSharedDialog } from "./MakeSharedDialog";
 
 
 export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
@@ -29,6 +30,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
   const [editing, setEditing] = useState<Schedule | "new" | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
+  const [sharing, setSharing] = useState<Schedule | null>(null); // Make shared…
   const closeEdit = useCallback(() => setEditing(null), []);
   const wsKey = tree.map((w) => w.id).join(",");
   const loadSeq = useRef(0);
@@ -171,6 +173,23 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                     <>
                       <button type="button" className="button secondary small" onClick={() => void copy(s)} aria-label={`Copy ${s.name} as JSON`}>
                         <Icon name="copy" /> Copy JSON
+                      <button type="button" className="button secondary small" onClick={() => setEditing(s)} aria-label={`Edit ${s.name}`}>
+                        <Icon name="pencil" /> Edit
+                      </button>
+                      {!s.shared && canShare(me) && (
+                        <button type="button" className="button secondary small" onClick={() => setSharing(s)} aria-label={`Make ${s.name} shared`}>
+                          <Icon name="share" /> Make shared…
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="button danger-button small"
+                        onClick={() => setConfirm(s.id)}
+                        disabled={s.uses > 0 || !!s.errand_uses}
+                        title={s.uses > 0 || s.errand_uses ? "Recurring gigs or errands use this schedule: delete them or give them another schedule first" : undefined}
+                        aria-label={`Delete ${s.name}`}
+                      >
+                        <Icon name="trash" /> Delete
                       </button>
                       {canWrite && (
                         <>
@@ -197,6 +216,18 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
             );
           })}
         </ul>
+      )}
+      {sharing && (
+        <MakeSharedDialog
+          kind="schedule"
+          id={sharing.id}
+          name={sharing.name}
+          onClose={() => setSharing(null)}
+          onDone={(msg) => {
+            load();
+            onChanged(msg);
+          }}
+        />
       )}
     </Modal>
   );

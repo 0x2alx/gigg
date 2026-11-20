@@ -1881,6 +1881,8 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .errand-panel .panel-title { margin-top: var(--sp-4); }
 .errand-actions { margin: 0 0 var(--sp-5); gap: var(--sp-3); align-items: center; }
 .errand-props { margin-top: var(--sp-4); }
+.make-shared-list { list-style: none; margin: 0 0 var(--sp-3); padding: 0; display: grid; gap: var(--sp-2); }
+.make-shared-list li { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--radius-s, 6px); overflow-wrap: anywhere; }
 .errand-h { font-size: var(--fs-base); margin: var(--sp-6) 0 var(--sp-3); }
 .errand-cmd, .errand-out {
   margin: 0; padding: var(--sp-4); background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-m);

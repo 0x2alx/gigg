@@ -444,6 +444,15 @@ export interface Schedule {
   shared?: boolean; // every workspace's (workspace_id 0): admins change it
 }
 
+export type ShareKind = "schedule" | "template" | "errand_template";
+const SHARE_PATH: Record<ShareKind, string> = { schedule: "/schedules", template: "/templates", errand_template: "/errand-templates" };
+export interface ShareItem { id: number; workspace_id: number; workspace: string; name: string; recurring_gigs: number; errands: number; reason?: string }
+export interface ShareUser { kind: "recurring_gig" | "errand"; id: number; workspace_id: number; workspace: string; label: string; from: number }
+export interface SharePlan {
+  kind: ShareKind; dry_run: boolean; source: ShareItem; shared?: ShareItem; copies: ShareItem[]; skipped: ShareItem[]; users: ShareUser[];
+  moved: number; deleted: number; new_name: string;
+}
+
 // GigSchedule: a schedule recurring gigs can use (not a minutes/hours one).
 export type GigSchedule = Schedule & { freq: "daily" | "weekly" | "monthly" };
 export const isGigSchedule = (s: Schedule): s is GigSchedule => s.freq === "daily" || s.freq === "weekly" || s.freq === "monthly";
@@ -614,6 +623,8 @@ export const api = {
   putSchedule: (id: number, body: ScheduleBody, version?: number) =>
     call<Schedule>("PUT", `/schedules/${id}`, body, version ? { "If-Match": `"${version}"` } : undefined),
   deleteSchedule: (id: number) => call<void>("DELETE", `/schedules/${id}`),
+  // Make shared: dry_run returns the plan (nothing changes); without it, the move is done.
+  makeShared: (kind: ShareKind, id: number, dry_run: boolean) => call<SharePlan>("POST", `${SHARE_PATH[kind]}/${id}/make-shared`, { dry_run }),
   wsGigs: (ws: string | number, params: Record<string, string | number>) =>
     call<{ items: Gig[]; next_cursor?: string }>("GET", `/workspaces/${ws}/gigs?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}`),
   projectGigs: (p: number, params: Record<string, string | number>) =>

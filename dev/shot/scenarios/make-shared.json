@@ -1,0 +1,122 @@
+{
+ "base": "https://gigg-dev:8443",
+ "waitUntil": "domcontentloaded",
+ "viewport": [
+  1440,
+  900
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => { const H = {'Content-Type':'application/json','X-Gigg-CSRF':'1'}; const j = async (m, u, b) => (await fetch('/api/v1' + u, {method: m, headers: H, body: JSON.stringify(b)})).status; await j('POST','/workspaces',{slug:'atlas',name:'Atlas'}); await j('POST','/workspaces',{slug:'meridian',name:'Meridian'}); const t = {freq:'daily',tz:'UTC',window_start:'07:00',window_minutes:60}; const a = await j('POST','/workspaces/atlas/schedules',{name:'Mornings A',...t}); const b = await j('POST','/workspaces/meridian/schedules',{name:'Mornings B',...t}); const c = await j('POST','/workspaces/meridian/schedules',{name:'Evenings',freq:'daily',tz:'UTC',window_start:'19:00',window_minutes:60}); return [a,b,c]; })()",
+   "expect": [
+    201,
+    201,
+    201
+   ]
+  },
+  {
+   "goto": "/board?tool=schedules"
+  },
+  {
+   "wait": "ul.schedules"
+  },
+  {
+   "eval": "[...document.querySelectorAll('ul.schedules li.schedule .schedule-title')].map(e => e.textContent).sort()",
+   "expect": [
+    "Evenings",
+    "Mornings A",
+    "Mornings B"
+   ]
+  },
+  {
+   "eval": "[...document.querySelectorAll('ul.schedules .pill-shared')].length",
+   "expect": 0
+  },
+  {
+   "click": "button[aria-label='Make Mornings A shared']"
+  },
+  {
+   "wait": ".make-shared [role=status]"
+  },
+  {
+   "eval": "document.querySelector('.make-shared [role=status]').textContent",
+   "expect": "Merges 1 identical copy into it. No recurring gig or errand uses it yet."
+  },
+  {
+   "eval": "[...document.querySelectorAll('.make-shared ul[aria-label=Copies] li strong')].map(e => e.textContent)",
+   "expect": [
+    "Mornings A",
+    "Mornings B"
+   ]
+  },
+  {
+   "wait": 600
+  },
+  {
+   "shot": "make-shared-dialog",
+   "el": ".make-shared",
+   "margin": 16
+  },
+  {
+   "click": ".make-shared .row.end .button:not(.secondary)"
+  },
+  {
+   "wait": ".toast"
+  },
+  {
+   "eval": "document.querySelector('.toast').textContent",
+   "expect": "Shared schedule \u201cMornings A\u201d made, 1 copy merged"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "[...document.querySelectorAll('ul.schedules li.schedule .schedule-title')].map(e => e.textContent).sort()",
+   "expect": [
+    "Evenings",
+    "Mornings A"
+   ]
+  },
+  {
+   "eval": "[...document.querySelectorAll('ul.schedules li.schedule')].filter(li => li.querySelector('.pill-shared')).map(li => li.querySelector('.schedule-title').textContent)",
+   "expect": [
+    "Mornings A"
+   ]
+  },
+  {
+   "eval": "!!document.querySelector('button[aria-label=\"Make Mornings A shared\"]')",
+   "expect": false
+  },
+  {
+   "shot": "make-shared-done",
+   "full": false
+  }
+ ]
+}

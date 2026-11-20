@@ -15,6 +15,7 @@ import { WEEKDAYS, localTZ, ordinal } from "./recurrence";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 import { copyJson, ImportJsonModal, importTargets } from "./ImportJsonModal";
+import { MakeSharedDialog } from "./MakeSharedDialog";
 import { Avatar, ClearFilters, ConfirmModal, Modal } from "./ui";
 import { PRIORITY_COLOR } from "./theme";
 import {
@@ -79,6 +80,7 @@ export function ErrandsPage({ open }: { open?: number }) {
   const [editing, setEditing] = useState<Errand | "new" | null>(null);
   const [library, setLibrary] = useState(false); // the shared errand templates (Shared library)
   const [importing, setImporting] = useState(false);
+  const [toast, setToast] = useState(""); // after Make shared
   const [now, setNow] = useState(Date.now());
 
   const wsKey = tree.map((w) => w.id).join(",");
@@ -331,6 +333,11 @@ export function ErrandsPage({ open }: { open?: number }) {
           canUnsandbox={hasCap(me, "errand_unsandboxed", selected.workspace_id)}
           onClose={() => navigate("/errands")}
           onEdit={() => setEditing(selected)}
+          onShared={(msg) => {
+            load();
+            setToast(msg);
+            window.setTimeout(() => setToast(""), 4000);
+          }}
           onChanged={onSaved}
           onDeleted={() => {
             navigate("/errands");
@@ -370,11 +377,16 @@ export function ErrandsPage({ open }: { open?: number }) {
           }}
         />
       )}
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
 
-function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChanged, onDeleted }: {
+function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChanged, onDeleted, onShared }: {
   errand: Errand;
   canEdit: boolean;
   canUnsandbox: boolean;
@@ -382,8 +394,10 @@ function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChan
   onEdit: () => void;
   onChanged: (c: Errand) => void;
   onDeleted: () => void;
+  onShared: (message: string) => void;
 }) {
-  const { tree, users } = useApp();
+  const { tree, users, me } = useApp();
+  const [sharing, setSharing] = useState<"template" | "schedule" | null>(null); // Make shared…
   const ws = tree.find((w) => w.id === c.workspace_id);
   const [runs, setRuns] = useState<ErrandRun[] | null>(null);
   const [more, setMore] = useState(false);
@@ -535,6 +549,29 @@ function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChan
           </>
         )}
       </dl>
+      {canShare(me) && (!c.template_shared || !c.schedule_shared) && (
+        <div className="row wrap errand-actions">
+          {!c.template_shared && (
+            <button type="button" className="button secondary small" onClick={() => setSharing("template")}>
+              <Icon name="share" /> Make its template shared…
+            </button>
+          )}
+          {!c.schedule_shared && (
+            <button type="button" className="button secondary small" onClick={() => setSharing("schedule")}>
+              <Icon name="share" /> Make its schedule shared…
+            </button>
+          )}
+        </div>
+      )}
+      {sharing && (
+        <MakeSharedDialog
+          kind={sharing === "template" ? "errand_template" : "schedule"}
+          id={sharing === "template" ? c.template_id : c.schedule_id}
+          name={sharing === "template" ? c.name : c.schedule_name}
+          onClose={() => setSharing(null)}
+          onDone={onShared}
+        />
+      )}
       <h3 className="errand-h">Command</h3>
       <pre className="errand-cmd">{c.command}</pre>
       {c.description_md && <p className="errand-desc">{c.description_md}</p>}

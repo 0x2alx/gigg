@@ -114,6 +114,8 @@ const P: Record<string, ReactNode> = {
     </>
   ),
   pencil: <path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z" />,
+  // make shared: two lines merging into one
+  share: <path d="M6 3v6a6 6 0 0 0 6 6h0M18 3v6a6 6 0 0 1-6 6M12 15v6" />,
   expand: <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />,
   shrink: <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />,
   "chevron-right": <path d="m9 18 6-6-6-6" />,
