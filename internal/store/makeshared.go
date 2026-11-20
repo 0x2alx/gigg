@@ -21,8 +21,10 @@ import (
 //     assignees. They name people of one workspace's projects and a shared template holds none: every
 //     recurring gig moved to the shared template keeps the assignees it had (as its own), so two copies
 //     that differ only in who they assign are still the same template.
-//   - Errand template: description, command, timeout_s, output and unsandboxed. Left out: who set the
-//     command and the sandbox (provenance; the new shared template keeps the source's).
+//   - Errand template: description, command, timeout_s, output and unsandboxed, and the provenance: who
+//     set the command (command_set_by) and who turned the sandbox off (unsandboxed_set_by). A copy whose
+//     command was written, or sandbox turned off, by someone else is not the same: merging it would
+//     give that command the source's author. The new shared template keeps the source's provenance.
 //
 // A shared template holds no project, custom values, assignees or followers, so a source with a project,
 // custom values or followers can't be made shared (it is refused, saying what to clear).
@@ -114,8 +116,18 @@ func templateContent(t *Template) string {
 		followers, t.Model, t.Effort, t.AlwaysRun, tools, t.AutoArchive, t.RunTimeout})
 }
 
+// errandTemplateSame: the content, and who set the command and turned the sandbox off (what the
+// executor trusts a command by): a copy written or unsandboxed by someone else isn't the same template.
 func errandTemplateSame(a, b *ErrandTemplate) bool {
-	return a.DescriptionMD == b.DescriptionMD && a.Command == b.Command && a.TimeoutS == b.TimeoutS && a.Output == b.Output && a.Unsandboxed == b.Unsandboxed
+	return a.DescriptionMD == b.DescriptionMD && a.Command == b.Command && a.TimeoutS == b.TimeoutS && a.Output == b.Output && a.Unsandboxed == b.Unsandboxed &&
+		a.CommandSetBy == b.CommandSetBy && ptrEq(a.UnsandboxedBy, b.UnsandboxedBy)
+}
+
+func ptrEq(a, b *int64) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // ShareFind loads the source (a workspace's, not a shared one) and the identical copies of it in every
