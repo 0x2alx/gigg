@@ -1,6 +1,7 @@
 // What a board card says about the agent side of a gig: the badge at its top left and the block
 // under its title (a running run, a question waiting for an answer, a run that failed).
-import type { Gig } from "./api";
+import type { Gig, RunBrief } from "./api";
+import { relTime } from "./errands";
 
 export type CardStateKind = "running" | "queued" | "answer" | "failed";
 
@@ -24,6 +25,23 @@ export function cardState(t: CardGig): CardState | null {
   if (t.status_category === "waiting" && t.question) return { kind: "answer", label: "Needs answer", tip: "The agent asked a question and waits for a person" };
   if (r && !closed && FAILED[r.status]) return { kind: "failed", label: FAILED[r.status]!, tip: "The agent's last run didn't finish" };
   return null;
+}
+
+const RUN_WORDS: Record<RunBrief["status"], string> = {
+  running: "running now",
+  done: "done",
+  needs_human: "needs a person",
+  error: "failed",
+  timeout: "timed out",
+  interrupted: "interrupted",
+  parked: "parked",
+};
+
+// runWorkedTip: the tooltip of the small "an agent has worked on it" badge: the last run's outcome in
+// words, who ran it and when ("Last run: needs a person, by Scout, 3 h ago").
+export function runWorkedTip(r: Pick<RunBrief, "status" | "started_at" | "ended_at">, worker: string, now: number): string {
+  const when = relTime(r.ended_at ?? r.started_at, now);
+  return `Last run: ${RUN_WORDS[r.status] ?? r.status}${worker ? `, by ${worker}` : ""}, ${when}`;
 }
 
 // elapsed: a duration as a card shows it ("42s", "4m 12s", "1h 05m").

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Board cards: an amber bolt pill marks an Always run gig (also in the gig panel), and the robot badge on a card now shows for any gig with an agent run, its tooltip giving the last run's outcome, the worker and when.
 - Followers: anyone who can see a gig can follow it (**Follow** at the top of the gig panel, or named in
   its **Followers** in the gig form, the API and MCP), and gets its bells as its assignees do. A gig's
   bells go to its assignees and followers, no longer to its creator as such: you follow the gigs you

@@ -270,6 +270,8 @@ export const PRIORITY_COLOR = ["", "#0090FF", "#FFC53D", "#F76B15", "#E5484D"];
 
 // Recurring gigs: the schedule badge, and a gig's time window while it is open.
 export const SCHEDULE_COLOR = "#8E4EC6";
+// Always-run badge (a gig the runner takes at any time): amber, readable on the light and the dark built-in themes
+export const ALWAYS_RUN_COLOR = "#E5A400";
 export const WINDOW_OPEN_COLOR = "#F76B15";
 
 // Recurring cards (a gig a recurring gig made): the card takes a tint of SCHEDULE_COLOR and its top

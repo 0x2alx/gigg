@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardState, elapsed, plainText } from "./cardState";
+import { cardState, elapsed, plainText, runWorkedTip } from "./cardState";
 import type { RunBrief } from "./api";
 
 const run = (status: RunBrief["status"]): RunBrief => ({
@@ -44,5 +44,15 @@ describe("plainText", () => {
     expect(plainText("## Which one\n- [x] `a`\n- see [docs](https://x.y)")).toBe("Which one a see docs");
     expect(plainText("snake_case_name stays")).toBe("snake_case_name stays");
     expect(plainText("*one* and _two_ and __three__, 2 * 3 * 4")).toBe("one and two and three, 2 * 3 * 4");
+  });
+});
+
+describe("runWorkedTip", () => {
+  it("names the outcome, the worker and when", () => {
+    const r = { ...run("needs_human"), ended_at: 1_000_000 - 3 * 3_600_000 };
+    expect(runWorkedTip(r, "Scout", 1_000_000)).toBe("Last run: needs a person, by Scout, 3 h ago");
+  });
+  it("falls back to the start time and omits an unknown worker", () => {
+    expect(runWorkedTip({ ...run("timeout"), started_at: 0 }, "", 5_000_000)).toBe("Last run: timed out, 1 h ago");
   });
 });

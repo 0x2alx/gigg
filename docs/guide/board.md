@@ -38,7 +38,7 @@ When agents are at work on the gigs in view, a line under the filters sums it up
 
 A card is quiet on purpose: the theme's border colour and width, the title first, a few facts under it. When someone else or an agent moves a card, it slides to its new place. Hover over (or long-press) any mark to see its tooltip.
 
-- **Top row:** the priority as an icon (three bars for Low, Medium and High, a square with "!" for Urgent; High and Urgent are coloured), a glowing **Recurring** badge on a gig a [recurring gig](recurring.md) made, the agent state if there is one (see below), and, when several workspaces are in view, the gig's workspace as a badge in its colour (with the owner's picture). With an agent state, the workspace starts a second line. When the column is a stage and the gig's own status is named differently (for example "Needs review"), that status follows in grey. The gig's key (`KEY-12`: the project's key and the gig's number) sits in the card's top right corner, small, and always stays visible.
+- **Top row:** the priority as an icon (three bars for Low, Medium and High, a square with "!" for Urgent; High and Urgent are coloured), a glowing **Recurring** badge on a gig a [recurring gig](recurring.md) made, an amber **bolt** pill on an **Always run** gig (the runner takes it any time, outside the night window and the usage budget; hover for the text; the gig panel shows it too), the agent state if there is one (see below), and, when several workspaces are in view, the gig's workspace as a badge in its colour (with the owner's picture). With an agent state, the workspace starts a second line. When the column is a stage and the gig's own status is named differently (for example "Needs review"), that status follows in grey. The gig's key (`KEY-12`: the project's key and the gig's number) sits in the card's top right corner, small, and always stays visible.
 - **Title:** up to two lines.
 - **Due date and labels:** the due date as a small outlined chip with a calendar (red when overdue), then up to two labels as tinted chips; "+3" stands for the rest (hover to list them).
 - **Agent block** (only when there is something to show, see below).
@@ -56,7 +56,7 @@ A card is quiet on purpose: the theme's border colour and width, the title first
 | circling arrows | Made by a recurring gig |
 | clock window / missed (red) | The time window it may be started in; missed if it closed untouched |
 | speech bubble n | Comments |
-| robot | An agent has worked on it (it has an agent session) |
+| a robot | An agent has run on the gig (not shown while a run is live). Hover for the last run's outcome (done, needs a person, failed, timed out, interrupted), who ran it and when |
 | $0.42 | What the agent's runs cost so far |
 | a tinted chip | A custom field value (select or checkbox) |
 

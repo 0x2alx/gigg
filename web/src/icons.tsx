@@ -175,6 +175,8 @@ const P: Record<string, ReactNode> = {
   ),
   undo: <path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />,
   // the agent mark on an avatar: a small robot head (two eyes, an antenna), readable at 10px
+  // always run: a lightning bolt
+  bolt: <path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12z" />,
   bot: (
     <>
       <rect x="4" y="8" width="16" height="12" rx="3.5" />

@@ -31,12 +31,12 @@ import { TemplatesModal } from "./Templates";
 import { GigModal, lastProject } from "./GigModal";
 import { GigPanel } from "./GigPanel";
 import { backTo, relTime, viewsApi } from "./views/viewsApi";
-import { CATEGORY_COLOR, colorFor, readableOn } from "./theme";
-import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, MoreMenu, PriorityIcon, PrioritySelect, GigBadges, WorkspaceChip, reducedMotion } from "./ui";
+import { ALWAYS_RUN_COLOR, CATEGORY_COLOR, colorFor, readableOn } from "./theme";
+import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, MoreMenu, PriorityIcon, PrioritySelect, GigBadges, ALWAYS_RUN_TIP, Pill, WorkspaceChip, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
-import { cardState, elapsed, plainText } from "./cardState";
+import { cardState, elapsed, runWorkedTip, plainText } from "./cardState";
 
 
 
@@ -1583,6 +1583,11 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
               Recurring
             </span>
           )}
+          {!!gig.always_run && (
+            <Pill color={ALWAYS_RUN_COLOR} title={ALWAYS_RUN_TIP}>
+              <Icon name="bolt" strokeWidth={2.2} />
+            </Pill>
+          )}
           {state && (
             <span className={"run-badge run-" + state.kind} data-tip={state.tip}>
               {running ? <span className="pulse-dot" aria-hidden="true" /> : <Icon name={STATE_ICON[state.kind]} />}
@@ -1661,8 +1666,8 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
                 <Icon name="comment" /> {gig.comment_count}
               </span>
             )}
-            {gig.session_id && !running && (
-              <span className="meta-item" data-tip="An agent has worked on it: it has an agent session (see Runs in the gig)">
+            {(run || gig.session_id) && !running && (
+              <span className="meta-item" data-tip={run ? runWorkedTip(run, worker ? nameOf(worker) : "", Date.now()) : "An agent has worked on it: it has an agent session (see Runs in the gig)"}>
                 <Icon name="bot" />
               </span>
             )}

@@ -6,7 +6,7 @@ import { useNarrow } from "./narrow";
 import { avatarURL, priorityNames, type Category, type CustomField, type Tag, type Gig, type User } from "./api";
 import { cardChips } from "./items";
 import { windowBadge } from "./recurrence";
-import { CATEGORY_COLOR, PRIORITY_COLOR, SCHEDULE_COLOR, WINDOW_OPEN_COLOR, colorFor, readableOn } from "./theme";
+import { CATEGORY_COLOR, PRIORITY_COLOR, ALWAYS_RUN_COLOR, SCHEDULE_COLOR, WINDOW_OPEN_COLOR, colorFor, readableOn } from "./theme";
 import { Icon } from "./icons";
 import { FLAG_FILTERS, parseFlag, type FlagFilter, type FlagKey } from "./boardModel";
 
@@ -357,12 +357,14 @@ function writeFull(on: boolean) {
   }
 }
 
+export const ALWAYS_RUN_TIP = "Always run: the runner takes it any time, outside the night window and the budget";
+
 // GigBadges: the schedule, time-window and missed badges (cards and the gig panel). With items
 // (cards): also blocked, checklist and subgig progress, and up to two select/checkbox values. On a card
 // the progress and window marks are quiet text (icon and numbers, no box); only "blocked" and "missed"
 // keep a solid badge, since they mean something is wrong.
 export function GigBadges({ gig, now = Date.now(), items, fields }: {
-  gig: Pick<Gig, "recurrence_id" | "missed_at" | "start_at" | "not_after"> & Partial<ItemCounts>;
+  gig: Pick<Gig, "recurrence_id" | "always_run" | "missed_at" | "start_at" | "not_after"> & Partial<ItemCounts>;
   now?: number;
   items?: boolean;
   fields?: CustomField[];
@@ -399,6 +401,11 @@ export function GigBadges({ gig, now = Date.now(), items, fields }: {
       {!!gig.recurrence_id && !items && (
         <Pill color={SCHEDULE_COLOR} title="Made by a recurring gig">
           <Icon name="refresh" />
+        </Pill>
+      )}
+      {!!gig.always_run && !items && (
+        <Pill color={ALWAYS_RUN_COLOR} title={ALWAYS_RUN_TIP}>
+          <Icon name="bolt" />
         </Pill>
       )}
       {!!gig.missed_at && (
