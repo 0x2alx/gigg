@@ -88,7 +88,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
       <div className="list-bar">
         <PlaceFilter value={place} onChange={setPlace} tree={tree} projects={false} />
         <ClearFilters active={place !== ""} onClear={() => setPlace("")} />
-        {items && <span className="muted small">{shown.length === items.length ? `${items.length} schedules` : `${shown.length} of ${items.length}`}</span>}
+        {items && <span className="muted small">{shown.length === items.length ? `${items.length} schedule${items.length === 1 ? "" : "s"}` : `${shown.length} of ${items.length}`}</span>}
         {startWs && (
           <button type="button" className="button small list-new" onClick={() => setEditing("new")}>
             + New schedule
