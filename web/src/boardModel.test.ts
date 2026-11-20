@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Category, Project, Gig } from "./api";
 import type { WorkspaceTree } from "./App";
-import { activeFilters, alwaysRunMatches, categoryColumns, EMPTY_FILTER, filterQuery, matches, moveToCategory, parseFilter, recurringMatches, scope, statusColumns } from "./boardModel";
+import { activeFilters, alwaysRunMatches, categoryColumns, EMPTY_FILTER, filterQuery, isMainProject, matches, moveToCategory, parseFilter, placeName, recurringMatches, removablePlaces, scope, shortcutProjects, statusColumns, whereLabel, whereTree } from "./boardModel";
 
 const gig = (id: number, x: Partial<Gig> = {}): Gig =>
   ({ id, key: `K-${id}`, title: `gig ${id}`, description_md: "", priority: 0, due_at: null, assignees: [], labels: [], status_id: 0, status_name: "", status_category: "todo", ...x }) as Gig;
@@ -139,5 +139,48 @@ describe("activeFilters", () => {
     expect(got[0]!.without.ws).toEqual([]);
     expect(got[3]!.without).toEqual({ ...f, a: "" });
     expect(activeFilters({ ...EMPTY_FILTER, pr: 4, a: "none" }, names).map((x) => x.label)).toEqual(["Unassigned", "Urgent"]);
+  });
+});
+
+describe("the Where picker", () => {
+  const named = (id: number, name: string) => ({ id, key: "P" + id, name }) as Project;
+  const places: WorkspaceTree[] = [
+    { id: 1, slug: "gigg", name: "gigg", role: "member", projects: [named(1, "Main"), named(2, "Web")] },
+    { id: 2, slug: "meridian", name: "Meridian", role: "member", projects: [named(3, "main"), named(4, "Scripts"), named(5, "Notes")] },
+  ];
+  it("names a project called Main with its workspace", () => {
+    expect(isMainProject({ name: " MAIN " })).toBe(true);
+    expect(isMainProject({ name: "Mainframe" })).toBe(false);
+    expect(placeName(places[0]!, places[0]!.projects[0]!)).toBe("gigg / Main");
+    expect(placeName(places[0]!, places[0]!.projects[1]!)).toBe("Web");
+  });
+  it("labels the button by the selection", () => {
+    expect(whereLabel(places, EMPTY_FILTER)).toBe("All");
+    expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["gigg"] })).toBe("gigg");
+    expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["meridian"] })).toBe("Meridian");
+    expect(whereLabel(places, { ...EMPTY_FILTER, p: [2] })).toBe("Web");
+    expect(whereLabel(places, { ...EMPTY_FILTER, p: [3] })).toBe("Meridian / main");
+    expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["gigg"], p: [2, 4] })).toBe("3 places");
+    expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["gone"], p: [99] })).toBe("All");
+  });
+  it("gives a shortcut to every project that is not Main, within the workspaces shown", () => {
+    expect(shortcutProjects(places, EMPTY_FILTER).map((x) => x.project.id)).toEqual([2, 4, 5]);
+    expect(shortcutProjects(places, { ...EMPTY_FILTER, ws: ["gigg"] }).map((x) => x.project.id)).toEqual([2]);
+    expect(shortcutProjects([{ ...places[0]!, projects: [places[0]!.projects[0]!] }], EMPTY_FILTER)).toEqual([]);
+  });
+  it("lists the picked items that have no shortcut", () => {
+    expect(removablePlaces(places, EMPTY_FILTER)).toEqual([]);
+    expect(removablePlaces(places, { ...EMPTY_FILTER, p: [2, 4] })).toEqual([]);
+    const got = removablePlaces(places, { ...EMPTY_FILTER, ws: ["meridian"], p: [3, 4] });
+    expect(got.map((x) => [x.kind, x.id, x.label])).toEqual([["ws", "meridian", "Meridian"], ["p", 3, "Meridian / main"]]);
+  });
+  it("filters the tree by search: a project match keeps its workspace", () => {
+    expect(whereTree(places, EMPTY_FILTER, "").map((r) => [r.ws.slug, r.projects.length])).toEqual([["gigg", 2], ["meridian", 3]]);
+    expect(whereTree(places, EMPTY_FILTER, "scri").map((r) => [r.ws.slug, r.projects.map((p) => p.id)])).toEqual([["meridian", [4]]]);
+    expect(whereTree(places, EMPTY_FILTER, "MERI").map((r) => [r.ws.slug, r.projects.length])).toEqual([["meridian", 3]]);
+    expect(whereTree(places, EMPTY_FILTER, "nothing")).toEqual([]);
+  });
+  it("shows only the projects of the chosen workspaces", () => {
+    expect(whereTree(places, { ...EMPTY_FILTER, ws: ["gigg"] }, "").map((r) => [r.ws.slug, r.projects.length])).toEqual([["gigg", 2], ["meridian", 0]]);
   });
 });

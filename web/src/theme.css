@@ -1472,8 +1472,6 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 /* ---- the board's filters and the project picker ---- */
 .board-filters { display: flex; flex-direction: column; gap: var(--sp-4); margin: 0 0 var(--sp-5); }
 .bf-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); }
-.bf-scope { column-gap: var(--sp-6); }
-.bf-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
 /* the toolbar: one row of 30px controls */
 .bf-search { position: relative; display: inline-flex; align-items: center; flex: 0 1 16.5rem; min-width: 11rem; color: var(--muted); }
 .bf-search svg { position: absolute; left: 0.6rem; pointer-events: none; }
@@ -1493,7 +1491,7 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
    sits at its right edge, also when it wraps onto a line of its own */
 .bf-end { flex: 1 0 auto; margin-left: var(--sp-4); display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; justify-content: flex-end; }
 .bf-count { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* workspace and project chips: small, selected = a tint. Corners a step rounder than buttons (round with
+/* the shortcut chips (a project each, and a picked workspace or "Main" to remove): small, selected = a tint. Corners a step rounder than buttons (round with
    the theme's pill shape); a workspace's chip and its projects' chips glow in the workspace colour */
 .bf-chip {
   display: inline-flex; align-items: center; gap: 0.3rem; font: inherit; font-size: var(--fs-sm); line-height: 1; cursor: pointer;
@@ -1508,7 +1506,6 @@ label.vw-toggle { display: inline-flex; flex-direction: row; align-items: center
 .bf-ws { --c: var(--muted); }
 .bf-ws:hover { border-color: var(--c); box-shadow: 0 0 0.6rem color-mix(in srgb, var(--c) 60%, transparent); }
 .bf-ws.on { background: color-mix(in srgb, var(--c) 20%, var(--surface)); border-color: var(--c); box-shadow: 0 0 0.6rem color-mix(in srgb, var(--c) 65%, transparent); }
-.bf-chip .avatar-xs { width: 1.45rem; height: 1.45rem; font-size: 0.56rem; border-width: 0; }
 /* Filters: the fold button leads the row; folded, the filters that are on follow it as removable chips */
 .bf-fold {
   display: inline-flex; align-items: center; gap: 0.35rem; height: var(--ctl-h); padding: 0 0.55rem; font: inherit; font-size: var(--fs-base);
@@ -1959,3 +1956,39 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 @media (max-width: 720px) {
   .mf-panel select, .bf-fields .mf-panel select { font-size: max(16px, 1em); }
 }
+/* Where (the board toolbar): the workspaces and projects as a searchable tree of checkboxes. The button is a
+   More filters button; the face is cut short with an ellipsis on a narrow window */
+.wp-face { overflow: hidden; text-overflow: ellipsis; max-width: 14rem; }
+.wp-panel {
+  position: absolute; left: 0; top: calc(100% + 0.35rem); z-index: 30; width: 22rem; max-width: calc(100vw - 1rem);
+  display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4);
+  background: var(--high); border: 1px solid var(--line-strong); border-radius: var(--radius-m); box-shadow: var(--shadow-pop);
+}
+.wp-head { display: flex; align-items: center; gap: var(--sp-3); }
+.wp-head input, .bf-fields .wp-head input {
+  flex: 1 1 auto; min-width: 0; width: 100%; height: var(--ctl-h); padding: 0 0.6rem; font-size: var(--fs-base);
+  border: 1px solid var(--line-strong); background-color: var(--surface); color: var(--text);
+}
+.wp-all {
+  flex: none; height: var(--ctl-h); padding: 0 0.7rem; font: inherit; font-size: var(--fs-base); cursor: pointer;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line-strong); border-radius: var(--radius-m);
+}
+.wp-all:hover { background: color-mix(in srgb, var(--text) 6%, var(--surface)); }
+.wp-all.on { background: var(--selected); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.wp-tree { display: flex; flex-direction: column; gap: 0.1rem; max-height: min(60vh, 26rem); overflow-y: auto; overscroll-behavior: contain; }
+.wp-ws { display: flex; flex-direction: column; }
+.wp-row { display: flex; align-items: center; gap: 0.5rem; min-height: 2rem; padding: 0 0.4rem; border-radius: var(--radius-m); font-size: var(--fs-base); color: var(--text); cursor: pointer; min-width: 0; }
+.wp-row:hover { background: var(--hover); }
+.wp-ws-row { font-weight: var(--weight-strong); }
+.wp-indent { padding-left: 1.9rem; }
+.wp-row .avatar-xs { width: 1.45rem; height: 1.45rem; font-size: 0.56rem; border-width: 0; flex: none; }
+.wp-row .dot { flex: none; }
+.wp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-row input[type="checkbox"], .bf-fields .wp-row input[type="checkbox"] { width: auto; height: auto; margin: 0; padding: 0; border: revert; background: revert; flex: none; }
+.wp-empty { padding: 0.4rem; font-size: var(--fs-sm); }
+.bf-chip .ico { font-size: 0.8rem; color: var(--muted); }
+@media (max-width: 720px) {
+  .wp-head input, .bf-fields .wp-head input { font-size: max(16px, 1em); }
+  .wp-face { max-width: 10rem; }
+}
+

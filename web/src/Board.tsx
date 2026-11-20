@@ -15,7 +15,9 @@ import {
   matches,
   moveToCategory,
   parseFilter,
+  removablePlaces,
   scope,
+  shortcutProjects,
   statusColumns,
   type BoardColumn,
   type BoardFilter,
@@ -34,6 +36,7 @@ import { backTo, relTime, viewsApi } from "./views/viewsApi";
 import { ALWAYS_RUN_COLOR, CATEGORY_COLOR, colorFor, readableOn } from "./theme";
 import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, MoreMenu, PriorityIcon, PrioritySelect, GigBadges, ALWAYS_RUN_TIP, Pill, WorkspaceChip, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
+import { WherePicker } from "./WherePicker";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 import { cardState, elapsed, runWorkedTip, plainText } from "./cardState";
@@ -894,9 +897,9 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   );
 }
 
-// BoardFilters: one toolbar row (search, More filters: assignee, label, priority, recurring, always run and
-// archived; Clear filters) and under it
-// the workspaces and projects as compact toggle chips (none on = all).
+// BoardFilters: one toolbar row (search, Where: the workspaces and projects; More filters: assignee, label,
+// priority, recurring, always run and archived; Clear filters) and under it a row of shortcuts: a chip per
+// project not named "Main", and a removable chip for each other thing picked.
 function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end }: {
   filter: BoardFilter;
   setFilter: (f: BoardFilter) => void;
@@ -923,8 +926,12 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
   }, [text, setFilter]);
   const wsShown = filter.ws.length ? tree.filter((w) => filter.ws.includes(w.slug)) : tree;
   const projects = wsShown.flatMap((w) => w.projects.map((p) => ({ w, p })));
-  // the workspace and project chips; open, the view tools end their row (the fields row is full)
-  const scopeRow = tree.length > 1 || projects.length > 1;
+  // the Where picker (only with something to choose), and the shortcut chips under the toolbar; the view
+  // tools end the shortcut row when there is one (the fields row is full), else the toolbar
+  const choose = tree.length > 1 || projects.length > 1;
+  const shortcuts = shortcutProjects(tree, filter);
+  const removable = removablePlaces(tree, filter);
+  const shortcutRow = shortcuts.length > 0 || removable.length > 0;
   const toggleWs = (slug: string) => {
     const next = filter.ws.includes(slug) ? filter.ws.filter((s) => s !== slug) : [...filter.ws, slug];
     const all = next.length === tree.length;
@@ -1002,6 +1009,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
           </svg>
           <input type="search" aria-label="Search gigs" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
         </span>
+        {choose && <WherePicker tree={tree} filter={filter} users={users} onWs={toggleWs} onProject={toggleP} onAll={() => setFilter({ ...filter, ws: [], p: [] })} />}
         <MoreFilters count={[filter.a, filter.l, filter.pr, filter.rec, filter.run].filter(Boolean).length}>
           <FilterField label="Assignee">
             <AssigneeSelect special people={people} className={sel(filter.a)} value={filter.a} onChange={(a) => setFilter({ ...filter, a })} />
@@ -1026,72 +1034,46 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
           </FilterField>
         </MoreFilters>
         <ClearFilters className="bf-clear" active={isFiltered(filter)} onClear={() => setFilter({ ...EMPTY_FILTER, arch: filter.arch })} />
-        {end && !scopeRow && <div className="bf-end">{end}</div>}
+        {end && !shortcutRow && <div className="bf-end">{end}</div>}
       </div>
-      {scopeRow && (
-        <div className="bf-row bf-scope">
-          {tree.length > 1 && (
-            <div className="bf-group" role="group" aria-label="Workspaces">
+      {shortcutRow && (
+        <div className="bf-row bf-shortcuts" role="group" aria-label="Project shortcuts">
+          {shortcuts.map(({ ws, project: pr }) => {
+            const on = filter.p.includes(pr.id);
+            const c = colorFor(ws.slug, ws.color);
+            return (
               <button
+                key={pr.id}
                 type="button"
-                className={"bf-chip" + (filter.ws.length === 0 ? " on" : "")}
-                aria-pressed={filter.ws.length === 0}
-                data-tip="Show every workspace (clears the workspace and project filters)"
-                onClick={() => setFilter({ ...filter, ws: [], p: [] })}
+                className={"bf-chip bf-ws" + (on ? " on" : "")}
+                aria-pressed={on}
+                style={{ "--c": c } as CSSProperties}
+                data-tip={`${ws.name} / ${pr.name} (${pr.key})\nOne project shown: its own columns and manual order`}
+                onClick={() => toggleP(pr.id)}
               >
-                All workspaces
+                <span className="dot" style={{ background: c }} />
+                {pr.name}
               </button>
-              {tree.map((w) => {
-                const on = filter.ws.includes(w.slug);
-                const c = colorFor(w.slug, w.color);
-                const owner = w.owner_id != null ? users.get(w.owner_id) : undefined;
-                return (
-                  <button
-                    key={w.id}
-                    type="button"
-                    className={"bf-chip bf-ws" + (on ? " on" : "")}
-                    aria-pressed={on}
-                    data-tip={`${on ? "Hide" : "Show only"} ${w.name}${filter.ws.length && !on ? " (add it to the selection)" : ""}${owner ? `\nOwner: ${owner.display_name || owner.username}` : ""}`}
-                    style={{ "--c": c } as CSSProperties}
-                    onClick={() => toggleWs(w.slug)}
-                  >
-                    {owner ? <Avatar user={owner} size="xs" /> : <span className="dot" style={{ background: c }} />}
-                    {w.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {projects.length > 1 && (
-            <div className="bf-group" role="group" aria-label="Projects">
+            );
+          })}
+          {removable.map((x) => {
+            const c = colorFor(x.ws.slug, x.ws.color);
+            return (
               <button
+                key={x.key}
                 type="button"
-                className={"bf-chip" + (filter.p.length === 0 ? " on" : "")}
-                aria-pressed={filter.p.length === 0}
-                data-tip="Show every project of the workspaces shown"
-                onClick={() => setFilter({ ...filter, p: [] })}
+                className="bf-chip bf-ws on"
+                style={{ "--c": c } as CSSProperties}
+                aria-label={`Remove ${x.label}`}
+                data-tip={`Showing ${x.label}: click to remove`}
+                onClick={() => (x.kind === "ws" ? toggleWs(x.id as string) : toggleP(x.id as number))}
               >
-                All projects
+                <span className="dot" style={{ background: c }} />
+                {x.label}
+                <Icon name="x" />
               </button>
-              {projects.map(({ w, p }) => {
-                const on = filter.p.includes(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={"bf-chip bf-ws" + (on ? " on" : "")}
-                    aria-pressed={on}
-                    style={{ "--c": colorFor(w.slug, w.color) } as CSSProperties}
-                    data-tip={`${w.name} / ${p.name} (${p.key})\nOne project shown: its own columns and manual order`}
-                    onClick={() => toggleP(p.id)}
-                  >
-                    <span className="dot" style={{ background: colorFor(w.slug, w.color) }} />
-                    {p.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+            );
+          })}
           {end && <div className="bf-end">{end}</div>}
         </div>
       )}

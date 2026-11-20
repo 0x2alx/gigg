@@ -431,7 +431,7 @@ export function GigBadges({ gig, now = Date.now(), items, fields }: {
 // puts the focus back on the button, the wrapper's first), and kept inside the window (CSS places it
 // under its button; one that would still run off an edge, at the right of a phone, is shifted back in).
 // `ref` goes on the wrapper, `panelRef` on the panel.
-function usePopover() {
+export function usePopover() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
