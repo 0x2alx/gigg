@@ -924,24 +924,15 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
     const t = setTimeout(() => setFilter({ ...filterRef.current, q: text }), 250);
     return () => clearTimeout(t);
   }, [text, setFilter]);
-  const wsShown = filter.ws.length ? tree.filter((w) => filter.ws.includes(w.slug)) : tree;
-  const projects = wsShown.flatMap((w) => w.projects.map((p) => ({ w, p })));
   // the Where picker (only with something to choose), and the shortcut chips under the toolbar; the view
   // tools end the shortcut row when there is one (the fields row is full), else the toolbar
-  const choose = tree.length > 1 || projects.length > 1;
-  const shortcuts = shortcutProjects(tree, filter);
+  const choose = tree.length > 1 || tree.some((w) => w.projects.length > 1);
+  const shortcuts = shortcutProjects(tree);
   const removable = removablePlaces(tree, filter);
   const shortcutRow = shortcuts.length > 0 || removable.length > 0;
-  const toggleWs = (slug: string) => {
-    const next = filter.ws.includes(slug) ? filter.ws.filter((s) => s !== slug) : [...filter.ws, slug];
-    const all = next.length === tree.length;
-    const keepP = filter.p.filter((id) => (all || next.length === 0 ? tree : tree.filter((w) => next.includes(w.slug))).some((w) => w.projects.some((p) => p.id === id)));
-    setFilter({ ...filter, ws: all ? [] : next, p: keepP });
-  };
-  const toggleP = (id: number) => {
-    const next = filter.p.includes(id) ? filter.p.filter((x) => x !== id) : [...filter.p, id];
-    setFilter({ ...filter, p: next.length === projects.length ? [] : next });
-  };
+  // the picks add up: a workspace is all of it, a project just itself (see scope())
+  const toggleWs = (slug: string) => setFilter({ ...filter, ws: filter.ws.includes(slug) ? filter.ws.filter((s) => s !== slug) : [...filter.ws, slug] });
+  const toggleP = (id: number) => setFilter({ ...filter, p: filter.p.includes(id) ? filter.p.filter((x) => x !== id) : [...filter.p, id] });
   const sel = (v: string | number) => (v === "" || v === 0 ? "" : " active");
   const active = activeFilters(filter, {
     ws: (slug) => {
@@ -1039,7 +1030,8 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
       {shortcutRow && (
         <div className="bf-row bf-shortcuts" role="group" aria-label="Project shortcuts">
           {shortcuts.map(({ ws, project: pr }) => {
-            const on = filter.p.includes(pr.id);
+            const implied = filter.ws.includes(ws.slug);
+            const on = implied || filter.p.includes(pr.id);
             const c = colorFor(ws.slug, ws.color);
             return (
               <button
@@ -1047,8 +1039,9 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
                 type="button"
                 className={"bf-chip bf-ws" + (on ? " on" : "")}
                 aria-pressed={on}
+                disabled={implied}
                 style={{ "--c": c } as CSSProperties}
-                data-tip={`${ws.name} / ${pr.name} (${pr.key})\nOne project shown: its own columns and manual order`}
+                data-tip={`${ws.name} / ${pr.name} (${pr.key})\n${implied ? "Included: its workspace is picked" : "One project shown: its own columns and manual order"}`}
                 onClick={() => toggleP(pr.id)}
               >
                 <span className="dot" style={{ background: c }} />

@@ -27,12 +27,24 @@ describe("board filter", () => {
     expect(filterQuery(EMPTY_FILTER)).toBe("");
     expect(parseFilter("?p=x,0,4&pr=9")).toEqual({ ...EMPTY_FILTER, p: [4] });
   });
-  it("scopes workspaces and projects; a project outside the chosen workspaces is ignored", () => {
-    expect(scope(tree, EMPTY_FILTER).map((x) => x.project.id)).toEqual([1, 2, 3]);
-    expect(scope(tree, { ...EMPTY_FILTER, ws: ["atlas"] }).map((x) => x.project.id)).toEqual([3]);
-    expect(scope(tree, { ...EMPTY_FILTER, p: [2, 3] }).map((x) => x.project.id)).toEqual([2, 3]);
-    expect(scope(tree, { ...EMPTY_FILTER, ws: ["scout"], p: [3] }).map((x) => x.project.id)).toEqual([1, 2]);
-    expect(scope(tree, { ...EMPTY_FILTER, ws: ["gone"] }).map((x) => x.project.id)).toEqual([1, 2, 3]); // a lost workspace: all
+  it("scopes to the picked workspaces plus the picked projects", () => {
+    const ids = (f: Partial<typeof EMPTY_FILTER>) => scope(tree, { ...EMPTY_FILTER, ...f }).map((x) => x.project.id);
+    expect(ids({})).toEqual([1, 2, 3]);
+    expect(ids({ ws: ["atlas"] })).toEqual([3]);
+    expect(ids({ ws: ["scout", "atlas"] })).toEqual([1, 2, 3]);
+    expect(ids({ p: [2, 3] })).toEqual([2, 3]);
+    expect(ids({ p: [3] })).toEqual([3]); // one project: its own columns and order
+    expect(ids({ ws: ["scout"], p: [3] })).toEqual([1, 2, 3]); // a workspace plus a project of another
+    expect(ids({ ws: ["atlas"], p: [1] })).toEqual([1, 3]); // in sidebar order, not pick order
+    expect(ids({ ws: ["scout"], p: [2] })).toEqual([1, 2]); // an implied project adds nothing
+  });
+  it("ignores unknown workspaces and projects; nothing known means everything", () => {
+    const ids = (f: Partial<typeof EMPTY_FILTER>) => scope(tree, { ...EMPTY_FILTER, ...f }).map((x) => x.project.id);
+    expect(ids({ ws: ["gone"] })).toEqual([1, 2, 3]);
+    expect(ids({ p: [99] })).toEqual([1, 2, 3]);
+    expect(ids({ ws: ["gone"], p: [99] })).toEqual([1, 2, 3]);
+    expect(ids({ ws: ["gone"], p: [2] })).toEqual([2]);
+    expect(ids({ ws: ["atlas"], p: [99] })).toEqual([3]);
   });
   it("matches assignee, label, priority and text", () => {
     const t = gig(1, { assignees: [7], labels: [{ id: 1, name: "Ops", color: null }], priority: 3, title: "Morning brief" });
@@ -160,27 +172,26 @@ describe("the Where picker", () => {
     expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["meridian"] })).toBe("Meridian");
     expect(whereLabel(places, { ...EMPTY_FILTER, p: [2] })).toBe("Web");
     expect(whereLabel(places, { ...EMPTY_FILTER, p: [3] })).toBe("Meridian / main");
-    expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["gigg"], p: [2, 4] })).toBe("3 places");
+    expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["gigg"], p: [4] })).toBe("2 places");
+    expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["gigg"], p: [2] })).toBe("gigg"); // the project is in the workspace already
+    expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["gigg"], p: [2, 4, 5] })).toBe("3 places");
     expect(whereLabel(places, { ...EMPTY_FILTER, ws: ["gone"], p: [99] })).toBe("All");
   });
-  it("gives a shortcut to every project that is not Main, within the workspaces shown", () => {
-    expect(shortcutProjects(places, EMPTY_FILTER).map((x) => x.project.id)).toEqual([2, 4, 5]);
-    expect(shortcutProjects(places, { ...EMPTY_FILTER, ws: ["gigg"] }).map((x) => x.project.id)).toEqual([2]);
-    expect(shortcutProjects([{ ...places[0]!, projects: [places[0]!.projects[0]!] }], EMPTY_FILTER)).toEqual([]);
+  it("gives a shortcut to every project that is not Main, in every workspace", () => {
+    expect(shortcutProjects(places).map((x) => x.project.id)).toEqual([2, 4, 5]);
+    expect(shortcutProjects([{ ...places[0]!, projects: [places[0]!.projects[0]!] }])).toEqual([]);
   });
   it("lists the picked items that have no shortcut", () => {
     expect(removablePlaces(places, EMPTY_FILTER)).toEqual([]);
     expect(removablePlaces(places, { ...EMPTY_FILTER, p: [2, 4] })).toEqual([]);
     const got = removablePlaces(places, { ...EMPTY_FILTER, ws: ["meridian"], p: [3, 4] });
-    expect(got.map((x) => [x.kind, x.id, x.label])).toEqual([["ws", "meridian", "Meridian"], ["p", 3, "Meridian / main"]]);
+    expect(got.map((x) => [x.kind, x.id, x.label])).toEqual([["ws", "meridian", "Meridian"]]); // its Main is in the workspace already
+    expect(removablePlaces(places, { ...EMPTY_FILTER, ws: ["gigg"], p: [3, 4] }).map((x) => [x.kind, x.id])).toEqual([["ws", "gigg"], ["p", 3]]);
   });
   it("filters the tree by search: a project match keeps its workspace", () => {
-    expect(whereTree(places, EMPTY_FILTER, "").map((r) => [r.ws.slug, r.projects.length])).toEqual([["gigg", 2], ["meridian", 3]]);
-    expect(whereTree(places, EMPTY_FILTER, "scri").map((r) => [r.ws.slug, r.projects.map((p) => p.id)])).toEqual([["meridian", [4]]]);
-    expect(whereTree(places, EMPTY_FILTER, "MERI").map((r) => [r.ws.slug, r.projects.length])).toEqual([["meridian", 3]]);
-    expect(whereTree(places, EMPTY_FILTER, "nothing")).toEqual([]);
-  });
-  it("shows only the projects of the chosen workspaces", () => {
-    expect(whereTree(places, { ...EMPTY_FILTER, ws: ["gigg"] }, "").map((r) => [r.ws.slug, r.projects.length])).toEqual([["gigg", 2], ["meridian", 0]]);
+    expect(whereTree(places, "").map((r) => [r.ws.slug, r.projects.length])).toEqual([["gigg", 2], ["meridian", 3]]);
+    expect(whereTree(places, "scri").map((r) => [r.ws.slug, r.projects.map((p) => p.id)])).toEqual([["meridian", [4]]]);
+    expect(whereTree(places, "MERI").map((r) => [r.ws.slug, r.projects.length])).toEqual([["meridian", 3]]);
+    expect(whereTree(places, "nothing")).toEqual([]);
   });
 });

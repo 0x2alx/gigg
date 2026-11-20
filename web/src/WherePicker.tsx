@@ -24,7 +24,7 @@ export function WherePicker({ tree, filter, users, onWs, onProject, onAll }: {
     if (!open) setQ("");
   }, [open]);
   const label = whereLabel(tree, filter);
-  const rows = whereTree(tree, filter, q);
+  const rows = whereTree(tree, q);
   const flat = tree.length === 1;
   const none = filter.ws.length === 0 && filter.p.length === 0;
   return (
@@ -69,13 +69,16 @@ export function WherePicker({ tree, filter, users, onWs, onProject, onAll }: {
                       <span className="wp-name">{ws.name}</span>
                     </label>
                   )}
-                  {projects.map((pr) => (
-                    <label key={pr.id} className={"wp-row wp-p-row" + (flat ? "" : " wp-indent")} data-tip={`${placeName(ws, pr)} (${pr.key})`}>
-                      <input type="checkbox" checked={filter.p.includes(pr.id)} onChange={() => onProject(pr.id)} />
-                      <span className="dot" style={{ background: c } as CSSProperties} aria-hidden="true" />
-                      <span className="wp-name">{pr.name}</span>
-                    </label>
-                  ))}
+                  {projects.map((pr) => {
+                    const implied = filter.ws.includes(ws.slug);
+                    return (
+                      <label key={pr.id} className={"wp-row wp-p-row" + (flat ? "" : " wp-indent") + (implied ? " wp-implied" : "")} data-tip={implied ? "Included: its workspace is picked" : `${placeName(ws, pr)} (${pr.key})`}>
+                        <input type="checkbox" checked={implied || filter.p.includes(pr.id)} disabled={implied} onChange={() => onProject(pr.id)} />
+                        <span className="dot" style={{ background: c } as CSSProperties} aria-hidden="true" />
+                        <span className="wp-name">{pr.name}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               );
             })}

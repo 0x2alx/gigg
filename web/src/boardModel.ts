@@ -140,16 +140,15 @@ export interface ScopedProject {
   project: Project;
 }
 
-// scope: the projects the board covers, in sidebar order (workspaces, then project position). Unknown
-// slugs and ids are ignored (only unknown ones: as if none were chosen); a project filter that matches
-// nothing in the chosen workspaces is ignored too.
+// scope: the projects the board covers, in sidebar order (workspaces, then project position): every
+// project of the workspaces in f.ws, plus the projects in f.p (so a pick can span workspaces). Unknown
+// slugs and ids are ignored; nothing known picked means every project.
 export function scope(tree: WorkspaceTree[], f: BoardFilter): ScopedProject[] {
-  const chosen = tree.filter((w) => f.ws.includes(w.slug));
-  const wss = chosen.length ? chosen : tree; // none chosen, or only unknown ones (a lost workspace): all
-  const all = wss.flatMap((ws) => ws.projects.map((project) => ({ ws, project })));
-  const picked = all.filter((x) => f.p.includes(x.project.id));
+  const all = tree.flatMap((ws) => ws.projects.map((project) => ({ ws, project })));
+  const picked = all.filter((x) => f.ws.includes(x.ws.slug) || f.p.includes(x.project.id));
   return picked.length ? picked : all;
 }
+
 
 // ---- the "Where" picker: workspaces and projects as one tree, and the shortcut row under the toolbar ----
 
@@ -166,47 +165,46 @@ export interface PickedPlace {
   kind: "ws" | "p";
   id: string | number; // the workspace slug, or the project id
   main: boolean; // a project named "Main"
+  implied: boolean; // a project whose workspace is picked too: already in view through it
 }
 function pickedPlaces(tree: WorkspaceTree[], f: BoardFilter): PickedPlace[] {
   const out: PickedPlace[] = [];
   for (const slug of f.ws) {
     const w = tree.find((x) => x.slug === slug);
-    if (w) out.push({ key: "ws:" + slug, label: w.name, ws: w, kind: "ws", id: slug, main: false });
+    if (w) out.push({ key: "ws:" + slug, label: w.name, ws: w, kind: "ws", id: slug, main: false, implied: false });
   }
   for (const id of f.p) {
     const w = tree.find((x) => x.projects.some((p) => p.id === id));
     const p = w?.projects.find((x) => x.id === id);
-    if (w && p) out.push({ key: "p:" + id, label: placeName(w, p), ws: w, kind: "p", id, main: isMainProject(p) });
+    if (w && p) out.push({ key: "p:" + id, label: placeName(w, p), ws: w, kind: "p", id, main: isMainProject(p), implied: f.ws.includes(w.slug) });
   }
   return out;
 }
 
 // whereLabel: the Where button's face: "All", the one name picked, or "3 places".
 export function whereLabel(tree: WorkspaceTree[], f: BoardFilter): string {
-  const picked = pickedPlaces(tree, f);
+  const picked = pickedPlaces(tree, f).filter((x) => !x.implied);
   return picked.length === 0 ? "All" : picked.length === 1 ? picked[0]!.label : `${picked.length} places`;
 }
 
-// shortcutProjects: the projects with a chip of their own under the toolbar (those of the workspaces
-// shown, but not the ones named "Main").
-export function shortcutProjects(tree: WorkspaceTree[], f: BoardFilter): ScopedProject[] {
-  const shown = f.ws.length ? tree.filter((w) => f.ws.includes(w.slug)) : tree;
-  return shown.flatMap((ws) => ws.projects.filter((p) => !isMainProject(p)).map((project) => ({ ws, project })));
+// shortcutProjects: the projects with a chip of their own under the toolbar (those of every workspace,
+// but not the ones named "Main").
+export function shortcutProjects(tree: WorkspaceTree[]): ScopedProject[] {
+  return tree.flatMap((ws) => ws.projects.filter((p) => !isMainProject(p)).map((project) => ({ ws, project })));
 }
 
 // removablePlaces: the picked items that have no shortcut chip (every picked workspace, and the picked
 // projects named "Main"), each as a chip with an x. Removing one is the same toggle as ticking it.
-export const removablePlaces = (tree: WorkspaceTree[], f: BoardFilter): PickedPlace[] => pickedPlaces(tree, f).filter((x) => x.kind === "ws" || x.main);
+export const removablePlaces = (tree: WorkspaceTree[], f: BoardFilter): PickedPlace[] => pickedPlaces(tree, f).filter((x) => !x.implied && (x.kind === "ws" || x.main));
 
 // whereTree: the rows of the Where panel for a search text. Workspaces in order, each with its projects
-// (those of the workspaces shown only, as the old project chips). A workspace whose name matches keeps all
+// (all of them: the picks add up across workspaces). A workspace whose name matches keeps all
 // its projects; otherwise only the projects that match, and the workspace stays only for one.
-export function whereTree(tree: WorkspaceTree[], f: BoardFilter, query: string): { ws: WorkspaceTree; projects: Project[] }[] {
+export function whereTree(tree: WorkspaceTree[], query: string): { ws: WorkspaceTree; projects: Project[] }[] {
   const q = query.trim().toLowerCase();
   const out: { ws: WorkspaceTree; projects: Project[] }[] = [];
   for (const ws of tree) {
-    const open = f.ws.length === 0 || f.ws.includes(ws.slug);
-    const all = open ? ws.projects : [];
+    const all = ws.projects;
     if (!q || ws.name.toLowerCase().includes(q)) out.push({ ws, projects: all });
     else {
       const projects = all.filter((p) => p.name.toLowerCase().includes(q) || placeName(ws, p).toLowerCase().includes(q));

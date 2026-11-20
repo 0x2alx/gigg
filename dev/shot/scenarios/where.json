@@ -34,7 +34,7 @@
    "wait": ".board"
   },
   {
-   "eval": "(async () => { const H = {'Content-Type':'application/json','X-Gigg-CSRF':'1'}; const j = async (m, u, b) => (await fetch('/api/v1' + u, {method: m, headers: H, body: JSON.stringify(b)})).status; await j('POST','/workspaces',{slug:'atlas',name:'Atlas'}); await j('POST','/workspaces',{slug:'meridian',name:'Meridian'}); await j('POST','/workspaces/atlas/projects',{slug:'main',name:'Main',key:'ATM'}); await j('POST','/workspaces/atlas/projects',{slug:'billing',name:'Billing',key:'BIL'}); await j('POST','/workspaces/meridian/projects',{slug:'main',name:'Main',key:'MVM'}); await j('POST','/workspaces/meridian/projects',{slug:'scripts',name:'Scripts',key:'SCR'}); return 'ok'; })()"
+   "eval": "(async () => { const H = {'Content-Type':'application/json','X-Gigg-CSRF':'1'}; const j = async (m, u, b) => (await fetch('/api/v1' + u, {method: m, headers: H, body: JSON.stringify(b)})).status; await j('POST','/workspaces',{slug:'atlas',name:'Atlas'}); await j('POST','/workspaces',{slug:'meridian',name:'Meridian'}); await j('POST','/workspaces/atlas/projects',{slug:'main',name:'Main',key:'ATM'}); await j('POST','/workspaces/atlas/projects',{slug:'billing',name:'Billing',key:'BIL'}); await j('POST','/workspaces/meridian/projects',{slug:'main',name:'Main',key:'MVM'}); await j('POST','/workspaces/meridian/projects',{slug:'scripts',name:'Scripts',key:'SCR'}); for (const w of ['atlas', 'meridian']) { const r = await fetch('/api/v1/workspaces/' + w + '/projects'); for (const pr of (await r.json()).items) await j('POST', '/projects/' + pr.id + '/gigs', {title: 'Where ' + w + '/' + pr.slug}); } return 'ok'; })()"
   },
   {
    "wait": 300
@@ -159,6 +159,22 @@
    ]
   },
   {
+   "click": ".wp-p-row input"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Meridian / Main"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.getAttribute('aria-label') || e.textContent.trim())",
+   "expect": [
+    "Billing",
+    "Scripts",
+    "gigg",
+    "Remove Meridian / Main"
+   ]
+  },
+  {
    "click": ".wp-ws-row input"
   },
   {
@@ -166,25 +182,19 @@
    "expect": "Where: Meridian"
   },
   {
-   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => (e.getAttribute('aria-label') || e.textContent.trim()) + (e.disabled ? '!' : ''))",
    "expect": [
-    "Scripts",
-    "Meridian"
+    "Billing",
+    "Scripts!",
+    "gigg",
+    "Remove Meridian"
    ]
   },
   {
-   "click": ".wp-p-row input"
-  },
-  {
-   "eval": "document.querySelector('.wp-button .wp-face').textContent",
-   "expect": "Where: 2 places"
-  },
-  {
-   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.getAttribute('aria-label') || e.textContent.trim())",
+   "eval": "(i => [i.checked, i.disabled])(document.querySelector('.wp-p-row input'))",
    "expect": [
-    "Scripts",
-    "Remove Meridian",
-    "Remove Meridian / Main"
+    true,
+    true
    ]
   },
   {
@@ -211,6 +221,97 @@
   {
    "eval": "document.querySelectorAll('.wp-panel').length",
    "expect": 0
+  },
+  {
+   "click": ".wp-button"
+  },
+  {
+   "wait": ".wp-panel"
+  },
+  {
+   "eval": "(rows => { rows[0].querySelector('input').click(); return true; })([...document.querySelectorAll('.wp-row')].filter(l => l.textContent.trim() === 'Atlas'))",
+   "expect": true
+  },
+  {
+   "eval": "(rows => { rows[0].querySelector('input').click(); return true; })([...document.querySelectorAll('.wp-row')].filter(l => l.textContent.trim() === 'Scripts'))",
+   "expect": true
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: 2 places"
+  },
+  {
+   "eval": "(l => [l.querySelector('input').checked, l.querySelector('input').disabled])([...document.querySelectorAll('.wp-row')].find(l => l.textContent.trim() === 'Billing'))",
+   "expect": [
+    true,
+    true
+   ]
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Billing*",
+    "Scripts*",
+    "gigg",
+    "Atlas"
+   ]
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "['atlas/main', 'atlas/billing', 'meridian/scripts', 'meridian/main'].map(k => document.querySelector('.board').textContent.includes('Where ' + k))",
+   "expect": [
+    true,
+    true,
+    true,
+    false
+   ]
+  },
+  {
+   "eval": "document.querySelector('.wp-panel').getBoundingClientRect().right <= window.innerWidth",
+   "expect": true
+  },
+  {
+   "shot": "where-union-1440",
+   "full": false
+  },
+  {
+   "eval": "(rows => { rows[0].querySelector('input').click(); return true; })([...document.querySelectorAll('.wp-row')].filter(l => l.textContent.trim() === 'Atlas'))",
+   "expect": true
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Scripts"
+  },
+  {
+   "eval": "(l => [l.querySelector('input').checked, l.querySelector('input').disabled])([...document.querySelectorAll('.wp-row')].find(l => l.textContent.trim() === 'Billing'))",
+   "expect": [
+    false,
+    false
+   ]
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "['atlas/main', 'atlas/billing', 'meridian/scripts', 'meridian/main'].map(k => document.querySelector('.board').textContent.includes('Where ' + k))",
+   "expect": [
+    false,
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "click": ".wp-all"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: All"
+  },
+  {
+   "press": "Escape"
   },
   {
    "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
@@ -342,6 +443,22 @@
    ]
   },
   {
+   "click": ".wp-p-row input"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Meridian / Main"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.getAttribute('aria-label') || e.textContent.trim())",
+   "expect": [
+    "Billing",
+    "Scripts",
+    "gigg",
+    "Remove Meridian / Main"
+   ]
+  },
+  {
    "click": ".wp-ws-row input"
   },
   {
@@ -349,25 +466,19 @@
    "expect": "Where: Meridian"
   },
   {
-   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => (e.getAttribute('aria-label') || e.textContent.trim()) + (e.disabled ? '!' : ''))",
    "expect": [
-    "Scripts",
-    "Meridian"
+    "Billing",
+    "Scripts!",
+    "gigg",
+    "Remove Meridian"
    ]
   },
   {
-   "click": ".wp-p-row input"
-  },
-  {
-   "eval": "document.querySelector('.wp-button .wp-face').textContent",
-   "expect": "Where: 2 places"
-  },
-  {
-   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.getAttribute('aria-label') || e.textContent.trim())",
+   "eval": "(i => [i.checked, i.disabled])(document.querySelector('.wp-p-row input'))",
    "expect": [
-    "Scripts",
-    "Remove Meridian",
-    "Remove Meridian / Main"
+    true,
+    true
    ]
   },
   {
@@ -394,6 +505,97 @@
   {
    "eval": "document.querySelectorAll('.wp-panel').length",
    "expect": 0
+  },
+  {
+   "click": ".wp-button"
+  },
+  {
+   "wait": ".wp-panel"
+  },
+  {
+   "eval": "(rows => { rows[0].querySelector('input').click(); return true; })([...document.querySelectorAll('.wp-row')].filter(l => l.textContent.trim() === 'Atlas'))",
+   "expect": true
+  },
+  {
+   "eval": "(rows => { rows[0].querySelector('input').click(); return true; })([...document.querySelectorAll('.wp-row')].filter(l => l.textContent.trim() === 'Scripts'))",
+   "expect": true
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: 2 places"
+  },
+  {
+   "eval": "(l => [l.querySelector('input').checked, l.querySelector('input').disabled])([...document.querySelectorAll('.wp-row')].find(l => l.textContent.trim() === 'Billing'))",
+   "expect": [
+    true,
+    true
+   ]
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Billing*",
+    "Scripts*",
+    "gigg",
+    "Atlas"
+   ]
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "['atlas/main', 'atlas/billing', 'meridian/scripts', 'meridian/main'].map(k => document.querySelector('.board').textContent.includes('Where ' + k))",
+   "expect": [
+    true,
+    true,
+    true,
+    false
+   ]
+  },
+  {
+   "eval": "document.querySelector('.wp-panel').getBoundingClientRect().right <= window.innerWidth",
+   "expect": true
+  },
+  {
+   "shot": "where-union-390",
+   "full": false
+  },
+  {
+   "eval": "(rows => { rows[0].querySelector('input').click(); return true; })([...document.querySelectorAll('.wp-row')].filter(l => l.textContent.trim() === 'Atlas'))",
+   "expect": true
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Scripts"
+  },
+  {
+   "eval": "(l => [l.querySelector('input').checked, l.querySelector('input').disabled])([...document.querySelectorAll('.wp-row')].find(l => l.textContent.trim() === 'Billing'))",
+   "expect": [
+    false,
+    false
+   ]
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "['atlas/main', 'atlas/billing', 'meridian/scripts', 'meridian/main'].map(k => document.querySelector('.board').textContent.includes('Where ' + k))",
+   "expect": [
+    false,
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "click": ".wp-all"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: All"
+  },
+  {
+   "press": "Escape"
   },
   {
    "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",

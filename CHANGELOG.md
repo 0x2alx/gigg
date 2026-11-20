@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Board filters: the rows of workspace and project chips are replaced by a **Where** button in the toolbar (a searchable tree of workspaces with their projects, its face naming the selection, and a project called "Main" shown as "Workspace / Main") and one short row of shortcut chips: a chip per project not called "Main", and a removable chip for each other picked item. The filter and its URL are unchanged.
+- Board filters: the rows of workspace and project chips are replaced by a **Where** button in the toolbar (a searchable tree of workspaces with their projects, its face naming the selection, and a project called "Main" shown as "Workspace / Main") and one short row of shortcut chips: a chip per project not called "Main", and a removable chip for each other picked item. The URL keys are unchanged, but the picks now add up: the board shows every project of the picked workspaces plus the picked projects, so a pick can span workspaces (before, a project outside the picked workspaces was ignored).
 - Board cards: an amber bolt pill marks an Always run gig (also in the gig panel), and the robot badge on a card now shows for any gig with an agent run, its tooltip giving the last run's outcome, the worker and when.
 - Shared library permission: the shared gig templates, schedules and errand templates no longer need
   an instance admin. The new `shared_library` permission (Planning) makes, changes and deletes them; it
