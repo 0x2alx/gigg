@@ -79,7 +79,7 @@ podman run --rm --network gigg-dev -v "$PWD/dev/shot":/shot:ro -v "$PWD/out":/ou
 ```
 
 `smoke.json` is the quick check (sign in, the board, a gig's panel, phone width; it needs one gig,
-which `dev/e2e.sh` leaves behind). `cards.json` checks the cards' top line (the key and the **⋯** level
-within 1 px, the key visible on hover, a recurring card's badge and tint) at both widths in both built-in themes, also after `e2e.sh`. `batch.json` (desktop) and `mobile.json` (phone width) are the
+which `dev/e2e.sh` leaves behind). `cards.json` checks the cards (the key in the top right corner, the gear and a done card's
+archive button always shown at the foot's start and level with its row within 1 px, a recurring card's badge and tint) at both widths in both built-in themes, and the **More filters** panel on the board and the table (it fits the window, the always-run filter works and is counted); run it on a fresh `e2e.sh` instance, since it adds gigs. `batch.json` (desktop) and `mobile.json` (phone width) are the
 longer regression scenarios; they predate the top bar and need updating before they pass again. The
 documentation's screenshots come from a demo instance; see `dev/demo/README.md`.

@@ -22,6 +22,7 @@ export interface GigQuery {
   label?: string;
   priority_min?: number;
   recurring?: "" | "hide" | "only";
+  always_run?: "" | "hide" | "only";
   assignee?: number;
   created_by?: number;
   q?: string;

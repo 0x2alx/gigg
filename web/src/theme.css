@@ -377,8 +377,8 @@ a.pulse-item:hover { color: var(--text); }
 .gig-card {
   /* card text a step smaller than the page's: every size inside reads these */
   --fs-xs: 0.66rem; --fs-sm: 0.72rem; --fs-base: 0.79rem; --fs-md: 0.85rem;
-  /* the card's box: padding, the top line's row height, the ⋯ button and its inset (phones: bigger) */
-  --card-pad-y: 0.6rem; --card-pad-r: 0.7rem; --card-line: 1.3rem; --card-menu: 1.6rem; --card-menu-inset: 0.25rem;
+  /* the card's box: padding, the top line's row height, the foot's tool buttons (phones: bigger) */
+  --card-pad-y: 0.6rem; --card-pad-r: 0.7rem; --card-pad-l: 0.8rem; --card-line: 1.3rem; --card-menu: 1.6rem;
   position: relative;
   background: var(--surface);
   border: max(1px, var(--border-w)) solid var(--edge); /* at least 1px: blocked, missed and archived show on it */
@@ -403,19 +403,22 @@ a.pulse-item:hover { color: var(--text); }
 .rec-badge .ico { width: 0.95em; height: 0.95em; }
 .card-open {
   display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit;
-  padding: var(--card-pad-y) var(--card-pad-r) var(--card-pad-y) 0.8rem; cursor: pointer; border-radius: var(--radius-m);
+  padding: var(--card-pad-y) var(--card-pad-r) 0 var(--card-pad-l); cursor: pointer; border-radius: var(--radius-m) var(--radius-m) 0 0;
 }
+/* the foot, under the open button: the tools (gear, Archive) at its start, badges, people, then the
+   schedule and done lines; it opens the gig on a click too */
+.card-bottom { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3) var(--card-pad-r) var(--card-pad-y) var(--card-pad-l); cursor: pointer; }
+/* nothing to show in it: just the card's bottom padding */
+.card-bottom:not(:has(> .card-when)):has(> .card-foot > .meta:empty):not(:has(> .card-foot > :is(.people, .card-tools))) { padding-top: 0; }
 /* the top line: the main cell wraps (priority, run state, workspace, ...); the key has the first row to
-   itself at the right, a fixed --card-line tall, and the ⋯ (absolute, below) is centred on that same row */
+   itself in the top right corner, a fixed --card-line tall */
 .card-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: var(--card-line) auto; column-gap: 0.5rem; }
 .card-top-main { grid-row: 1 / span 2; display: flex; gap: 0.1rem 0.5rem; align-items: center; flex-wrap: wrap; min-width: 0; }
 /* a strut: the main cell's first line is at least --card-line tall, so its items share the key's middle */
 .card-top-main::before { content: ""; height: var(--card-line); margin-right: -0.5rem; }
 .key { font-size: var(--fs-sm); color: var(--muted); font-weight: var(--weight-body); font-variant-numeric: tabular-nums; }
-/* the key sits top right, small and monospaced, always visible; a card with a ⋯ keeps the ⋯'s slot free
-   right of it (the ⋯ fades in on hover, the key never moves) */
+/* the key sits in the top right corner, small and monospaced, always visible */
 .card-key { grid-column: 2; grid-row: 1; align-self: center; font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.01em; }
-.gig-card:has(> .card-menu) .card-top { padding-right: calc(var(--card-menu) + var(--card-menu-inset) - var(--card-pad-r) + var(--sp-2)); }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 /* the agent state of a card: a small uppercase badge in the state's colour */
 .run-badge {
@@ -480,13 +483,10 @@ a.pulse-item:hover { color: var(--text); }
   padding: 0.05rem 0.4rem; display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%;
 }
 .card-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: var(--sp-3); }
-.card-foot:has(> .meta:empty):not(:has(> .people)) { display: none; }
+.card-foot:has(> .meta:empty):not(:has(> :is(.people, .card-tools))) { display: none; }
 /* the card's last line: the schedule that made it, and when it was done */
 .card-when { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.2rem var(--sp-4); margin-top: calc(-1 * var(--sp-2)); font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
 .card-when .meta-item { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* a done card's archive button opens its "Done ..." line, bottom left */
-.gig-card:has(> .card-archive) .card-when { padding-left: 1.4rem; }
-.gig-card:has(> .card-archive) .card-done-at { margin-left: 0; order: -1; }
 .card-done-at { margin-left: auto; }
 .card-top .ws-chip { max-width: 10rem; }
 .card-break { flex-basis: 100%; height: 0; }
@@ -504,15 +504,17 @@ a.pulse-item:hover { color: var(--text); }
 .meta-item { white-space: nowrap; display: inline-flex; align-items: center; gap: 0.25rem; }
 .meta-done { color: var(--text); }
 .meta-overdue { color: var(--danger); font-weight: var(--weight-strong); }
-/* the ⋯: top right, its middle on the middle of the key's row (card padding + half the row) */
-.card-menu { position: absolute; top: calc(var(--card-pad-y) + (var(--card-line) - var(--card-menu)) / 2); right: var(--card-menu-inset); transition: opacity 0.12s ease-out; }
-.card-menu > .icon-button { width: var(--card-menu); height: var(--card-menu); padding: 0; }
-/* the card's menu button shows on hover and keyboard focus (it stays in the tab order), and always on touch screens */
-.gig-card:not(:hover):not(:focus-within) .card-menu:not(:has(.menu)) { opacity: 0; }
-@media (hover: none) { .gig-card .card-menu { opacity: 1 !important; } }
-/* a done card's one-click archive: bottom left, just before its "Done ..." line, always there and quiet */
-.card-archive { position: absolute; left: 0.4rem; bottom: 0.3rem; width: 1.6rem; height: 1.6rem; padding: 0; color: var(--muted); }
-.card-archive:hover, .card-archive:focus-visible { color: var(--text); }
+/* the foot's tools, bottom left and always in view: the gear (the card's menu) and a done card's
+   one-click Archive; quiet until pointed at. The negative margins keep the row as tall as before and
+   line the gear's drawing up with the card's text edge. */
+.card-tools { display: inline-flex; align-items: center; gap: 0.1rem; flex: none; margin: calc((var(--card-line) - var(--card-menu)) / 2) 0; margin-left: -0.3rem; }
+.card-tools .icon-button { width: var(--card-menu); height: var(--card-menu); padding: 0; color: var(--muted); }
+.card-tools .icon-button:hover, .card-tools .icon-button:focus-visible, .card-tools .icon-button[aria-expanded="true"] { color: var(--text); }
+.card-menu { position: relative; display: inline-flex; }
+/* the gear's menu: at the page's top level, fixed under (or over) the gear and opening rightwards from
+   it (Board.tsx places it), over the board like the other popovers */
+.menu.card-menu-pop { position: fixed; right: auto; z-index: 45; transform-origin: top left; max-height: calc(100dvh - 16px); overflow-y: auto; }
+.menu.card-menu-pop.menu-up { transform-origin: bottom left; }
 .menu {
   position: absolute; right: 0; top: calc(100% + 0.25rem); z-index: 20; min-width: 11rem;
   background: var(--high); border: 1px solid var(--line-strong); border-radius: var(--radius-m);
@@ -896,7 +898,7 @@ label.check input { width: auto; accent-color: var(--accent); }
 
 /* drag and drop */
 .gig-card[draggable="true"] { cursor: grab; }
-.gig-card.dragging > :not(.card-menu) { opacity: 0.4; }
+.gig-card.dragging > * { opacity: 0.4; }
 .column.drag-over { background: var(--high); border-color: var(--accent); }
 /* the line sits in the gap between cards, so showing it never shifts the cards under the pointer */
 .drop-line { height: 3px; border-radius: 999px; background: var(--accent); pointer-events: none; }
@@ -1043,7 +1045,8 @@ label.check input { width: auto; accent-color: var(--accent); }
 .archive-all > span { grid-column: 2 / -1; }
 .button.on { outline: 2px solid var(--accent); outline-offset: 1px; }
 .gig-card.archived { border-style: dashed; }
-.gig-card.archived > :not(.card-menu) { opacity: 0.55; }
+/* an archived card fades, all but its gear */
+.gig-card.archived > :not(.card-bottom), .gig-card.archived .card-bottom > :not(.card-foot), .gig-card.archived .card-foot > :not(.card-tools) { opacity: 0.55; }
 .gig-card.blocked { border-color: var(--danger); }
 .card-top .pill-danger, .card-top .pill-done { flex: none; }
 
@@ -1910,3 +1913,38 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .confirm-body { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
 .confirm-body p, .confirm-body ul { margin: 0; }
 .confirm-body ul { padding-left: 1.2rem; }
+
+/* More filters (the board and the table): one button with a count of the filters in it that are on,
+   and a panel of labelled pickers under it, labels in one column and pickers in the other */
+.more-filters { position: relative; display: inline-flex; }
+.mf-button {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-height: var(--ctl-h); padding: 0 0.75rem;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line-strong); border-radius: var(--ctl-r);
+  font: inherit; font-size: var(--fs-base); font-weight: var(--weight-strong); white-space: nowrap; cursor: pointer;
+  transition: border-color var(--dur-1) ease-out, background-color var(--dur-1) ease-out;
+}
+.board-filters .mf-button { border-color: transparent; }
+.mf-button:hover, .board-filters .mf-button:hover { border-color: var(--line-strong); }
+.mf-button .ico:first-child { color: var(--muted); }
+.mf-button .ico:last-child { font-size: 0.85em; color: var(--muted); }
+.mf-button.on, .board-filters .mf-button.on { background: var(--selected); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.mf-button .count { font-size: var(--fs-xs); min-width: 1.1rem; padding: 0 0.3rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); text-align: center; }
+.mf-panel {
+  position: absolute; left: 0; top: calc(100% + 0.35rem); z-index: 30; width: max-content; min-width: 19rem; max-width: calc(100vw - 1rem);
+  display: grid; grid-template-columns: auto minmax(11rem, 1fr); gap: var(--sp-3) var(--sp-5); align-items: center;
+  padding: var(--sp-5); background: var(--high); border: 1px solid var(--line-strong); border-radius: var(--radius-m); box-shadow: var(--shadow-pop);
+}
+.mf-field { display: contents; }
+.mf-label { color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }
+.mf-panel select, .bf-fields .mf-panel select {
+  width: 100%; height: var(--ctl-h); padding: 0 1.9rem 0 0.6rem; font-size: var(--fs-base);
+  border: 1px solid var(--line-strong); background-color: var(--surface); color: var(--text);
+}
+.mf-panel select.active, .bf-fields .mf-panel select.active { background-color: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: var(--accent); }
+.mf-check { display: inline-flex; align-items: center; gap: 0.45rem; min-height: var(--ctl-h); font-size: var(--fs-base); color: var(--text); white-space: nowrap; }
+.mf-check input, .bf-fields .mf-check input { width: auto; height: auto; margin: 0; padding: 0; border: revert; background: revert; }
+.mf-check:has(input:disabled) { color: var(--muted); }
+/* phones: 16px pickers, so tapping one doesn't zoom the page (as everywhere else) */
+@media (max-width: 720px) {
+  .mf-panel select, .bf-fields .mf-panel select { font-size: max(16px, 1em); }
+}

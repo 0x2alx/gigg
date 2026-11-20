@@ -51,7 +51,7 @@
       "expect": true
     },
     {
-      "eval": "[...document.querySelectorAll('.card-open')].some(c => c.innerText.includes('Scenario parent '+localStorage.getItem('scen')) && c.innerText.includes('0/2') && c.innerText.includes('0/1'))",
+      "eval": "[...document.querySelectorAll('.gig-card')].some(c => c.innerText.includes('Scenario parent '+localStorage.getItem('scen')) && c.innerText.includes('0/2') && c.innerText.includes('0/1'))",
       "expect": true
     },
     {

@@ -15,7 +15,7 @@ On a phone the two pages are icons, and **+** holds New gig and New errand.
 ## Columns
 
 - **Several projects in view:** one column per stage: Backlog, To-Do, Doing, Waiting and Done. A column takes a project's own name for a stage when every project in view uses the same name; otherwise it shows the stage's general name, and each card shows its project's status name (for example "Needs review") when it differs. Cards are ordered by priority, then by the earliest due date.
-- **One project in view:** that project's own statuses as columns, in the order you set. Drag cards up and down to reorder them, or use the card's **⋯** menu (To top, Up, Down, To bottom).
+- **One project in view:** that project's own statuses as columns, in the order you set. Drag cards up and down to reorder them, or use the card's **gear** menu (To top, Up, Down, To bottom).
 
 Cancelled gigs don't appear on the board. Use the table view to see them.
 
@@ -26,7 +26,7 @@ Each column header shows the column's name on a label filled with its colour, wi
 - **+**: a new gig in this column. The form starts in this column's status; if you move the gig to another project in the form, it starts in that project's first status of the same stage.
 - **Collapse** (two arrows pointing in): the column leaves the board and becomes a small button above it, with its name and count. Click the button to bring the column back. The board remembers collapsed columns per browser. You can drop a card on a collapsed column's button too.
 
-A done card has an archive button at its bottom left, before **Done …**: one click archives that gig, and the message that follows has **Undo**. Each column ends with **+ New gig**, after its last card. Done has none; its header has a small **Archive all** with a count, left of the sort button: one click archives the done gigs the column shows, under the filters in use, and the message has **Undo**. To archive whole projects, or only gigs finished some time ago, use **Archive done** in the account menu (below). With **Archived** on (in **Filters**), archived gigs show first in their column, dimmed. Cancelled gigs never show on the board; **⋯ → Archive done** archives them too. On a phone, the columns are tabs above the cards.
+A done card has an archive button at its bottom left, right of the gear: one click archives that gig, and the message that follows has **Undo**. Each column ends with **+ New gig**, after its last card. Done has none; its header has a small **Archive all** with a count, left of the sort button: one click archives the done gigs the column shows, under the filters in use, and the message has **Undo**. To archive whole projects, or only gigs finished some time ago, use **Archive done** in the account menu (below). With **Show archived gigs** on (in **More filters**), archived gigs show first in their column, dimmed. Cancelled gigs never show on the board; **Archive done** in the account menu archives them too. On a phone, the columns are tabs above the cards.
 
 ### Agent activity
 
@@ -38,15 +38,15 @@ When agents are at work on the gigs in view, a line under the filters sums it up
 
 A card is quiet on purpose: the theme's border colour and width, the title first, a few facts under it. When someone else or an agent moves a card, it slides to its new place. Hover over (or long-press) any mark to see its tooltip.
 
-- **Top row:** the priority as an icon (three bars for Low, Medium and High, a square with "!" for Urgent; High and Urgent are coloured), a glowing **Recurring** badge on a gig a [recurring gig](recurring.md) made, the agent state if there is one (see below), and, when several workspaces are in view, the gig's workspace as a badge in its colour (with the owner's picture). With an agent state, the workspace starts a second line. When the column is a stage and the gig's own status is named differently (for example "Needs review"), that status follows in grey. The gig's key (`KEY-12`: the project's key and the gig's number) sits at the right of the first line, small, and always stays visible; the card's **⋯** sits just right of it, level with it.
+- **Top row:** the priority as an icon (three bars for Low, Medium and High, a square with "!" for Urgent; High and Urgent are coloured), a glowing **Recurring** badge on a gig a [recurring gig](recurring.md) made, the agent state if there is one (see below), and, when several workspaces are in view, the gig's workspace as a badge in its colour (with the owner's picture). With an agent state, the workspace starts a second line. When the column is a stage and the gig's own status is named differently (for example "Needs review"), that status follows in grey. The gig's key (`KEY-12`: the project's key and the gig's number) sits in the card's top right corner, small, and always stays visible.
 - **Title:** up to two lines.
 - **Due date and labels:** the due date as a small outlined chip with a calendar (red when overdue), then up to two labels as tinted chips; "+3" stands for the rest (hover to list them).
 - **Agent block** (only when there is something to show, see below).
 - **Bottom row:** under a thin line, facts as small grey icons and numbers, then the people.
 - **Foot:** a recurring gig's card shows its schedule (for example "Every Tue all day"); a done gig shows when it was done ("Done 8h ago"; hover for the exact time).
-- **Recurring:** a gig a recurring gig made has a purple-tinted card and border besides its badge, so it stands out in any theme (the hue is the same everywhere; how strong it is follows the theme). **Filters → Recurring** hides them or shows only them.
+- **Recurring:** a gig a recurring gig made has a purple-tinted card and border besides its badge, so it stands out in any theme (the hue is the same everywhere; how strong it is follows the theme). **More filters → Recurring** hides them or shows only them.
 - **The gig's colour:** a coloured stripe on the card's left edge appears only when the gig has a colour. A card that is blocked or missed has a red border, and an archived card a dashed one.
-- **⋯** (top right, shown when you hover the card or tab to it, and always on a touch screen): move the card (see below).
+- **Gear** (bottom left, at the start of the foot, always shown): move or reorder the card (see below). On a done card, the archive button follows it.
 
 | Mark | Meaning |
 |---|---|
@@ -78,7 +78,7 @@ The avatars at the bottom right are the people assigned to the gig, overlapping.
 ## Moving gigs
 
 - Drag a card to another column. With several projects in view, the gig goes to its project's first status of that stage (for example, the first "Done" status).
-- Or use the card's **⋯** menu: **Move to** lists the gig's project statuses, and **Move to project** lists the other projects of its workspace.
+- Or use the card's **gear** menu: **Move to** lists the gig's project statuses, and **Move to project** lists the other projects of its workspace.
 - Click a card to open the gig panel (see [Gigs](gigs.md)).
 
 ## Filters
@@ -88,11 +88,13 @@ The avatars at the bottom right are the people assigned to the gig, overlapping.
 The toolbar above the columns narrows the board, in one row:
 
 - **Search**: text in the key, title or description.
-- **Assignee**: anyone, assigned to you, unassigned, or a person.
-- **Label** and **Priority** (a minimum: "High or higher"). A filter that is on is tinted.
-- **Recurring**: every gig (the default), **Hide recurring** (leaves out the gigs a [recurring gig](recurring.md) made), or **Only recurring** (just those).
-- **Archived**: a toggle that shows archived gigs, greyed out, in their columns.
-- **Clear filters**: resets everything except the archived toggle; greyed out while nothing is filtered. Every page with filters has one (the table, the recurring gigs, templates and schedules lists, the admin users list and audit log).
+- **More filters**: one button that opens the other filters; its count says how many of them are on (not counting **Show archived gigs**), and a filter that is on is tinted in it. The table has the same button.
+  - **Assignee**: anyone, assigned to you, unassigned, or a person.
+  - **Label** and **Priority** (a minimum: "High or higher").
+  - **Recurring**: every gig (the default), **Hide recurring** (leaves out the gigs a [recurring gig](recurring.md) made), or **Only recurring** (just those).
+  - **Always run**: every gig (the default), **Hide always run** or **Only always run** (the gigs worked whatever the usage budget; see [agents](agents.md)).
+  - **Archived**: **Show archived gigs** shows them too, greyed out, in their columns.
+- **Clear filters**: resets everything except **Show archived gigs**; greyed out while nothing is filtered. Every page with filters has one (the table, the recurring gigs, templates and schedules lists, the admin users list and audit log).
 
 With the filters open, small chips under the toolbar scope the board: **Workspaces** and **Projects**. Click a chip to show only that one; click more chips to add them. **All workspaces** / **All projects** clears the selection. The workspace chips show the workspace's owner picture and colour.
 

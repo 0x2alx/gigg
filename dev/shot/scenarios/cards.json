@@ -41,6 +41,14 @@
    "expect": 201
   },
   {
+   "eval": "(async () => (await fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({title: 'Nightly backup check, always run', priority: 2, always_run: true, assignees: [2]})})).status)()",
+   "expect": 201
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({title: 'A finished gig with a rather long title that wraps over two lines', category: 'done', assignees: [1]})})).status)()",
+   "expect": 201
+  },
+  {
    "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'daywalker', match_system: false})})).status)()",
    "expect": 204
   },
@@ -60,7 +68,15 @@
    "wait": 1200
   },
   {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const r = c.getBoundingClientRect(), k = c.querySelector('.card-key').getBoundingClientRect(), o = c.querySelector('.card-open'), pr = parseFloat(getComputedStyle(o).paddingRight), pt = parseFloat(getComputedStyle(o).paddingTop); return Math.abs((r.right - k.right) - pr - parseFloat(getComputedStyle(c).borderRightWidth)) <= 1.5 && k.top - r.top <= pt + 14; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), f = c.querySelector('.card-foot'), fs = getComputedStyle(f), fb = f.getBoundingClientRect(), mid = (fb.top + parseFloat(fs.paddingTop) + parseFloat(fs.borderTopWidth) + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "!!document.querySelector('.gig-card .card-tools .card-archive')",
    "expect": true
   },
   {
@@ -71,19 +87,122 @@
    "hover": ".gig-card.state-queued .card-title"
   },
   {
-   "wait": 400
+   "wait": 300
   },
   {
-   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible' && getComputedStyle(c.querySelector('.card-menu')).opacity === '1')(document.querySelector('.gig-card:hover'))",
-   "expect": true
-  },
-  {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible')(document.querySelector('.gig-card:hover'))",
    "expect": true
   },
   {
    "shot": "cards-desk-day",
    "full": false
+  },
+  {
+   "click": ".gig-card .card-tools .card-menu > .icon-button"
+  },
+  {
+   "wait": ".card-menu-pop"
+  },
+  {
+   "eval": "(m => { const r = m.getBoundingClientRect(), g = document.querySelector('.gig-card .card-tools .card-menu > .icon-button').getBoundingClientRect(); return Math.abs(r.left - g.left) <= 1 && r.right <= innerWidth && r.bottom <= innerHeight && [[0.5,0.3],[0.5,0.7],[0.2,0.9]].every(([x, y]) => m.contains(document.elementFromPoint(r.left + r.width * x, r.top + r.height * y))); })(document.querySelector('.card-menu-pop'))",
+   "expect": true
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "!!document.activeElement?.closest('.card-menu-pop') && document.activeElement.getAttribute('role') === 'menuitem'",
+   "expect": true
+  },
+  {
+   "shot": "gear-menu-desk-day",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "!document.querySelector('.card-menu-pop')",
+   "expect": true
+  },
+  {
+   "click": ".gig-card .card-tools .card-menu > .icon-button"
+  },
+  {
+   "wait": ".card-menu-pop"
+  },
+  {
+   "viewport": [
+    1300,
+    900
+   ]
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "!document.querySelector('.card-menu-pop')",
+   "expect": true
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "(f => { const r = f.getBoundingClientRect(); document.elementFromPoint(r.left + r.width * 0.6, r.top + r.height - 4).click(); return true; })(document.querySelector('.gig-card .card-foot'))",
+   "expect": true
+  },
+  {
+   "wait": "aside.panel"
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "click": "button[data-tip^='Statuses as rows']"
+  },
+  {
+   "wait": ".board-rows"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "click": ".board-rows .gig-card .card-tools .card-menu > .icon-button"
+  },
+  {
+   "wait": ".card-menu-pop"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "(m => { const r = m.getBoundingClientRect(); return r.top >= 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && [[0.5,0.1],[0.5,0.5],[0.5,0.9]].every(([x, y]) => m.contains(document.elementFromPoint(r.left + r.width * x, r.top + r.height * y))); })(document.querySelector('.card-menu-pop'))",
+   "expect": true
+  },
+  {
+   "shot": "gear-menu-rows",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "click": "button[data-tip='Statuses as columns']"
+  },
+  {
+   "wait": 600
   },
   {
    "viewport": [
@@ -101,7 +220,11 @@
    "wait": 1200
   },
   {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const r = c.getBoundingClientRect(), k = c.querySelector('.card-key').getBoundingClientRect(), o = c.querySelector('.card-open'), pr = parseFloat(getComputedStyle(o).paddingRight), pt = parseFloat(getComputedStyle(o).paddingTop); return Math.abs((r.right - k.right) - pr - parseFloat(getComputedStyle(c).borderRightWidth)) <= 1.5 && k.top - r.top <= pt + 14; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), f = c.querySelector('.card-foot'), fs = getComputedStyle(f), fb = f.getBoundingClientRect(), mid = (fb.top + parseFloat(fs.paddingTop) + parseFloat(fs.borderTopWidth) + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
    "expect": true
   },
   {
@@ -112,19 +235,221 @@
    "hover": ".gig-card.state-queued .card-title"
   },
   {
-   "wait": 400
+   "wait": 300
   },
   {
-   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible' && getComputedStyle(c.querySelector('.card-menu')).opacity === '1')(document.querySelector('.gig-card:hover'))",
-   "expect": true
-  },
-  {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible')(document.querySelector('.gig-card:hover'))",
    "expect": true
   },
   {
    "shot": "cards-phone-day",
    "full": false
+  },
+  {
+   "click": ".gig-card .card-tools .card-menu > .icon-button"
+  },
+  {
+   "wait": ".card-menu-pop"
+  },
+  {
+   "eval": "(m => { const r = m.getBoundingClientRect(), g = document.querySelector('.gig-card .card-tools .card-menu > .icon-button').getBoundingClientRect(); return Math.abs(r.left - g.left) <= 1 && r.right <= innerWidth && r.bottom <= innerHeight && [[0.5,0.3],[0.5,0.7],[0.2,0.9]].every(([x, y]) => m.contains(document.elementFromPoint(r.left + r.width * x, r.top + r.height * y))); })(document.querySelector('.card-menu-pop'))",
+   "expect": true
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "!!document.activeElement?.closest('.card-menu-pop') && document.activeElement.getAttribute('role') === 'menuitem'",
+   "expect": true
+  },
+  {
+   "shot": "gear-menu-phone-day",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "!document.querySelector('.card-menu-pop')",
+   "expect": true
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "(b => { if (b && b.getAttribute('aria-expanded') === 'false') b.click(); return true; })(document.querySelector('.bf-fold'))",
+   "expect": true
+  },
+  {
+   "wait": ".mf-button"
+  },
+  {
+   "click": ".mf-button"
+  },
+  {
+   "wait": ".mf-panel"
+  },
+  {
+   "eval": "document.querySelectorAll('.mf-panel select').length === 5 && !!document.querySelector('.mf-panel input[type=checkbox]')",
+   "expect": true
+  },
+  {
+   "eval": "(p => { const r = p.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })(document.querySelector('.mf-panel'))",
+   "expect": true
+  },
+  {
+   "eval": "(s => { s.value = 'only'; s.dispatchEvent(new Event('change', {bubbles: true})); return true; })(document.querySelector('.mf-panel select[aria-label=\"Always-run gigs\"]'))",
+   "expect": true
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "document.querySelector('.mf-button .count')?.textContent === '1' && location.search.includes('always_run=only') && (cs => cs.length === 1 && cs[0].textContent.includes('Nightly backup'))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "shot": "filters-desk",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "!document.querySelector('.mf-panel')",
+   "expect": true
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/board?always_run=only"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "(b => { if (b && b.getAttribute('aria-expanded') === 'false') b.click(); return true; })(document.querySelector('.bf-fold'))",
+   "expect": true
+  },
+  {
+   "wait": ".mf-button"
+  },
+  {
+   "click": ".mf-button"
+  },
+  {
+   "wait": ".mf-panel"
+  },
+  {
+   "eval": "(p => { const r = p.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && p.scrollWidth <= p.clientWidth; })(document.querySelector('.mf-panel'))",
+   "expect": true
+  },
+  {
+   "shot": "filters-phone",
+   "full": false
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "goto": "/table?always_run=hide"
+  },
+  {
+   "wait": ".vw-filters"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "click": ".mf-button"
+  },
+  {
+   "wait": ".mf-panel"
+  },
+  {
+   "eval": "document.querySelectorAll('.mf-panel select').length === 6 && document.querySelector('.mf-button .count')?.textContent === '1' && ![...document.querySelectorAll('.vw-table tbody tr')].some(r => r.textContent.includes('Nightly backup'))",
+   "expect": true
+  },
+  {
+   "shot": "table-filters-desk",
+   "full": false
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/table?always_run=hide"
+  },
+  {
+   "wait": ".vw-filters"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "click": ".mf-button"
+  },
+  {
+   "wait": ".mf-panel"
+  },
+  {
+   "eval": "(p => { const r = p.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })(document.querySelector('.mf-panel'))",
+   "expect": true
+  },
+  {
+   "shot": "table-filters-phone",
+   "full": false
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "(b => { b?.click(); return true; })(document.querySelector('.bf-active-x') || document.querySelector('.bf-clear:not([disabled])'))",
+   "expect": true
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "!location.search.includes('always_run')",
+   "expect": true
   },
   {
    "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'nightwalker', match_system: false})})).status)()",
@@ -146,7 +471,15 @@
    "wait": 1200
   },
   {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const r = c.getBoundingClientRect(), k = c.querySelector('.card-key').getBoundingClientRect(), o = c.querySelector('.card-open'), pr = parseFloat(getComputedStyle(o).paddingRight), pt = parseFloat(getComputedStyle(o).paddingTop); return Math.abs((r.right - k.right) - pr - parseFloat(getComputedStyle(c).borderRightWidth)) <= 1.5 && k.top - r.top <= pt + 14; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), f = c.querySelector('.card-foot'), fs = getComputedStyle(f), fb = f.getBoundingClientRect(), mid = (fb.top + parseFloat(fs.paddingTop) + parseFloat(fs.borderTopWidth) + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "!!document.querySelector('.gig-card .card-tools .card-archive')",
    "expect": true
   },
   {
@@ -157,19 +490,46 @@
    "hover": ".gig-card.state-queued .card-title"
   },
   {
-   "wait": 400
+   "wait": 300
   },
   {
-   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible' && getComputedStyle(c.querySelector('.card-menu')).opacity === '1')(document.querySelector('.gig-card:hover'))",
-   "expect": true
-  },
-  {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible')(document.querySelector('.gig-card:hover'))",
    "expect": true
   },
   {
    "shot": "cards-desk-night",
    "full": false
+  },
+  {
+   "click": ".gig-card .card-tools .card-menu > .icon-button"
+  },
+  {
+   "wait": ".card-menu-pop"
+  },
+  {
+   "eval": "(m => { const r = m.getBoundingClientRect(), g = document.querySelector('.gig-card .card-tools .card-menu > .icon-button').getBoundingClientRect(); return Math.abs(r.left - g.left) <= 1 && r.right <= innerWidth && r.bottom <= innerHeight && [[0.5,0.3],[0.5,0.7],[0.2,0.9]].every(([x, y]) => m.contains(document.elementFromPoint(r.left + r.width * x, r.top + r.height * y))); })(document.querySelector('.card-menu-pop'))",
+   "expect": true
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "!!document.activeElement?.closest('.card-menu-pop') && document.activeElement.getAttribute('role') === 'menuitem'",
+   "expect": true
+  },
+  {
+   "shot": "gear-menu-desk-night",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "!document.querySelector('.card-menu-pop')",
+   "expect": true
   },
   {
    "viewport": [
@@ -187,7 +547,11 @@
    "wait": 1200
   },
   {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const r = c.getBoundingClientRect(), k = c.querySelector('.card-key').getBoundingClientRect(), o = c.querySelector('.card-open'), pr = parseFloat(getComputedStyle(o).paddingRight), pt = parseFloat(getComputedStyle(o).paddingTop); return Math.abs((r.right - k.right) - pr - parseFloat(getComputedStyle(c).borderRightWidth)) <= 1.5 && k.top - r.top <= pt + 14; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), f = c.querySelector('.card-foot'), fs = getComputedStyle(f), fb = f.getBoundingClientRect(), mid = (fb.top + parseFloat(fs.paddingTop) + parseFloat(fs.borderTopWidth) + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
    "expect": true
   },
   {
@@ -198,19 +562,46 @@
    "hover": ".gig-card.state-queued .card-title"
   },
   {
-   "wait": 400
+   "wait": 300
   },
   {
-   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible' && getComputedStyle(c.querySelector('.card-menu')).opacity === '1')(document.querySelector('.gig-card:hover'))",
-   "expect": true
-  },
-  {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const k = c.querySelector('.card-key').getBoundingClientRect(), m = c.querySelector('.card-menu > .icon-button').getBoundingClientRect(); return Math.abs((k.top + k.height / 2) - (m.top + m.height / 2)) <= 1 && m.left >= k.right - 0.5; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector(':scope > .card-menu')))",
+   "eval": "(c => !!c && getComputedStyle(c.querySelector('.card-key')).visibility === 'visible')(document.querySelector('.gig-card:hover'))",
    "expect": true
   },
   {
    "shot": "cards-phone-night",
    "full": false
+  },
+  {
+   "click": ".gig-card .card-tools .card-menu > .icon-button"
+  },
+  {
+   "wait": ".card-menu-pop"
+  },
+  {
+   "eval": "(m => { const r = m.getBoundingClientRect(), g = document.querySelector('.gig-card .card-tools .card-menu > .icon-button').getBoundingClientRect(); return Math.abs(r.left - g.left) <= 1 && r.right <= innerWidth && r.bottom <= innerHeight && [[0.5,0.3],[0.5,0.7],[0.2,0.9]].every(([x, y]) => m.contains(document.elementFromPoint(r.left + r.width * x, r.top + r.height * y))); })(document.querySelector('.card-menu-pop'))",
+   "expect": true
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "!!document.activeElement?.closest('.card-menu-pop') && document.activeElement.getAttribute('role') === 'menuitem'",
+   "expect": true
+  },
+  {
+   "shot": "gear-menu-phone-night",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "!document.querySelector('.card-menu-pop')",
+   "expect": true
   }
  ]
 }

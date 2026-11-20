@@ -288,3 +288,34 @@ func TestListGigsRecurringFilter(t *testing.T) {
 		t.Fatalf("only: %v", got)
 	}
 }
+
+// The always-run filter: "hide" leaves out the always-run gigs, "only" keeps just those.
+func TestListGigsAlwaysRunFilter(t *testing.T) {
+	f := newFixture(t)
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		if _, err := CreateGig(f.ctx, tx, f.a, NewGig{ProjectID: f.p1.ID, Title: "Nightly", AlwaysRun: true}); err != nil {
+			return err
+		}
+		_, err := CreateGig(f.ctx, tx, f.a, NewGig{ProjectID: f.p1.ID, Title: "One-off"})
+		return err
+	}))
+	titles := func(mode string) []string {
+		t.Helper()
+		gigs, _, err := ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID, AlwaysRun: mode, Sort: "number"})
+		must(t, err)
+		out := []string{}
+		for _, g := range gigs {
+			out = append(out, g.Title)
+		}
+		return out
+	}
+	if got := titles(""); len(got) != 2 {
+		t.Fatalf("all: %v", got)
+	}
+	if got := titles("hide"); len(got) != 1 || got[0] != "One-off" {
+		t.Fatalf("hide: %v", got)
+	}
+	if got := titles("only"); len(got) != 1 || got[0] != "Nightly" {
+		t.Fatalf("only: %v", got)
+	}
+}

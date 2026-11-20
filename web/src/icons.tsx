@@ -56,6 +56,14 @@ const P: Record<string, ReactNode> = {
     </>
   ),
   star: <path d="m12 2.8 2.85 5.78 6.37.93-4.61 4.49 1.09 6.35L12 17.35l-5.7 3 1.09-6.35-4.61-4.49 6.37-.93z" />,
+  // a cog: a hub, a ring and eight short, thick teeth (the card's menu)
+  gear: (
+    <>
+      <circle cx="12" cy="12" r="2.6" />
+      <circle cx="12" cy="12" r="6.2" />
+      <path strokeWidth="3.2" strokeLinecap="butt" d="M17.73 14.37L20.59 15.56M14.37 17.73L15.56 20.59M9.63 17.73L8.44 20.59M6.27 14.37L3.41 15.56M6.27 9.63L3.41 8.44M9.63 6.27L8.44 3.41M14.37 6.27L15.56 3.41M17.73 9.63L20.59 8.44" />
+    </>
+  ),
   settings: (
     <>
       <path d="M20 7h-9M14 17H4" />

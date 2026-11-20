@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Category, Project, Gig } from "./api";
 import type { WorkspaceTree } from "./App";
-import { activeFilters, categoryColumns, EMPTY_FILTER, filterQuery, matches, moveToCategory, parseFilter, recurringMatches, scope, statusColumns } from "./boardModel";
+import { activeFilters, alwaysRunMatches, categoryColumns, EMPTY_FILTER, filterQuery, matches, moveToCategory, parseFilter, recurringMatches, scope, statusColumns } from "./boardModel";
 
 const gig = (id: number, x: Partial<Gig> = {}): Gig =>
   ({ id, key: `K-${id}`, title: `gig ${id}`, description_md: "", priority: 0, due_at: null, assignees: [], labels: [], status_id: 0, status_name: "", status_category: "todo", ...x }) as Gig;
@@ -68,6 +68,33 @@ describe("recurring filter", () => {
     const names = { ws: () => undefined, project: () => undefined, user: () => undefined, priority: (n: number) => String(n) };
     const chips = activeFilters({ ...EMPTY_FILTER, rec: "only" }, names);
     expect(chips.map((c) => [c.key, c.label])).toEqual([["recurring", "Only recurring"]]);
+    expect(chips[0]!.without).toEqual(EMPTY_FILTER);
+  });
+});
+
+describe("always-run filter", () => {
+  const plain = gig(1);
+  const nightly = gig(2, { always_run: true });
+  it("all, hide and only", () => {
+    expect([plain, nightly].map((t) => alwaysRunMatches(t, ""))).toEqual([true, true]);
+    expect([plain, nightly].map((t) => alwaysRunMatches(t, "hide"))).toEqual([true, false]);
+    expect([plain, nightly].map((t) => alwaysRunMatches(t, "only"))).toEqual([false, true]);
+    expect(alwaysRunMatches(gig(3, { always_run: false }), "only")).toBe(false);
+  });
+  it("is part of the board filter, next to recurring, in the URL and the saved board_filter", () => {
+    const f = { ...EMPTY_FILTER, rec: "hide" as const, run: "only" as const };
+    const saved = filterQuery(f);
+    expect(saved).toBe("?recurring=hide&always_run=only");
+    expect(parseFilter(saved)).toEqual(f);
+    expect(parseFilter("?always_run=yes").run).toBe("");
+    expect(matches(nightly, { ...EMPTY_FILTER, run: "hide" }, 7)).toBe(false);
+    expect(matches(nightly, { ...EMPTY_FILTER, run: "only" }, 7)).toBe(true);
+    expect(matches(plain, { ...EMPTY_FILTER, run: "only" }, 7)).toBe(false);
+  });
+  it("shows as a chip that takes it off", () => {
+    const names = { ws: () => undefined, project: () => undefined, user: () => undefined, priority: (n: number) => String(n) };
+    const chips = activeFilters({ ...EMPTY_FILTER, run: "hide" }, names);
+    expect(chips.map((c) => [c.key, c.label])).toEqual([["always_run", "Always run hidden"]]);
     expect(chips[0]!.without).toEqual(EMPTY_FILTER);
   });
 });

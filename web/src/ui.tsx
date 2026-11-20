@@ -8,7 +8,7 @@ import { cardChips } from "./items";
 import { windowBadge } from "./recurrence";
 import { CATEGORY_COLOR, PRIORITY_COLOR, SCHEDULE_COLOR, WINDOW_OPEN_COLOR, colorFor, readableOn } from "./theme";
 import { Icon } from "./icons";
-import { RECURRING_CHOICES, parseRecurring, type RecurringFilter } from "./boardModel";
+import { FLAG_FILTERS, parseFlag, type FlagFilter, type FlagKey } from "./boardModel";
 
 // ClearFilters: the one "Clear filters" button of every filtered list. Always there, so the bar
 // doesn't jump; greyed out while nothing is filtered.
@@ -20,14 +20,67 @@ export function ClearFilters({ active, onClear, className }: { active: boolean; 
   );
 }
 
-// RecurringSelect: the one picker of the recurring filter (board and table): every gig, hide the gigs
-// a recurring gig made, or only those.
-export function RecurringSelect({ value, onChange, className }: { value: RecurringFilter; onChange: (v: RecurringFilter) => void; className?: string }) {
+// FlagSelect: the one picker of a yes/no filter (recurring, always run) on the board and in the table:
+// every gig, hide the gigs with the flag, or only those.
+export function FlagSelect({ flag, value, onChange, className }: { flag: FlagKey; value: FlagFilter; onChange: (v: FlagFilter) => void; className?: string }) {
   return (
-    <select className={className} aria-label="Recurring gigs" value={value} onChange={(e) => onChange(parseRecurring(e.target.value))}>
-      {RECURRING_CHOICES.map((c) => (
+    <select className={className} aria-label={FLAG_FILTERS[flag].aria} value={value} onChange={(e) => onChange(parseFlag(e.target.value))}>
+      {FLAG_FILTERS[flag].choices.map((c) => (
         <option key={c.value} value={c.value}>
           {c.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// The More filters pickers the board and the table share, so both read the same.
+// AssigneeSelect: anyone, a person (agents marked); `special` adds "Assigned to me" and "Unassigned"
+// (the board's values "me" and "none"). Values are strings: "" any, or a user id.
+export function AssigneeSelect({ people, value, onChange, special, className }: {
+  people: { id: number; username: string; display_name: string; kind?: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  special?: boolean;
+  className?: string;
+}) {
+  return (
+    <select className={className} aria-label="Assignee" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Anyone</option>
+      {special && <option value="me">Assigned to me</option>}
+      {special && <option value="none">Unassigned</option>}
+      {people.map((u) => (
+        <option key={u.id} value={String(u.id)}>
+          {u.display_name || u.username}
+          {u.kind === "agent" ? " (agent)" : ""}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// LabelSelect: any label, or one by name.
+export function LabelSelect({ names, value, onChange, className }: { names: string[]; value: string; onChange: (v: string) => void; className?: string }) {
+  return (
+    <select className={className} aria-label="Label" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Any label</option>
+      {names.map((l) => (
+        <option key={l} value={l}>
+          {l}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// PrioritySelect: a minimum priority (0 = any): "High or higher", ..., "Urgent".
+export function PrioritySelect({ value, onChange, className }: { value: number; onChange: (v: number) => void; className?: string }) {
+  return (
+    <select className={className} aria-label="Priority" value={value} onChange={(e) => onChange(Number(e.target.value))}>
+      <option value={0}>Any priority</option>
+      {priorityNames.slice(1).map((n, i) => (
+        <option key={n} value={i + 1}>
+          {i + 1 === 4 ? n : `${n} or higher`}
         </option>
       ))}
     </select>
@@ -367,13 +420,14 @@ export function GigBadges({ gig, now = Date.now(), items, fields }: {
   );
 }
 
-// MoreMenu: a "⋯" button with a drop-down of actions (page heads). Closes on a choice, a tap outside
-// or Esc. `icon` makes it a square "⋯" button named by the label (for the wide page head); `className`
-// goes on the wrapper, `buttonClass` replaces the button's classes, `face` replaces the button's
-// contents (the label then names the button, as with `icon`).
-export function MoreMenu({ label, children, icon, className, buttonClass, face }: { label: string; children: ReactNode; icon?: boolean; className?: string; buttonClass?: string; face?: ReactNode }) {
+// usePopover: a small panel under a button: open state, closed by a press outside it or Escape (which
+// puts the focus back on the button, the wrapper's first), and kept inside the window (CSS places it
+// under its button; one that would still run off an edge, at the right of a phone, is shifted back in).
+// `ref` goes on the wrapper, `panelRef` on the panel.
+function usePopover() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const down = (e: PointerEvent) => {
@@ -383,6 +437,7 @@ export function MoreMenu({ label, children, icon, className, buttonClass, face }
       if (e.key === "Escape") {
         e.stopPropagation();
         setOpen(false);
+        ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
       }
     };
     document.addEventListener("pointerdown", down);
@@ -392,12 +447,8 @@ export function MoreMenu({ label, children, icon, className, buttonClass, face }
       document.removeEventListener("keydown", key, true);
     };
   }, [open]);
-  // keep the open menu inside the window: CSS places it under its button (to the left or right by
-  // screen size); a menu that would still run off an edge (a column's sort at the right on a phone)
-  // is shifted back in
-  const menuRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const m = menuRef.current;
+    const m = panelRef.current;
     if (!open || !m) return;
     m.style.transform = "";
     const r = m.getBoundingClientRect();
@@ -405,6 +456,15 @@ export function MoreMenu({ label, children, icon, className, buttonClass, face }
     const dx = r.right > window.innerWidth - pad ? window.innerWidth - pad - r.right : r.left < pad ? pad - r.left : 0;
     if (dx) m.style.transform = `translateX(${Math.round(Math.max(dx, pad - r.left))}px)`;
   }, [open]);
+  return { open, setOpen, ref, panelRef };
+}
+
+// MoreMenu: a "⋯" button with a drop-down of actions (page heads). Closes on a choice, a tap outside
+// or Esc. `icon` makes it a square "⋯" button named by the label (for the wide page head); `className`
+// goes on the wrapper, `buttonClass` replaces the button's classes, `face` replaces the button's
+// contents (the label then names the button, as with `icon`).
+export function MoreMenu({ label, children, icon, className, buttonClass, face }: { label: string; children: ReactNode; icon?: boolean; className?: string; buttonClass?: string; face?: ReactNode }) {
+  const { open, setOpen, ref, panelRef: menuRef } = usePopover();
   return (
     <div className={"more-menu" + (className ? " " + className : "")} ref={ref}>
       <button
@@ -424,6 +484,52 @@ export function MoreMenu({ label, children, icon, className, buttonClass, face }
         </div>
       )}
     </div>
+  );
+}
+
+// MoreFilters: the one "More filters" button of a filter bar (the board and the table), with a count
+// of the filters in it that are on; it opens a panel of labelled pickers (FilterField) that stays open
+// while you pick. A press outside or Escape closes it.
+export function MoreFilters({ count, children }: { count: number; children: ReactNode }) {
+  const { open, setOpen, ref, panelRef } = usePopover();
+  return (
+    <div
+      className="more-filters"
+      ref={ref}
+      onBlur={(e) => {
+        // tabbing out of the panel closes it
+        if (open && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        className={"mf-button" + (count ? " on" : "")}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        data-tip={count ? `${count} more filter${count === 1 ? "" : "s"} on` : undefined}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Icon name="settings" />
+        More filters
+        {count > 0 && <span className="count">{count}</span>}
+        <Icon name={open ? "chevron-up" : "chevron-down"} />
+      </button>
+      {open && (
+        <div className="mf-panel" role="dialog" aria-label="More filters" ref={panelRef}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// FilterField: one row of the More filters panel, a label and its picker side by side.
+export function FilterField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="mf-field">
+      <span className="mf-label">{label}</span>
+      {children}
+    </label>
   );
 }
 

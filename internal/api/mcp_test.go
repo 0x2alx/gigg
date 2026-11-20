@@ -204,6 +204,12 @@ func TestMCP(t *testing.T) {
 	if r = call("list_gigs", map[string]any{"recurring": "only"}); r.IsError || strings.Contains(text(r), child.Key) {
 		t.Fatalf("list recurring=only: %s", text(r))
 	}
+	if r = call("list_gigs", map[string]any{"always_run": "hide"}); r.IsError || !strings.Contains(text(r), child.Key) {
+		t.Fatalf("list always_run=hide: %s", text(r))
+	}
+	if r = call("list_gigs", map[string]any{"always_run": "only"}); r.IsError || strings.Contains(text(r), child.Key) {
+		t.Fatalf("list always_run=only: %s", text(r))
+	}
 	r = call("update_checklist", map[string]any{"gig": child.Key, "add": []string{"c"}})
 	if r.IsError || strings.Count(text(r), `"text"`) != 3 {
 		t.Fatalf("update_checklist: %s", text(r))

@@ -11,10 +11,10 @@ import { RecurringModal } from "../Recurring";
 import { useApp, type WorkspaceTree } from "../App";
 import { assignable } from "../fields";
 import { CATEGORY_COLOR, colorFor } from "../theme";
-import { ClearFilters, Avatar, LabelChip, Modal, PriorityIcon, RecurringSelect, StatusDot } from "../ui";
+import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, PriorityIcon, PrioritySelect, StatusDot } from "../ui";
 import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
-import { CATEGORY_LABEL } from "../boardModel";
+import { CATEGORY_LABEL, FLAG_FILTERS } from "../boardModel";
 import { ALL_CATEGORIES, errMsg, isClosed, isOverdue, pool, relTime, gigHref, viewsApi, type GigQuery } from "./viewsApi";
 import { compareGigs } from "./tableSort";
 import { PlaceFilter } from "../places";
@@ -68,13 +68,14 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const [assignee, setAssignee] = useState(initial.assignee);
   const [prioMin, setPrioMin] = useState(initial.prioMin);
   const [recFilter, setRecFilter] = useState(initial.recurring);
+  const [runFilter, setRunFilter] = useState(initial.alwaysRun);
   const [includeDone, setIncludeDone] = useState(initial.includeDone);
   const [extra, setExtra] = useState<Record<string, string>>(initial.extra);
   const [saving, setSaving] = useState(false);
 
   const filters = useMemo<TableFilters>(
-    () => ({ q, category, label, assignee, prioMin, recurring: recFilter, sort, includeDone, extra }),
-    [q, category, label, assignee, prioMin, recFilter, sort, includeDone, extra],
+    () => ({ q, category, label, assignee, prioMin, recurring: recFilter, alwaysRun: runFilter, sort, includeDone, extra }),
+    [q, category, label, assignee, prioMin, recFilter, runFilter, sort, includeDone, extra],
   );
   const written = useRef(search);
   // URL -> state when the search changes from outside (a saved view, back/forward)
@@ -90,6 +91,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     setAssignee(f.assignee);
     setPrioMin(f.prioMin);
     setRecFilter(f.recurring);
+    setRunFilter(f.alwaysRun);
     setIncludeDone(f.includeDone);
     setExtra(f.extra);
   }, [search, me.user.id]);
@@ -161,11 +163,12 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
       assignee,
       priority_min: prioMin,
       recurring: recFilter,
+      always_run: runFilter,
       q,
       sort: (sort.desc ? "-" : "") + sort.key,
       limit: PAGE,
     }),
-    [pid, category, label, assignee, prioMin, recFilter, q, sort, extra],
+    [pid, category, label, assignee, prioMin, recFilter, runFilter, q, sort, extra],
   );
 
   const loadSeq = useRef(0);
@@ -254,7 +257,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     });
 
   const clickSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, desc: !s.desc } : { key, desc: key === "updated" || key === "created" || key === "priority" }));
-  const filtered = text !== "" || category !== "" || label !== "" || assignee !== 0 || prioMin !== 0 || recFilter !== "" || Object.keys(extra).length > 0;
+  const filtered = text !== "" || category !== "" || label !== "" || assignee !== 0 || prioMin !== 0 || recFilter !== "" || runFilter !== "" || Object.keys(extra).length > 0;
   const reset = () => {
     setText("");
     setCategory("");
@@ -262,6 +265,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     setAssignee(0);
     setPrioMin(0);
     setRecFilter("");
+    setRunFilter("");
     setExtra({});
   };
   const views = savedViews.filter((v) => v.workspace_id === null || (ws ? v.workspace_id === ws.id : false));
@@ -283,6 +287,8 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   };
 
   // Clear filters also goes back to every workspace (the place is a filter like the others)
+  // a picker that is set shows tinted, as on the board
+  const on = (v: string | number) => (v ? "active" : undefined);
   const clearAll = () => {
     reset();
     if (place !== "") navigate("/table");
@@ -315,44 +321,39 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
       <div className="vw-filters" role="search" aria-label="Filter gigs">
         <input type="search" className="vw-search" placeholder="Search titles, descriptions, comments…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search" />
         <PlaceFilter value={place} onChange={goPlace} tree={tree} plain />
-        <select value={category} onChange={(e) => setCategory(e.target.value as Category | "")} aria-label="Status category">
-          <option value="">Any status</option>
-          {ALL_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABEL[c]}
-            </option>
-          ))}
-        </select>
-        <select value={label} onChange={(e) => setLabel(e.target.value)} aria-label="Label">
-          <option value="">Any label</option>
-          {labels.map((l) => (
-            <option key={l.id} value={l.name}>
-              {l.name}
-            </option>
-          ))}
-        </select>
-        <select value={assignee} onChange={(e) => setAssignee(Number(e.target.value))} aria-label="Assignee">
-          <option value={0}>Anyone</option>
-          {candidates.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.display_name || u.username}
-              {u.kind === "agent" ? " (agent)" : ""}
-            </option>
-          ))}
-        </select>
-        <select value={prioMin} onChange={(e) => setPrioMin(Number(e.target.value))} aria-label="Minimum priority">
-          <option value={0}>Any priority</option>
-          {priorityNames.slice(1).map((n, i) => (
-            <option key={n} value={i + 1}>
-              {n}+
-            </option>
-          ))}
-        </select>
-        <RecurringSelect value={recFilter} onChange={setRecFilter} />
-        <label className="vw-toggle">
-          <input type="checkbox" checked={includeDone} onChange={(e) => setIncludeDone(e.target.checked)} disabled={category !== ""} />
-          Include done
-        </label>
+        <MoreFilters count={[category, label, assignee, prioMin, recFilter, runFilter].filter(Boolean).length}>
+          <FilterField label="Status">
+            <select className={on(category)} value={category} onChange={(e) => setCategory(e.target.value as Category | "")}>
+              <option value="">Any status</option>
+              {ALL_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABEL[c]}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField label="Label">
+            <LabelSelect names={labels.map((l) => l.name)} className={on(label)} value={label} onChange={setLabel} />
+          </FilterField>
+          <FilterField label="Assignee">
+            <AssigneeSelect people={candidates} className={on(assignee)} value={assignee ? String(assignee) : ""} onChange={(v) => setAssignee(Number(v) || 0)} />
+          </FilterField>
+          <FilterField label="Priority">
+            <PrioritySelect className={on(prioMin)} value={prioMin} onChange={setPrioMin} />
+          </FilterField>
+          <FilterField label={FLAG_FILTERS.recurring.name}>
+            <FlagSelect flag="recurring" className={on(recFilter)} value={recFilter} onChange={setRecFilter} />
+          </FilterField>
+          <FilterField label={FLAG_FILTERS.always_run.name}>
+            <FlagSelect flag="always_run" className={on(runFilter)} value={runFilter} onChange={setRunFilter} />
+          </FilterField>
+          <FilterField label="Done">
+            <span className="mf-check" data-tip={category !== "" ? "A status is picked: it decides" : "Show done and cancelled gigs too"}>
+              <input type="checkbox" checked={includeDone} onChange={(e) => setIncludeDone(e.target.checked)} disabled={category !== ""} />
+              Include done
+            </span>
+          </FilterField>
+        </MoreFilters>
         {PASSTHROUGH.filter((k) => extra[k]).map((k) => (
           <span key={k} className="pill pill-muted" title="Set by a saved view">
             {k.replace("_", " ")}: {extra[k]}

@@ -70,7 +70,7 @@ There are no MCP tools for claiming gigs or recording runs; runners use the REST
 | `whoami` | `workspace:read` | none | `GET /auth/me`: identity, workspaces with permissions, key scopes. |
 | `list_projects` | `workspace:read` | `workspace?` | Projects of a workspace (or of every workspace in reach), with ids, gig key prefixes and each project's description: what it is about, context for its gigs. |
 | `summary` | `gigs:read` | `workspace?` | Plain-text board summary: per project, each status with up to 5 gigs (every workspace in reach without `workspace`). |
-| `list_gigs` | `gigs:read` | `workspace?`, `project?`, `category?`, `label?`, `q?`, `priority_min?` (0-4), `sort?`, `limit?` (default 50, max 500), `cursor?`, `archived?` (`only`/`include`), `parent?`, `blocked?`, `recurring?` (`hide`/`only`) | Finds gigs; filters combine; board order unless `sort` is given. |
+| `list_gigs` | `gigs:read` | `workspace?`, `project?`, `category?`, `label?`, `q?`, `priority_min?` (0-4), `sort?`, `limit?` (default 50, max 500), `cursor?`, `archived?` (`only`/`include`), `parent?`, `blocked?`, `recurring?` (`hide`/`only`), `always_run?` (`hide`/`only`) | Finds gigs; filters combine; board order unless `sort` is given. |
 | `get_gig` | `gigs:read` | `gig`, `comments?` | One gig; with `comments: true` (and `comments:read`) returns `{"gig": ..., "comments": ...}`. |
 | `list_runs` | `gigs:read` | `gig` | The gig's runs (sessions, status, cost), newest first. |
 | `list_comments` | `comments:read` | `gig`, `since_id?` | Comments with author facts, oldest first. |

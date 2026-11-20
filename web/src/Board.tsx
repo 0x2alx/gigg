@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useSearch } from "wouter";
 import { api, ApiError, fmtTime, canCreateGigIn, canWriteIn, gigChoices, hasCap, priorityNames, type Board, type Category, type CustomField, type Status, type Tag, type Gig } from "./api";
 import { fmtDue } from "./dates";
@@ -8,6 +9,7 @@ import {
   CATEGORY_LABEL,
   categoryColumns,
   EMPTY_FILTER,
+  FLAG_FILTERS,
   filterQuery,
   isFiltered,
   matches,
@@ -30,7 +32,7 @@ import { GigModal, lastProject } from "./GigModal";
 import { GigPanel } from "./GigPanel";
 import { backTo, relTime, viewsApi } from "./views/viewsApi";
 import { CATEGORY_COLOR, colorFor, readableOn } from "./theme";
-import { ClearFilters, Avatar, LabelChip, Modal, MoreMenu, PriorityIcon, GigBadges, RecurringSelect, WorkspaceChip, reducedMotion } from "./ui";
+import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, MoreMenu, PriorityIcon, PrioritySelect, GigBadges, WorkspaceChip, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
@@ -445,8 +447,11 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   if (!loaded) return <p className="muted">Loading…</p>;
 
   const me_ = me.user.id;
-  // a manual order only makes sense on the whole column: with a gig filter on, drops go last
-  const manual = !!single && !(filter.a || filter.l || filter.pr || filter.q);
+  // with a gig filter (assignee, label, priority, search, recurring, always run) on, the columns show
+  // only some of their gigs: the count says how many of all match, and the manual order is off (a
+  // position among the shown gigs isn't one in the whole column)
+  const gigFiltered = !!(filter.a || filter.l || filter.pr || filter.q || filter.rec || filter.run);
+  const manual = !!single && !gigFiltered;
   const columns: BoardColumn[] = (
     single
       ? boards.get(single.project.id)
@@ -458,13 +463,11 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const manualIn = (c: BoardColumn) => manual && sortOf(c) === "manual";
   const countOpen = (cols: BoardColumn[]) => cols.filter((c) => c.category !== "done").reduce((n, c) => n + c.gigs.length, 0);
   const open = countOpen(columns);
-  // with a gig filter (assignee, label, priority, search) on, the count says how many of all match
-  const gigFiltered = !!(filter.a || filter.l || filter.pr || filter.q || filter.rec);
   const allOpen = !gigFiltered
     ? open
     : countOpen(
         (() => {
-          const f: BoardFilter = { ...filter, a: "", l: "", pr: 0, q: "", rec: "" };
+          const f: BoardFilter = { ...filter, a: "", l: "", pr: 0, q: "", rec: "", run: "" };
           return single
             ? boards.get(single.project.id)
               ? statusColumns(boards.get(single.project.id)!, f, me_)
@@ -891,7 +894,8 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   );
 }
 
-// BoardFilters: one toolbar row (search, assignee, label, priority, the archived toggle, Clear filters) and under it
+// BoardFilters: one toolbar row (search, More filters: assignee, label, priority, recurring, always run and
+// archived; Clear filters) and under it
 // the workspaces and projects as compact toggle chips (none on = all).
 function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end }: {
   filter: BoardFilter;
@@ -998,55 +1002,29 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
           </svg>
           <input type="search" aria-label="Search gigs" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
         </span>
-        <label className="bf-pick">
-          <span className="bf-pick-label" aria-hidden="true">Assignee</span>
-          <select className={sel(filter.a)} aria-label="Assignee" value={filter.a} onChange={(e) => setFilter({ ...filter, a: e.target.value })}>
-            <option value="">Anyone</option>
-            <option value="me">Assigned to me</option>
-            <option value="none">Unassigned</option>
-            {people.map((u) => (
-              <option key={u.id} value={String(u.id)}>
-                {u.display_name || u.username}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="bf-pick">
-          <span className="bf-pick-label" aria-hidden="true">Label</span>
-          <select className={sel(filter.l)} aria-label="Label" value={filter.l} onChange={(e) => setFilter({ ...filter, l: e.target.value })}>
-            <option value="">Any label</option>
-            {labelNames.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="bf-pick">
-          <span className="bf-pick-label" aria-hidden="true">Priority</span>
-          <select className={sel(filter.pr)} aria-label="Priority" value={filter.pr} onChange={(e) => setFilter({ ...filter, pr: Number(e.target.value) })}>
-            <option value={0}>Any priority</option>
-            {priorityNames.slice(1).map((n, i) => (
-              <option key={n} value={i + 1}>
-                {i + 1 === 4 ? n : `${n} or higher`}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="bf-pick">
-          <span className="bf-pick-label" aria-hidden="true">Recurring</span>
-          <RecurringSelect className={sel(filter.rec)} value={filter.rec} onChange={(rec) => setFilter({ ...filter, rec })} />
-        </label>
-        <button
-          type="button"
-          className={"bf-toggle" + (filter.arch ? " on" : "")}
-          aria-pressed={filter.arch}
-          data-tip="Show archived gigs too, greyed out, in their columns"
-          onClick={() => setFilter({ ...filter, arch: !filter.arch })}
-        >
-          <Icon name="archive" />
-          Archived
-        </button>
+        <MoreFilters count={[filter.a, filter.l, filter.pr, filter.rec, filter.run].filter(Boolean).length}>
+          <FilterField label="Assignee">
+            <AssigneeSelect special people={people} className={sel(filter.a)} value={filter.a} onChange={(a) => setFilter({ ...filter, a })} />
+          </FilterField>
+          <FilterField label="Label">
+            <LabelSelect names={labelNames} className={sel(filter.l)} value={filter.l} onChange={(l) => setFilter({ ...filter, l })} />
+          </FilterField>
+          <FilterField label="Priority">
+            <PrioritySelect className={sel(filter.pr)} value={filter.pr} onChange={(pr) => setFilter({ ...filter, pr })} />
+          </FilterField>
+          <FilterField label={FLAG_FILTERS.recurring.name}>
+            <FlagSelect flag="recurring" className={sel(filter.rec)} value={filter.rec} onChange={(rec) => setFilter({ ...filter, rec })} />
+          </FilterField>
+          <FilterField label={FLAG_FILTERS.always_run.name}>
+            <FlagSelect flag="always_run" className={sel(filter.run)} value={filter.run} onChange={(run) => setFilter({ ...filter, run })} />
+          </FilterField>
+          <FilterField label="Archived">
+            <span className="mf-check" data-tip="Show archived gigs too, greyed out, in their columns">
+              <input type="checkbox" checked={filter.arch} onChange={(e) => setFilter({ ...filter, arch: e.target.checked })} />
+              Show archived gigs
+            </span>
+          </FilterField>
+        </MoreFilters>
         <ClearFilters className="bf-clear" active={isFiltered(filter)} onClear={() => setFilter({ ...EMPTY_FILTER, arch: filter.arch })} />
         {end && !scopeRow && <div className="bf-end">{end}</div>}
       </div>
@@ -1381,10 +1359,17 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
   const [menu, setMenu] = useState(false);
   const [err, setErr] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menu) return;
     const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setMenu(false);
+      const t = e.target as Node;
+      if (!ref.current?.contains(t) && !menuRef.current?.contains(t)) setMenu(false);
+    };
+    // the menu is placed once, fixed in the window: a scroll or resize elsewhere closes it
+    const away = (e: Event) => {
+      const t = e.target;
+      if (!(t instanceof Node) || !menuRef.current?.contains(t)) setMenu(false);
     };
     // Esc closes it (and only it), focus back on its button
     const key = (e: KeyboardEvent) => {
@@ -1396,21 +1381,35 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
     };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", key, true);
+    document.addEventListener("scroll", away, true);
+    window.addEventListener("resize", away);
     return () => {
       document.removeEventListener("mousedown", close);
       document.removeEventListener("keydown", key, true);
+      document.removeEventListener("scroll", away, true);
+      window.removeEventListener("resize", away);
     };
   }, [menu]);
-  // near the bottom of the screen the menu opens upwards, so all of it stays in view
-  const [up, setUp] = useState(false);
+  // the menu lives at the page's top level (a portal), fixed under the gear, so no column or lane
+  // that scrolls can clip it; it opens upwards when it wouldn't fit below, and stays inside the window
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   useLayoutEffect(() => {
-    if (!menu) return setUp(false);
-    const m = ref.current?.querySelector<HTMLElement>(".menu");
-    const b = ref.current?.getBoundingClientRect();
+    if (!menu) return setPos(null);
+    const m = menuRef.current;
+    const b = ref.current?.querySelector("button")?.getBoundingClientRect();
     if (!m || !b) return;
-    const h = m.getBoundingClientRect().height;
-    setUp(b.bottom + h + 8 > window.innerHeight && b.top - h - 8 > 0);
+    const w = m.offsetWidth, h = m.offsetHeight; // layout size: the opening animation's scale doesn't count
+    const pad = 8;
+    const left = Math.max(pad, Math.min(b.left, window.innerWidth - w - pad));
+    if (b.bottom + 4 + h <= window.innerHeight - pad) setPos({ left, top: b.bottom + 4 });
+    else if (b.top - 4 - h >= pad) setPos({ left, bottom: window.innerHeight - b.top + 4 });
+    else setPos({ left, top: Math.max(pad, window.innerHeight - h - pad) });
   }, [menu]);
+  // the menu sits at the end of the page, not after the gear: once placed, the focus moves into it
+  const placed = !!pos;
+  useEffect(() => {
+    if (menu && placed) menuRef.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus({ preventScroll: true });
+  }, [menu, placed]);
   const move = (body: MoveBody) => {
     setMenu(false);
     api
@@ -1481,6 +1480,83 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Retry failed."))
       .finally(() => setRetrying(false));
   };
+  // the card's tools at the start of its foot: the gear (move, reorder), then Archive on a done gig
+  const tools = (
+    <>
+      {canWrite && (
+        <div className="card-menu" ref={ref}>
+          <button type="button" className="icon-button" aria-label={`Move ${gig.key}`} aria-expanded={menu} data-tip="Move or reorder" onClick={() => setMenu(!menu)}>
+            <Icon name="gear" />
+          </button>
+          {menu &&
+            createPortal(
+            <div
+              ref={menuRef}
+              className={"menu card-menu-pop" + (pos?.bottom !== undefined ? " menu-up" : "")}
+              role="menu"
+              onBlur={(e) => {
+                // Tab out of the menu (anywhere but back to the gear) closes it
+                const t = e.relatedTarget as Node | null;
+                if (t && !menuRef.current?.contains(t) && !ref.current?.contains(t)) setMenu(false);
+              }}
+              style={pos ? { left: pos.left, top: pos.top ?? "auto", bottom: pos.bottom ?? "auto" } : { visibility: "hidden", left: 0, top: 0 }}
+            >
+              {canReorder && !(first && last) && <div className="menu-label">Order</div>}
+              {canReorder && !first && (
+                <>
+                  <button type="button" role="menuitem" onClick={() => reorder("top")}>
+                    ⤒ To top
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => reorder("up")}>
+                    ↑ Up
+                  </button>
+                </>
+              )}
+              {canReorder && !last && (
+                <>
+                  <button type="button" role="menuitem" onClick={() => reorder("down")}>
+                    ↓ Down
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => reorder("bottom")}>
+                    ⤓ To bottom
+                  </button>
+                </>
+              )}
+              <div className="menu-label">Move to</div>
+              {statuses
+                .filter((s) => s.id !== gig.status_id)
+                .map((s) => (
+                  <button key={s.id} type="button" role="menuitem" onClick={() => move({ status: s.id })}>
+                    <span className="dot" style={{ background: s.color ?? CATEGORY_COLOR[s.category] }} /> {s.name}
+                  </button>
+                ))}
+              {ws.projects.filter((p) => p.id !== gig.project_id).length > 0 && <div className="menu-label">Move to project</div>}
+              {ws.projects
+                .filter((p) => p.id !== gig.project_id)
+                .map((p) => (
+                  <button key={p.id} type="button" role="menuitem" onClick={() => move({ project: p.id })}>
+                    <span className="pill pill-key">{p.key}</span> {p.name}
+                  </button>
+                ))}
+            </div>,
+            document.body,
+          )}
+        </div>
+      )}
+      {canArchive && !gig.archived_at && (
+        <button
+          type="button"
+          className="icon-button card-archive"
+          disabled={archiving}
+          onClick={archive}
+          aria-label={`Archive ${gig.key}`}
+          data-tip="Archive"
+        >
+          <Icon name="archive" />
+        </button>
+      )}
+    </>
+  );
   return (
     <article
       className={"gig-card" + (gig.recurrence_id ? " recurring" : "") + (state ? " state-" + state.kind : "") + (dragging ? " dragging" : "") + (gig.missed_at ? " missed" : "") + (gig.archived_at ? " archived" : "") + (gig.blocked_by ? " blocked" : "") + (gig.color ? " colored" : "")}
@@ -1496,8 +1572,8 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
       onDragEnd={onDragEnd}
     >
       <button type="button" className="card-open" onClick={onOpen} aria-label={cardLabel}>
-        {/* the top line: a grid with the key in its own cell on the first line, level with the ⋯ beside
-            it, so the key never hides or wraps away; everything else wraps in the main cell */}
+        {/* the top line: a grid with the key in its own cell at the top right of the first line, so it never
+            hides or wraps away; everything else wraps in the main cell */}
         <div className="card-top">
           <div className="card-top-main">
           <PriorityIcon priority={gig.priority} />
@@ -1571,7 +1647,13 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
             <p>{plainText(gig.question.text)}</p>
           </div>
         )}
+      </button>
+      {/* the card's foot, outside the open button so it can hold buttons: the gear (the card's menu) and the
+          one-click Archive at its start, always in view, then the badges and the people; a click on the
+          rest of it opens the gig like the card does */}
+      <div className="card-bottom" onClick={(e) => !(e.target as HTMLElement).closest("button, a, .menu") && onOpen()}>
         <div className="card-foot">
+          {(canWrite || (canArchive && !gig.archived_at)) && <span className="card-tools">{tools}</span>}
           <span className="meta">
             <GigBadges gig={gig} items fields={fields} />
             {gig.comment_count > 0 && (
@@ -1622,7 +1704,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
             )}
           </div>
         )}
-      </button>
+      </div>
       {state?.kind === "failed" && run && (
         <div className="card-fail">
           <div className="card-fail-text">
@@ -1647,66 +1729,6 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
             >
               <Icon name="refresh" /> Retry
             </button>
-          )}
-        </div>
-      )}
-      {canArchive && !gig.archived_at && (
-        <button
-          type="button"
-          className="icon-button card-archive"
-          disabled={archiving}
-          onClick={archive}
-          aria-label={`Archive ${gig.key}`}
-          data-tip="Archive"
-        >
-          <Icon name="archive" />
-        </button>
-      )}
-      {canWrite && (
-        <div className="card-menu" ref={ref}>
-          <button type="button" className="icon-button" aria-label={`Move ${gig.key}`} aria-expanded={menu} onClick={() => setMenu(!menu)}>
-            ⋯
-          </button>
-          {menu && (
-            <div className={"menu" + (up ? " menu-up" : "")} role="menu">
-              {canReorder && !(first && last) && <div className="menu-label">Order</div>}
-              {canReorder && !first && (
-                <>
-                  <button type="button" role="menuitem" onClick={() => reorder("top")}>
-                    ⤒ To top
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => reorder("up")}>
-                    ↑ Up
-                  </button>
-                </>
-              )}
-              {canReorder && !last && (
-                <>
-                  <button type="button" role="menuitem" onClick={() => reorder("down")}>
-                    ↓ Down
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => reorder("bottom")}>
-                    ⤓ To bottom
-                  </button>
-                </>
-              )}
-              <div className="menu-label">Move to</div>
-              {statuses
-                .filter((s) => s.id !== gig.status_id)
-                .map((s) => (
-                  <button key={s.id} type="button" role="menuitem" onClick={() => move({ status: s.id })}>
-                    <span className="dot" style={{ background: s.color ?? CATEGORY_COLOR[s.category] }} /> {s.name}
-                  </button>
-                ))}
-              {ws.projects.filter((p) => p.id !== gig.project_id).length > 0 && <div className="menu-label">Move to project</div>}
-              {ws.projects
-                .filter((p) => p.id !== gig.project_id)
-                .map((p) => (
-                  <button key={p.id} type="button" role="menuitem" onClick={() => move({ project: p.id })}>
-                    <span className="pill pill-key">{p.key}</span> {p.name}
-                  </button>
-                ))}
-            </div>
           )}
         </div>
       )}

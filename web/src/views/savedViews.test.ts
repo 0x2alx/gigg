@@ -33,6 +33,14 @@ describe("toQuery", () => {
     const x = f({ recurring: "only", label: "ops" });
     expect(parse(new URLSearchParams(toSearch(x))).filters).toEqual(x);
   });
+  it("stores the always-run filter as the list API's always_run key", () => {
+    expect(toQuery(f({ alwaysRun: "only" }))).toEqual({ always_run: "only" });
+    expect(parse({ always_run: "hide" }).filters.alwaysRun).toBe("hide");
+    expect(parse({ always_run: "bogus" }).filters.alwaysRun).toBe("");
+    expect(summary({ recurring: "hide", always_run: "only" })).toEqual(["recurring hidden", "only always run"]);
+    const x = f({ alwaysRun: "hide", recurring: "only" });
+    expect(parse(new URLSearchParams(toSearch(x))).filters).toEqual(x);
+  });
   it("never stores include-done (no server key)", () => {
     expect(toQuery(f({ includeDone: true }))).toEqual({});
     expect(toSearch(f({ includeDone: true }))).toBe("done=1");
