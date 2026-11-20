@@ -105,7 +105,7 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
   if (importing)
     return (
       <ImportJsonModal
-        kinds={["recurring_gig"]}
+        kinds={["schedule", "gig_template", "recurring_gig"]}
         initialPlace={place}
         onClose={() => setImporting(false)}
         onDone={(msg) => {

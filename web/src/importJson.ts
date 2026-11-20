@@ -102,8 +102,22 @@ export function exportObject(kind: Kind, src: Schedule | Template | ErrandTempla
 export interface ImportCtx {
   // a username or a user id -> the user id, or undefined when nobody in reach has it
   userId: (v: string | number) => number | undefined;
-  // a reference by name (or by id when no name is given), within the target's reach; undefined: unresolved
-  ref: (what: "template" | "schedule", name: string | undefined, id: number | undefined) => number | undefined;
+  // a reference by name (or by id when no name is given), within the target's reach: its id, a row of this
+  // same list that will be created first, a problem, or undefined (unresolved)
+  ref: (what: "template" | "schedule", name: string | undefined, id: number | undefined) => number | Pending | { problem: string } | undefined;
+}
+
+// Pending: a reference to a row of the same list: its id is known once that row is created.
+export interface Pending {
+  pending: number; // the row's index
+}
+
+// After: a reference of a row still to fill in when the row it names is created.
+export interface After {
+  key: "template_id" | "schedule_id";
+  row: number;
+  what: "template" | "schedule";
+  name: string;
 }
 
 export interface Parsed {
@@ -199,9 +213,10 @@ function missing(kind: Kind, b: Obj): string[] {
 
 // toBody: the create body for a parsed row: user names and references resolved. problems lists what
 // doesn't resolve (the row is then skipped).
-export function toBody(row: Parsed, ctx: ImportCtx): { body: Obj; problems: string[] } {
+export function toBody(row: Parsed, ctx: ImportCtx): { body: Obj; problems: string[]; after: After[] } {
   const body: Obj = { ...row.body };
   const problems: string[] = [];
+  const after: After[] = [];
   for (const k of USER_LISTS) {
     const v = body[k];
     if (v === undefined) continue;
@@ -222,11 +237,50 @@ export function toBody(row: Parsed, ctx: ImportCtx): { body: Obj; problems: stri
       delete body[what];
       if (name === undefined && id === undefined) continue;
       const found = ctx.ref(what, name, id);
+      delete body[idKey];
       if (found === undefined) problems.push(name !== undefined ? `No ${what} named “${name}” in reach.` : `No ${what} with id ${id} in reach.`);
-      else body[idKey] = found;
+      else if (typeof found === "number") body[idKey] = found;
+      else if ("problem" in found) problems.push(found.problem);
+      else after.push({ key: idKey as After["key"], row: found.pending, what, name: name ?? "" });
     }
   }
-  return { body, problems };
+  return { body, problems, after };
+}
+
+// RANK: the order rows are created in: what others refer to comes first (schedules, then templates),
+// then what uses them (recurring gigs, errands), then gigs.
+const RANK: Record<Kind, number> = { schedule: 0, gig_template: 1, errand_template: 1, recurring_gig: 2, errand: 2, gig: 3 };
+export const CREATION_ORDER_NOTE = "Created in order: schedules, templates, then what uses them.";
+
+// creationOrder: the rows in the order to create them (the pasted order inside each rank).
+export function creationOrder<T extends { kind: Kind | null }>(rows: T[]): T[] {
+  return rows.map((r, i) => [r, i] as const).sort((a, b) => RANK[a[0].kind ?? "gig"] - RANK[b[0].kind ?? "gig"] || a[1] - b[1]).map(([r]) => r);
+}
+
+// needsOrder: whether the rows span more than one step (worth saying).
+export const needsOrder = (rows: { kind: Kind | null }[]) => new Set(rows.map((r) => RANK[r.kind ?? "gig"])).size > 1;
+
+// findInBatch: a template or schedule of the same list that a row's reference names: it must go to the same
+// workspace (or be shared) and be a row that will be created. `entries`: the rows with their target workspace
+// (0: shared).
+export function findInBatch(entries: { row: Parsed; ws: number }[], ws: number, what: "template" | "schedule", name: string): Pending | { problem: string } | undefined {
+  const kind: Kind = what === "template" ? "gig_template" : "schedule";
+  const hit = entries.find((e) => e.row.kind === kind && e.row.label.trim().toLowerCase() === name.trim().toLowerCase() && (e.ws === ws || e.ws === 0));
+  if (!hit) return undefined;
+  if (hit.row.problems.length > 0) return { problem: `The ${what} “${name}” in this list is skipped.` };
+  return { pending: hit.row.index };
+}
+
+// finishBody: a row's body once the rows it waits for are created (`created`: row index -> new id), or the
+// reason it can't be created.
+export function finishBody(body: Obj, after: After[], created: Map<number, number>): { body: Obj } | { problem: string } {
+  const out = { ...body };
+  for (const dep of after) {
+    const id = created.get(dep.row);
+    if (id === undefined) return { problem: `${dep.what} '${dep.name}' wasn't created` };
+    out[dep.key] = id;
+  }
+  return { body: out };
 }
 
 // describe: one line for the preview: what the row is.

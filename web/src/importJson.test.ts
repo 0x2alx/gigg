@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exportObject, MAX_OBJECTS, parseImport, toBody, type ImportCtx, type Kind } from "./importJson";
+import { creationOrder, exportObject, finishBody, findInBatch, MAX_OBJECTS, needsOrder, parseImport, toBody, type ImportCtx, type Kind } from "./importJson";
 
 const ctx: ImportCtx = {
   userId: (v) => ({ ada: 1, scout: 2 } as Record<string, number>)[String(v)] ?? (v === 7 ? 7 : undefined),
@@ -108,5 +108,61 @@ describe("toBody", () => {
     expect(toBody(row({ template: "Report", schedule_id: 5 }, "recurring_gig"), ctx).body).toEqual({ template_id: 21, schedule_id: 5 });
     const r = toBody(row({ template: "Nope", schedule_id: 99 }, "recurring_gig"), ctx);
     expect(r.problems).toEqual(["No template named “Nope” in reach.", "No schedule with id 99 in reach."]);
+  });
+});
+
+describe("a list that holds what it uses", () => {
+  const list = JSON.stringify([
+    { kind: "gig", title: "g" },
+    { kind: "recurring_gig", template: "Weekday report", schedule: "Weekday 07:00" },
+    { kind: "gig_template", name: "Weekday report", title: "Report" },
+    { kind: "errand", name: "e", command: "true", rule: { freq: "hours" } },
+    { kind: "schedule", name: "Weekday 07:00", freq: "weekly", weekdays: [1, 2, 3, 4, 5] },
+    { kind: "errand_template", name: "et", command: "true" },
+  ]);
+  const rows = parseImport(list, ALL).rows;
+
+  it("creates schedules, then templates, then what uses them, then gigs; the pasted order stays inside a step", () => {
+    expect(creationOrder(rows).map((r) => r.kind)).toEqual(["schedule", "gig_template", "errand_template", "recurring_gig", "errand", "gig"]);
+    expect(rows.map((r) => r.index)).toEqual([0, 1, 2, 3, 4, 5]); // the preview keeps the pasted order
+    expect(needsOrder(rows)).toBe(true);
+    expect(needsOrder(rows.filter((r) => r.kind === "schedule"))).toBe(false);
+  });
+
+  const entries = rows.map((row) => ({ row, ws: 1 }));
+  const inBatch: ImportCtx = { userId: () => undefined, ref: (what, name) => (name ? findInBatch(entries, 1, what, name) : undefined) };
+
+  it("a name in the same list is pending, not an error", () => {
+    const r = toBody(rows[1]!, inBatch);
+    expect(r.problems).toEqual([]);
+    expect(r.after).toEqual([
+      { key: "template_id", row: 2, what: "template", name: "Weekday report" },
+      { key: "schedule_id", row: 4, what: "schedule", name: "Weekday 07:00" },
+    ]);
+    expect(r.body).toEqual({});
+  });
+
+  it("fills the ids in as the rows are created", () => {
+    const { after } = toBody(rows[1]!, inBatch);
+    expect(finishBody({ paused: true }, after, new Map([[4, 11], [2, 21]]))).toEqual({ body: { paused: true, template_id: 21, schedule_id: 11 } });
+  });
+
+  it("a dependent fails with a clear message when the row it names wasn't created", () => {
+    const { after } = toBody(rows[1]!, inBatch);
+    expect(finishBody({}, after, new Map([[2, 21]]))).toEqual({ problem: "schedule 'Weekday 07:00' wasn't created" });
+  });
+
+  it("only a row for the same workspace (or a shared one) counts, and a skipped row is flagged", () => {
+    const other = rows.map((row) => ({ row, ws: 2 }));
+    expect(findInBatch(other, 1, "schedule", "Weekday 07:00")).toBeUndefined();
+    expect(findInBatch(rows.map((row) => ({ row, ws: 0 })), 1, "schedule", "weekday 07:00")).toEqual({ pending: 4 });
+    const bad = parseImport('[{"kind":"schedule","name":"S"}]', ALL).rows;
+    expect(findInBatch([{ row: bad[0]!, ws: 1 }], 1, "schedule", "S")).toEqual({ problem: "The schedule “S” in this list is skipped." });
+  });
+
+  it("a name that is not in the list still goes to what is in reach", () => {
+    const r = toBody(parseImport('{"kind":"recurring_gig","template":"Report","schedule":"Daily"}', ALL).rows[0]!, { ...ctx, ref: (what, name, id) => findInBatch(entries, 1, what, name!) ?? ctx.ref(what, name, id) });
+    expect(r.after).toEqual([]);
+    expect(r.body).toEqual({ template_id: 21, schedule_id: 11 });
   });
 });

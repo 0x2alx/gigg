@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, canShare, canWriteIn, errandMakers, gigChoices, hasCap, type GigCreateBody, type RecurrenceBody, type Schedule, type ScheduleBody, type Template, type TemplateBody, type User } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { errandApi, type ErrandBody, type ErrandTemplateBody } from "./errands";
-import { describeRow, exportObject, KIND_LABEL, MAX_BYTES, parseImport, toBody, type ImportCtx, type Kind, type Obj, type Parsed } from "./importJson";
+import { CREATION_ORDER_NOTE, creationOrder, describeRow, exportObject, finishBody, findInBatch, KIND_LABEL, MAX_BYTES, needsOrder, parseImport, toBody, type After, type ImportCtx, type Kind, type Obj, type Parsed } from "./importJson";
 import { Modal } from "./ui";
 
 // ---- Copy as JSON
@@ -140,20 +140,23 @@ export function ImportJsonModal({ kinds, initialPlace = "", onClose, onDone }: {
       for (const u of users.values()) if (u.username.toLowerCase() === n) return u.id;
       return undefined;
     },
+    // a name first meets the templates and schedules of this same list (created first), then those in reach
     ref: (what, name, id) => {
       const items = (what === "template" ? lib[ws]?.templates : lib[ws]?.schedules) ?? [];
-      if (name !== undefined) return items.find((x) => x.name.toLowerCase() === name.toLowerCase())?.id;
+      if (name !== undefined) return findInBatch(entries, ws, what, name) ?? items.find((x) => x.name.toLowerCase() === name.toLowerCase())?.id;
       return items.find((x) => x.id === id)?.id;
     },
   });
   const waiting = needWs.length > 0;
+  const entries = rows.map((r) => ({ row: r, ws: targetOf(r)?.ws ?? -1 }));
   // each row's create body and its problems (its own, plus what doesn't resolve)
   const plan = rows.map((r) => {
     const t = targetOf(r);
-    if (r.problems.length > 0 || !r.kind) return { r, t, body: {} as Obj, problems: r.problems };
-    if (!t) return { r, t, body: {} as Obj, problems: ["You can't make this here."] };
+    const none: After[] = [];
+    if (r.problems.length > 0 || !r.kind) return { r, t, body: {} as Obj, problems: r.problems, after: none };
+    if (!t) return { r, t, body: {} as Obj, problems: ["You can't make this here."], after: none };
     const x = toBody(r, ctxFor(t.ws));
-    return { r, t, body: x.body, problems: waiting && r.kind === "recurring_gig" ? [] : x.problems };
+    return { r, t, body: x.body, problems: waiting && r.kind === "recurring_gig" ? [] : x.problems, after: x.after };
   });
   const good = plan.filter((p) => p.problems.length === 0);
 
@@ -171,9 +174,17 @@ export function ImportJsonModal({ kinds, initialPlace = "", onClose, onDone }: {
   const run = async () => {
     setBusy(true);
     const out: Record<number, Outcome> = {};
-    for (const p of good) {
+    const created = new Map<number, number>(); // row -> the id it got, for the rows that name it
+    for (const p of creationOrder(good.map((g) => ({ ...g, kind: g.r.kind })))) {
+      const f = finishBody(p.body, p.after, created);
+      if ("problem" in f) {
+        out[p.r.index] = { ok: false, message: f.problem };
+        setResults({ ...out });
+        continue;
+      }
       try {
-        await createOne(p.r.kind!, p.t!, p.body);
+        const made = (await createOne(p.r.kind!, p.t!, f.body)) as { id?: number };
+        if (typeof made?.id === "number") created.set(p.r.index, made.id);
         out[p.r.index] = { ok: true };
       } catch (e) {
         out[p.r.index] = { ok: false, message: e instanceof ApiError ? e.message : "Couldn't create it." };
@@ -224,8 +235,9 @@ export function ImportJsonModal({ kinds, initialPlace = "", onClose, onDone }: {
             <h3 className="import-head">
               Preview <span className="muted small">{good.length} of {rows.length} will be created</span>
             </h3>
+            {needsOrder(good.map((g) => g.r)) && <p className="muted small import-order">{CREATION_ORDER_NOTE}</p>}
             <ul className="import-rows" aria-label="Preview">
-              {plan.map(({ r, t, problems }) => {
+              {plan.map(({ r, t, problems, after }) => {
                 const res = results?.[r.index];
                 const targets = r.kind ? (targetsOf.get(r.kind) ?? []) : [];
                 return (
@@ -251,6 +263,12 @@ export function ImportJsonModal({ kinds, initialPlace = "", onClose, onDone }: {
                         {p}
                       </div>
                     ))}
+                    {problems.length === 0 &&
+                      after.map((a) => (
+                        <div key={a.key} className="import-note muted small" data-pending="">
+                          Uses {a.what} “{a.name}” from this list: will be created first
+                        </div>
+                      ))}
                     {res && !res.ok && <div className="import-note danger small">{res.message}</div>}
                     {r.dropped.length > 0 && <div className="import-note muted small">Ignored: {r.dropped.join(", ")}</div>}
                   </li>

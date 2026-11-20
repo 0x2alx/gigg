@@ -319,6 +319,118 @@
    "expect": true
   },
   {
+   "eval": "(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim().includes(\"Import JSON\") && !x.disabled); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "textarea.import-text"
+  },
+  {
+   "eval": "(() => { const ta = document.querySelector('textarea.import-text'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, JSON.stringify([{kind:'recurring_gig',template:'Import scen batch tpl',schedule:'Import scen batch sched'},{kind:'gig_template',name:'Import scen batch tpl',title:'Batch gig title'},{kind:'schedule',name:'Import scen batch sched',freq:'daily',window_start:'07:00'}])); ta.dispatchEvent(new Event('input', {bubbles: true})); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": ".import-row[data-state=ready]"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "document.querySelectorAll('.import-row[data-state=ready]').length + ',' + document.querySelectorAll('.import-row[data-state=skipped]').length",
+   "expect": "3,0"
+  },
+  {
+   "eval": "document.querySelector('.import-order').textContent",
+   "expect": "Created in order: schedules, templates, then what uses them."
+  },
+  {
+   "eval": "[...document.querySelectorAll('.import-row')].map(r => r.querySelector('.import-name').textContent).join('|')",
+   "expect": "Import scen batch tpl|Import scen batch tpl|Import scen batch sched"
+  },
+  {
+   "eval": "document.querySelectorAll('.import-row [data-pending]').length",
+   "expect": 2
+  },
+  {
+   "shot": "batch-preview",
+   "full": false
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim().includes(\"Create 3\") && !x.disabled); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": ".import-row[data-state=created]"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "document.querySelectorAll('.import-row[data-state=created]').length + ',' + document.querySelectorAll('.import-row[data-state=failed]').length",
+   "expect": "3,0"
+  },
+  {
+   "shot": "batch-created",
+   "full": false
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim().includes(\"Close\") && !x.disabled); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "(async () => { const r = await fetch('/api/v1/workspaces/scout/recurrences'); const j = await r.json(); const x = j.items.find(i => i.title === 'Batch gig title'); return x ? [x.template_name, x.schedule_name] : null; })()",
+   "expect": [
+    "Import scen batch tpl",
+    "Import scen batch sched"
+   ]
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim().includes(\"Import JSON\") && !x.disabled); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "textarea.import-text"
+  },
+  {
+   "eval": "(() => { const ta = document.querySelector('textarea.import-text'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, JSON.stringify([{kind:'recurring_gig',template:'Import scen tpl',schedule:'Import scen broken'},{kind:'schedule',name:'Import scen broken',freq:'daily',window_start:'25:99'}])); ta.dispatchEvent(new Event('input', {bubbles: true})); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": ".import-row[data-state=ready]"
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim().includes(\"Create 2\") && !x.disabled); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": ".import-row[data-state=failed]"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "document.querySelectorAll('.import-row[data-state=failed]').length + ',' + document.querySelectorAll('.import-row[data-state=created]').length",
+   "expect": "2,0"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.import-row .import-note.danger')].map(n => n.textContent).filter(t => t.includes('wasn')).join('|')",
+   "expect": "schedule 'Import scen broken' wasn't created"
+  },
+  {
+   "shot": "batch-dependent-failed",
+   "full": false
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim().includes(\"Close\") && !x.disabled); if (!b) return false; b.click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": 400
+  },
+  {
    "goto": "/board?tool=import"
   },
   {

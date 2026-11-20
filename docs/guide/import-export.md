@@ -11,7 +11,7 @@ Each page that lists these things has an **Import JSON** button next to its **Ne
 |---|---|
 | **Schedules** (account menu) | schedules |
 | **Templates** (account menu) | gig templates |
-| **Recurring** (account menu) | recurring gigs |
+| **Recurring** (account menu) | recurring gigs, and the schedules and gig templates they use |
 | **Import gigs** (account menu) | gigs |
 | **Errands** page | errands and errand templates |
 
@@ -21,7 +21,7 @@ Each page that lists these things has an **Import JSON** button next to its **Ne
    workspace or project you were looking at to start with; **Shared** for schedules, gig templates and
    errand templates if you hold the Shared library permission). A row with a problem says so and is
    skipped. Fields gigg doesn't use are listed as ignored.
-3. **Create** makes the good rows one by one and shows each result: created, or the message the form
+3. **Create** makes the good rows one by one (in dependency order) and shows each result: created, or the message the form
    would have given. The list behind the dialog refreshes.
 
 Every object is made through the same checks as the form and the API: the permissions you hold, the
@@ -49,6 +49,10 @@ preview.
 - A recurring gig names its template and schedule with `template` and `schedule` (resolved among the
   ones in the chosen workspace and the shared ones), or with `template_id` and `schedule_id`. When
   nothing matches, the row is skipped.
+- One list can hold the schedules and templates and the recurring gigs that use them. The dialog creates
+  them in order (schedules, then templates, then what uses them, then gigs), whatever order they were
+  pasted in, and a name that matches a row of the same list shows "will be created first" in the
+  preview. If that row is refused, the rows that use it fail with "schedule 'X' wasn't created".
 - Gigs take what the new-gig form takes (title, description, priority, labels by name, dates, checklist
   items, subgigs, run settings). Comments, relations and the gig's parent are not carried.
 - Custom field values are keyed by field id and only fit a workspace that has those fields.
