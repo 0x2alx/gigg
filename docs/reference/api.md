@@ -88,7 +88,7 @@ permission in the workspace (see [access.md](access.md#api-keys-scopes-and-permi
 | `errands:output` | Reading an errand run's output tail (with `errands:read`). |
 | `errands:write` | Making, changing, pausing, running now and deleting errands and errand templates (with the `errands` permission). |
 | `errands:run` | An agent's errand executor: claiming its own due runs and reporting them. |
-| `library:write` | Making, changing and deleting the shared library: shared gig templates, schedules and errand templates (with the `shared_library` permission, on a key not limited to some places; admin keys need it too). |
+| `library:write` | Making, changing and deleting the shared library: shared gig templates, schedules and errand templates (with the `shared_library` permission, on a key not limited to some places; admin keys need it too). Always together with the scope of the kind: `gigs:write` for gig templates and schedules, `errands:write` for errand templates. |
 | `profile:write` | Your own profile, themes and picture. |
 | `keys:self` | Managing keys that act as yourself. |
 | `admin:workspaces` | Creating workspaces; archiving them and setting owners; runner caps; pausing any workspace. |
@@ -547,7 +547,11 @@ See [runner-protocol.md](runner-protocol.md) for how these fit together.
 `POST /schedules/{id}/make-shared`, `POST /templates/{id}/make-shared` and
 `POST /errand-templates/{id}/make-shared` turn a workspace's item into a shared one in one transaction
 and merge its identical copies into it. Body: `{"dry_run": true}` returns the plan and changes nothing;
-without it (or `false`) the move is made and the same shape comes back with `shared` filled in.
+without it (or `false`) the move is made and the same shape comes back with `shared` filled in. The
+optional `expect_copies` (a list of ids, the `copies` of the plan the caller reviewed) ties the move to
+that plan: when the copies computed inside the transaction are others (a copy appeared, or one was
+skipped or stopped being identical), nothing happens and the answer is 409 (`the copies changed; review
+the plan again`). An empty list expects no copies; omitted, nothing is compared. A dry run ignores it.
 
 ```json
 {
@@ -555,7 +559,7 @@ without it (or `false`) the move is made and the same shape comes back with `sha
   "source":  {"id": 12, "workspace_id": 1, "workspace": "Atlas", "name": "Mornings", "recurring_gigs": 1, "errands": 0},
   "copies":  [{"id": 15, "workspace_id": 2, "workspace": "Meridian", "name": "Mornings B", "recurring_gigs": 2, "errands": 1}],
   "skipped": [{"id": 19, "workspace_id": 3, "workspace": "Scout", "name": "Mornings", "reason": "no Recurring gigs permission in Scout", "recurring_gigs": 0, "errands": 0}],
-  "users":   [{"kind": "recurring_gig", "id": 7, "workspace_id": 1, "workspace": "Atlas", "label": "Weekly review · Mornings", "from": 12}],
+  "users":   [{"kind": "recurring_gig", "id": 7, "workspace_id": 1, "workspace": "Atlas", "project_id": 4, "label": "Weekly review · Mornings", "from": 12}],
   "moved": 4, "deleted": 2
 }
 ```
@@ -569,17 +573,27 @@ without it (or `false`) the move is made and the same shape comes back with `sha
   labels, checklist, subgigs, custom values, followers, model, effort, `always_run`, `allowed_tools`
   (order ignored), auto-archive and run timeout (not the assignees: a recurring gig keeps the assignees
   it took from its template, as its own). Errand template: description, command, timeout, output and
-  `unsandboxed`.
-- The caller needs `shared_library` and, on a key, the `library:write` scope (as for
-  `POST /shared/...`; a dry run needs them too). For the source it needs what deleting it needs in its
-  workspace (403 otherwise), and for each copy the same: a copy it lacks that for is listed under
-  `skipped` with the `reason` and left alone. The risky settings of the new shared item (`always_run`,
+  `unsandboxed`, and who set the command and who turned the sandbox off (`command_set_by`,
+  `unsandboxed_set_by`): a copy written or unsandboxed by someone else is not identical, so it is not
+  merged.
+- The caller needs `shared_library` and, on a key, the `library:write` scope and the scope of the kind
+  (`gigs:write`; `errands:write` for an errand template) (as for `POST /shared/...`; a dry run needs
+  them too). For the source it needs what deleting it needs in its workspace (403 otherwise), and for
+  each copy the same: a copy it lacks that for is listed under `skipped` with the `reason` and left
+  alone.
+- It also needs, for every recurring gig or errand that moves (`users`, each with its `project_id`),
+  what editing it by hand takes in that project: `edit_gigs` (`gigs:write`), `create_gigs` and
+  `recurring_gigs` for a recurring gig; `errands` (`errands:write`) for an errand; and a view of the
+  project. A copy with a user the caller can't edit is `skipped` with a reason and left alone, with all
+  its users; if one of the source's own users fails, the whole call is refused with 403. The risky settings of the new shared item (`always_run`,
   `allowed_tools`, a run timeout, `errand_unsandboxed`; for a schedule, those of every recurring gig and
   errand that moves onto it) need their permission on the all-workspaces level, as when making a shared
-  item by hand.
+  item by hand: they are checked there, not in the project of each moved user. The runtime checks of the
+  gig owner (a recurring gig creates gigs as its owner) and of the errand's setter (who set the command
+  and turned the sandbox off) still apply after the move.
 - 422: the item is shared already, or (gig templates) it has a project, custom values or followers, which
   a shared template cannot hold. 409: two recurring gigs of one project would end up with the same
-  template and schedule.
+  template and schedule, or `expect_copies` no longer matches.
 - The audit log gets the shared item's create, each moved recurring gig's or errand's `updated` diff,
   each `deleted`, and one `<kind>.made_shared` row on the shared item listing the source and the merged
   copies.

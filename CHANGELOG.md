@@ -10,7 +10,11 @@
   repoint and delete. API: `POST /schedules/{id}/make-shared`, `/templates/{id}/make-shared` and
   `/errand-templates/{id}/make-shared` (`dry_run` returns the plan). The risky settings (always-run, tool
   allowlists, run timeouts, no-sandbox) need their permission on the all-workspaces level, as for any
-  shared item. Errand templates and errand schedules are shared from the errand's panel.
+  shared item. Errand templates and errand schedules are shared from the errand's panel. Each recurring
+  gig and errand that moves is checked in its own project, as editing it by hand would be (a copy that
+  fails is skipped with a reason, a failing source user refuses the move); errand templates match only
+  when who set the command and the sandbox match too; the body's `expect_copies` (sent by the dialog)
+  refuses the move with 409 when the copies changed since the plan was reviewed.
 - Metrics: a new page (account menu) with the numbers per day, week or month over up to 400 days, for what you can see: gigs created, done, cancelled and archived, median time from created to done, agent runs by outcome with run time, cost and tokens (also by agent, model and project), errand runs, and recurring gigs on time or missed. Pick a period, filter by workspace, project, person or humans/agents; charts are small inline SVG, no outside calls. Days are cut in your time zone. API: `GET /metrics`; MCP: `get_metrics`. Migration 0020 adds the indexes it reads. Time spent in Doing is not included. See the new [metrics guide](docs/guide/metrics.md).
 - Board filters: the rows of workspace and project chips are replaced by a **Where** button in the toolbar (a searchable tree of workspaces with their projects, its face naming the selection, and a project called "Main" shown as "Workspace / Main") and one short row of shortcut chips: a chip per project not called "Main", and a removable chip for each other picked item. The URL keys are unchanged, but the picks now add up: the board shows every project of the picked workspaces plus the picked projects, so a pick can span workspaces (before, a project outside the picked workspaces was ignored).
 - Import JSON and Copy as JSON: schedules, gig templates, errand templates, gigs, errands and recurring gigs (shared ones too, with the Shared library permission) copy as JSON and import from pasted JSON or a file, one object or a list (up to 100, 1 MB). The preview shows what will be made, where, and skips rows that don't resolve (a wrong kind, a missing field, an unknown username, a template or schedule name that matches nothing); Create then makes each object through the normal create call, so validation and permissions are the forms' own, and shows the result per row. One list can hold schedules, templates and the recurring gigs that name them: rows are created in dependency order (schedules, templates, then what uses them, then gigs), and a name from the same list resolves to the row just made. Ids, workspaces and `created_*` in the JSON are ignored. A refused request now names the field (`window_start: ...`) instead of just "validation failed". See the new [import guide](docs/guide/import-export.md).
@@ -18,10 +22,14 @@
 - Shared library permission: the shared gig templates, schedules and errand templates no longer need
   an instance admin. The new `shared_library` permission (Planning) makes, changes and deletes them; it
   counts only on an all-workspaces rule (a workspace or project rule can't hold it), needs view on that
-  level and in every workspace, and is in no preset. The run settings inside a shared item
+  level, in every workspace and in every project, and is in no preset. The run settings inside a shared item
   (always-run, tool allowlists, run timeouts, no-sandbox) need their own permission on the
-  all-workspaces level too. Keys need the new `library:write` scope and must not be limited to some
-  places; existing unlimited admin keys with `gigs:write` or `errands:write` get it in migration 0019.
+  all-workspaces level too. Keys need the new `library:write` scope next to the scope of the kind
+  (`gigs:write` for gig templates and schedules, `errands:write` for errand templates) and must not be
+  limited to some places; existing unlimited admin keys with `gigs:write` or `errands:write` get
+  `library:write` in migration 0019, which changes nothing they could do before. A project hidden from
+  the holder takes the permission away like a hidden workspace; retiming a shared schedule that errands
+  use needs Errands on the all-workspaces level and `errands:write`.
   `/auth/me` lists `all_workspaces` (the permissions held on that level); the permissions editor shows
   Shared library only on **All workspaces**, and the Shared toggles, edit buttons and **Shared
   templates** follow the permission instead of the admin flag.

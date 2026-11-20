@@ -47,12 +47,13 @@ What counts as identical (the name, the workspace and the dates never do):
 
 - **Schedules**: the whole timing (frequency, interval, days, month day, time zone, window start and length, create-early).
 - **Templates**: the project it is limited to, title, description, priority, colour, labels, checklist, subgigs, custom field values, followers, model, effort, always-run, tool allowlist, auto-archive and run timeout. The assignees don't count: a recurring gig that took them from its template keeps them as its own.
-- **Errand templates**: the notes, command, timeout, output setting and sandbox setting.
+- **Errand templates**: the notes, command, timeout, output setting and sandbox setting, and who set the command and who turned the sandbox off (a copy written by someone else isn't merged).
 
 Things to know:
 
 - A template limited to a project, or holding custom field values or followers, can't be shared (a shared template has none of them): clear them first.
-- A copy in a workspace where you can't delete it by hand (for a schedule: Recurring gigs, and Errands when errands use it; for a template: Templates; for an errand template: Errands) is left alone and listed as skipped. Its users stay on it.
+- A copy in a workspace where you can't delete it by hand (for a schedule: Recurring gigs, and Errands when errands use it; for a template: Templates; for an errand template: Errands) is left alone and listed as skipped. Its users stay on it. The same goes for a copy with a recurring gig or errand in a project where you couldn't edit that recurring gig or errand yourself; if one of the source's own users is like that, the move is refused.
+- The dialog moves exactly the copies it showed. If they changed while it was open, it shows the new plan and asks again.
 - The settings with a permission of their own, in the item or in what moves onto a shared schedule (always-run, tool allowlists, run timeouts, no-sandbox), need that permission on the all-workspaces level, as for any shared item.
 - Two recurring gigs of one project that would end up with the same template and schedule once merged stop the move; delete or change one first.
 - The audit log shows the new item, each recurring gig or errand that moved, and each deletion.

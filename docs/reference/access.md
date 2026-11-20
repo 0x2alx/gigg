@@ -163,18 +163,34 @@ takes `shared_library`, which only counts on the all-workspaces level:
 - only an all-workspaces rule (a user's or a group's) can hold it; a workspace or project rule that
   names it is refused (422), and asked about one workspace it is never held (source `all_workspaces`
   in the access grid);
-- it needs `view` on the all-workspaces level and in every workspace (a holder sees everything their
-  change moves); a deny of `view` anywhere takes it away (source `needs_view`);
+- it needs `view` on the all-workspaces level, in every workspace and in every project (a holder sees
+  everything their change moves); a deny of `view` anywhere, a project's included, takes it away
+  (source `needs_view`);
 - the settings with a permission of their own are asked on the all-workspaces level too: `always_run`,
   `allowed_tools` and `run_timeout` on a shared gig template, `errand_unsandboxed` and a timeout other
   than the default on a shared errand template, and the same guards as for a workspace schedule when a
-  shared schedule is retimed. A workspace's grants don't count for the library;
-- through a key, the key must not be limited to some places and must carry `library:write`.
+  shared schedule is retimed (that includes `errands`, and the `errands:write` scope, when errands use
+  it). A workspace's grants don't count for the library;
+- through a key, the key must not be limited to some places and must carry `library:write` **and** the
+  scope of the kind: `gigs:write` for shared gig templates and schedules, `errands:write` for shared
+  errand templates. `library:write` only widens where a key may act, never what it may do: a key with
+  `gigs:write` but not `errands:write` can't touch the shared errand templates, and the other way round.
 
-**Make shared** (`POST .../make-shared`, see the API reference) takes the same: `shared_library` and the
-`library:write` scope, the permissions the risky settings need on the all-workspaces level, and, for the
-source and for each identical copy it merges, what deleting that item takes in its workspace. A copy in
-a workspace where the caller lacks that is left alone and reported as skipped.
+**Make shared** (`POST .../make-shared`, see the API reference) takes the same: `shared_library`, the
+`library:write` scope and the scope of the kind (`gigs:write` for a schedule or gig template,
+`errands:write` for an errand template), the permissions the risky settings need on the all-workspaces
+level, and, for the source and for each identical copy it merges, what deleting that item takes in its
+workspace. It also repoints the recurring gigs and errands that use them, so for each one that moves the
+caller needs what editing it by hand takes in its own project: `edit_gigs` (`gigs:write`), `create_gigs`
+and `recurring_gigs` for a recurring gig, `errands` (`errands:write`) for an errand, and a view of the
+project. A copy where the caller lacks any of that, for the copy or for one of its users, is left alone
+and reported as skipped; a source whose own users fail the check is refused (403).
+
+The risky settings of what moves (an always-run or tool-restricted recurring gig, a no-sandbox errand)
+are checked at the all-workspaces level, not in the project the user lives in. The runtime checks
+that follow the item still apply after the move: a recurring gig still creates gigs with its owner's
+permissions, and an errand still runs only while whoever set its command and turned its sandbox off
+holds the matching permission.
 
 Instance admins hold it, like every permission. A no-sandbox errand made from a shared errand template
 still runs in a workspace only while whoever turned the sandbox off holds `errand_unsandboxed` there.
