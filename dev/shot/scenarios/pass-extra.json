@@ -1102,5 +1102,6 @@
   {
    "wait": 300
   }
- ]
+ ],
+ "waitUntil": "domcontentloaded"
 }
