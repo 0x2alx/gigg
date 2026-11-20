@@ -79,3 +79,7 @@ A gig can have a window: it may only be started between its start time and **Win
 - **Auto-archive** (in **Details**): the gig archives itself this long after it's done or cancelled (1 hour to 30 days; **never** by default). Set it on a template or a recurring gig and every gig it makes gets it. gigg checks once a minute.
 - **Delete** moves the gig to the trash. **Trash** on the board lists the deleted gigs of the projects in view, with **Restore**. A deleted gig opened from a link shows **Restore** too.
 - Every change is recorded with its old and new values: the API's gig activity (`GET /gigs/{id}/activity`) and, for admins, **Admin → Audit**.
+
+## Copy and import as JSON
+
+A card's menu (the gear) has **Copy as JSON**, and the account menu has **Import gigs**: paste JSON or choose a file to make one or several gigs in a project. See [Import JSON and Copy as JSON](import-export.md).

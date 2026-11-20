@@ -545,8 +545,11 @@ async function call<T>(method: string, path: string, body?: unknown, headers?: R
   if (r.status === 204) return undefined as T;
   if (!r.ok) {
     noteStatus(r.status, path);
-    const d = (r.data ?? {}) as { code?: string; detail?: string };
-    throw new ApiError(r.status, d.code ?? "error", d.detail ?? r.statusText);
+    const d = (r.data ?? {}) as { code?: string; detail?: string; errors?: { message?: string; location?: string }[] };
+    // a refused body: say which field (huma's detail alone is just "validation failed")
+    const first = d.errors?.[0];
+    const extra = first?.message ? ` (${first.location ? first.location.replace(/^body\./, "") + ": " : ""}${first.message})` : "";
+    throw new ApiError(r.status, d.code ?? "error", (d.detail ?? r.statusText) + extra);
   }
   return r.data as T;
 }

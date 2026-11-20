@@ -48,3 +48,7 @@ Holders of the **Shared library** permission (given on an all-workspaces rule; i
 ## Schedules
 
 **Schedules** lists the timings and how many recurring gigs use each. A new schedule asks which workspace it belongs to when you can add to several. A schedule named after its timing (the default) is renamed automatically when you change the timing.
+
+## Copy and import as JSON
+
+Schedules, templates and recurring gigs each have **Copy JSON** on their card and **Import JSON** next to **New**, to carry them to another place or to make several from prepared JSON. See [Import JSON and Copy as JSON](import-export.md).
