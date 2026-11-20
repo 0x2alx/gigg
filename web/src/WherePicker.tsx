@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { WorkspaceTree } from "./App";
 import type { User } from "./api";
 import { whereLabel, whereTree, placeName, type BoardFilter } from "./boardModel";
@@ -20,6 +20,9 @@ export function WherePicker({ tree, filter, users, onWs, onProject, onAll }: {
 }) {
   const { open, setOpen, ref, panelRef } = usePopover();
   const [q, setQ] = useState("");
+  useEffect(() => {
+    if (!open) setQ("");
+  }, [open]);
   const label = whereLabel(tree, filter);
   const rows = whereTree(tree, filter, q);
   const flat = tree.length === 1;
@@ -47,7 +50,7 @@ export function WherePicker({ tree, filter, users, onWs, onProject, onAll }: {
       {open && (
         <div className="wp-panel" role="dialog" aria-label="Where" ref={panelRef}>
           <div className="wp-head">
-            <input type="search" aria-label="Search workspaces and projects" placeholder="Search workspaces and projects" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+            <input type="search" aria-label="Search workspaces and projects" placeholder="Search places" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
             <button type="button" className={"wp-all" + (none ? " on" : "")} aria-pressed={none} data-tip="Show everything (clears the workspace and project choices)" onClick={onAll}>
               All
             </button>

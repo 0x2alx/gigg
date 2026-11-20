@@ -1,0 +1,403 @@
+{
+ "base": "https://gigg-dev:8443",
+ "waitUntil": "domcontentloaded",
+ "viewport": [
+  1440,
+  900
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => { const H = {'Content-Type':'application/json','X-Gigg-CSRF':'1'}; const j = async (m, u, b) => (await fetch('/api/v1' + u, {method: m, headers: H, body: JSON.stringify(b)})).status; await j('POST','/workspaces',{slug:'atlas',name:'Atlas'}); await j('POST','/workspaces',{slug:'meridian',name:'Meridian'}); await j('POST','/workspaces/atlas/projects',{slug:'main',name:'Main',key:'ATM'}); await j('POST','/workspaces/atlas/projects',{slug:'billing',name:'Billing',key:'BIL'}); await j('POST','/workspaces/meridian/projects',{slug:'main',name:'Main',key:'MVM'}); await j('POST','/workspaces/meridian/projects',{slug:'scripts',name:'Scripts',key:'SCR'}); return 'ok'; })()"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "wait": ".bf-fold"
+  },
+  {
+   "eval": "(b => { if (b && b.getAttribute('aria-expanded') === 'false') b.click(); return true; })(document.querySelector('.bf-fold'))"
+  },
+  {
+   "wait": ".wp-button"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: All"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Billing",
+    "Scripts",
+    "gigg"
+   ]
+  },
+  {
+   "click": ".wp-button"
+  },
+  {
+   "wait": ".wp-panel"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.wp-panel .wp-name')].map(e => e.textContent)",
+   "expect": [
+    "Atlas",
+    "Main",
+    "Billing",
+    "Meridian",
+    "Main",
+    "Scripts",
+    "Scout",
+    "gigg"
+   ]
+  },
+  {
+   "eval": "(p => { const r = p.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })(document.querySelector('.wp-panel'))",
+   "expect": true
+  },
+  {
+   "shot": "where-open-1440",
+   "full": false
+  },
+  {
+   "type": [
+    ".wp-head input",
+    "scri"
+   ]
+  },
+  {
+   "eval": "[...document.querySelectorAll('.wp-panel .wp-name')].map(e => e.textContent)",
+   "expect": [
+    "Meridian",
+    "Scripts"
+   ]
+  },
+  {
+   "click": ".wp-p-row input"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Scripts"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Billing",
+    "Scripts*",
+    "gigg"
+   ]
+  },
+  {
+   "shot": "where-search-1440",
+   "full": false
+  },
+  {
+   "click": ".wp-all"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: All"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Billing",
+    "Scripts",
+    "gigg"
+   ]
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "click": ".wp-button"
+  },
+  {
+   "wait": ".wp-panel"
+  },
+  {
+   "type": [
+    ".wp-head input",
+    "meri"
+   ]
+  },
+  {
+   "click": ".wp-ws-row input"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Meridian"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Scripts",
+    "Meridian"
+   ]
+  },
+  {
+   "click": ".wp-p-row input"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: 2 places"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.getAttribute('aria-label') || e.textContent.trim())",
+   "expect": [
+    "Scripts",
+    "Remove Meridian",
+    "Remove Meridian / Main"
+   ]
+  },
+  {
+   "shot": "where-main-1440",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "click": ".bf-shortcuts .bf-chip[aria-label='Remove Meridian']"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Meridian / Main"
+  },
+  {
+   "click": ".bf-shortcuts .bf-chip[aria-label='Remove Meridian / Main']"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: All"
+  },
+  {
+   "eval": "document.querySelectorAll('.wp-panel').length",
+   "expect": 0
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+   "expect": true
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "wait": ".bf-fold"
+  },
+  {
+   "eval": "(b => { if (b && b.getAttribute('aria-expanded') === 'false') b.click(); return true; })(document.querySelector('.bf-fold'))"
+  },
+  {
+   "wait": ".wp-button"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: All"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Billing",
+    "Scripts",
+    "gigg"
+   ]
+  },
+  {
+   "click": ".wp-button"
+  },
+  {
+   "wait": ".wp-panel"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.wp-panel .wp-name')].map(e => e.textContent)",
+   "expect": [
+    "Atlas",
+    "Main",
+    "Billing",
+    "Meridian",
+    "Main",
+    "Scripts",
+    "Scout",
+    "gigg"
+   ]
+  },
+  {
+   "eval": "(p => { const r = p.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })(document.querySelector('.wp-panel'))",
+   "expect": true
+  },
+  {
+   "shot": "where-open-390",
+   "full": false
+  },
+  {
+   "type": [
+    ".wp-head input",
+    "scri"
+   ]
+  },
+  {
+   "eval": "[...document.querySelectorAll('.wp-panel .wp-name')].map(e => e.textContent)",
+   "expect": [
+    "Meridian",
+    "Scripts"
+   ]
+  },
+  {
+   "click": ".wp-p-row input"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Scripts"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Billing",
+    "Scripts*",
+    "gigg"
+   ]
+  },
+  {
+   "shot": "where-search-390",
+   "full": false
+  },
+  {
+   "click": ".wp-all"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: All"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Billing",
+    "Scripts",
+    "gigg"
+   ]
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "click": ".wp-button"
+  },
+  {
+   "wait": ".wp-panel"
+  },
+  {
+   "type": [
+    ".wp-head input",
+    "meri"
+   ]
+  },
+  {
+   "click": ".wp-ws-row input"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Meridian"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.textContent.trim() + (e.getAttribute('aria-pressed') === 'true' ? '*' : ''))",
+   "expect": [
+    "Scripts",
+    "Meridian"
+   ]
+  },
+  {
+   "click": ".wp-p-row input"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: 2 places"
+  },
+  {
+   "eval": "[...document.querySelectorAll('.bf-shortcuts .bf-chip')].map(e => e.getAttribute('aria-label') || e.textContent.trim())",
+   "expect": [
+    "Scripts",
+    "Remove Meridian",
+    "Remove Meridian / Main"
+   ]
+  },
+  {
+   "shot": "where-main-390",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "click": ".bf-shortcuts .bf-chip[aria-label='Remove Meridian']"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: Meridian / Main"
+  },
+  {
+   "click": ".bf-shortcuts .bf-chip[aria-label='Remove Meridian / Main']"
+  },
+  {
+   "eval": "document.querySelector('.wp-button .wp-face').textContent",
+   "expect": "Where: All"
+  },
+  {
+   "eval": "document.querySelectorAll('.wp-panel').length",
+   "expect": 0
+  },
+  {
+   "eval": "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+   "expect": true
+  }
+ ]
+}

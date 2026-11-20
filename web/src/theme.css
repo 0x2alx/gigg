@@ -1977,14 +1977,14 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .wp-all.on { background: var(--selected); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .wp-tree { display: flex; flex-direction: column; gap: 0.1rem; max-height: min(60vh, 26rem); overflow-y: auto; overscroll-behavior: contain; }
 .wp-ws { display: flex; flex-direction: column; }
-.wp-row { display: flex; align-items: center; gap: 0.5rem; min-height: 2rem; padding: 0 0.4rem; border-radius: var(--radius-m); font-size: var(--fs-base); color: var(--text); cursor: pointer; min-width: 0; }
+.wp-row { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; min-height: 2rem; padding: 0 0.4rem; border-radius: var(--radius-m); font-size: var(--fs-base); color: var(--text); cursor: pointer; min-width: 0; }
 .wp-row:hover { background: var(--hover); }
 .wp-ws-row { font-weight: var(--weight-strong); }
 .wp-indent { padding-left: 1.9rem; }
 .wp-row .avatar-xs { width: 1.45rem; height: 1.45rem; font-size: 0.56rem; border-width: 0; flex: none; }
 .wp-row .dot { flex: none; }
 .wp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wp-row input[type="checkbox"], .bf-fields .wp-row input[type="checkbox"] { width: auto; height: auto; margin: 0; padding: 0; border: revert; background: revert; flex: none; }
+.wp-row input[type="checkbox"], .bf-fields .wp-row input[type="checkbox"] { accent-color: var(--accent); width: auto; height: auto; margin: 0; padding: 0; border: revert; background: revert; flex: none; }
 .wp-empty { padding: 0.4rem; font-size: var(--fs-sm); }
 .bf-chip .ico { font-size: 0.8rem; color: var(--muted); }
 @media (max-width: 720px) {
