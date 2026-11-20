@@ -3,6 +3,9 @@ package api
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -13,11 +16,13 @@ import (
 // Make shared: a workspace's schedule, gig template or errand template becomes a shared one in one
 // transaction. The identical copies in other workspaces are merged into it: their recurring gigs and
 // errands move to the shared item and the source and the copies are deleted (see store/makeshared.go for
-// what "identical" means). Needs Shared library (sharedWrite: the library:write scope, a key not limited
-// to some places), and for the source and every copy what deleting it needs in its workspace; a copy in a
-// workspace where the caller lacks that is left alone and listed as skipped. The settings that have a
-// permission of their own (always-run, tool allowlists, run timeouts, no sandbox) are asked on the
-// all-workspaces level, as for any shared item.
+// what "identical" means). Needs Shared library (sharedWrite: the library:write scope and the scope of
+// the kind, a key not limited to some places), and for the source and every copy what deleting it needs in
+// its workspace, and for every recurring gig and errand that moves what editing it by hand would need in
+// its project; a copy in a workspace where the caller lacks any of that is left alone and listed as
+// skipped (the source's own users refuse the whole move). The settings that have a permission of their own
+// (always-run, tool allowlists, run timeouts, no sandbox) are asked on the all-workspaces level, as for any
+// shared item.
 
 type makeSharedBody struct {
 	DryRun bool `json:"dry_run,omitempty" doc:"Only return the plan: the shared item, the copies found (and skipped), the users that would move. Nothing changes"`
@@ -64,6 +69,47 @@ func shareDenied(p *access.Principal, kind string, it store.ShareItem) string {
 	return ""
 }
 
+// shareUserDenied says why the caller may not repoint a recurring gig or an errand in its project, or ""
+// when they may: what editing it by hand would need there (mirroring update-recurrence and the errand
+// guard), and seeing the project at all.
+func shareUserDenied(p *access.Principal, u store.ShareUser) string {
+	ws := u.WorkspaceID
+	where := func(what string) string {
+		return what + " in the project of " + strings.ReplaceAll(u.Kind, "_", " ") + " #" + fmt.Sprint(u.ID) + " (" + u.Workspace + ")"
+	}
+	if u.ProjectID == nil {
+		if !p.Allowed(ws, access.Viewer) {
+			return where("no access")
+		}
+	} else if !p.SeesProject(ws, *u.ProjectID) {
+		return "a project of " + u.Workspace + " you can't see"
+	}
+	has := func(perm, scope string) bool {
+		switch {
+		case u.ProjectID == nil && scope == "":
+			return p.Allowed(ws, perm)
+		case u.ProjectID == nil:
+			return p.Can(ws, perm, scope)
+		case scope == "":
+			return p.AllowedIn(ws, *u.ProjectID, perm)
+		}
+		return p.CanIn(ws, *u.ProjectID, perm, scope)
+	}
+	var checks []struct{ perm, scope string }
+	switch u.Kind {
+	case "recurring_gig":
+		checks = []struct{ perm, scope string }{{access.Editor, "gigs:write"}, {"create_gigs", ""}, {"recurring_gigs", ""}}
+	case "errand":
+		checks = []struct{ perm, scope string }{{"errands", "errands:write"}}
+	}
+	for _, c := range checks {
+		if !has(c.perm, c.scope) {
+			return where("no " + permNames[c.perm] + " permission")
+		}
+	}
+	return ""
+}
+
 // sharePlan plans (and checks) a Make shared of the source id, reading through q. It returns the plan and
 // the ids of the copies to merge.
 func (a *API) sharePlan(ctx context.Context, q store.Q, p *access.Principal, kind string, id int64) (*store.SharePlan, []int64, error) {
@@ -74,11 +120,34 @@ func (a *API) sharePlan(ctx context.Context, q store.Q, p *access.Principal, kin
 	if why := shareDenied(p, kind, src); why != "" {
 		return nil, nil, errForbidden("You can't remove this item: " + why + ".")
 	}
+	candIDs := []int64{id}
+	for _, c := range cands {
+		candIDs = append(candIDs, c.ID)
+	}
+	users, err := store.ShareUsers(ctx, q, kind, candIDs)
+	if err != nil {
+		return nil, nil, storeErr(err)
+	}
+	byItem := map[int64][]store.ShareUser{}
+	for _, u := range users {
+		byItem[u.From] = append(byItem[u.From], u)
+	}
+	for _, u := range byItem[id] {
+		if why := shareUserDenied(p, u); why != "" {
+			return nil, nil, errForbidden("You can't move what uses this item: " + why + ".")
+		}
+	}
 	plan := &store.SharePlan{Kind: kind, Source: src, Copies: []store.ShareItem{}, Skipped: []store.ShareItem{}, NewName: src.Name}
 	ids := []int64{id}
 	var copyIDs []int64
 	for _, c := range cands {
-		if why := shareDenied(p, kind, c); why != "" {
+		why := shareDenied(p, kind, c)
+		for _, u := range byItem[c.ID] {
+			if why == "" {
+				why = shareUserDenied(p, u)
+			}
+		}
+		if why != "" {
 			c.Reason = why
 			plan.Skipped = append(plan.Skipped, c)
 			continue
@@ -90,8 +159,11 @@ func (a *API) sharePlan(ctx context.Context, q store.Q, p *access.Principal, kin
 	if err := a.shareRisks(ctx, q, p, kind, id, ids); err != nil {
 		return nil, nil, err
 	}
-	if plan.Users, err = store.ShareUsers(ctx, q, kind, ids); err != nil {
-		return nil, nil, storeErr(err)
+	plan.Users = []store.ShareUser{}
+	for _, u := range users {
+		if slices.Contains(ids, u.From) {
+			plan.Users = append(plan.Users, u)
+		}
 	}
 	if err := store.ShareCheck(ctx, q, kind, ids); err != nil {
 		return nil, nil, storeErr(err)
@@ -163,11 +235,11 @@ func shareScope(kind string) string {
 }
 
 // makeShared runs the plan (dry run) or the move, in one transaction.
-func (a *API) makeShared(ctx context.Context, p *access.Principal, kind string, id int64, dry bool) (*sharePlanOut, error) {
+func (a *API) makeShared(ctx context.Context, p *access.Principal, kind string, id int64, body makeSharedBody) (*sharePlanOut, error) {
 	if err := sharedWrite(p, shareScope(kind)); err != nil {
 		return nil, err
 	}
-	if dry {
+	if body.DryRun {
 		plan, _, err := a.sharePlan(ctx, a.st.R, p, kind, id)
 		if err != nil {
 			return nil, err
@@ -206,7 +278,7 @@ func (a *API) registerMakeShared() {
 			if _, err := a.schedule(ctx, p, i.ID); err != nil {
 				return nil, err
 			}
-			return a.makeShared(ctx, p, store.ShareSchedule, i.ID, i.Body.DryRun)
+			return a.makeShared(ctx, p, store.ShareSchedule, i.ID, i.Body)
 		})
 	huma.Register(a.h, huma.Operation{OperationID: "make-template-shared", Method: "POST", Path: "/templates/{id}/make-shared", Tags: []string{"templates"},
 		Summary: "Make a workspace gig template shared, merging its identical copies (Shared library; dry_run returns the plan only)"},
@@ -218,7 +290,7 @@ func (a *API) registerMakeShared() {
 			if _, err := a.template(ctx, p, i.ID); err != nil {
 				return nil, err
 			}
-			return a.makeShared(ctx, p, store.ShareTemplate, i.ID, i.Body.DryRun)
+			return a.makeShared(ctx, p, store.ShareTemplate, i.ID, i.Body)
 		})
 	huma.Register(a.h, huma.Operation{OperationID: "make-errand-template-shared", Method: "POST", Path: "/errand-templates/{id}/make-shared", Tags: []string{"errands"},
 		Summary: "Make a workspace errand template shared, merging its identical copies (Shared library; dry_run returns the plan only)"},
@@ -230,6 +302,6 @@ func (a *API) registerMakeShared() {
 			if _, err := a.errandTemplate(ctx, p, i.ID); err != nil {
 				return nil, err
 			}
-			return a.makeShared(ctx, p, store.ShareErrandTemplate, i.ID, i.Body.DryRun)
+			return a.makeShared(ctx, p, store.ShareErrandTemplate, i.ID, i.Body)
 		})
 }

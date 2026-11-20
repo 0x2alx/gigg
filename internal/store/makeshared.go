@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"slices"
 	"strings"
@@ -53,6 +54,7 @@ type ShareUser struct {
 	ID          int64  `json:"id"`
 	WorkspaceID int64  `json:"workspace_id"`
 	Workspace   string `json:"workspace"`
+	ProjectID   *int64 `json:"project_id,omitempty" doc:"Its project (an errand whose project is gone has none)"`
 	Label       string `json:"label" doc:"Its template (or errand) name and its schedule"`
 	From        int64  `json:"from" doc:"The id of the source or copy it uses now"`
 }
@@ -237,20 +239,22 @@ func ShareUsers(ctx context.Context, q Q, kind string, ids []int64) ([]ShareUser
 		defer rows.Close()
 		for rows.Next() {
 			u := ShareUser{Kind: userKind}
-			if err := rows.Scan(&u.ID, &u.WorkspaceID, &u.Label, &u.From); err != nil {
+			var proj sql.NullInt64
+			if err := rows.Scan(&u.ID, &u.WorkspaceID, &proj, &u.Label, &u.From); err != nil {
 				return err
 			}
+			u.ProjectID = ptrInt(proj)
 			u.Workspace = names[u.WorkspaceID]
 			out = append(out, u)
 		}
 		return rows.Err()
 	}
 	rec := func(col string) string {
-		return `SELECT r.id, r.workspace_id, t.title || ' · ' || s.name, r.` + col + ` FROM recurrences r JOIN gig_templates t ON t.id = r.template_id
+		return `SELECT r.id, r.workspace_id, r.project_id, t.title || ' · ' || s.name, r.` + col + ` FROM recurrences r JOIN gig_templates t ON t.id = r.template_id
 			JOIN schedules s ON s.id = r.schedule_id WHERE r.` + col + ` IN (` + in + `) AND r.deleted_at IS NULL ORDER BY r.id`
 	}
 	err2 := func(col string) string {
-		return `SELECT c.id, c.workspace_id, t.name || ' · ' || s.name, c.` + col + ` FROM errands c JOIN errand_templates t ON t.id = c.template_id
+		return `SELECT c.id, c.workspace_id, c.project_id, t.name || ' · ' || s.name, c.` + col + ` FROM errands c JOIN errand_templates t ON t.id = c.template_id
 			JOIN schedules s ON s.id = c.schedule_id WHERE c.` + col + ` IN (` + in + `) AND c.deleted_at IS NULL ORDER BY c.id`
 	}
 	switch kind {
