@@ -120,13 +120,21 @@ func readIn(p *access.Principal, ws int64, scope string) error {
 	return require(p, ws, access.Viewer, scope)
 }
 
-// sharedWrite: shared templates and schedules are made, changed and deleted by instance admins (a
-// session, or a key not bound to a workspace) whose key holds the scope.
-func sharedWrite(p *access.Principal, scope string) error {
-	if !p.IsInstanceAdmin() {
-		return errForbidden("Shared templates and schedules are changed by instance admins.")
+// sharedWrite: the shared library (gig templates, schedules, errand templates) is made, changed and
+// deleted by holders of Shared library on the all-workspaces level (instance admins hold it), through a
+// session or a key not limited to some places, with the library:write scope. The settings that have a
+// permission of their own are checked on that level too (allowed(p, 0, ...)).
+func sharedWrite(p *access.Principal) error {
+	if p.Library() {
+		return nil
 	}
-	return need(p, scope)
+	if p.Allowed(0, "shared_library") {
+		return errForbidden("This key lacks the library:write scope.")
+	}
+	if p.Key != nil && p.Key.Bound {
+		return errForbidden("A key limited to some places can't change the shared library.")
+	}
+	return allowed(p, 0, "shared_library")
 }
 
 func (a *API) field(ctx context.Context, p *access.Principal, id int64) (*store.CustomField, error) {
@@ -557,14 +565,23 @@ func (a *API) registerItems() {
 		return items(ts), nil
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "create-shared-template", Method: "POST", Path: "/shared/templates", Tags: []string{"templates"},
-		Summary: "Save a shared gig template (instance admins)", DefaultStatus: 201}, func(ctx context.Context, in *struct {
+		Summary: "Save a shared gig template (Shared library, on the all-workspaces level)", DefaultStatus: 201}, func(ctx context.Context, in *struct {
 		Body templateBody
 	}) (*struct{ Body *store.Template }, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if err := sharedWrite(p, "gigs:write"); err != nil {
+		if err := sharedWrite(p); err != nil {
+			return nil, err
+		}
+		if err := alwaysRunChange(p, 0, false, in.Body.AlwaysRun); err != nil {
+			return nil, err
+		}
+		if err := timeoutChange(p, 0, nil, in.Body.RunTimeout); err != nil {
+			return nil, err
+		}
+		if err := toolsChange(p, 0, nil, in.Body.AllowedTools); err != nil {
 			return nil, err
 		}
 		t := &store.Template{}
@@ -606,7 +623,7 @@ func (a *API) registerItems() {
 			return nil, err
 		}
 		if t.Shared {
-			if err := sharedWrite(p, "gigs:write"); err != nil {
+			if err := sharedWrite(p); err != nil {
 				return nil, err
 			}
 		} else {
@@ -627,16 +644,15 @@ func (a *API) registerItems() {
 		if err != nil {
 			return nil, err
 		}
-		if !t.Shared { // an admin holds every permission
-			if err := alwaysRunGuard(p, t.WorkspaceID, t.AlwaysRun || in.Body.AlwaysRun); err != nil {
-				return nil, err
-			}
-			if err := toolsGuard(p, t.WorkspaceID, len(t.AllowedTools) > 0 || len(in.Body.AllowedTools) > 0); err != nil {
-				return nil, err
-			}
-			if err := timeoutChange(p, t.WorkspaceID, t.RunTimeout, in.Body.RunTimeout); err != nil {
-				return nil, err
-			}
+		// a shared template's WorkspaceID is 0: the all-workspaces level
+		if err := alwaysRunGuard(p, t.WorkspaceID, t.AlwaysRun || in.Body.AlwaysRun); err != nil {
+			return nil, err
+		}
+		if err := toolsGuard(p, t.WorkspaceID, len(t.AllowedTools) > 0 || len(in.Body.AllowedTools) > 0); err != nil {
+			return nil, err
+		}
+		if err := timeoutChange(p, t.WorkspaceID, t.RunTimeout, in.Body.RunTimeout); err != nil {
+			return nil, err
 		}
 		in.Body.apply(t)
 		err = a.tx(ctx, func(tx *sql.Tx) error {
@@ -657,7 +673,7 @@ func (a *API) registerItems() {
 			return nil, err
 		}
 		if t.Shared {
-			if err := sharedWrite(p, "gigs:write"); err != nil {
+			if err := sharedWrite(p); err != nil {
 				return nil, err
 			}
 			return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.DeleteTemplate(ctx, tx, p.Actor(), t) })

@@ -34,6 +34,7 @@ same workspace: without it, it counts as not held.
 | `errand_unsandboxed` | Runner | Let an errand run outside the agent's sandbox. An errand loses the flag when someone without this permission changes it, and its runs fail while the person who set it lacks the permission. |
 | `recurring_gigs` | Planning | Create, change, pause and stop recurring gigs and schedules (recurring gigs also need `edit_gigs`, and `create_gigs` to make their gigs). |
 | `templates` | Planning | Create, change and delete gig templates, with `edit_gigs` (using one only needs `create_gigs`). |
+| `shared_library` | Planning | Create, change and delete the shared library: the gig templates, schedules and errand templates every workspace can use. Only on an all-workspaces rule (see [The shared library](#the-shared-library)). |
 | `custom_fields` | Planning | Define the workspace's custom fields. |
 | `saved_filters` | Planning | Save personal filtered views. |
 | `manage_workspace` | Admin | Projects, statuses (columns), labels, workspace settings, and other people's comments. |
@@ -104,9 +105,10 @@ one before it:
 | `allowed_tools` | | | | x |
 | `run_timeout` | | | | x |
 | `errand_unsandboxed` | | | | |
+| `shared_library` | | | | |
 
-`errand_unsandboxed` is in no preset: it is granted only by an override (or by being an instance
-admin). A preset is a starting point: any rule can add or remove single permissions with overrides.
+`errand_unsandboxed` and `shared_library` are in no preset: they are granted only by an override (or
+by being an instance admin). A preset is a starting point: any rule can add or remove single permissions with overrides.
 
 The role displayed for a user in a workspace (`role` in `/auth/me` and member lists) is the closest
 preset to what they actually hold there: `admin`, else `manager` if they have `manage_workspace`,
@@ -152,6 +154,34 @@ Uses:
 
 A workspace's member list shows people with only some projects as such, with their projects.
 
+### The shared library
+
+Shared gig templates, shared schedules and shared errand templates belong to no workspace: every
+workspace sees and uses them, and a change to one reaches every workspace that uses it. Changing them
+takes `shared_library`, which only counts on the all-workspaces level:
+
+- only an all-workspaces rule (a user's or a group's) can hold it; a workspace or project rule that
+  names it is refused (422), and asked about one workspace it is never held (source `all_workspaces`
+  in the access grid);
+- it needs `view` on the all-workspaces level and in every workspace (a holder sees everything their
+  change moves); a deny of `view` anywhere takes it away (source `needs_view`);
+- the settings with a permission of their own are asked on the all-workspaces level too: `always_run`,
+  `allowed_tools` and `run_timeout` on a shared gig template, `errand_unsandboxed` and a timeout other
+  than the default on a shared errand template, and the same guards as for a workspace schedule when a
+  shared schedule is retimed. A workspace's grants don't count for the library;
+- through a key, the key must not be limited to some places and must carry `library:write`.
+
+Instance admins hold it, like every permission. A no-sandbox errand made from a shared errand template
+still runs in a workspace only while whoever turned the sandbox off holds `errand_unsandboxed` there.
+
+Example: let an agent maintain the shared library without making it an admin:
+
+```
+gigg admin access librarian all viewer shared_library=allow
+```
+
+plus a key with `library:write` that follows the user (not limited to some places).
+
 ### Resolution
 
 For one user, one place and one permission, the first level with an opinion decides, most specific
@@ -180,7 +210,8 @@ workspaces `scout` is a plain member.
 
 `GET /api/v1/users/{id}/access` (admin) shows a user's rules, groups and the resolved grid for every
 workspace, and for each project with a rule of its own, with the level each answer came from (`admin`,
-`user_project`, `user`, `user_all`, `group_project`, `group`, `group_all`, `needs_view`, `default`).
+`user_project`, `user`, `user_all`, `group_project`, `group`, `group_all`, `needs_view`, `all_workspaces`,
+`default`).
 The row with `workspace_id` 0 is the all-workspaces level: what a new workspace starts with.
 
 ### Setting rules

@@ -593,6 +593,9 @@ func allowed(p *access.Principal, ws int64, perm string) error {
 	if p.Allowed(ws, perm) {
 		return nil
 	}
+	if ws == 0 { // the shared library: it belongs to every workspace
+		return errForbidden("You don't have the \"" + permNames[perm] + "\" permission (" + perm + ") on the all-workspaces level, which the shared library needs; an admin can grant it in Admin › Users or through a group.")
+	}
 	return errNoPermission(perm)
 }
 

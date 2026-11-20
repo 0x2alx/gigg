@@ -329,6 +329,9 @@ func runAdmin(ctx context.Context, st *store.Store, a store.Actor, cmd string, a
 					if rule.ProjectID != nil && !store.IsProjectPermission(perm) {
 						continue
 					}
+					if rule.WorkspaceID != nil && store.IsAllWorkspacesPermission(perm) {
+						continue // only an all-workspaces rule holds it
+					}
 					if v, ok := ov[perm]; ok && v != val {
 						fmt.Fprintf(os.Stderr, "%s: was %s for %s, now %s\n", perm, done[v], u.Username, done[val])
 					}

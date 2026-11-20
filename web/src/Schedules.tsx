@@ -2,9 +2,9 @@
 // window, create-early) that recurring gigs pair with templates. List, new, edit (every recurring gig
 // on it moves), delete when unused. Minutes/hours timings belong to errands and are left out (the Errands page has them).
 // Shared schedules (every workspace's) come with each workspace's list: shown once, under any filter, changed
-// only by instance admins; a workspace that retimes a recurring gig on one moves it to a schedule of its own.
+// only with the Shared library permission; a workspace that retimes a recurring gig on one moves it to a schedule of its own.
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { api, ApiError, canWriteIn, hasCap, isGigSchedule, type GigSchedule as Schedule } from "./api";
+import { api, ApiError, canShare, canWriteIn, hasCap, isGigSchedule, type GigSchedule as Schedule } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { optionOf, PlaceFilter, placeMatch, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
@@ -47,7 +47,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
   const canWriteWs = useCallback((w: WorkspaceTree) => canWriteIn(w) && hasCap(me, "recurring_gigs", w.id), [me]);
   const shown = useMemo(() => (items ?? []).filter((x) => x.shared || placeMatch(place, tree, x.workspace_id, null)), [items, place, tree]);
   const writable = useMemo(() => tree.filter(canWriteWs), [tree, canWriteWs]);
-  const startWs = (place.startsWith("w:") ? writable.find((w) => w.id === Number(place.slice(2))) : undefined) ?? writable[0] ?? (me.admin ? tree[0] : undefined);
+  const startWs = (place.startsWith("w:") ? writable.find((w) => w.id === Number(place.slice(2))) : undefined) ?? writable[0] ?? (canShare(me) ? tree[0] : undefined);
 
   const remove = (s: Schedule) => {
     setErr("");
@@ -66,7 +66,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
       <ScheduleModal
         ws={editWs}
         choices={editing === "new" ? writable : undefined}
-        canShare={editing === "new" && me.admin}
+        canShare={editing === "new" && canShare(me)}
         schedule={editing === "new" ? undefined : editing}
         onClose={closeEdit}
         onSaved={(msg) => {
@@ -101,7 +101,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
         <ul className="schedules" aria-label="Schedules">
           {shown.map((s) => {
             const sws = s.shared ? undefined : wsOf(s.workspace_id);
-            const canWrite = s.shared ? me.admin : !!sws && canWriteWs(sws);
+            const canWrite = s.shared ? canShare(me) : !!sws && canWriteWs(sws);
             return (
             <li key={s.id} className="schedule rec-card">
               <div className="schedule-top">
@@ -110,7 +110,7 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
                 <span className="rec-state">
                   {s.tz !== tz && <span className="pill pill-ws">{s.tz}</span>}
                   {s.shared ? (
-                    <span className="pill pill-shared" data-tip="Offered in every workspace; only instance admins change it">
+                    <span className="pill pill-shared" data-tip="Offered in every workspace; changed with the Shared library permission">
                       Shared
                     </span>
                   ) : (
@@ -177,12 +177,13 @@ export function SchedulesModal({ initialPlace = "", onClose, onChanged }: {
   );
 }
 
-// ScheduleModal: new or edit. canShare (instance admins, new): the workspace list offers "Shared: every
+// ScheduleModal: new or edit. canShare (Shared library, new): the workspace list offers "Shared: every
 // workspace" (wsId 0).
 function ScheduleModal({ ws: ws0, choices, canShare, schedule, onClose, onSaved }: {
   ws: WorkspaceTree; choices?: WorkspaceTree[]; canShare?: boolean; schedule?: Schedule; onClose: () => void; onSaved: (msg?: string) => void;
 }) {
-  const [wsId, setWsId] = useState(ws0.id);
+  // with Shared library and no workspace to make schedules in, a new schedule starts (and stays) shared
+  const [wsId, setWsId] = useState(canShare && choices?.length === 0 ? 0 : ws0.id);
   const ws = choices?.find((w) => w.id === wsId) ?? ws0;
   const shared = schedule ? !!schedule.shared : canShare && wsId === 0;
   const [name, setName] = useState(schedule?.name ?? "");

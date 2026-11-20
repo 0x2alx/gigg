@@ -1,9 +1,9 @@
 // Every gig template in reach, across the workspaces (narrowed by an optional workspace/project filter;
 // a project shows its own and its workspace's "any project" ones): list with badges; new, edit, delete.
 // Shared templates (every workspace's) come with each workspace's list: shown once, under any filter,
-// changed only by instance admins.
+// changed only with the Shared library permission (on the all-workspaces level).
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { api, ApiError, canWriteIn, hasCap, type Tag, type Template } from "./api";
+import { api, ApiError, canShare, canWriteIn, hasCap, type Tag, type Template } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
 import { WorkspaceBadge } from "./WorkspaceBadge";
@@ -51,7 +51,8 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
   const canEditIn = useCallback((w: WorkspaceTree) => canWriteIn(w) && hasCap(me, "templates", w.id), [me]);
   const shown = useMemo(() => (items ?? []).filter((t) => t.shared || placeMatch(place, tree, t.workspace_id, t.project_id)), [items, place, tree]);
   const editable = useMemo(() => tree.filter(canEditIn), [tree, canEditIn]);
-  const start = placeStart(place, tree, (w) => editable.includes(w));
+  // with Shared library and no workspace to make templates in, a new template can only be shared
+  const start = placeStart(place, tree, (w) => editable.includes(w)) ?? (canShare(me) ? placeStart("", tree, () => true) : null);
 
   const remove = (t: Template) => {
     setErr("");
@@ -64,7 +65,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't delete the template."));
   };
 
-  // a shared template is edited in the first workspace the admin may edit (for its labels and members)
+  // a shared template is edited in the first workspace the editor may edit (for its labels and members)
   const editWs = editing && editing !== "new" ? (editing.shared ? (editable[0] ?? tree[0]) : wsOf(editing.workspace_id)) : undefined;
   if (editing && (editing === "new" ? start : editWs)) {
     const w = editing === "new" ? start!.ws : editWs!;
@@ -108,7 +109,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
         <ul className="schedules" aria-label="Templates">
           {shown.map((t) => {
             const tws = t.shared ? undefined : wsOf(t.workspace_id);
-            const canEdit = t.shared ? me.admin : !!tws && canEditIn(tws);
+            const canEdit = t.shared ? canShare(me) : !!tws && canEditIn(tws);
             const labels = labelsOf.get(t.workspace_id) ?? [];
             return (
             <li key={t.id} className="schedule rec-card" style={t.color ? ({ "--row-c": t.color } as CSSProperties) : undefined}>
@@ -119,7 +120,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                   <PriorityBadge priority={t.priority} />
                   {t.project_id === null ? <span className="pill pill-ws">any project</span> : <span className="pill pill-key">{tws?.projects.find((p) => p.id === t.project_id)?.key ?? "?"}</span>}
                   {t.shared ? (
-                    <span className="pill pill-shared" data-tip="Offered in every workspace; only instance admins change it">
+                    <span className="pill pill-shared" data-tip="Offered in every workspace; changed with the Shared library permission">
                       Shared
                     </span>
                   ) : (

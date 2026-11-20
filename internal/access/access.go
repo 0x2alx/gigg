@@ -101,8 +101,12 @@ func (p *Principal) ProjectsWith(ws int64, perm string) []int64 {
 	return out
 }
 
-// AllowedAnywhere reports a permission held in at least one workspace (or project) in reach.
+// AllowedAnywhere reports a permission held in at least one workspace (or project) in reach; for an
+// all-workspaces permission (the shared library), held on the all-workspaces level.
 func (p *Principal) AllowedAnywhere(perm string) bool {
+	if store.IsAllWorkspacesPermission(perm) {
+		return p.Allowed(0, perm)
+	}
 	if p.Key != nil && p.Key.Bound {
 		for _, pl := range p.Key.Reach {
 			if pl.ProjectID == nil && p.Allowed(pl.WorkspaceID, perm) {
@@ -144,6 +148,14 @@ func (p *Principal) HasScope(scope string) bool {
 // AdminWith: an instance admin holding the given admin scope (always true for an admin session).
 func (p *Principal) AdminWith(scope string) bool {
 	return p.IsInstanceAdmin() && p.HasScope(scope)
+}
+
+// Library: may change the shared library (shared gig templates, schedules, errand templates), which
+// belongs to no workspace: Shared library on the all-workspaces level (an instance admin holds it),
+// through a session or a key that isn't limited to some places, with the library:write scope. The
+// settings with a permission of their own are then asked on that level too: Allowed(0, perm).
+func (p *Principal) Library() bool {
+	return p.Allowed(0, "shared_library") && p.HasScope("library:write")
 }
 
 // SeesWorkspace reports whether the workspace exists for this caller: whole, or some of its projects.

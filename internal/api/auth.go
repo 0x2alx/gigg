@@ -27,10 +27,11 @@ type MeBody struct {
 	Key        *KeyInfo          `json:"key,omitempty"`
 	Listener   string            `json:"listener"`
 	// Capabilities: the permissions held in at least one workspace (see GET /permissions).
-	Capabilities []string `json:"capabilities"`
-	RemoteFonts  bool     `json:"remote_fonts" doc:"Whether pages may load fonts gigg doesn't bundle from Google Fonts (GIGG_REMOTE_FONTS)"`
-	Version      string   `json:"version" doc:"The server's version"`
-	SourceURL    string   `json:"source_url" doc:"Where to get this server's source code (GIGG_SOURCE_URL)"`
+	Capabilities  []string `json:"capabilities"`
+	AllWorkspaces []string `json:"all_workspaces" doc:"Permissions held on the all-workspaces level: what the shared library (shared templates, schedules, errand templates) asks for"`
+	RemoteFonts   bool     `json:"remote_fonts" doc:"Whether pages may load fonts gigg doesn't bundle from Google Fonts (GIGG_REMOTE_FONTS)"`
+	Version       string   `json:"version" doc:"The server's version"`
+	SourceURL     string   `json:"source_url" doc:"Where to get this server's source code (GIGG_SOURCE_URL)"`
 }
 
 // WorkspaceAccess is a workspace in reach and the caller's role there.
@@ -108,10 +109,13 @@ func (a *API) meBody(ctx context.Context, p *access.Principal) (*MeBody, error) 
 	if p.Key != nil {
 		b.Key = keyInfo(p.Key)
 	}
-	b.Capabilities = []string{}
+	b.Capabilities, b.AllWorkspaces = []string{}, []string{}
 	for _, c := range store.Permissions {
 		if p.AllowedAnywhere(c.Name) {
 			b.Capabilities = append(b.Capabilities, c.Name)
+		}
+		if p.Allowed(0, c.Name) {
+			b.AllWorkspaces = append(b.AllWorkspaces, c.Name)
 		}
 	}
 	return b, nil

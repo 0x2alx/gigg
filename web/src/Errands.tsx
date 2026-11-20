@@ -5,7 +5,7 @@ import { launch } from "./Launch";
 import { usePanelOutsideClose } from "./panelClose";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useLocation, useSearch } from "wouter";
-import { ApiError, errandMakers, errandWritable, fmtTime, hasCap } from "./api";
+import { ApiError, canShare, errandMakers, errandWritable, fmtTime, hasAllCap, hasCap } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { runnerApi, type RunnerState } from "./Dashboard";
 import { PlaceFilter, placeMatch, type Place } from "./places";
@@ -76,7 +76,7 @@ export function ErrandsPage({ open }: { open?: number }) {
   const [state, setState] = useState<StateFilter>(() => (new URLSearchParams(location.search).get("state") === "failing" ? "failing" : ""));
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Errand | "new" | null>(null);
-  const [library, setLibrary] = useState(false); // the shared errand templates (instance admins)
+  const [library, setLibrary] = useState(false); // the shared errand templates (Shared library)
   const [now, setNow] = useState(Date.now());
 
   const wsKey = tree.map((w) => w.id).join(",");
@@ -156,7 +156,7 @@ export function ErrandsPage({ open }: { open?: number }) {
           <p className="muted small">Commands the agents run on a schedule, in their sandbox. Each run is recorded here; errands make no gigs.</p>
         </div>
         <div className="row">
-          {me.admin && (
+          {canShare(me) && (
             <button type="button" className="button secondary" onClick={() => setLibrary(true)} data-tip="Errand templates every workspace can start an errand from">
               <Icon name="template" /> Shared templates
             </button>
@@ -590,7 +590,7 @@ const UNIT: Record<ErrandFreq, [string, string]> = {
   monthly: ["month", "months"],
 };
 
-// SharedTemplates: the shared errand templates (instance admins): list, new, edit, delete. Each is
+// SharedTemplates: the shared errand templates (Shared library): list, new, edit, delete. Each is
 // edited in the errand editor (its command half).
 function SharedTemplates({ ws, onClose }: { ws: WorkspaceTree; onClose: () => void }) {
   const [items, setItems] = useState<ErrandTemplate[] | null>(null);
@@ -738,9 +738,9 @@ function ErrandEditor({ errand, template, choices, initialWs, initialProject = 0
     if (t) set(contentOf(t));
   };
   const usesPicked = !!picked && sameContent(f, picked);
-  const canUnsandbox = tplMode || hasCap(me, "errand_unsandboxed", ws.id);
+  const canUnsandbox = tplMode ? hasAllCap(me, "errand_unsandboxed") : hasCap(me, "errand_unsandboxed", ws.id);
   // another timeout than the default, or a change (a picked command brings its own, used as is)
-  const canTimeout = tplMode || hasCap(me, "run_timeout", ws.id);
+  const canTimeout = tplMode ? hasAllCap(me, "run_timeout") : hasCap(me, "run_timeout", ws.id);
   const manager = hasCap(me, "manage_workspace", ws.id);
   // the agents who can run it: yourself (an agent), or with Manage the workspace any agent member
   const agents = useMemo(() => (members.get(ws.id) ?? []).map((id) => users.get(id)).filter((u) => u && u.kind === "agent"), [members, users, ws.id]);
@@ -1012,7 +1012,7 @@ function ErrandEditor({ errand, template, choices, initialWs, initialProject = 0
               <li key={d}>{d}.</li>
             ))}
           </ul>
-          <p className="muted small">Later changes an admin makes to the shared one won't reach it. The shared one and the other workspaces stay as they are.</p>
+          <p className="muted small">Later changes to the shared one won't reach it. The shared one and the other workspaces stay as they are.</p>
         </ConfirmModal>
       )}
     </Modal>

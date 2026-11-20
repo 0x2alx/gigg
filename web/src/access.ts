@@ -8,6 +8,7 @@ export interface Permission {
   description: string;
   section: string;
   project?: boolean; // can be given for one project (a gig permission)
+  all_workspaces?: boolean; // decided only on the all-workspaces level (the shared library)
 }
 
 export interface PermissionsInfo {
@@ -27,7 +28,7 @@ export interface AccessRule {
   overrides: Record<string, boolean>;
 }
 
-export type Source = "admin" | "user_project" | "user" | "user_all" | "group_project" | "group" | "group_all" | "needs_view" | "default";
+export type Source = "admin" | "user_project" | "user" | "user_all" | "group_project" | "group" | "group_all" | "needs_view" | "all_workspaces" | "default";
 
 export interface Decision {
   name: string;
@@ -121,7 +122,8 @@ export function ruleSummary(rule: AccessRule | undefined, perms: Permission[]): 
 }
 
 // sourceText: where an answer comes from, in a few words.
-export function sourceText(d: Pick<Decision, "source" | "group">): string {
+// allWs: a permission decided on the all-workspaces level only (it needs view in every workspace).
+export function sourceText(d: Pick<Decision, "source" | "group">, allWs = false): string {
   switch (d.source) {
     case "admin":
       return "admin: everything";
@@ -138,7 +140,9 @@ export function sourceText(d: Pick<Decision, "source" | "group">): string {
     case "group_all":
       return d.group ? `group ${d.group}, all workspaces` : "a group";
     case "needs_view":
-      return "can't see the workspace";
+      return allWs ? "doesn't see every workspace" : "can't see the workspace";
+    case "all_workspaces":
+      return "set on All workspaces";
     default:
       return "no rule: off";
   }

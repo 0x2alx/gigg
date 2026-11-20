@@ -12,7 +12,7 @@ import (
 
 // Schedules: named timing (rule, window, create-early) of a workspace, or shared by every workspace.
 // Recurring gigs pair one with a template. Reading needs view; changing needs the Recurring gigs
-// permission (a shared one: an instance admin).
+// permission (a shared one: Shared library, on the all-workspaces level).
 
 // ScheduleBody creates or replaces a schedule.
 type ScheduleBody struct {
@@ -46,13 +46,31 @@ func (a *API) schedule(ctx context.Context, p *access.Principal, id int64) (*sto
 	return s, nil
 }
 
-// sharedScheduleWrite: changing a shared schedule (instance admins) retimes errands too when some use it.
-func sharedScheduleWrite(p *access.Principal, s *store.Schedule) error {
-	if err := sharedWrite(p, "gigs:write"); err != nil {
+// sharedScheduleWrite: a shared schedule is made, changed and deleted with Shared library (sharedWrite).
+func sharedScheduleWrite(p *access.Principal) error { return sharedWrite(p) }
+
+// retimeGuards: retiming a schedule retimes every recurring gig and errand on it, so an always-run
+// recurring gig (or one with a tool allowlist) on it needs those permissions, as editing that recurring
+// gig would, and a no-sandbox errand on it needs No-sandbox errands. ws 0 (a shared schedule): on the
+// all-workspaces level.
+func (a *API) retimeGuards(ctx context.Context, p *access.Principal, ws int64, s *store.Schedule) error {
+	always, tools, err := store.ScheduleGuards(ctx, a.st.R, s.ID)
+	if err != nil {
 		return err
 	}
-	if s != nil && s.ErrandUses > 0 {
-		return need(p, "errands:write")
+	if err := alwaysRunGuard(p, ws, always); err != nil {
+		return err
+	}
+	if err := toolsGuard(p, ws, tools); err != nil {
+		return err
+	}
+	if s.ErrandUses == 0 {
+		return nil
+	}
+	if n, err := store.UnsandboxedErrandUses(ctx, a.st.R, s.ID); err != nil {
+		return err
+	} else if n > 0 && !p.Allowed(ws, "errand_unsandboxed") {
+		return errForbidden("An errand without the sandbox uses this schedule: changing it needs No-sandbox errands.")
 	}
 	return nil
 }
@@ -169,14 +187,14 @@ func (a *API) registerSchedules() {
 		return out, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "create-shared-schedule", Method: "POST", Path: "/shared/schedules", Tags: []string{"recurrence"},
-		Summary: "Make a shared schedule (instance admins)", DefaultStatus: 201}, func(ctx context.Context, in *struct {
+		Summary: "Make a shared schedule (Shared library, on the all-workspaces level)", DefaultStatus: 201}, func(ctx context.Context, in *struct {
 		Body ScheduleBody
 	}) (*scheduleOut, error) {
 		p, err := me(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if err := sharedScheduleWrite(p, nil); err != nil {
+		if err := sharedScheduleWrite(p); err != nil {
 			return nil, err
 		}
 		s := &store.Schedule{}
@@ -223,7 +241,10 @@ func (a *API) registerSchedules() {
 			return nil, err
 		}
 		if s.Shared {
-			if err := sharedScheduleWrite(p, s); err != nil {
+			if err := sharedScheduleWrite(p); err != nil {
+				return nil, err
+			}
+			if err := a.retimeGuards(ctx, p, 0, s); err != nil {
 				return nil, err
 			}
 			v, err := ifMatch(in.IfMatch)
@@ -249,30 +270,13 @@ func (a *API) registerSchedules() {
 		if a.scheduleUsedOutside(ctx, p, s.WorkspaceID, s.ID) {
 			return nil, errForbidden("This schedule is used outside the projects this key reaches.")
 		}
-		// retiming a schedule retimes every recurring gig on it: an always-run one (or one with a tool
-		// allowlist) needs those permissions, as editing that recurring gig would
-		always, tools, err := store.ScheduleGuards(ctx, a.st.R, s.ID)
-		if err != nil {
-			return nil, err
-		}
-		if err := alwaysRunGuard(p, s.WorkspaceID, always); err != nil {
-			return nil, err
-		}
-		if err := toolsGuard(p, s.WorkspaceID, tools); err != nil {
-			return nil, err
-		}
 		if s.ErrandUses > 0 { // retiming a schedule retimes its errands too
 			if err := require(p, s.WorkspaceID, "errands", "errands:write"); err != nil {
 				return nil, err
 			}
-			// ... and when a no-sandbox errand uses it, that's deciding when a no-sandbox command runs
-			if n, err := store.UnsandboxedErrandUses(ctx, a.st.R, s.ID); err != nil {
-				return nil, err
-			} else if n > 0 {
-				if err := require(p, s.WorkspaceID, "errand_unsandboxed", "errands:write"); err != nil {
-					return nil, errForbidden("An errand without the sandbox uses this schedule: changing it needs No-sandbox errands.")
-				}
-			}
+		}
+		if err := a.retimeGuards(ctx, p, s.WorkspaceID, s); err != nil {
+			return nil, err
 		}
 		v, err := ifMatch(in.IfMatch)
 		if err != nil {
@@ -302,7 +306,7 @@ func (a *API) registerSchedules() {
 			return nil, err
 		}
 		if s.Shared {
-			if err := sharedScheduleWrite(p, s); err != nil {
+			if err := sharedScheduleWrite(p); err != nil {
 				return nil, err
 			}
 		} else if err := require(p, s.WorkspaceID, "recurring_gigs", "gigs:write"); err != nil {

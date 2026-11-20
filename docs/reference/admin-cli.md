@@ -184,7 +184,8 @@ Allows or denies permissions on the user's rule for one workspace or project, th
 `each` rule they have, and keeps the rest of it (preset and other overrides); `access` replaces a rule
 as a whole. The user needs that rule first (`member` or `access`). The most specific rule wins, so a
 deny meant for the user everywhere goes on `each`. On a project rule, the permissions a project can't
-hold are skipped.
+hold are skipped, and so is `shared_library` on a workspace's or project's rule (only the `all` rule
+holds it).
 
 ```sh
 # let the agent scout manage its own errands in its workspace

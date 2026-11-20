@@ -145,13 +145,14 @@ func (a *API) errandRefs(ctx context.Context, p *access.Principal, ws, template,
 	return nil
 }
 
-// sharedErrandEdit: a shared errand template is saved by an instance admin (who holds every permission,
-// No-sandbox errands included) whose key has errands:write.
+// sharedErrandEdit: a shared errand template is saved by a holder of Shared library (sharedWrite); what
+// else they may do to it (no sandbox, timeouts, output) is their permissions on the all-workspaces level.
 func sharedErrandEdit(p *access.Principal) (store.ErrandEdit, error) {
-	if err := sharedWrite(p, "errands:write"); err != nil {
+	if err := sharedWrite(p); err != nil {
 		return store.ErrandEdit{}, err
 	}
-	return store.ErrandEdit{CanUnsandbox: true, CanManage: true, CanTimeout: true}, nil
+	return store.ErrandEdit{CanUnsandbox: p.Allowed(0, "errand_unsandboxed"), CanManage: p.Allowed(0, access.Manager),
+		CanTimeout: p.Allowed(0, "run_timeout")}, nil
 }
 
 // errandWorker resolves the worker: yourself by default; another user only with Manage the workspace.
@@ -727,7 +728,7 @@ func (a *API) registerErrands() {
 		return out, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "create-shared-errand-template", Method: "POST", Path: "/shared/errand-templates", Tags: []string{"errands"},
-		Summary: "Make a shared errand template (instance admins)", DefaultStatus: 201}, func(ctx context.Context, in *struct {
+		Summary: "Make a shared errand template (Shared library, on the all-workspaces level)", DefaultStatus: 201}, func(ctx context.Context, in *struct {
 		Body ErrandTemplateBody
 	}) (*errandTemplateOut, error) {
 		p, err := me(ctx)

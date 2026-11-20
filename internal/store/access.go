@@ -34,28 +34,31 @@ type Permission struct {
 	Description string `json:"description"`
 	Section     string `json:"section"`
 	Project     bool   `json:"project"` // can be given per project (see ProjectPermissions)
+	// AllWorkspaces: decided only on the all-workspaces level (see AllWorkspacesPermissions)
+	AllWorkspaces bool `json:"all_workspaces,omitempty"`
 }
 
 // Permissions, in display order.
 var Permissions = []Permission{
-	{"view", "See the workspace", "See the workspace, its projects, gigs, comments and runs. Every other permission needs it.", "Basics", false},
-	{"comment", "Comment", "Write comments and edit or delete your own.", "Basics", false},
-	{"work_gigs", "Work on gigs", "Move gigs between statuses of their project, tick checklist items, ask for a resume; claim gigs assigned to you and report runs (agents).", "Gigs", false},
-	{"edit_gigs", "Edit gigs", "Change and assign gigs: title, description, dates, labels, run settings, checklist items and dependencies; move them to another project.", "Gigs", false},
-	{"create_gigs", "Create gigs", "Create one-off gigs, clone gigs, and create gigs from templates (with Edit gigs).", "Gigs", false},
-	{"delete_gigs", "Delete gigs", "Move gigs to the trash and restore them (with Edit gigs).", "Gigs", false},
-	{"archive_gigs", "Archive gigs", "Archive and unarchive gigs (with Edit gigs).", "Gigs", false},
-	{"always_run", "Always-run gigs", "Mark gigs to run whatever the usage budget (cron-like gigs). The gig cap and pauses still apply.", "Runner", false},
-	{"run_timeout", "Run timeouts", "Set how long an agent may run on a gig (templates and recurring gigs too) or how long an errand may run, instead of the default. The agent's host caps it.", "Runner", false},
-	{"allowed_tools", "Gig tool allowlists", "Give gigs (templates, recurring gigs) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change gigs that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner", false},
-	{"errands", "Errands", "Create, change, pause and delete errands (commands an agent's executor runs on a schedule, sandboxed); in a whole workspace, its errand templates too. Given for one project: that project's errands, and changing one's command never changes other errands' template. An errand's worker is yourself, or any agent with Manage the workspace.", "Runner", false},
-	{"errand_unsandboxed", "No-sandbox errands", "Let an errand run outside its agent's sandbox. Any change to such an errand by someone without this permission turns its sandbox back on.", "Runner", false},
-	{"pause_runs", "Pause gig runs", "Pause and resume new agent gig runs and errand runs; with an all-workspaces rule, every workspace at once. Changing the caps stays with admins.", "Runner", false},
-	{"recurring_gigs", "Recurring gigs", "Create, change, pause and stop recurring gigs (with Edit gigs; they make gigs with Create gigs).", "Planning", false},
-	{"templates", "Gig templates", "Create, change and delete gig templates, with Edit gigs (using one only needs Create gigs).", "Planning", false},
-	{"custom_fields", "Custom fields", "Define the workspace's custom fields.", "Planning", false},
-	{"saved_filters", "Saved filters", "Save personal filtered views.", "Planning", false},
-	{"manage_workspace", "Manage the workspace", "Projects, columns, sections and labels, and other people's comments.", "Admin", false},
+	{"view", "See the workspace", "See the workspace, its projects, gigs, comments and runs. Every other permission needs it.", "Basics", false, false},
+	{"comment", "Comment", "Write comments and edit or delete your own.", "Basics", false, false},
+	{"work_gigs", "Work on gigs", "Move gigs between statuses of their project, tick checklist items, ask for a resume; claim gigs assigned to you and report runs (agents).", "Gigs", false, false},
+	{"edit_gigs", "Edit gigs", "Change and assign gigs: title, description, dates, labels, run settings, checklist items and dependencies; move them to another project.", "Gigs", false, false},
+	{"create_gigs", "Create gigs", "Create one-off gigs, clone gigs, and create gigs from templates (with Edit gigs).", "Gigs", false, false},
+	{"delete_gigs", "Delete gigs", "Move gigs to the trash and restore them (with Edit gigs).", "Gigs", false, false},
+	{"archive_gigs", "Archive gigs", "Archive and unarchive gigs (with Edit gigs).", "Gigs", false, false},
+	{"always_run", "Always-run gigs", "Mark gigs to run whatever the usage budget (cron-like gigs). The gig cap and pauses still apply.", "Runner", false, false},
+	{"run_timeout", "Run timeouts", "Set how long an agent may run on a gig (templates and recurring gigs too) or how long an errand may run, instead of the default. The agent's host caps it.", "Runner", false, false},
+	{"allowed_tools", "Gig tool allowlists", "Give gigs (templates, recurring gigs) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change gigs that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner", false, false},
+	{"errands", "Errands", "Create, change, pause and delete errands (commands an agent's executor runs on a schedule, sandboxed); in a whole workspace, its errand templates too. Given for one project: that project's errands, and changing one's command never changes other errands' template. An errand's worker is yourself, or any agent with Manage the workspace.", "Runner", false, false},
+	{"errand_unsandboxed", "No-sandbox errands", "Let an errand run outside its agent's sandbox. Any change to such an errand by someone without this permission turns its sandbox back on.", "Runner", false, false},
+	{"pause_runs", "Pause gig runs", "Pause and resume new agent gig runs and errand runs; with an all-workspaces rule, every workspace at once. Changing the caps stays with admins.", "Runner", false, false},
+	{"recurring_gigs", "Recurring gigs", "Create, change, pause and stop recurring gigs (with Edit gigs; they make gigs with Create gigs).", "Planning", false, false},
+	{"templates", "Gig templates", "Create, change and delete gig templates, with Edit gigs (using one only needs Create gigs).", "Planning", false, false},
+	{"shared_library", "Shared library", "Make, change and delete the shared gig templates, schedules and errand templates every workspace can use. Only on an all-workspaces rule, for someone who sees every workspace; the settings with a permission of their own (always-run, tool allowlists, run timeouts, no-sandbox errands) also need it on the all-workspaces rule.", "Planning", false, false},
+	{"custom_fields", "Custom fields", "Define the workspace's custom fields.", "Planning", false, false},
+	{"saved_filters", "Saved filters", "Save personal filtered views.", "Planning", false, false},
+	{"manage_workspace", "Manage the workspace", "Projects, columns, sections and labels, and other people's comments.", "Admin", false, false},
 }
 
 // ProjectPermissions are the permissions a project rule can hold: what can be done to the gigs and
@@ -68,9 +71,20 @@ var ProjectRoles = []string{"viewer", "consumer", "member"}
 // IsProjectPermission reports a permission that can be decided per project.
 func IsProjectPermission(name string) bool { return slices.Contains(ProjectPermissions, name) }
 
+// AllWorkspacesPermissions are about things that belong to no workspace (the shared library): only
+// an all-workspaces rule (a user's or a group's) holds them, they need "view" on that level and in
+// every workspace, and no preset includes them. Asked about one workspace, they're never held.
+var AllWorkspacesPermissions = []string{"shared_library"}
+
+// IsAllWorkspacesPermission reports a permission decided only on the all-workspaces level.
+func IsAllWorkspacesPermission(name string) bool {
+	return slices.Contains(AllWorkspacesPermissions, name)
+}
+
 func init() {
 	for i := range Permissions {
 		Permissions[i].Project = IsProjectPermission(Permissions[i].Name)
+		Permissions[i].AllWorkspaces = IsAllWorkspacesPermission(Permissions[i].Name)
 	}
 }
 
@@ -166,7 +180,7 @@ func RulesOfGroup(ctx context.Context, q Q, group int64) ([]*AccessRule, error) 
 type Decision struct {
 	Name    string `json:"name"`
 	Allowed bool   `json:"allowed"`
-	Source  string `json:"source"`          // admin | user_project | user | user_all | group_project | group | group_all | needs_view | default
+	Source  string `json:"source"`          // admin | user_project | user | user_all | group_project | group | group_all | needs_view | all_workspaces | default
 	Group   string `json:"group,omitempty"` // the deciding group
 }
 
@@ -324,9 +338,20 @@ func (g *Grants) Decide(ws int64, perm string) Decision { return g.DecideIn(ws, 
 // DecideIn answers one permission in one project of a workspace (project 0: the workspace as a
 // whole), with its source.
 func (g *Grants) DecideIn(ws, project int64, perm string) Decision {
+	global := IsAllWorkspacesPermission(perm) && !g.Admin
+	if global && ws != 0 {
+		return Decision{Name: perm, Source: "all_workspaces"} // decided on the all-workspaces level only
+	}
 	d := g.raw(ws, project, perm)
 	if perm != "view" && d.Allowed && !g.raw(ws, project, "view").Allowed {
 		return Decision{Name: perm, Source: "needs_view"}
+	}
+	if global && d.Allowed {
+		for _, w := range g.workspaces { // it reaches every workspace: so must the holder's view
+			if !g.Has(w, "view") {
+				return Decision{Name: perm, Source: "needs_view"}
+			}
+		}
 	}
 	return d
 }
@@ -643,6 +668,13 @@ func SetRule(ctx context.Context, q Q, a Actor, subject string, id int64, ws, pr
 		for name := range overrides {
 			if !IsProjectPermission(name) {
 				return Invalid("%q is about the whole workspace; a project rule can't hold it", name)
+			}
+		}
+	}
+	if ws != nil {
+		for name := range overrides {
+			if IsAllWorkspacesPermission(name) {
+				return Invalid("%q is decided for all workspaces; only an all-workspaces rule can hold it", name)
 			}
 		}
 	}

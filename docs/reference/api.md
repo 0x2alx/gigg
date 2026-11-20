@@ -88,6 +88,7 @@ permission in the workspace (see [access.md](access.md#api-keys-scopes-and-permi
 | `errands:output` | Reading an errand run's output tail (with `errands:read`). |
 | `errands:write` | Making, changing, pausing, running now and deleting errands and errand templates (with the `errands` permission). |
 | `errands:run` | An agent's errand executor: claiming its own due runs and reporting them. |
+| `library:write` | Making, changing and deleting the shared library: shared gig templates, schedules and errand templates (with the `shared_library` permission, on a key not limited to some places; admin keys need it too). |
 | `profile:write` | Your own profile, themes and picture. |
 | `keys:self` | Managing keys that act as yourself. |
 | `admin:workspaces` | Creating workspaces; archiving them and setting owners; runner caps; pausing any workspace. |

@@ -4,7 +4,7 @@
 // On a phone the pages are icons and the two New buttons fold into one "+" menu.
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { api, ApiError, canWriteIn, errandMakers, gigChoices, hasCap } from "./api";
+import { api, ApiError, canShare, canWriteIn, errandMakers, gigChoices, hasCap } from "./api";
 import { useApp } from "./App";
 import { TopBell } from "./Bell";
 import { badgeCount } from "./notifications";
@@ -167,7 +167,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
   // the board's tools open on the board (the projects in view, or every project from another page)
   const onBoard = loc === "/board" || loc.startsWith("/board/");
   const tool = (t: string) => (onBoard ? withParam(loc, search, "tool", t) : `/board?tool=${t}`);
-  const anyTemplates = tree.some((w) => hasCap(me, "templates", w.id));
+  const anyTemplates = canShare(me) || tree.some((w) => hasCap(me, "templates", w.id));
   const anyArchive = tree.some((w) => w.projects.some((p) => canWriteIn(w, p.id) && hasCap(me, "archive_gigs", w.id, p.id)));
   const name = me.user.display_name || me.user.username;
 

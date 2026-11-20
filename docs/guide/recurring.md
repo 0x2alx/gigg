@@ -30,14 +30,14 @@ You can also pick an existing **template** and an existing **schedule** in the s
 
 ## Shared templates and schedules
 
-Instance admins can make a template or a schedule **shared**: it belongs to no workspace and every workspace sees it, marked **Shared**, in the lists and in the template and schedule pickers. Only admins change or delete it.
+Holders of the **Shared library** permission (given on an all-workspaces rule; instance admins hold it) can make a template or a schedule **shared**: it belongs to no workspace and every workspace sees it, marked **Shared**, in the lists and in the template and schedule pickers. Only they change or delete it (see [access.md](../reference/access.md#the-shared-library)).
 
-- A new template's **Scope** row (admins only) chooses **This workspace** or **Shared: every workspace**. A shared template is for any project and has no assignees or custom field values: those belong to each workspace.
-- A new schedule's **Workspace** list offers **Shared: every workspace** to admins.
+- A new template's **Scope** row (Shared library only) chooses **This workspace** or **Shared: every workspace**. A shared template is for any project and has no assignees or custom field values: those belong to each workspace.
+- A new schedule's **Workspace** list offers **Shared: every workspace** with Shared library.
 - A recurring gig on a shared template picks its own assignees (the workspace's owner when you pick nobody). Changing anything else (title, checklist, run settings...) gives that recurring gig its own copy of the template in its workspace; the shared one stays as it is.
 - Likewise, new timing on a recurring gig that uses a shared schedule moves it to a schedule of its own workspace.
 - Before such a save, gigg asks: **Leave the shared library?** names what the recurring gig leaves. **Save anyway** makes the copies; **Cancel** goes back to the form as you left it.
-- Editing a shared template or schedule (admins) changes it for every recurring gig that uses it, in every workspace.
+- Editing a shared template or schedule (Shared library) changes it for every recurring gig that uses it, in every workspace.
 
 ## Templates
 

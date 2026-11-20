@@ -151,7 +151,7 @@ export const SCOPE_GROUPS: { name: string; scopes: string[] }[] = [
   { name: "Read", scopes: ["workspace:read", "gigs:read", "comments:read", "errands:read", "errands:output"] },
   {
     name: "Write",
-    scopes: ["workspace:write", "gigs:work", "gigs:write", "gigs:delete", "comments:write", "runs:write", "projects:write", "profile:write", "keys:self", "errands:write", "errands:run"],
+    scopes: ["workspace:write", "gigs:work", "gigs:write", "gigs:delete", "comments:write", "runs:write", "projects:write", "profile:write", "keys:self", "errands:write", "errands:run", "library:write"],
   },
   {
     name: "Admin",

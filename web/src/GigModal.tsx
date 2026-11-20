@@ -7,7 +7,7 @@
 import { launch } from "./Launch";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { runBody, runFrom, type RunSettings } from "./runsettings";
-import { api, ApiError, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isGigSchedule, type GigSchedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubgig } from "./api";
+import { api, ApiError, canShare, hasAllCap, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isGigSchedule, type GigSchedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubgig } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { assignable } from "./fields";
 import { cleanCustom, normSubs, sameAsTemplate } from "./items";
@@ -46,8 +46,10 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const [known, setKnown] = useState<Tag[]>(labels);
   const [tplName, setTplName] = useState(tpl?.name ?? "");
   const [tplAnyProject, setTplAnyProject] = useState(tpl ? tpl.project_id === null : false);
-  // a shared template (every workspace's): instance admins choose it for a new one; an existing one keeps its scope
-  const [shared, setShared] = useState(!!tpl?.shared);
+  // a shared template (every workspace's): holders of Shared library choose it for a new one; an existing one keeps its scope
+  // shareOnly: a new template by someone who may make shared ones but none in any workspace (no choices)
+  const shareOnly = tplMode && !tpl && choices?.length === 0 && canShare(me);
+  const [shared, setShared] = useState(!!tpl?.shared || shareOnly);
   const [checklist, setChecklist] = useState<string[]>(schedule?.checklist ?? tpl?.checklist ?? []);
   // bumped when a picked template fills the checklist, so its section opens to show the items
   const [checklistFilled, setChecklistFilled] = useState(0);
@@ -428,9 +430,11 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   };
   const canRelations = hasCap(me, "edit_gigs", ws.id, project ?? undefined);
   const single = !tplMode && !editing && !repeating; // one gig, made now
-  const alwaysOk = hasCap(me, "always_run", ws.id);
+  // a shared template's run settings are asked on the all-workspaces level, like the template itself
+  const runCap = (c: string) => (tplMode && shared ? hasAllCap(me, c) : hasCap(me, c, ws.id));
+  const alwaysOk = runCap("always_run");
   // without Run timeouts: an edit keeps the timeout as it is; a new item may only drop the one it got
-  const timeoutLock = hasCap(me, "run_timeout", ws.id) ? undefined : editing || tpl ? "all" : "clear";
+  const timeoutLock = runCap("run_timeout") ? undefined : editing || tpl ? "all" : "clear";
   const mode: EditorMode = tplMode ? "template" : repeating || editing ? "recurring" : "new";
   return (
     <Modal title={heading} onClose={guardedClose} wide expandable help={<HelpButton topic={repeating || editing ? "recurring" : "gigs"} label={repeating || editing ? "Help: recurring gigs" : "Help: gigs"} />}>
@@ -465,7 +469,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           places={!editing && !tpl ? places : undefined}
           onWorkspace={moveWs}
           anyProject={tplMode ? { on: tplAnyProject, set: setTplAnyProject } : undefined}
-          shared={tplMode && (me.admin || shared) ? { on: shared, set: me.admin && !tpl ? setShared : undefined } : undefined}
+          shared={tplMode && (canShare(me) || shared) ? { on: shared, set: canShare(me) && !tpl && !shareOnly ? setShared : undefined } : undefined}
           projectLocked={editing}
           statuses={!repeating && !tplMode ? projectStatuses : undefined}
           statusBusy={!statusReady && !statusErr}
@@ -474,7 +478,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           candidates={candidates}
           alwaysLocked={!alwaysOk && !run.always_run}
           timeoutLock={timeoutLock}
-          canTools={hasCap(me, "allowed_tools", ws.id)}
+          canTools={runCap("allowed_tools")}
           head={
             <>
               {(tplMode || templates.length > 0) && (
@@ -626,7 +630,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
               <li key={d}>{d}.</li>
             ))}
           </ul>
-          <p className="muted small">Later changes an admin makes to the shared one won't reach it. The shared one and the other workspaces stay as they are.</p>
+          <p className="muted small">Later changes to the shared one won't reach it. The shared one and the other workspaces stay as they are.</p>
         </ConfirmModal>
       )}
     </Modal>

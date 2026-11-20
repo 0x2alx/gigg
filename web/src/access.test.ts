@@ -33,6 +33,8 @@ describe("rules", () => {
     expect(sourceText({ source: "group", group: "agents" })).toBe("group agents, this workspace");
     expect(sourceText({ source: "needs_view" })).toBe("can't see the workspace");
     expect(sourceText({ source: "default" })).toBe("no rule: off");
+    expect(sourceText({ source: "all_workspaces" })).toBe("set on All workspaces");
+    expect(sourceText({ source: "needs_view" }, true)).toBe("doesn't see every workspace");
     expect(triLabel(null, "Preset ✓")).toBe("Preset ✓");
   });
   it("groups permissions by section", () => {

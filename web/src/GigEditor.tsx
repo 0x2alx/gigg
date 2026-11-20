@@ -61,7 +61,7 @@ export function GigEditor(p: {
   places?: WorkspaceTree[]; // a new gig may move to these workspaces
   onWorkspace?: (id: number) => void;
   anyProject?: { on: boolean; set: (on: boolean) => void }; // a template may be for any project
-  // a template shared by every workspace (instance admins): set given = the scope can still be chosen.
+  // a template shared by every workspace (Shared library): set given = the scope can still be chosen.
   // Shared: no workspace, any project, no assignees (each recurring gig names its own)
   shared?: { on: boolean; set?: (on: boolean) => void };
   projectLocked?: boolean;
@@ -119,7 +119,7 @@ export function GigEditor(p: {
         <div className="tp-props">
           <PropGroup icon="layers" title="Where">
             {p.shared && (
-              <Row tip="A shared template is offered in every workspace; only instance admins change it" label="Scope">
+              <Row tip="A shared template is offered in every workspace; it is changed with the Shared library permission" label="Scope">
                 {p.shared.set ? (
                   <select value={p.shared.on ? "shared" : "ws"} onChange={(e) => p.shared!.set!(e.target.value === "shared")} aria-label="Scope">
                     <option value="ws">This workspace</option>

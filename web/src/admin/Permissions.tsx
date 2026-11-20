@@ -103,7 +103,9 @@ function RuleEditor({ info, rule, level, decisions, busy, onSet, who }: {
   const dec = new Map((decisions ?? []).map((d) => [d.name, d]));
   // a project's rule holds the gig permissions only (an older server marks none: show them all)
   const marked = info.permissions.some((p) => p.project);
-  const perms = project && marked ? info.permissions.filter((p) => p.project) : info.permissions;
+  // a workspace's or a project's rule never holds the all-workspaces ones (the shared library)
+  const levelPerms = ws === null ? info.permissions : info.permissions.filter((p) => !p.all_workspaces);
+  const perms = project && marked ? levelPerms.filter((p) => p.project) : levelPerms;
   const roles = project ? info.roles.filter((r) => PROJECT_PRESETS.includes(r)) : info.roles;
   return (
     <div className="acc-editor">
@@ -137,7 +139,7 @@ function RuleEditor({ info, rule, level, decisions, busy, onSet, who }: {
                     <span className="muted small perm-desc">{project && p.name === "view" ? "See this project: its gigs, comments, runs and errands (and its workspace's name). Every other permission here needs it." : p.description}</span>
                   </span>
                   {d && <Effective allowed={d.allowed} blocked={NEEDS_EDIT.has(p.name) && dec.get("edit_gigs")?.allowed === false ? "Edit gigs" : undefined} />}
-                  {d && <span className={"pill perm-src perm-src-" + d.source}>{sourceText(d)}</span>}
+                  {d && <span className={"pill perm-src perm-src-" + d.source}>{sourceText(d, !!p.all_workspaces)}</span>}
                   <span className="grow" />
                   <TriState
                     label={`${p.label} for ${who}`}

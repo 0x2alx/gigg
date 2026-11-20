@@ -3,6 +3,16 @@
 ## Unreleased
 
 - Board cards: an amber bolt pill marks an Always run gig (also in the gig panel), and the robot badge on a card now shows for any gig with an agent run, its tooltip giving the last run's outcome, the worker and when.
+- Shared library permission: the shared gig templates, schedules and errand templates no longer need
+  an instance admin. The new `shared_library` permission (Planning) makes, changes and deletes them; it
+  counts only on an all-workspaces rule (a workspace or project rule can't hold it), needs view on that
+  level and in every workspace, and is in no preset. The run settings inside a shared item
+  (always-run, tool allowlists, run timeouts, no-sandbox) need their own permission on the
+  all-workspaces level too. Keys need the new `library:write` scope and must not be limited to some
+  places; existing unlimited admin keys with `gigs:write` or `errands:write` get it in migration 0019.
+  `/auth/me` lists `all_workspaces` (the permissions held on that level); the permissions editor shows
+  Shared library only on **All workspaces**, and the Shared toggles, edit buttons and **Shared
+  templates** follow the permission instead of the admin flag.
 - Followers: anyone who can see a gig can follow it (**Follow** at the top of the gig panel, or named in
   its **Followers** in the gig form, the API and MCP), and gets its bells as its assignees do. A gig's
   bells go to its assignees and followers, no longer to its creator as such: you follow the gigs you

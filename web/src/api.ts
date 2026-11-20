@@ -55,6 +55,7 @@ export interface Me {
   admin: boolean;
   workspaces: WorkspaceAccess[];
   capabilities?: string[]; // permissions held in at least one workspace
+  all_workspaces?: string[]; // permissions held on the all-workspaces level (what the shared library asks)
   remote_fonts?: boolean; // the server allows Google Fonts (GIGG_REMOTE_FONTS)
   version?: string;
   source_url?: string; // this server's source code (AGPL-3.0 §13; GIGG_SOURCE_URL)
@@ -74,6 +75,16 @@ export function hasCap(me: Pick<Me, "capabilities" | "workspaces" | "admin"> | n
   }
   return !me.capabilities || me.capabilities.includes(cap);
 }
+
+// hasAllCap: a permission on the all-workspaces level, which is what the shared library (shared
+// templates, schedules, errand templates) asks for. An older server without the list: admins only.
+export function hasAllCap(me: Pick<Me, "admin" | "all_workspaces"> | null | undefined, cap: string): boolean {
+  if (!me) return false;
+  return me.admin || !!me.all_workspaces?.includes(cap);
+}
+
+// canShare: may make, change and delete shared templates, schedules and errand templates.
+export const canShare = (me: Pick<Me, "admin" | "all_workspaces"> | null | undefined) => hasAllCap(me, "shared_library");
 
 // The permissions a project's rules can decide; the rest are the whole workspace's.
 export const PROJECT_PERMISSIONS = new Set(["view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "errands"]);
