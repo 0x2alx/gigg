@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -92,5 +93,37 @@ func addRunnerTools(s *mcp.Server, p *access.Principal, call apiCall) {
 				return bad, nil, nil
 			}
 			return toolResult(call("POST", "/runner/resume", nil, PauseBody{Workspaces: ws, Gigs: in.Gigs, Errands: in.Errands}))
+		})
+}
+
+type metricsArgs struct {
+	From       string `json:"from,omitempty" jsonschema:"First day, YYYY-MM-DD in tz (default: 29 days before to)"`
+	To         string `json:"to,omitempty" jsonschema:"Last day included, YYYY-MM-DD in tz (default: today)"`
+	Bucket     string `json:"bucket,omitempty" jsonschema:"day (default), week (Monday first) or month"`
+	TZ         string `json:"tz,omitempty" jsonschema:"IANA time zone that cuts the days (default: your time zone preference, else the instance default)"`
+	Workspace  string `json:"workspace,omitempty" jsonschema:"Only this workspace (id or slug)"`
+	Project    int64  `json:"project,omitempty" jsonschema:"Only this project (id)"`
+	Assignee   string `json:"assignee,omitempty" jsonschema:"A user, id or @username. Gigs: assigned to them. Runs and errand runs: done by them"`
+	WorkerKind string `json:"worker_kind,omitempty" jsonschema:"human or agent: the same, for every user of that kind"`
+}
+
+// addMetricsTool: get_metrics reads GET /metrics (the same scoping as every read: your workspaces and projects).
+func addMetricsTool(s *mcp.Server, p *access.Principal, call apiCall) {
+	if !p.HasScope("gigs:read") {
+		return
+	}
+	mcp.AddTool(s, &mcp.Tool{Name: "get_metrics", Description: "Numbers per day, week or month over a range of up to 400 days: gigs created, done, cancelled and archived, median time from created to done, agent runs by outcome with duration, cost (USD) and tokens (and by agent, model and project), errand runs and failures, recurring gigs on time vs missed. Only what you may see counts.", Annotations: ro("Get metrics")},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in metricsArgs) (*mcp.CallToolResult, any, error) {
+			q := url.Values{}
+			for k, v := range map[string]string{"from": in.From, "to": in.To, "bucket": in.Bucket, "tz": in.TZ, "workspace": in.Workspace,
+				"assignee": in.Assignee, "worker_kind": in.WorkerKind} {
+				if v != "" {
+					q.Set(k, v)
+				}
+			}
+			if in.Project != 0 {
+				q.Set("project", strconv.FormatInt(in.Project, 10))
+			}
+			return toolResult(call("GET", "/metrics", q, nil))
 		})
 }

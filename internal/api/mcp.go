@@ -694,6 +694,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 	}
 	addItemTools(s, p, call, ws)
 	addRunnerTools(s, p, call)
+	addMetricsTool(s, p, call)
 	addErrandTools(s, p, call, ws)
 	return s
 }
