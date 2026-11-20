@@ -96,12 +96,13 @@ func uniqIDs(ids []int64) []int64 {
 	return out
 }
 
-// whoSee keeps the users who can see project (0: the whole workspace) of ws, sorted, at most max.
-// For lists copied from a template, where someone may have lost access since.
+// whoSee keeps the users who can see project (0: the whole workspace) of ws, sorted, at most max:
+// for lists copied from a template or another gig, where someone may have lost access (or been
+// disabled) since. The same check setFollowers makes, so a copied list never fails a create.
 func whoSee(ctx context.Context, q Q, ws, project int64, ids []int64, max int) []int64 {
 	out := []int64{}
 	for _, u := range uniqIDs(ids) {
-		if _, g, err := UserGrants(ctx, q, u); err == nil && g.HasIn(ws, project, "view") {
+		if UserHasIn(ctx, q, u, ws, project, "view") {
 			out = append(out, u)
 		}
 	}
@@ -112,7 +113,8 @@ func whoSee(ctx context.Context, q Q, ws, project int64, ids []int64, max int) [
 	return out
 }
 
-// setFollowers replaces a gig's followers (nil: unchanged). Each must be able to see the gig.
+// setFollowers replaces a gig's followers (nil: unchanged). Each one added must be able to see the
+// gig; one already following who since lost access may stay in the list sent back (the bell skips them).
 func setFollowers(ctx context.Context, q Q, ws, project, gig int64, users []int64) error {
 	if users == nil {
 		return nil
@@ -121,11 +123,25 @@ func setFollowers(ctx context.Context, q Q, ws, project, gig int64, users []int6
 	if len(uniq) > MaxFollowers {
 		return Invalid("at most %d followers", MaxFollowers)
 	}
+	had := map[int64]bool{}
+	rows, err := q.QueryContext(ctx, `SELECT user_id FROM gig_followers WHERE gig_id = ?`, gig)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var u int64
+		if err := rows.Scan(&u); err != nil {
+			rows.Close()
+			return err
+		}
+		had[u] = true
+	}
+	rows.Close()
 	if _, err := q.ExecContext(ctx, `DELETE FROM gig_followers WHERE gig_id = ?`, gig); err != nil {
 		return err
 	}
 	for _, u := range uniq {
-		if !UserHasIn(ctx, q, u, ws, project, "view") {
+		if !had[u] && !UserHasIn(ctx, q, u, ws, project, "view") {
 			return Invalid("user %d can't see this project, so can't follow its gigs", u)
 		}
 		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_followers (gig_id, user_id) VALUES (?,?)`, gig, u); err != nil {
@@ -152,6 +168,10 @@ func FollowGig(ctx context.Context, q Q, a Actor, t *Gig, user int64, on bool) (
 			return nil, err
 		}
 	} else if _, err := q.ExecContext(ctx, `DELETE FROM gig_followers WHERE gig_id = ? AND user_id = ?`, t.ID, user); err != nil {
+		return nil, err
+	}
+	// updated_at (not the version: a follow never conflicts with someone's edit), so pollers see it
+	if _, err := q.ExecContext(ctx, `UPDATE gigs SET updated_at = ? WHERE id = ?`, Now(), t.ID); err != nil {
 		return nil, err
 	}
 	after, err := GetGig(ctx, q, t.ID)

@@ -720,9 +720,19 @@ func SetProjectMembership(ctx context.Context, q Q, a Actor, ws, project, user i
 	return SetRule(ctx, q, a, "user", user, &ws, &project, role, ov)
 }
 
-// dropUnseenAssignees removes assignees who can no longer see their gig's project.
+// dropUnseenAssignees removes assignees and followers who can no longer see their gig's project.
 func dropUnseenAssignees(ctx context.Context, q Q) error {
-	rows, err := q.QueryContext(ctx, `SELECT DISTINCT a.user_id, t.workspace_id, t.project_id FROM gig_assignees a JOIN gigs t ON t.id = a.gig_id`)
+	for _, table := range []string{"gig_assignees", "gig_followers"} {
+		if err := dropUnseen(ctx, q, table); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// dropUnseen: one table of (gig_id, user_id) pairs (gig_assignees or gig_followers).
+func dropUnseen(ctx context.Context, q Q, table string) error {
+	rows, err := q.QueryContext(ctx, `SELECT DISTINCT a.user_id, t.workspace_id, t.project_id FROM `+table+` a JOIN gigs t ON t.id = a.gig_id`)
 	if err != nil {
 		return err
 	}
@@ -749,7 +759,7 @@ func dropUnseenAssignees(ctx context.Context, q Q) error {
 		if g != nil && g.HasIn(p.ws, p.project, "view") {
 			continue
 		}
-		if _, err := q.ExecContext(ctx, `DELETE FROM gig_assignees WHERE user_id = ? AND gig_id IN (SELECT id FROM gigs WHERE project_id = ?)`, p.user, p.project); err != nil {
+		if _, err := q.ExecContext(ctx, `DELETE FROM `+table+` WHERE user_id = ? AND gig_id IN (SELECT id FROM gigs WHERE project_id = ?)`, p.user, p.project); err != nil {
 			return err
 		}
 	}

@@ -115,6 +115,10 @@ func TestFollowerWhoLosesViewHearsNothing(t *testing.T) {
 	f := newFollowFix(t)
 	g := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "private soon", Followers: []int64{f.bob.ID}})
 	f.tx(t, func(tx *sql.Tx) error { return SetMembership(f.ctx, tx, f.a, f.ws.ID, f.bob.ID, "") })
+	// losing access takes bob off the followers, as it does for assignees
+	if cur, err := GetGig(f.ctx, f.s.R, g.ID); err != nil || slices.Contains(cur.Followers, f.bob.ID) {
+		t.Fatalf("bob still follows after losing access: %v %v", cur.Followers, err)
+	}
 	f.run(t, g, Finish{Status: "needs_human", ReportMD: "Anyone?", CommentKind: "question"})
 	if b := f.bells(t, f.bob.ID, g.ID); len(b) != 0 {
 		t.Fatalf("a follower without view got %v", b)
@@ -230,4 +234,49 @@ func TestTemplateFollowersReachItsGigs(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+// A disabled follower in a template never fails a gig made from it, and the creator's own follow
+// never pushes a full list past the cap.
+func TestFollowerCopiesNeverFail(t *testing.T) {
+	f := newFollowFix(t)
+	var tpl *Template
+	f.tx(t, func(tx *sql.Tx) error {
+		var err error
+		tpl, err = SaveTemplate(f.ctx, tx, f.a, &Template{WorkspaceID: f.ws.ID, Name: "t", Title: "T", Followers: []int64{f.bob.ID}}, 0)
+		return err
+	})
+	disabled := true
+	f.tx(t, func(tx *sql.Tx) error {
+		_, err := PatchUser(f.ctx, tx, f.a, f.bob.ID, 0, UserPatch{Disabled: &disabled})
+		return err
+	})
+	var g *Gig
+	f.tx(t, func(tx *sql.Tx) error {
+		var err error
+		g, err = GigFromTemplate(f.ctx, tx, f.a, tpl, f.p1, nil, nil)
+		return err
+	})
+	if slices.Contains(g.Followers, f.bob.ID) {
+		t.Fatalf("a disabled follower was copied: %v", g.Followers)
+	}
+	// 50 named followers: the creator doesn't add a 51st
+	var many []int64
+	f.tx(t, func(tx *sql.Tx) error {
+		for i := 0; i < MaxFollowers; i++ {
+			u, err := CreateUser(f.ctx, tx, Actor{}, NewUser{Username: "v" + strconv.Itoa(i), Kind: "human"})
+			if err != nil {
+				return err
+			}
+			if err := SetMembership(f.ctx, tx, f.a, f.ws.ID, u.ID, "viewer"); err != nil {
+				return err
+			}
+			many = append(many, u.ID)
+		}
+		return nil
+	})
+	full := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "crowded", Followers: many})
+	if len(full.Followers) != MaxFollowers || slices.Contains(full.Followers, f.admin.ID) {
+		t.Fatalf("followers %d, creator in: %v", len(full.Followers), slices.Contains(full.Followers, f.admin.ID))
+	}
 }

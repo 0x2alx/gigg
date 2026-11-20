@@ -754,7 +754,8 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 		return nil, err
 	}
 	followers := slices.Clone(n.Followers)
-	if a.UserID != 0 && !slices.Contains(followers, a.UserID) && FollowsOwnGigs(ctx, q, a.UserID) && UserHasIn(ctx, q, a.UserID, p.WorkspaceID, p.ID, "view") {
+	if a.UserID != 0 && len(uniqIDs(followers)) < MaxFollowers && !slices.Contains(followers, a.UserID) && FollowsOwnGigs(ctx, q, a.UserID) &&
+		UserHasIn(ctx, q, a.UserID, p.WorkspaceID, p.ID, "view") {
 		followers = append(followers, a.UserID)
 	}
 	if err := setFollowers(ctx, q, p.WorkspaceID, p.ID, id, followers); err != nil {
