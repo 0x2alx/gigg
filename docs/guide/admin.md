@@ -40,3 +40,16 @@ The token is shown once, when the key is created or rotated.
 ## Audit
 
 Every change on the instance, newest first: who did it, through which key and listener, with the old and new values.
+
+What an entry records is the same for every object (gigs, workspaces, projects, statuses, labels, custom fields, schedules,
+templates, recurring gigs, errands and errand templates):
+
+- an **update**: each field that changed, with its old and new value, and nothing else (`priority: 0 → 3`); long text such
+  as descriptions is kept in full, old and new;
+- a **create**: every value the new object started with;
+- a **delete**: every value it had last.
+
+Errand commands are recorded too, with anything that looks like a secret (a `TOKEN=…` or `--password …`, an
+`Authorization` header, a password in a URL, a well-known token format) replaced by `[masked]`: the log can't be edited,
+so a secret pasted into a command would otherwise stay in it for good. A `$VARIABLE` that names a secret is kept. In a
+workspace's activity, errand entries show their content only to readers with `errands:read`.

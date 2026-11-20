@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Audit log: every object records the same thing. An update records each field that changed with its old
+  and new value (schedules, templates, recurring gigs, errands and errand templates recorded only a few
+  fields before; workspaces, projects and statuses only the new values), a create every initial value, a
+  delete the last values. One store helper diffs the object as read before and after the write, so new
+  fields are audited without more code. Errand commands are recorded old and new, with secrets masked.
+  **Admin → Audit** shows a change as `field: old → new`. In workspace activity, the change feed and live
+  events, errand entries carry their content only for readers with `errands:read`.
 - Cards: a gig a recurring gig made stands out: a glowing purple **Recurring** badge on its top
   line, and a purple-tinted card and border. The hue is the same in every theme, the strength follows
   the theme, and the badge text reads at 4.5:1 in every built-in theme. The small ↻ pill in the card's

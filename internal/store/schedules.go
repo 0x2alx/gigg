@@ -437,7 +437,7 @@ func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) 
 	if utf8.RuneCountInString(s.Name) > 80 {
 		return nil, Invalid("schedule name: 1-80 characters")
 	}
-	action := "schedule.updated"
+	var before *Schedule
 	if s.ID == 0 {
 		var n int
 		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM schedules WHERE workspace_id IS ? AND deleted_at IS NULL`, wsArg(s.WorkspaceID)).Scan(&n); err != nil {
@@ -453,12 +453,12 @@ func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) 
 			return nil, err
 		}
 		s.ID, _ = res.LastInsertId()
-		action = "schedule.created"
 	} else {
 		cur, err := GetSchedule(ctx, q, s.ID)
 		if err != nil {
 			return nil, err
 		}
+		before = cur
 		if expect != 0 && expect != cur.Version {
 			return nil, ErrVersion
 		}
@@ -479,10 +479,18 @@ func SaveSchedule(ctx context.Context, q Q, a Actor, s *Schedule, expect int64) 
 			}
 		}
 	}
-	if _, err := Activity(ctx, q, a, wsRef(s.WorkspaceID), nil, action, "schedule", s.ID, map[string]any{"name": s.Name, "shared": s.Shared || s.WorkspaceID == 0}); err != nil {
+	after, err := GetSchedule(ctx, q, s.ID)
+	if err != nil {
 		return nil, err
 	}
-	return GetSchedule(ctx, q, s.ID)
+	action, data := "schedule.created", AuditSnapshot("schedule", after, nil)
+	if before != nil {
+		action, data = "schedule.updated", AuditDiff("schedule", before, after)
+	}
+	if _, err := Activity(ctx, q, a, wsRef(s.WorkspaceID), nil, action, "schedule", s.ID, data); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 // rescheduleAll recomputes the next occurrence of every live recurring gig on a schedule.
@@ -543,7 +551,7 @@ func DeleteSchedule(ctx context.Context, q Q, a Actor, s *Schedule) error {
 	if _, err := q.ExecContext(ctx, `UPDATE schedules SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), s.ID); err != nil {
 		return err
 	}
-	_, err = Activity(ctx, q, a, wsRef(s.WorkspaceID), nil, "schedule.deleted", "schedule", s.ID, map[string]any{"name": s.Name, "shared": s.Shared})
+	_, err = Activity(ctx, q, a, wsRef(s.WorkspaceID), nil, "schedule.deleted", "schedule", s.ID, AuditSnapshot("schedule", s, nil))
 	return err
 }
 

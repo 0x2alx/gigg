@@ -169,6 +169,30 @@ func TestFeedPermissions(t *testing.T) {
 			t.Fatal("comment.deleted missing")
 		}
 	}
+	// errand entries carry their commands: only readers with errands:read see their content
+	code, out, _ = e.req("POST", fmt.Sprintf("/workspaces/%d/errands", e.ids["scout.ws"]),
+		`{"name":"marker","command":"echo errand-cmd-marker","worker":"scout","rule":{"freq":"hours","tz":"UTC"}}`, e.ada())
+	e.ok(code, out, 201)
+	body = fmt.Sprintf(`{"name":"noerrands","user_id":%d,"reach":["scout"],"scopes":["workspace:read","gigs:read","comments:read"]}`, e.ids["scout.user"])
+	code, out, _ = e.req("POST", "/keys", body, e.ada())
+	e.ok(code, out, 201)
+	_ = json.Unmarshal(out, &kc)
+	for _, who := range []struct {
+		c    cred
+		ws   string
+		want bool
+	}{{cred{token: kc.Token, listener: "main"}, "current", false}, {e.ada(), "scout", true}} {
+		for _, path := range []string{"/changes?limit=500", "/activity?limit=200"} {
+			code, out, _ := e.req("GET", "/workspaces/"+who.ws+path, "", who.c)
+			e.ok(code, out, 200)
+			if !strings.Contains(string(out), "errand.created") {
+				t.Fatalf("%s: errand.created missing", path)
+			}
+			if has := strings.Contains(string(out), "errand-cmd-marker"); has != who.want {
+				t.Fatalf("%s: errand command visible=%v, want %v", path, has, who.want)
+			}
+		}
+	}
 }
 
 func TestFeedMCP(t *testing.T) {

@@ -244,11 +244,15 @@ func SaveErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ex
 			return nil, err
 		}
 		t.ID, _ = res.LastInsertId()
-		if _, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), nil, "errand_template.created", "errand_template", t.ID,
-			map[string]any{"name": t.Name, "unsandboxed": t.Unsandboxed, "shared": t.WorkspaceID == 0}); err != nil {
+		after, err := GetErrandTemplate(ctx, q, t.ID)
+		if err != nil {
 			return nil, err
 		}
-		return GetErrandTemplate(ctx, q, t.ID)
+		if _, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), nil, "errand_template.created", "errand_template", t.ID,
+			AuditSnapshot("errand_template", after, nil)); err != nil {
+			return nil, err
+		}
+		return after, nil
 	}
 	cur, err := GetErrandTemplate(ctx, q, t.ID)
 	if err != nil {
@@ -287,16 +291,24 @@ func SaveErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ex
 		t.TimeoutS, t.Output, t.Unsandboxed, setBy, setAt, ub, t.ID); err != nil {
 		return nil, err
 	}
-	data := map[string]any{"name": t.Name, "command_changed": t.Command != cur.Command, "unsandboxed": t.Unsandboxed}
-	if _, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), nil, "errand_template.updated", "errand_template", t.ID, data); err != nil {
+	after, err := GetErrandTemplate(ctx, q, t.ID)
+	if err != nil {
 		return nil, err
 	}
-	return GetErrandTemplate(ctx, q, t.ID)
+	if _, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), nil, "errand_template.updated", "errand_template", t.ID,
+		AuditDiff("errand_template", cur, after)); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 // clearUnsandboxed turns a template's no-sandbox flag off (a change to its only errand by someone
 // without the permission). The command keeps its author.
 func clearUnsandboxed(ctx context.Context, q Q, a Actor, tplID int64) error {
+	before, err := GetErrandTemplate(ctx, q, tplID)
+	if err != nil {
+		return err
+	}
 	res, err := q.ExecContext(ctx, `UPDATE errand_templates SET unsandboxed = 0, unsandboxed_set_by = NULL, version = version + 1
 		WHERE id = ? AND unsandboxed = 1`, tplID)
 	if err != nil {
@@ -305,11 +317,11 @@ func clearUnsandboxed(ctx context.Context, q Q, a Actor, tplID int64) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return nil
 	}
-	var ws int64
-	if err := q.QueryRowContext(ctx, `SELECT COALESCE(workspace_id, 0) FROM errand_templates WHERE id = ?`, tplID).Scan(&ws); err != nil {
+	after, err := GetErrandTemplate(ctx, q, tplID)
+	if err != nil {
 		return err
 	}
-	_, err = Activity(ctx, q, a, wsRef(ws), nil, "errand_template.updated", "errand_template", tplID, map[string]any{"unsandboxed_cleared": true})
+	_, err = Activity(ctx, q, a, wsRef(after.WorkspaceID), nil, "errand_template.updated", "errand_template", tplID, AuditDiff("errand_template", before, after))
 	return err
 }
 
@@ -349,11 +361,15 @@ func copyErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ws
 		return 0, err
 	}
 	id, _ := res.LastInsertId()
-	data := map[string]any{"name": t.Name, "copy_of": t.ID}
+	extra := map[string]any{"copy_of": t.ID}
 	if sandboxed && t.Unsandboxed {
-		data = map[string]any{"name": t.Name, "sandboxed_copy_of": t.ID}
+		extra = map[string]any{"sandboxed_copy_of": t.ID}
 	}
-	_, err = Activity(ctx, q, a, &ws, nil, "errand_template.created", "errand_template", id, data)
+	cp, err := GetErrandTemplate(ctx, q, id)
+	if err != nil {
+		return 0, err
+	}
+	_, err = Activity(ctx, q, a, &ws, nil, "errand_template.created", "errand_template", id, AuditSnapshot("errand_template", cp, extra))
 	return id, err
 }
 
@@ -365,7 +381,7 @@ func DeleteErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate) 
 	if _, err := q.ExecContext(ctx, `UPDATE errand_templates SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), t.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), nil, "errand_template.deleted", "errand_template", t.ID, map[string]any{"name": t.Name, "shared": t.Shared})
+	_, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), nil, "errand_template.deleted", "errand_template", t.ID, AuditSnapshot("errand_template", t, nil))
 	return err
 }
 
@@ -591,8 +607,7 @@ func CreateErrand(ctx context.Context, q Q, a Actor, n NewErrand, e ErrandEdit) 
 	if err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &n.WorkspaceID, &project, "errand.created", "errand", id,
-		map[string]any{"name": c.Name, "worker": c.WorkerName, "schedule": c.ScheduleText, "unsandboxed": c.Unsandboxed}); err != nil {
+	if _, err := Activity(ctx, q, a, &n.WorkspaceID, &project, "errand.created", "errand", id, AuditSnapshot("errand", c, nil)); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -740,8 +755,7 @@ func UpdateErrand(ctx context.Context, q Q, a Actor, id, expect int64, ch Errand
 	if err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &c.WorkspaceID, nil, "errand.updated", "errand", c.ID,
-		map[string]any{"name": out.Name, "worker": out.WorkerName, "schedule": out.ScheduleText}); err != nil {
+	if _, err := Activity(ctx, q, a, &c.WorkspaceID, nil, "errand.updated", "errand", c.ID, AuditDiff("errand", c, out)); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -809,7 +823,7 @@ func DeleteErrand(ctx context.Context, q Q, a Actor, c *Errand) error {
 	if _, err := q.ExecContext(ctx, `UPDATE errands SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), c.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &c.WorkspaceID, nil, "errand.deleted", "errand", c.ID, map[string]any{"name": c.Name})
+	_, err := Activity(ctx, q, a, &c.WorkspaceID, nil, "errand.deleted", "errand", c.ID, AuditSnapshot("errand", c, nil))
 	return err
 }
 

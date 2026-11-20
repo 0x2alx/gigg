@@ -436,9 +436,7 @@ func (a *API) registerRuns() {
 		}
 		out := &activityOut{}
 		out.Body.Items, err = a.activity(ctx, where, args, in.BeforeID, in.Limit)
-		if !p.IsInstanceAdmin() {
-			redactDeleted(out.Body.Items)
-		}
+		redactFeed(p, out.Body.Items)
 		return out, storeErr(err)
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "audit", Method: "GET", Path: "/audit", Tags: []string{"admin"},
@@ -628,6 +626,23 @@ func (a *API) activity(ctx context.Context, where string, args []any, beforeID i
 		out = append(out, it)
 	}
 	return out, rows.Err()
+}
+
+// redactFeed narrows workspace activity to what the reader may see elsewhere: the old text of deleted
+// and edited comments only for instance admins; errand entries' content (commands, descriptions, the
+// changes recorded) only with errands:read, which the errands themselves need.
+func redactFeed(p *access.Principal, items []ActivityItem) {
+	if !p.IsInstanceAdmin() {
+		redactDeleted(items)
+	}
+	if p.HasScope("errands:read") {
+		return
+	}
+	for i := range items {
+		if items[i].EntityType == "errand" || items[i].EntityType == "errand_template" {
+			items[i].Data = map[string]any{}
+		}
+	}
 }
 
 // redactDeleted removes the old text of deleted and edited comments from activity entries (admins see it).

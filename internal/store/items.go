@@ -401,7 +401,7 @@ func SaveCustomField(ctx context.Context, q Q, a Actor, f *CustomField, expect i
 	if n >= 30 {
 		return nil, Invalid("a workspace has at most 30 custom fields")
 	}
-	action := "field.updated"
+	var before *CustomField
 	if f.ID == 0 {
 		var pos float64
 		_ = q.QueryRowContext(ctx, `SELECT COALESCE(max(position), 0) + 1024 FROM custom_fields WHERE workspace_id = ?`, f.WorkspaceID).Scan(&pos)
@@ -414,12 +414,12 @@ func SaveCustomField(ctx context.Context, q Q, a Actor, f *CustomField, expect i
 			return nil, err
 		}
 		f.ID, _ = res.LastInsertId()
-		action = "field.created"
 	} else {
 		cur, err := GetCustomField(ctx, q, f.ID)
 		if err != nil {
 			return nil, err
 		}
+		before = cur
 		if expect != 0 && expect != cur.Version {
 			return nil, ErrVersion
 		}
@@ -433,10 +433,18 @@ func SaveCustomField(ctx context.Context, q Q, a Actor, f *CustomField, expect i
 			return nil, err
 		}
 	}
-	if _, err := Activity(ctx, q, a, &f.WorkspaceID, nil, action, "field", f.ID, map[string]any{"name": f.Name, "kind": f.Kind}); err != nil {
+	after, err := GetCustomField(ctx, q, f.ID)
+	if err != nil {
 		return nil, err
 	}
-	return GetCustomField(ctx, q, f.ID)
+	action, data := "field.created", AuditSnapshot("field", after, nil)
+	if before != nil {
+		action, data = "field.updated", AuditDiff("field", before, after)
+	}
+	if _, err := Activity(ctx, q, a, &f.WorkspaceID, nil, action, "field", f.ID, data); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 // DeleteCustomField hides a field (its values go with it).
@@ -447,7 +455,7 @@ func DeleteCustomField(ctx context.Context, q Q, a Actor, f *CustomField) error 
 	if _, err := q.ExecContext(ctx, `DELETE FROM gig_custom_values WHERE field_id = ?`, f.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &f.WorkspaceID, nil, "field.deleted", "field", f.ID, map[string]any{"name": f.Name})
+	_, err := Activity(ctx, q, a, &f.WorkspaceID, nil, "field.deleted", "field", f.ID, AuditSnapshot("field", f, nil))
 	return err
 }
 
@@ -777,7 +785,7 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			return nil, Invalid("a workspace (and the shared library) has at most 200 templates")
 		}
 	}
-	action := "template.updated"
+	var before *Template
 	if t.ID == 0 {
 		res, err := q.ExecContext(ctx, `INSERT INTO gig_templates (workspace_id, project_id, name, title, description_md, priority, color, labels, assignees,
 			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes, run_timeout_minutes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, wsArg(t.WorkspaceID), nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
@@ -786,12 +794,12 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			return nil, err
 		}
 		t.ID, _ = res.LastInsertId()
-		action = "template.created"
 	} else {
 		cur, err := GetTemplate(ctx, q, t.ID)
 		if err != nil {
 			return nil, err
 		}
+		before = cur
 		if expect != 0 && expect != cur.Version {
 			return nil, ErrVersion
 		}
@@ -801,10 +809,18 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			return nil, err
 		}
 	}
-	if _, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), t.ProjectID, action, "template", t.ID, map[string]any{"name": t.Name, "shared": t.WorkspaceID == 0}); err != nil {
+	after, err := GetTemplate(ctx, q, t.ID)
+	if err != nil {
 		return nil, err
 	}
-	return GetTemplate(ctx, q, t.ID)
+	action, data := "template.created", AuditSnapshot("template", after, nil)
+	if before != nil {
+		action, data = "template.updated", AuditDiff("template", before, after)
+	}
+	if _, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), t.ProjectID, action, "template", t.ID, data); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 // DeleteTemplate removes a template (gigs made from it stay). A template recurring gigs use stays.
@@ -815,7 +831,7 @@ func DeleteTemplate(ctx context.Context, q Q, a Actor, t *Template) error {
 	if _, err := q.ExecContext(ctx, `UPDATE gig_templates SET deleted_at = ? WHERE id = ?`, Now(), t.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), t.ProjectID, "template.deleted", "template", t.ID, map[string]any{"name": t.Name, "shared": t.WorkspaceID == 0})
+	_, err := Activity(ctx, q, a, wsRef(t.WorkspaceID), t.ProjectID, "template.deleted", "template", t.ID, AuditSnapshot("template", t, nil))
 	return err
 }
 

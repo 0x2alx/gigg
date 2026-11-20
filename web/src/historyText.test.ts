@@ -14,6 +14,15 @@ group("history lines", () => {
     expect(say("gig.updated", { assignees: [2] })).toBe("assigned Bob");
     expect(say("gig.updated", { due_at: null })).toBe("cleared the due date");
     expect(say("gig.updated", { custom_fields: {} })).toBe("changed custom fields");
+    // entries with old and new for every field
+    expect(say("gig.updated", { due_at: { old: 5, new: null }, color: { old: null, new: "#FF0000" } })).toBe("cleared the due date, changed the colour");
+    expect(say("gig.updated", { color: { old: "#FF0000", new: null } })).toBe("removed the colour");
+    expect(say("gig.updated", { labels: { old: [], new: [{ id: 1, name: "ui", color: null }] }, assignees: { old: [], new: [2] } })).toBe(
+      "set labels to ui, assigned Bob",
+    );
+    expect(say("gig.updated", { parent_id: { old: 4, new: null } })).toBe("removed the parent gig");
+    expect(say("gig.updated", { not_after: { old: null, new: 9 }, missed_at: { old: 3, new: null } })).toMatch(/^set the window close to /);
+    expect(say("gig.updated", { labels: ["bug"] })).toBe("set labels to bug");
   });
 
   it("reads moves, links and the rest", () => {

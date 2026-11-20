@@ -385,11 +385,14 @@ func CreateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence) (*Recurr
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	if _, err := Activity(ctx, q, a, &r.WorkspaceID, &r.ProjectID, "recurrence.created", "recurrence", id,
-		map[string]any{"title": r.Title, "template": r.TemplateID, "schedule": r.ScheduleID}); err != nil {
+	after, err := GetRecurrence(ctx, q, id)
+	if err != nil {
 		return nil, err
 	}
-	return GetRecurrence(ctx, q, id)
+	if _, err := Activity(ctx, q, a, &r.WorkspaceID, &r.ProjectID, "recurrence.created", "recurrence", id, AuditSnapshot("recurrence", after, nil)); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 // pairFree: a template and a schedule are paired at most once per project.
@@ -616,11 +619,14 @@ func UpdateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence, expect i
 		r.TemplateID, r.ScheduleID, r.StartsOn, nullInt(r.EndsOn), nullInt(r.MaxCount), r.Overlap, next, paused, a.UserID, ownAssignees(ctx, q, r), r.ID); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &r.WorkspaceID, &r.ProjectID, "recurrence.updated", "recurrence", r.ID,
-		map[string]any{"title": r.Title, "template": r.TemplateID, "schedule": r.ScheduleID}); err != nil {
+	after, err := GetRecurrence(ctx, q, r.ID)
+	if err != nil {
 		return nil, err
 	}
-	return GetRecurrence(ctx, q, r.ID)
+	if _, err := Activity(ctx, q, a, &r.WorkspaceID, &r.ProjectID, "recurrence.updated", "recurrence", r.ID, AuditDiff("recurrence", cur, after)); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 // sameContent reports whether the template already holds the recurring gig's content.
@@ -681,7 +687,7 @@ func DeleteRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence) error {
 	if _, err := q.ExecContext(ctx, `UPDATE recurrences SET deleted_at = ?, next_at = NULL, version = version + 1 WHERE id = ?`, Now(), r.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &r.WorkspaceID, &r.ProjectID, "recurrence.deleted", "recurrence", r.ID, map[string]any{"title": r.Title})
+	_, err := Activity(ctx, q, a, &r.WorkspaceID, &r.ProjectID, "recurrence.deleted", "recurrence", r.ID, AuditSnapshot("recurrence", r, nil))
 	return err
 }
 

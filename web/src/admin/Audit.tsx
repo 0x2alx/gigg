@@ -167,14 +167,22 @@ function AuditRow({ it, actor, apiKey }: { it: AuditItem; actor: AdminUser | und
   );
 }
 
-// summarize: "key: value" pairs, short values only, cut at ~120 characters.
+function short(v: unknown, max: number): string {
+  const s = typeof v === "string" ? v : (JSON.stringify(v) ?? "");
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+// summarize: "key: value" pairs ("key: old → new" for a change), short values only, cut at ~120 characters.
 function summarize(data: unknown): string {
   let s: string;
   if (data && typeof data === "object" && !Array.isArray(data)) {
     s = Object.entries(data as Record<string, unknown>)
       .map(([k, v]) => {
-        const val = typeof v === "string" ? v : JSON.stringify(v);
-        return `${k}: ${val && val.length > 40 ? val.slice(0, 40) + "…" : val}`;
+        if (v && typeof v === "object" && !Array.isArray(v) && "old" in v && "new" in v) {
+          const c = v as { old: unknown; new: unknown };
+          return `${k}: ${short(c.old, 20)} → ${short(c.new, 20)}`;
+        }
+        return `${k}: ${short(v, 40)}`;
       })
       .join(" · ");
   } else {

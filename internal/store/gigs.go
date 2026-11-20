@@ -738,15 +738,15 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 	if err := setAssignees(ctx, q, p.WorkspaceID, p.ID, id, OwnerDefault(ctx, q, p.WorkspaceID, p.ID, n.Assignees)); err != nil {
 		return nil, err
 	}
-	data := map[string]any{"key": fmt.Sprintf("%s-%d", p.Key, num), "title": n.Title, "status": st.Name}
-	if n.ClonedFromID != nil {
-		data["cloned_from"] = *n.ClonedFromID
-	}
-	if _, err := Activity(ctx, q, a, &p.WorkspaceID, &p.ID, "gig.created", "gig", id, data); err != nil {
-		return nil, err
-	}
 	t, err := GetGig(ctx, q, id)
 	if err != nil {
+		return nil, err
+	}
+	extra := map[string]any{"key": t.Key, "status": st.Name}
+	if n.ClonedFromID != nil {
+		extra["cloned_from"] = *n.ClonedFromID
+	}
+	if _, err := Activity(ctx, q, a, &p.WorkspaceID, &p.ID, "gig.created", "gig", id, AuditSnapshot("gig", t, extra)); err != nil {
 		return nil, err
 	}
 	if !n.Quiet {
@@ -861,30 +861,34 @@ type GigPatch struct {
 	RunTimeout    **int64 // minutes; *nil = the agent's default
 }
 
-// PatchGig applies a change and records old and new values (old text in full).
+// PatchGig applies a change; the activity log gets the old and new value of each field that changed.
 func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatch) (*Gig, error) {
 	if expect != 0 && expect != t.Version {
 		return nil, ErrVersion
 	}
+	before, err := GetGig(ctx, q, t.ID) // the caller's copy may come from the read pool
+	if err != nil {
+		return nil, err
+	}
 	changed := map[string]any{}
-	data := map[string]any{}
+	touched := false // labels or assignees
 	if p.Title != nil {
 		if err := validGigText(*p.Title, ""); err != nil {
 			return nil, err
 		}
-		changed["title"], data["title"] = *p.Title, map[string]any{"old": t.Title, "new": *p.Title}
+		changed["title"] = *p.Title
 	}
 	if p.DescriptionMD != nil {
 		if err := validGigText("x", *p.DescriptionMD); err != nil {
 			return nil, err
 		}
-		changed["description_md"], data["description_md"] = *p.DescriptionMD, map[string]any{"old": t.DescriptionMD}
+		changed["description_md"] = *p.DescriptionMD
 	}
 	if p.Priority != nil {
 		if *p.Priority < 0 || *p.Priority > 4 {
 			return nil, Invalid("priority is 0-4")
 		}
-		changed["priority"], data["priority"] = *p.Priority, map[string]any{"old": t.Priority, "new": *p.Priority}
+		changed["priority"] = *p.Priority
 	}
 	if p.Color != nil {
 		var v any
@@ -895,7 +899,7 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 			}
 			v = c
 		}
-		changed["color"], data["color"] = v, v
+		changed["color"] = v
 	}
 	if p.Model != nil || p.Effort != nil {
 		m, e := t.Model, t.Effort
@@ -909,14 +913,14 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 			return nil, err
 		}
 		if p.Model != nil {
-			changed["model"], data["model"] = m, map[string]any{"old": t.Model, "new": m}
+			changed["model"] = m
 		}
 		if p.Effort != nil {
-			changed["effort"], data["effort"] = e, map[string]any{"old": t.Effort, "new": e}
+			changed["effort"] = e
 		}
 	}
 	if p.AlwaysRun != nil {
-		changed["always_run"], data["always_run"] = *p.AlwaysRun, map[string]any{"old": t.AlwaysRun, "new": *p.AlwaysRun}
+		changed["always_run"] = *p.AlwaysRun
 	}
 	if p.AllowedTools != nil {
 		tools, err := NormTools(p.AllowedTools)
@@ -924,17 +928,17 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 			return nil, err
 		}
 		if !SameTools(tools, t.AllowedTools) {
-			changed["allowed_tools"], data["allowed_tools"] = mustJSON(tools), map[string]any{"old": t.AllowedTools, "new": tools}
+			changed["allowed_tools"] = mustJSON(tools)
 		}
 	}
 	if p.StartAt != nil {
-		changed["start_at"], data["start_at"] = nullInt(*p.StartAt), nullInt(*p.StartAt)
+		changed["start_at"] = nullInt(*p.StartAt)
 	}
 	if p.DueAt != nil {
-		changed["due_at"], data["due_at"] = nullInt(*p.DueAt), nullInt(*p.DueAt)
+		changed["due_at"] = nullInt(*p.DueAt)
 	}
 	if p.NotAfter != nil {
-		changed["not_after"], data["not_after"] = nullInt(*p.NotAfter), nullInt(*p.NotAfter)
+		changed["not_after"] = nullInt(*p.NotAfter)
 		if *p.NotAfter == nil || **p.NotAfter > Now() {
 			changed["missed_at"] = nil // a reopened window clears "missed"
 		}
@@ -963,7 +967,7 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 				return nil, Invalid("that gig is a subgig of this one; a gig can't be under its own subgig")
 			}
 		}
-		changed["parent_id"], data["parent_id"] = nullInt(*p.ParentID), nullInt(*p.ParentID)
+		changed["parent_id"] = nullInt(*p.ParentID)
 	}
 	parent := t.ParentID
 	if p.ParentID != nil {
@@ -973,7 +977,7 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 	case p.BlocksParent != nil && *p.BlocksParent && parent == nil:
 		return nil, Invalid("blocks_parent needs a parent gig")
 	case p.BlocksParent != nil && *p.BlocksParent != t.BlocksParent:
-		changed["blocks_parent"], data["blocks_parent"] = *p.BlocksParent, map[string]any{"old": t.BlocksParent, "new": *p.BlocksParent}
+		changed["blocks_parent"] = *p.BlocksParent
 	case parent == nil && t.BlocksParent:
 		changed["blocks_parent"] = false // no parent left to hold back
 	}
@@ -989,27 +993,27 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 		if err := validAutoArchive(*p.AutoArchive); err != nil {
 			return nil, err
 		}
-		changed["auto_archive_minutes"], data["auto_archive_minutes"] = nullInt(*p.AutoArchive), map[string]any{"old": t.AutoArchive, "new": *p.AutoArchive}
+		changed["auto_archive_minutes"] = nullInt(*p.AutoArchive)
 	}
 	if p.RunTimeout != nil && !eqIntPtr(*p.RunTimeout, t.RunTimeout) {
 		if err := validRunTimeout(*p.RunTimeout); err != nil {
 			return nil, err
 		}
-		changed["run_timeout_minutes"], data["run_timeout_minutes"] = nullInt(*p.RunTimeout), map[string]any{"old": t.RunTimeout, "new": *p.RunTimeout}
+		changed["run_timeout_minutes"] = nullInt(*p.RunTimeout)
 	}
 	if p.Labels != nil {
 		if err := setLabels(ctx, q, a, t.WorkspaceID, t.ID, p.Labels); err != nil {
 			return nil, err
 		}
-		data["labels"] = p.Labels
+		touched = true // a table of their own: the diff below shows them
 	}
 	if p.Assignees != nil {
 		if err := setAssignees(ctx, q, t.WorkspaceID, t.ProjectID, t.ID, p.Assignees); err != nil {
 			return nil, err
 		}
-		data["assignees"] = p.Assignees
+		touched = true // a table of their own: the diff below shows them
 	}
-	if len(data) == 0 {
+	if len(changed) == 0 && !touched {
 		return t, nil
 	}
 	var notifyAssigned, notifyMention []int64
@@ -1036,7 +1040,11 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 	if _, err := q.ExecContext(ctx, query+" WHERE id = ?", append(args, t.ID)...); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "gig.updated", "gig", t.ID, data); err != nil {
+	after, err := GetGig(ctx, q, t.ID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "gig.updated", "gig", t.ID, AuditDiff("gig", before, after)); err != nil {
 		return nil, err
 	}
 	if err := Notify(ctx, q, a, t, nil, "assigned", notifyAssigned); err != nil {
@@ -1045,7 +1053,7 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 	if err := Notify(ctx, q, a, t, nil, "mention", notifyMention); err != nil {
 		return nil, err
 	}
-	return GetGig(ctx, q, t.ID)
+	return after, nil
 }
 
 // Place says where a gig goes inside a status column.

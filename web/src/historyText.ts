@@ -25,13 +25,24 @@ function names(ids: unknown, users: Map<number, User>): string {
   return ids.map((id) => users.get(Number(id))?.display_name || users.get(Number(id))?.username || "someone").join(", ");
 }
 
-// changes: the readable parts of a gig.updated entry, one per field that changed.
+// Fields a gig.updated entry may carry that follow another change (a reopened window clears "missed").
+const QUIET = new Set(["missed_at"]);
+
+function labelNames(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((l) => (l && typeof l === "object" ? str((l as { name?: unknown }).name) : str(l)));
+}
+
+// changes: the readable parts of a gig.updated entry, one per field that changed. Entries hold
+// {old, new} per field; older ones held only the new value for some fields, read as it is.
 export function changes(d: Data, users: Map<number, User>): string[] {
   if (!d) return ["edited the gig"];
   const out: string[] = [];
   let runDone = false;
-  for (const [k, v] of Object.entries(d)) {
-    const ov = v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  for (const [k, raw] of Object.entries(d)) {
+    if (QUIET.has(k)) continue;
+    const ov = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+    const v = ov && "new" in ov ? ov.new : raw;
     if (k === "title") out.push(`renamed it to ${quote(str(ov?.new))}`);
     else if (k === "description_md") out.push("edited the description");
     else if (k === "priority") out.push(`set priority to ${priorityNames[Number(ov?.new)] ?? str(ov?.new)}${ov && "old" in ov ? ` (was ${priorityNames[Number(ov.old)] ?? str(ov.old)})` : ""}`);
@@ -41,7 +52,7 @@ export function changes(d: Data, users: Map<number, User>): string[] {
       runDone = true;
     } else if (k in DATE_LABEL) out.push(v ? `set the ${DATE_LABEL[k]} to ${when(v)}` : `cleared the ${DATE_LABEL[k]}`);
     else if (k === "parent_id") out.push(v ? "set a parent gig" : "removed the parent gig");
-    else if (k === "labels") out.push(Array.isArray(v) && v.length ? `set labels to ${v.join(", ")}` : "removed the labels");
+    else if (k === "labels") out.push(labelNames(v).length ? `set labels to ${labelNames(v).join(", ")}` : "removed the labels");
     else if (k === "assignees") out.push(Array.isArray(v) && v.length ? `assigned ${names(v, users)}` : "removed the assignees");
     else out.push(`changed ${k.replace(/_/g, " ")}`);
   }

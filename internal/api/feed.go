@@ -21,7 +21,8 @@ import (
 // The change feed (GET /workspaces/{ws}/changes) and live updates (GET /workspaces/{ws}/events,
 // Server-Sent Events) read the activity log in ascending id order, with exactly the visibility of
 // workspace-activity: role viewer, scopes workspace:read + gigs:read + comments:read, no key/member
-// actions for non-admins, project-narrowed keys see only their projects, deleted comment text redacted.
+// actions for non-admins, project-narrowed keys see only their projects, deleted comment text redacted,
+// errand entries' content only with errands:read.
 
 // Tunables (tests shorten them).
 var (
@@ -79,9 +80,7 @@ func (a *API) registerFeed() {
 			if len(items) > limit {
 				items, out.More = items[:limit], true
 			}
-			if !p.IsInstanceAdmin() {
-				redactDeleted(items)
-			}
+			redactFeed(p, items)
 			out.Items, out.NextAfterID = items, after
 			if len(items) > 0 {
 				out.NextAfterID = items[len(items)-1].ID
@@ -271,7 +270,6 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 	defer poll.Stop()
 	defer ping.Stop()
 	defer life.Stop()
-	admin := p.IsInstanceAdmin()
 	// write sends one batch under a deadline (a reader that stops reading doesn't pin the stream) and
 	// clears it again: over HTTP/2 a deadline left armed resets the stream when it expires, even with
 	// nothing pending, and Chrome reports ERR_HTTP2_PROTOCOL_ERROR between pings.
@@ -291,9 +289,7 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 				}
 				return false
 			}
-			if !admin {
-				redactDeleted(items)
-			}
+			redactFeed(p, items)
 			if len(items) > 0 && !write(func() error {
 				for _, it := range items {
 					b, _ := json.Marshal(it)

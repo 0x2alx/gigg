@@ -136,10 +136,14 @@ func CreateWorkspace(ctx context.Context, q Q, a Actor, slug, name string, tmpl 
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	if _, err := Activity(ctx, q, a, &id, nil, "workspace.created", "workspace", id, map[string]any{"slug": slug, "name": name}); err != nil {
+	w, err := GetWorkspace(ctx, q, id)
+	if err != nil {
 		return nil, err
 	}
-	return GetWorkspace(ctx, q, id)
+	if _, err := Activity(ctx, q, a, &id, nil, "workspace.created", "workspace", id, AuditSnapshot("workspace", w, nil)); err != nil {
+		return nil, err
+	}
+	return w, nil
 }
 
 // GetWorkspace loads a workspace by id.
@@ -278,10 +282,14 @@ func PatchWorkspace(ctx context.Context, q Q, a Actor, id, expect int64, p Works
 	if _, err := q.ExecContext(ctx, query+" WHERE id = ?", append(args, id)...); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &id, nil, "workspace.updated", "workspace", id, changed); err != nil {
+	after, err := GetWorkspace(ctx, q, id)
+	if err != nil {
 		return nil, err
 	}
-	return GetWorkspace(ctx, q, id)
+	if _, err := Activity(ctx, q, a, &id, nil, "workspace.updated", "workspace", id, AuditDiff("workspace", w, after)); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 // Project is a board inside a workspace.
@@ -363,10 +371,14 @@ func CreateProject(ctx context.Context, q Q, a Actor, ws int64, slug, name, key 
 			return nil, err
 		}
 	}
-	if _, err := Activity(ctx, q, a, &ws, &id, "project.created", "project", id, map[string]any{"slug": slug, "name": name, "key": key}); err != nil {
+	pr, err := GetProject(ctx, q, id)
+	if err != nil {
 		return nil, err
 	}
-	return GetProject(ctx, q, id)
+	if _, err := Activity(ctx, q, a, &ws, &id, "project.created", "project", id, AuditSnapshot("project", pr, nil)); err != nil {
+		return nil, err
+	}
+	return pr, nil
 }
 
 func aliasTaken(ctx context.Context, q Q, ws int64, key string) (bool, error) {
@@ -505,10 +517,14 @@ func PatchProject(ctx context.Context, q Q, a Actor, id, expect int64, p Project
 	if _, err := q.ExecContext(ctx, query+" WHERE id = ?", append(args, id)...); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &pr.WorkspaceID, &id, "project.updated", "project", id, changed); err != nil {
+	after, err := GetProject(ctx, q, id)
+	if err != nil {
 		return nil, err
 	}
-	return GetProject(ctx, q, id)
+	if _, err := Activity(ctx, q, a, &pr.WorkspaceID, &id, "project.updated", "project", id, AuditDiff("project", pr, after)); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 // DeleteProject soft-deletes an empty project (gigs must be moved or trashed first).
@@ -523,7 +539,7 @@ func DeleteProject(ctx context.Context, q Q, a Actor, p *Project) error {
 	if _, err := q.ExecContext(ctx, `UPDATE projects SET deleted_at = ?, version = version + 1 WHERE id = ?`, Now(), p.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &p.WorkspaceID, &p.ID, "project.deleted", "project", p.ID, nil)
+	_, err := Activity(ctx, q, a, &p.WorkspaceID, &p.ID, "project.deleted", "project", p.ID, AuditSnapshot("project", p, nil))
 	return err
 }
 
@@ -621,10 +637,14 @@ func CreateStatus(ctx context.Context, q Q, a Actor, p *Project, name, category 
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	if _, err := Activity(ctx, q, a, &p.WorkspaceID, &p.ID, "status.created", "status", id, map[string]any{"name": name, "category": category}); err != nil {
+	st, err := GetStatus(ctx, q, id)
+	if err != nil {
 		return nil, err
 	}
-	return GetStatus(ctx, q, id)
+	if _, err := Activity(ctx, q, a, &p.WorkspaceID, &p.ID, "status.created", "status", id, AuditSnapshot("status", st, nil)); err != nil {
+		return nil, err
+	}
+	return st, nil
 }
 
 // StatusPatch changes a status.
@@ -639,6 +659,10 @@ type StatusPatch struct {
 // PatchStatus applies a change.
 func PatchStatus(ctx context.Context, q Q, a Actor, s *Status, expect int64, p StatusPatch) (*Status, error) {
 	if err := checkVersion(ctx, q, "statuses", s.ID, expect); err != nil {
+		return nil, err
+	}
+	before, err := GetStatus(ctx, q, s.ID) // the caller's copy may be stale
+	if err != nil {
 		return nil, err
 	}
 	changed := map[string]any{}
@@ -691,10 +715,14 @@ func PatchStatus(ctx context.Context, q Q, a Actor, s *Status, expect int64, p S
 	if err := checkProjectCategories(ctx, q, s.ProjectID); err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &s.WorkspaceID, &s.ProjectID, "status.updated", "status", s.ID, changed); err != nil {
+	after, err := GetStatus(ctx, q, s.ID)
+	if err != nil {
 		return nil, err
 	}
-	return GetStatus(ctx, q, s.ID)
+	if _, err := Activity(ctx, q, a, &s.WorkspaceID, &s.ProjectID, "status.updated", "status", s.ID, AuditDiff("status", before, after)); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 func checkProjectCategories(ctx context.Context, q Q, project int64) error {
@@ -729,7 +757,7 @@ func DeleteStatus(ctx context.Context, q Q, a Actor, s *Status) error {
 	if _, err := q.ExecContext(ctx, `DELETE FROM statuses WHERE id = ?`, s.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &s.WorkspaceID, &s.ProjectID, "status.deleted", "status", s.ID, map[string]any{"name": s.Name})
+	_, err := Activity(ctx, q, a, &s.WorkspaceID, &s.ProjectID, "status.deleted", "status", s.ID, AuditSnapshot("status", s, nil))
 	return err
 }
 
@@ -845,10 +873,14 @@ func CreateLabel(ctx context.Context, q Q, a Actor, ws int64, name string, color
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	if _, err := Activity(ctx, q, a, &ws, nil, "label.created", "label", id, map[string]any{"name": name}); err != nil {
+	l, err := GetLabel(ctx, q, id)
+	if err != nil {
 		return nil, err
 	}
-	return GetLabel(ctx, q, id)
+	if _, err := Activity(ctx, q, a, &ws, nil, "label.created", "label", id, AuditSnapshot("label", l, nil)); err != nil {
+		return nil, err
+	}
+	return l, nil
 }
 
 // LabelPatch changes a label.
@@ -861,6 +893,10 @@ type LabelPatch struct {
 // PatchLabel applies a change.
 func PatchLabel(ctx context.Context, q Q, a Actor, l *Label, expect int64, p LabelPatch) (*Label, error) {
 	if err := checkVersion(ctx, q, "labels", l.ID, expect); err != nil {
+		return nil, err
+	}
+	before, err := GetLabel(ctx, q, l.ID) // the caller's copy may be stale
+	if err != nil {
 		return nil, err
 	}
 	changed := map[string]any{}
@@ -895,17 +931,21 @@ func PatchLabel(ctx context.Context, q Q, a Actor, l *Label, expect int64, p Lab
 		query += ", " + col + " = ?"
 		args = append(args, v)
 	}
-	_, err := q.ExecContext(ctx, query+" WHERE id = ?", append(args, l.ID)...)
+	_, err = q.ExecContext(ctx, query+" WHERE id = ?", append(args, l.ID)...)
 	if isUnique(err) {
 		return nil, Conflict("label %q exists", *p.Name)
 	}
 	if err != nil {
 		return nil, err
 	}
-	if _, err := Activity(ctx, q, a, &l.WorkspaceID, nil, "label.updated", "label", l.ID, changed); err != nil {
+	after, err := GetLabel(ctx, q, l.ID)
+	if err != nil {
 		return nil, err
 	}
-	return GetLabel(ctx, q, l.ID)
+	if _, err := Activity(ctx, q, a, &l.WorkspaceID, nil, "label.updated", "label", l.ID, AuditDiff("label", before, after)); err != nil {
+		return nil, err
+	}
+	return after, nil
 }
 
 // DeleteLabel removes a label from every gig and deletes it.
@@ -913,6 +953,6 @@ func DeleteLabel(ctx context.Context, q Q, a Actor, l *Label) error {
 	if _, err := q.ExecContext(ctx, `DELETE FROM labels WHERE id = ?`, l.ID); err != nil {
 		return err
 	}
-	_, err := Activity(ctx, q, a, &l.WorkspaceID, nil, "label.deleted", "label", l.ID, map[string]any{"name": l.Name})
+	_, err := Activity(ctx, q, a, &l.WorkspaceID, nil, "label.deleted", "label", l.ID, AuditSnapshot("label", l, nil))
 	return err
 }
