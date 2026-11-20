@@ -23,9 +23,14 @@ func TestConsumersMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// today's code reads access_rules.project_id (0017): add it for the setup, drop it before 0016 runs
-	if _, err := s.W.ExecContext(ctx, `ALTER TABLE access_rules ADD COLUMN project_id INTEGER`); err != nil {
-		t.Fatal(err)
+	// today's code reads access_rules.project_id (0017) and followers (0018): add them for the setup,
+	// drop them before 0016 runs
+	for _, q := range []string{`ALTER TABLE access_rules ADD COLUMN project_id INTEGER`,
+		`CREATE TABLE gig_followers (gig_id INTEGER NOT NULL, user_id INTEGER NOT NULL, PRIMARY KEY (gig_id, user_id)) STRICT`,
+		`ALTER TABLE gig_templates ADD COLUMN followers TEXT NOT NULL DEFAULT '[]'`} {
+		if _, err := s.W.ExecContext(ctx, q); err != nil {
+			t.Fatal(err)
+		}
 	}
 	var ws, ws2, pid, own, deny, open, done, tplNone, tplAda, tplShared, rec int64
 	var ada *User
@@ -114,6 +119,8 @@ func TestConsumersMigration(t *testing.T) {
 		`INSERT INTO api_keys (name, prefix, secret_hash, user_id, workspace_id, scopes, expires_at, created_at) VALUES ('adm', 'gk_adm', x'00', 1, NULL, '["admin:export","admin:keys","admin:settings","admin:transfer"]', 9000000000000, 1)`,
 		`INSERT INTO groups (id, name, created_at) VALUES (90, 'g', 1)`,
 		`ALTER TABLE access_rules DROP COLUMN project_id`,
+		`DROP TABLE gig_followers`,
+		`ALTER TABLE gig_templates DROP COLUMN followers`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?4, 'commenter', '{}', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?2, 'member', '{"schedules":true,"checklists":false,"relations":true}', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, NULL, 'manager', '{"schedules":false}', 1)`,

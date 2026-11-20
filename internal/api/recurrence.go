@@ -31,6 +31,7 @@ type RecurrenceBody struct {
 	Color         *string                `json:"color,omitempty"`
 	Labels        []string               `json:"labels,omitempty" maxItems:"20"`
 	Assignees     []int64                `json:"assignees,omitempty" maxItems:"50" doc:"Who its gigs go to. With a shared template (also when template_id names one), the recurring gig's own assignees"`
+	Followers     []int64                `json:"followers,omitempty" maxItems:"50" doc:"Who follows each of its gigs (kept in its template); omit to keep, [] clears"`
 	AutoArchive   *int64                 `json:"auto_archive_minutes,omitempty" minimum:"0" maximum:"527040" doc:"Its gigs archive themselves this many minutes after done or cancelled (kept in its template); omit to keep, 0 clears"`
 	RunTimeout    *int64                 `json:"run_timeout_minutes,omitempty" minimum:"0" maximum:"300" doc:"Its gigs' run timeout in minutes (kept in its template); omit to keep, 0 clears (the agent's default). Needs the run_timeout permission"`
 	Model         string                 `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
@@ -61,6 +62,9 @@ func (b RecurrenceBody) apply(r *store.Recurrence) {
 		r.Checklist, r.Custom, r.Subgigs = b.Checklist, b.Custom, b.Subgigs
 		if b.AllowedTools != nil {
 			r.AllowedTools = b.AllowedTools
+		}
+		if b.Followers != nil {
+			r.Followers = b.Followers
 		}
 		if b.AutoArchive != nil {
 			r.AutoArchive = b.AutoArchive

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -208,6 +209,7 @@ type GigCreate struct {
 	BlocksParent  bool                   `json:"blocks_parent,omitempty" doc:"A subgig that holds its parent back while it is open (needs parent_id)"`
 	Labels        []string               `json:"labels,omitempty" maxItems:"20" doc:"Label names; missing ones are created"`
 	Assignees     []int64                `json:"assignees,omitempty" maxItems:"50"`
+	Followers     []int64                `json:"followers,omitempty" maxItems:"50" doc:"Users who follow it (get its bells); you follow it too when your follow_own_gigs preference is on (the default)"`
 	Model         string                 `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for, e.g. opus, sonnet or a full id (default: the agent's)"`
 	Effort        string                 `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
 	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Work it whatever the usage budget, day or night (needs the always_run permission)"`
@@ -236,6 +238,7 @@ type gigPatchIn struct {
 		BlocksParent  Opt[bool]     `json:"blocks_parent,omitempty" doc:"A subgig that holds its parent back while it is open"`
 		Labels        Opt[[]string] `json:"labels,omitempty" doc:"Replaces the gig's labels (names)"`
 		Assignees     Opt[[]int64]  `json:"assignees,omitempty" doc:"Replaces the gig's assignees (user ids)"`
+		Followers     Opt[[]int64]  `json:"followers,omitempty" doc:"Replaces the gig's followers (user ids); to follow or unfollow it yourself, PUT or DELETE /gigs/{id}/follow"`
 		Model         Opt[string]   `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for; null or empty = the agent's default"`
 		Effort        Opt[string]   `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for; null or empty = the agent's default"`
 		AlwaysRun     Opt[bool]     `json:"always_run,omitempty" doc:"Work it whatever the usage budget (needs the always_run permission)"`
@@ -243,6 +246,11 @@ type gigPatchIn struct {
 		AutoArchive   Opt[int64]    `json:"auto_archive_minutes,omitempty" doc:"Archive it this many minutes (5-527040) after it is done or cancelled; null: never"`
 		RunTimeout    Opt[int64]    `json:"run_timeout_minutes,omitempty" doc:"How long a runner lets one run go (5-300 min); null: the agent's default. Needs the run_timeout permission"`
 	}
+}
+
+type followOut struct {
+	Following bool    `json:"following" doc:"You follow it"`
+	Followers []int64 `json:"followers" doc:"Everyone who follows it (user ids)"`
 }
 
 type gigMoveIn struct {
@@ -419,7 +427,7 @@ func (a *API) registerGigs() {
 			return nil, err
 		}
 		n := store.NewGig{ProjectID: pr.ID, Title: b.Title, DescriptionMD: b.DescriptionMD, Priority: b.Priority, Color: b.Color,
-			StartAt: b.StartAt, DueAt: b.DueAt, NotAfter: b.NotAfter, ParentID: b.ParentID, Labels: b.Labels, Assignees: b.Assignees,
+			StartAt: b.StartAt, DueAt: b.DueAt, NotAfter: b.NotAfter, ParentID: b.ParentID, Labels: b.Labels, Assignees: b.Assignees, Followers: b.Followers,
 			Model: strings.TrimSpace(b.Model), Effort: b.Effort, AlwaysRun: b.AlwaysRun, AllowedTools: b.AllowedTools, BlocksParent: b.BlocksParent,
 			AutoArchive: b.AutoArchive, RunTimeout: b.RunTimeout}
 		if p.Key != nil {
@@ -581,9 +589,50 @@ func (a *API) registerGigs() {
 			} else if b.Assignees.Null {
 				patch.Assignees = []int64{}
 			}
+			if fs := b.Followers.Val(); fs != nil {
+				patch.Followers = *fs
+				if patch.Followers == nil {
+					patch.Followers = []int64{}
+				}
+			} else if b.Followers.Null {
+				patch.Followers = []int64{}
+			}
 			return store.PatchGig(ctx, tx, p.Actor(), t, v, patch)
 		})
 	})
+	// following: anyone who sees a gig may follow it for themselves (a personal setting, like marking
+	// the bell read, so gigs:read is enough); setting other people's follows is an edit (PATCH followers)
+	huma.Register(a.h, huma.Operation{OperationID: "get-gig-follow", Method: "GET", Path: "/gigs/{id}/follow", Tags: []string{"gigs"},
+		Summary: "Whether you follow a gig, and who does"}, func(ctx context.Context, in *struct {
+		ID string `path:"id"`
+	}) (*struct{ Body followOut }, error) {
+		p, err := me(ctx)
+		if err != nil {
+			return nil, err
+		}
+		t, err := a.gig(ctx, p, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Viewer, "gigs:read"); err != nil {
+			return nil, err
+		}
+		return &struct{ Body followOut }{Body: followOut{Following: slices.Contains(t.Followers, p.User.ID), Followers: t.Followers}}, nil
+	})
+	for _, on := range []bool{true, false} {
+		op, method, summary := "follow-gig", "PUT", "Follow a gig: its bells (reports, questions, failed runs, missed windows) come to you, as your bell settings allow"
+		if !on {
+			op, method, summary = "unfollow-gig", "DELETE", "Stop following a gig"
+		}
+		huma.Register(a.h, huma.Operation{OperationID: op, Method: method, Path: "/gigs/{id}/follow", Tags: []string{"gigs"}, Summary: summary},
+			func(ctx context.Context, in *struct {
+				ID string `path:"id"`
+			}) (*gigOut, error) {
+				return a.withGigOp(ctx, in.ID, "", access.Viewer, "gigs:read", opTrashed, func(tx *sql.Tx, p *access.Principal, t *store.Gig, _ int64) (*store.Gig, error) {
+					return store.FollowGig(ctx, tx, p.Actor(), t, p.User.ID, on)
+				})
+			})
+	}
 	huma.Register(a.h, huma.Operation{OperationID: "move-gig", Method: "POST", Path: "/gigs/{id}/move", Tags: []string{"gigs"},
 		Summary: "Move a gig: status, position, or another project of the workspace"}, func(ctx context.Context, in *gigMoveIn) (*gigOut, error) {
 		return a.withGig(ctx, in.ID, in.IfMatch, access.Worker, "gigs:work", func(tx *sql.Tx, p *access.Principal, t *store.Gig, v int64) (*store.Gig, error) {

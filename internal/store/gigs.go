@@ -62,6 +62,7 @@ type Gig struct {
 	Deleted           bool           `json:"deleted"`
 	Labels            []GigTag       `json:"labels"`
 	Assignees         []int64        `json:"assignees"`
+	Followers         []int64        `json:"followers" doc:"Users who follow it: they get its bells (reports, questions, failed runs, missed windows) as its assignees do"`
 	Aliases           []string       `json:"aliases"`
 	Model             string         `json:"model" doc:"Model a runner should ask for ('' = the agent's default)"`
 	Effort            string         `json:"effort" doc:"Effort level a runner should ask for ('' = the agent's default)"`
@@ -160,7 +161,7 @@ func scanGig(row interface{ Scan(...any) error }) (*Gig, error) {
 	t.CreatedViaKeyID, t.LastRunID, t.ResumeRequestedAt = ptrInt(viaKey), ptrInt(lastRun), ptrInt(resume)
 	t.RecurrenceID, t.OccurrenceAt, t.NotAfter, t.MissedAt = ptrInt(rec), ptrInt(occ), ptrInt(notAfter), ptrInt(missed)
 	t.ArchivedAt, t.AutoArchive, t.RunTimeout = ptrInt(archived), ptrInt(autoArch), ptrInt(runTO)
-	t.Labels, t.Assignees, t.Aliases, t.Custom = []GigTag{}, []int64{}, []string{}, map[string]any{}
+	t.Labels, t.Assignees, t.Followers, t.Aliases, t.Custom = []GigTag{}, []int64{}, []int64{}, []string{}, map[string]any{}
 	t.AllowedTools = []string{}
 	_ = json.Unmarshal([]byte(tools), &t.AllowedTools)
 	t.BlockedBy += t.BlockedBySubgigs
@@ -207,6 +208,19 @@ func fill(ctx context.Context, q Q, ts []*Gig) error {
 			return err
 		}
 		byID[tid].Assignees = append(byID[tid].Assignees, uid)
+	}
+	rows.Close()
+	rows, err = q.QueryContext(ctx, `SELECT gig_id, user_id FROM gig_followers WHERE gig_id IN (`+in+`) ORDER BY user_id`, int64Args(ids)...)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var tid, uid int64
+		if err := rows.Scan(&tid, &uid); err != nil {
+			rows.Close()
+			return err
+		}
+		byID[tid].Followers = append(byID[tid].Followers, uid)
 	}
 	rows.Close()
 	rows, err = q.QueryContext(ctx, `SELECT v.gig_id, v.field_id, v.value FROM gig_custom_values v JOIN custom_fields f ON f.id = v.field_id
@@ -608,6 +622,7 @@ type NewGig struct {
 	ParentID      *int64
 	Labels        []string // names; created in the workspace if missing
 	Assignees     []int64
+	Followers     []int64 // besides the creator, who follows when their "follow the gigs I create" setting is on
 	ClonedFromID  *int64
 	CreatedViaKey *int64
 	NotAfter      *int64 // window closes
@@ -738,6 +753,13 @@ func CreateGig(ctx context.Context, q Q, a Actor, n NewGig) (*Gig, error) {
 	if err := setAssignees(ctx, q, p.WorkspaceID, p.ID, id, OwnerDefault(ctx, q, p.WorkspaceID, p.ID, n.Assignees)); err != nil {
 		return nil, err
 	}
+	followers := slices.Clone(n.Followers)
+	if a.UserID != 0 && !slices.Contains(followers, a.UserID) && FollowsOwnGigs(ctx, q, a.UserID) && UserHasIn(ctx, q, a.UserID, p.WorkspaceID, p.ID, "view") {
+		followers = append(followers, a.UserID)
+	}
+	if err := setFollowers(ctx, q, p.WorkspaceID, p.ID, id, followers); err != nil {
+		return nil, err
+	}
 	t, err := GetGig(ctx, q, id)
 	if err != nil {
 		return nil, err
@@ -852,6 +874,7 @@ type GigPatch struct {
 	ParentID      **int64
 	Labels        []string
 	Assignees     []int64
+	Followers     []int64 // nil = unchanged
 	Model         *string
 	Effort        *string
 	AlwaysRun     *bool
@@ -1012,6 +1035,12 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 			return nil, err
 		}
 		touched = true // a table of their own: the diff below shows them
+	}
+	if p.Followers != nil {
+		if err := setFollowers(ctx, q, t.WorkspaceID, t.ProjectID, t.ID, p.Followers); err != nil {
+			return nil, err
+		}
+		touched = true
 	}
 	if len(changed) == 0 && !touched {
 		return t, nil
@@ -1225,8 +1254,8 @@ func MoveGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, m Move) (*
 }
 
 // CloneGig copies a gig into a project of the same workspace (default: its own), at the bottom of
-// the target's default status. Title, description, priority, colour, dates, labels, assignees, model,
-// effort and custom field values are copied, and the checklist (every item unticked);
+// the target's default status. Title, description, priority, colour, dates, labels, assignees,
+// followers (those who can see the target), model, effort and custom field values are copied, and the checklist (every item unticked);
 // always_run and allowed_tools are not (setting those needs their own permissions), nor subgigs,
 // dependencies, comments or runs.
 func CloneGig(ctx context.Context, q Q, a Actor, t *Gig, project *int64, title *string, viaKey *int64) (*Gig, error) {
@@ -1239,6 +1268,7 @@ func CloneGig(ctx context.Context, q Q, a Actor, t *Gig, project *int64, title *
 			return nil, Invalid("project %d is not in this workspace", *project)
 		}
 	}
+	n.Followers = whoSee(ctx, q, t.WorkspaceID, n.ProjectID, t.Followers, MaxFollowers)
 	if title != nil {
 		n.Title = *title
 	}

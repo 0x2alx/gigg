@@ -580,6 +580,7 @@ type Template struct {
 	Color         *string          `json:"color"`
 	Labels        []string         `json:"labels"`
 	Assignees     []int64          `json:"assignees"`
+	Followers     []int64          `json:"followers" doc:"Users who follow each gig made from it (besides the creator's own setting)"`
 	Checklist     []string         `json:"checklist"`
 	Subgigs       []TemplateSubgig `json:"subgigs" doc:"Subgigs each gig made from it gets"`
 	Custom        map[string]any   `json:"custom"`
@@ -595,15 +596,15 @@ type Template struct {
 	Recurring     int64            `json:"recurring" doc:"Live recurring gigs that create their gigs from this template"`
 }
 
-const tplCols = `id, COALESCE(workspace_id, 0), project_id, name, title, description_md, priority, color, labels, assignees, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes, run_timeout_minutes,
+const tplCols = `id, COALESCE(workspace_id, 0), project_id, name, title, description_md, priority, color, labels, assignees, followers, checklist, custom, created_by, created_at, version, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes, run_timeout_minutes,
 	(SELECT count(*) FROM recurrences r WHERE r.template_id = gig_templates.id AND r.deleted_at IS NULL)`
 
 func scanTemplate(row interface{ Scan(...any) error }) (*Template, error) {
 	t := &Template{}
 	var proj, autoArch, runTO sql.NullInt64
 	var color sql.NullString
-	var labels, assignees, checklist, custom, tools, subs string
-	if err := row.Scan(&t.ID, &t.WorkspaceID, &proj, &t.Name, &t.Title, &t.DescriptionMD, &t.Priority, &color, &labels, &assignees, &checklist, &custom,
+	var labels, assignees, followers, checklist, custom, tools, subs string
+	if err := row.Scan(&t.ID, &t.WorkspaceID, &proj, &t.Name, &t.Title, &t.DescriptionMD, &t.Priority, &color, &labels, &assignees, &followers, &checklist, &custom,
 		&t.CreatedBy, &t.CreatedAt, &t.Version, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &subs, &autoArch, &runTO, &t.Recurring); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -614,6 +615,8 @@ func scanTemplate(row interface{ Scan(...any) error }) (*Template, error) {
 	t.Shared = t.WorkspaceID == 0
 	_ = json.Unmarshal([]byte(labels), &t.Labels)
 	_ = json.Unmarshal([]byte(assignees), &t.Assignees)
+	t.Followers = []int64{}
+	_ = json.Unmarshal([]byte(followers), &t.Followers)
 	_ = json.Unmarshal([]byte(checklist), &t.Checklist)
 	_ = json.Unmarshal([]byte(custom), &t.Custom)
 	t.AllowedTools = []string{}
@@ -685,6 +688,10 @@ func (t *Template) validate() error {
 	if t.Assignees == nil {
 		t.Assignees = []int64{}
 	}
+	t.Followers = uniqIDs(t.Followers)
+	if len(t.Followers) > MaxFollowers {
+		return Invalid("at most %d followers", MaxFollowers)
+	}
 	if t.Checklist == nil {
 		t.Checklist = []string{}
 	}
@@ -708,6 +715,8 @@ func (t *Template) validate() error {
 			return Invalid("a shared template has no custom field values (fields belong to a workspace)")
 		case len(t.Assignees) > 0:
 			return Invalid("a shared template has no assignees: each recurring gig that uses it sets its own")
+		case len(t.Followers) > 0:
+			return Invalid("a shared template has no followers: each recurring gig that uses it sets its own")
 		}
 	}
 	return validTemplateLists(t.Labels, t.Assignees, 0, nil)
@@ -787,9 +796,9 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 	}
 	var before *Template
 	if t.ID == 0 {
-		res, err := q.ExecContext(ctx, `INSERT INTO gig_templates (workspace_id, project_id, name, title, description_md, priority, color, labels, assignees,
-			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes, run_timeout_minutes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, wsArg(t.WorkspaceID), nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
-			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive), nullInt(t.RunTimeout))
+		res, err := q.ExecContext(ctx, `INSERT INTO gig_templates (workspace_id, project_id, name, title, description_md, priority, color, labels, assignees, followers,
+			checklist, custom, created_by, created_at, model, effort, always_run, allowed_tools, subgigs, auto_archive_minutes, run_timeout_minutes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, wsArg(t.WorkspaceID), nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD,
+			t.Priority, nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Followers), mustJSON(t.Checklist), mustJSON(t.Custom), a.UserID, Now(), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive), nullInt(t.RunTimeout))
 		if err != nil {
 			return nil, err
 		}
@@ -804,8 +813,8 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			return nil, ErrVersion
 		}
 		if _, err := q.ExecContext(ctx, `UPDATE gig_templates SET project_id = ?, name = ?, title = ?, description_md = ?, priority = ?, color = ?, labels = ?,
-			assignees = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, subgigs = ?, auto_archive_minutes = ?, run_timeout_minutes = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
-			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive), nullInt(t.RunTimeout), t.ID); err != nil {
+			assignees = ?, followers = ?, checklist = ?, custom = ?, model = ?, effort = ?, always_run = ?, allowed_tools = ?, subgigs = ?, auto_archive_minutes = ?, run_timeout_minutes = ?, version = version + 1 WHERE id = ?`, nullInt(t.ProjectID), t.Name, t.Title, t.DescriptionMD, t.Priority,
+			nullStr(t.Color), mustJSON(t.Labels), mustJSON(t.Assignees), mustJSON(t.Followers), mustJSON(t.Checklist), mustJSON(t.Custom), t.Model, t.Effort, t.AlwaysRun, mustJSON(t.AllowedTools), mustJSON(t.Subgigs), nullInt(t.AutoArchive), nullInt(t.RunTimeout), t.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -854,8 +863,8 @@ func templateSchedules(ctx context.Context, q Q, id int64) []string {
 	return out
 }
 
-// AddSubgigs creates subgigs of t, each made like t: same project, priority, assignees, window
-// and run settings. The assignees aren't notified again for each one (they were for t).
+// AddSubgigs creates subgigs of t, each made like t: same project, priority, assignees, followers,
+// window and run settings. The assignees aren't notified again for each one (they were for t).
 func AddSubgigs(ctx context.Context, q Q, a Actor, t *Gig, subs []TemplateSubgig) error {
 	subs, err := normSubgigs(subs)
 	if err != nil {
@@ -865,7 +874,7 @@ func AddSubgigs(ctx context.Context, q Q, a Actor, t *Gig, subs []TemplateSubgig
 		parent := t.ID
 		if _, err := CreateGig(ctx, q, a, NewGig{ProjectID: t.ProjectID, Title: s.Title, Priority: t.Priority, ParentID: &parent,
 			BlocksParent: s.BlocksParent, StartAt: t.StartAt, DueAt: t.DueAt, NotAfter: t.NotAfter, Assignees: t.Assignees,
-			CreatedViaKey: t.CreatedViaKeyID, Model: t.Model, Effort: t.Effort, AlwaysRun: t.AlwaysRun, AllowedTools: t.AllowedTools,
+			Followers: whoSee(ctx, q, t.WorkspaceID, t.ProjectID, t.Followers, MaxFollowers), CreatedViaKey: t.CreatedViaKeyID, Model: t.Model, Effort: t.Effort, AlwaysRun: t.AlwaysRun, AllowedTools: t.AllowedTools,
 			Quiet: true}); err != nil {
 			return err
 		}
@@ -906,7 +915,8 @@ func GigFromTemplate(ctx context.Context, q Q, a Actor, tpl *Template, p *Projec
 	}
 	n := NewGig{ProjectID: p.ID, Title: tpl.Title, DescriptionMD: tpl.DescriptionMD, Priority: tpl.Priority, Color: tpl.Color,
 		Model: tpl.Model, Effort: tpl.Effort, AlwaysRun: tpl.AlwaysRun, AllowedTools: tpl.AllowedTools, AutoArchive: tpl.AutoArchive, RunTimeout: tpl.RunTimeout,
-		Labels: tpl.Labels, Assignees: validAssignees(ctx, q, &Recurrence{WorkspaceID: p.WorkspaceID, Assignees: tpl.Assignees}), CreatedViaKey: viaKey}
+		Labels: tpl.Labels, Assignees: validAssignees(ctx, q, &Recurrence{WorkspaceID: p.WorkspaceID, Assignees: tpl.Assignees}),
+		Followers: whoSee(ctx, q, p.WorkspaceID, p.ID, tpl.Followers, MaxFollowers), CreatedViaKey: viaKey}
 	if title != nil && strings.TrimSpace(*title) != "" {
 		n.Title = *title
 	}
@@ -1029,20 +1039,21 @@ type Notification struct {
 	GigKey      *string `json:"gig_key"`
 	GigTitle    *string `json:"gig_title"`
 	CommentID   *int64  `json:"comment_id"`
-	Kind        string  `json:"kind" doc:"mention, assigned, question, missed or comment"`
+	Kind        string  `json:"kind" doc:"mention, assigned, question (needs a person), failed (a run ended in an error or timed out), missed or comment (a report)"`
 	ActorID     *int64  `json:"actor_user_id"`
 	CreatedAt   int64   `json:"created_at"`
 	ReadAt      *int64  `json:"read_at"`
 }
 
 // Notify records a bell entry for each user (never for the actor themself), deduplicated per
-// (user, gig, comment, kind). Users who can no longer see the workspace are skipped.
+// (user, gig, comment, kind). Users who can no longer see the gig, and users whose bell settings
+// leave this kind out, are skipped.
 func Notify(ctx context.Context, q Q, a Actor, t *Gig, commentID *int64, kind string, users []int64) error {
-	for _, u := range users {
-		if u == a.UserID || u == 0 {
+	for _, u := range uniqIDs(users) {
+		if u == a.UserID {
 			continue
 		}
-		if !UserHasIn(ctx, q, u, t.WorkspaceID, t.ProjectID, "view") {
+		if !UserHasIn(ctx, q, u, t.WorkspaceID, t.ProjectID, "view") || !BellAllows(ctx, q, u, kind) {
 			continue
 		}
 		var dup int

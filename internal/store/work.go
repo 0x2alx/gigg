@@ -73,7 +73,7 @@ func AddComment(ctx context.Context, q Q, a Actor, t *Gig, kind, body string, ru
 	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "comment.created", "comment", id, map[string]any{"gig_id": t.ID, "kind": kind}); err != nil {
 		return nil, err
 	}
-	// the bell: @mentions; questions and reports go to the gig's creator and assignees
+	// the bell: @mentions; questions and reports go to the gig's assignees and followers
 	if kind != "system" {
 		if err := Notify(ctx, q, a, t, &id, "mention", MentionedUsers(ctx, q, body)); err != nil {
 			return nil, err
@@ -84,7 +84,7 @@ func AddComment(ctx context.Context, q Q, a Actor, t *Gig, kind, body string, ru
 		if kind == "question" {
 			nk = "question"
 		}
-		if err := Notify(ctx, q, a, t, &id, nk, append([]int64{t.CreatedBy}, t.Assignees...)); err != nil {
+		if err := NotifyWatchers(ctx, q, a, t, &id, nk); err != nil {
 			return nil, err
 		}
 	}
@@ -486,6 +486,7 @@ func FinishRun(ctx context.Context, q Q, a Actor, r *Run, f Finish) (*Run, *Gig,
 		return nil, nil, err
 	}
 	var reportID *int64
+	asked := false // a question comment already rang the bell
 	if strings.TrimSpace(f.ReportMD) != "" {
 		kind := f.CommentKind
 		if kind == "" {
@@ -499,6 +500,18 @@ func FinishRun(ctx context.Context, q Q, a Actor, r *Run, f Finish) (*Run, *Gig,
 			return nil, nil, err
 		}
 		reportID = &c.ID
+		asked = kind == "question"
+	}
+	// a run that needs a person (or ended in an error or a timeout) rings the watchers even when the
+	// worker sent no question with it
+	if !asked && (f.Status == "needs_human" || f.Status == "error" || f.Status == "timeout") {
+		nk := "failed"
+		if f.Status == "needs_human" {
+			nk = "question"
+		}
+		if err := NotifyWatchers(ctx, q, a, t, reportID, nk); err != nil {
+			return nil, nil, err
+		}
 	}
 	now := Now()
 	dur := f.DurationMS

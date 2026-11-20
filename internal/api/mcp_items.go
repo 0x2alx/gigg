@@ -51,6 +51,7 @@ type (
 		Priority      int64          `json:"priority,omitempty" jsonschema:"0-4"`
 		Labels        []string       `json:"labels,omitempty"`
 		Assignees     []int64        `json:"assignees,omitempty"`
+		Followers     []int64        `json:"followers,omitempty" jsonschema:"User ids who follow each gig made from it (on update omit to keep, [] clears)"`
 		Checklist     []string       `json:"checklist,omitempty"`
 		Subgigs       []subgigArg    `json:"subgigs,omitempty" jsonschema:"Subgigs each gig made from it gets: title, and blocks_parent when the gig should wait for it"`
 		Custom        map[string]any `json:"custom,omitempty"`
@@ -96,7 +97,7 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 				}
 				return toolResult(call("GET", "/workspaces/"+ws(in.Workspace)+"/templates", q, nil))
 			})
-		mcp.AddTool(s, &mcp.Tool{Name: "notifications", Description: "Your notifications: @mentions, assignments, questions on your gigs, missed windows.", Annotations: ro("Notifications")},
+		mcp.AddTool(s, &mcp.Tool{Name: "notifications", Description: "Your notifications: @mentions, assignments, and for the gigs you're assigned or follow: reports, questions, failed runs, missed windows (as your bell settings allow).", Annotations: ro("Notifications")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in notifArgs) (*mcp.CallToolResult, any, error) {
 				q := url.Values{}
 				if in.Unread {
@@ -174,7 +175,7 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 				if in.Subgigs != nil {
 					b["subgigs"] = in.Subgigs
 				}
-				for k, v := range map[string]any{"labels": in.Labels, "assignees": in.Assignees, "checklist": in.Checklist} {
+				for k, v := range map[string]any{"labels": in.Labels, "assignees": in.Assignees, "followers": in.Followers, "checklist": in.Checklist} {
 					switch x := v.(type) {
 					case []string:
 						if x != nil {

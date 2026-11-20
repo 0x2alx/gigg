@@ -132,6 +132,10 @@ type (
 		Gig      string `json:"gig" jsonschema:"Gig id or key, e.g. GIG-12"`
 		Comments bool   `json:"comments,omitempty" jsonschema:"Include the comments"`
 	}
+	followGigArgs struct {
+		Gig      string `json:"gig" jsonschema:"Gig id or key, e.g. GIG-12"`
+		Unfollow bool   `json:"unfollow,omitempty" jsonschema:"Stop following it instead"`
+	}
 	commentsArgs struct {
 		Gig     string `json:"gig" jsonschema:"Gig id or key"`
 		SinceID int64  `json:"since_id,omitempty" jsonschema:"Only comments after this id"`
@@ -144,6 +148,7 @@ type (
 		Priority      int64          `json:"priority,omitempty" jsonschema:"0 none, 1 low, 2 medium, 3 high, 4 urgent"`
 		Labels        []string       `json:"labels,omitempty" jsonschema:"Label names (created if missing)"`
 		Assignees     []string       `json:"assignees,omitempty" jsonschema:"Usernames (or user ids) to assign; they must be able to see the workspace"`
+		Followers     []string       `json:"followers,omitempty" jsonschema:"Usernames (or user ids) who follow it: they get its bells (reports, questions, failed runs, missed windows) as their bell settings allow. You follow it too unless your follow_own_gigs preference is off"`
 		Color         string         `json:"color,omitempty" jsonschema:"#RRGGBB"`
 		StartAt       int64          `json:"start_at,omitempty" jsonschema:"Unix ms"`
 		DueAt         int64          `json:"due_at,omitempty" jsonschema:"Unix ms"`
@@ -164,6 +169,7 @@ type (
 		Priority      *int64   `json:"priority,omitempty" jsonschema:"0-4"`
 		Labels        []string `json:"labels,omitempty" jsonschema:"Replaces the labels"`
 		Assignees     []string `json:"assignees,omitempty" jsonschema:"Usernames (or user ids); replaces the assignees (clear: assignees removes them all)"`
+		Followers     []string `json:"followers,omitempty" jsonschema:"Usernames (or user ids); replaces the followers (clear: followers removes them all). To follow it yourself, follow_gig"`
 		Color         string   `json:"color,omitempty" jsonschema:"#RRGGBB"`
 		StartAt       int64    `json:"start_at,omitempty" jsonschema:"Unix ms"`
 		DueAt         int64    `json:"due_at,omitempty" jsonschema:"Unix ms"`
@@ -174,7 +180,7 @@ type (
 		AllowedTools  []string `json:"allowed_tools,omitempty" jsonschema:"Replaces the runner tool allowlist ([] clears; needs the allowed_tools permission)"`
 		BlocksParent  *bool    `json:"blocks_parent,omitempty" jsonschema:"For a subgig: true = its parent waits until it is done"`
 		AutoArchive   int64    `json:"auto_archive_minutes,omitempty" jsonschema:"Archive it this many minutes (5-527040) after it is done or cancelled"`
-		Clear         []string `json:"clear,omitempty" jsonschema:"Fields to clear: color, start_at, due_at, not_after, labels, assignees, auto_archive_minutes"`
+		Clear         []string `json:"clear,omitempty" jsonschema:"Fields to clear: color, start_at, due_at, not_after, labels, assignees, followers, auto_archive_minutes"`
 	}
 	moveGigArgs struct {
 		Gig      string `json:"gig" jsonschema:"Gig id or key"`
@@ -213,6 +219,7 @@ type (
 		Priority      *int64      `json:"priority,omitempty" jsonschema:"0-4"`
 		Labels        []string    `json:"labels,omitempty"`
 		Assignees     []int64     `json:"assignees,omitempty" jsonschema:"User ids"`
+		Followers     []int64     `json:"followers,omitempty" jsonschema:"User ids who follow each of its gigs (kept in its template; [] clears)"`
 		Freq          string      `json:"freq,omitempty" jsonschema:"daily, weekly or monthly"`
 		Interval      int64       `json:"interval,omitempty" jsonschema:"Every N days/weeks/months (default 1)"`
 		Weekdays      []int       `json:"weekdays,omitempty" jsonschema:"Weekly: 1=Mon .. 7=Sun"`
@@ -398,6 +405,14 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				return toolResult(200, []byte(`{"gig":`+string(body)+`,"comments":`+string(cb)+`}`))
 			})
+		mcp.AddTool(s, &mcp.Tool{Name: "follow_gig", Description: "Follow a gig (or stop, with unfollow): its bells (reports, questions, failed runs, missed windows) come to you as your bell settings allow. Anyone who can see a gig may follow it.", Annotations: rw("Follow gig", false)},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in followGigArgs) (*mcp.CallToolResult, any, error) {
+				method := "PUT"
+				if in.Unfollow {
+					method = "DELETE"
+				}
+				return toolResult(call(method, "/gigs/"+t(in.Gig)+"/follow", nil, nil))
+			})
 		mcp.AddTool(s, &mcp.Tool{Name: "list_runs", Description: "A gig's agent runs (sessions, status, cost), newest first.", Annotations: ro("List runs")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in gigArg) (*mcp.CallToolResult, any, error) {
 				return toolResult(call("GET", "/gigs/"+t(in.Gig)+"/runs", nil, nil))
@@ -451,6 +466,13 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 					}
 					b["assignees"] = ids
 				}
+				if in.Followers != nil {
+					ids, res := mcpUserIDs(call, in.Followers)
+					if res != nil {
+						return res, nil, nil
+					}
+					b["followers"] = ids
+				}
 				if len(in.Custom) > 0 {
 					b["custom"] = in.Custom
 				}
@@ -464,7 +486,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				return toolResult(call("POST", fmt.Sprintf("/projects/%d/gigs", in.Project), nil, b))
 			})
-		addToolIf(p.AllowedAnywhere("edit_gigs"), s, &mcp.Tool{Name: "update_gig", Description: "Change a gig's title, description, priority, labels, assignees, colour, dates, or how an agent runs it (model, effort, always_run, allowed_tools).", Annotations: rw("Update gig", false)},
+		addToolIf(p.AllowedAnywhere("edit_gigs"), s, &mcp.Tool{Name: "update_gig", Description: "Change a gig's title, description, priority, labels, assignees, followers, colour, dates, or how an agent runs it (model, effort, always_run, allowed_tools).", Annotations: rw("Update gig", false)},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in updateGigArgs) (*mcp.CallToolResult, any, error) {
 				b := map[string]any{}
 				setIf(b, "title", in.Title)
@@ -484,6 +506,13 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 						return res, nil, nil
 					}
 					b["assignees"] = ids
+				}
+				if in.Followers != nil {
+					ids, res := mcpUserIDs(call, in.Followers)
+					if res != nil {
+						return res, nil, nil
+					}
+					b["followers"] = ids
 				}
 				if in.StartAt != 0 {
 					b["start_at"] = in.StartAt
@@ -513,10 +542,10 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 				}
 				for _, f := range in.Clear {
 					switch f {
-					case "color", "start_at", "due_at", "not_after", "labels", "assignees", "auto_archive_minutes":
+					case "color", "start_at", "due_at", "not_after", "labels", "assignees", "followers", "auto_archive_minutes":
 						b[f] = nil
 					default:
-						return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"clear accepts color, start_at, due_at, not_after, labels, assignees, auto_archive_minutes"}`))
+						return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"clear accepts color, start_at, due_at, not_after, labels, assignees, followers, auto_archive_minutes"}`))
 					}
 				}
 				return toolResult(call("PATCH", "/gigs/"+t(in.Gig), nil, b))
@@ -688,6 +717,9 @@ func (in recArgs) merge(b map[string]any) map[string]any {
 	if in.Assignees != nil {
 		b["assignees"] = in.Assignees
 	}
+	if in.Followers != nil {
+		b["followers"] = in.Followers
+	}
 	if in.Interval != 0 {
 		b["interval"] = in.Interval
 	}
@@ -743,7 +775,7 @@ func (in recArgs) merge(b map[string]any) map[string]any {
 
 // content: the call changes the gig content.
 func (in recArgs) content() bool {
-	return in.Title != "" || in.DescriptionMD != nil || in.Priority != nil || in.Labels != nil || in.Assignees != nil || in.Model != nil ||
+	return in.Title != "" || in.DescriptionMD != nil || in.Priority != nil || in.Labels != nil || in.Assignees != nil || in.Followers != nil || in.Model != nil ||
 		in.Effort != nil || in.AlwaysRun != nil || in.AllowedTools != nil || in.Checklist != nil || in.Subgigs != nil
 }
 

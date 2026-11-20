@@ -56,6 +56,7 @@ type templateBody struct {
 	Color         *string                `json:"color,omitempty"`
 	Labels        []string               `json:"labels,omitempty" maxItems:"20"`
 	Assignees     []int64                `json:"assignees,omitempty" maxItems:"50"`
+	Followers     []int64                `json:"followers,omitempty" maxItems:"50" doc:"Users who follow each gig made from it (they must see its project then; others are left out); on update, omit to keep, [] clears"`
 	Checklist     []string               `json:"checklist,omitempty" maxItems:"200"`
 	Subgigs       []store.TemplateSubgig `json:"subgigs,omitempty" maxItems:"50" doc:"Subgigs each gig made from it gets (title; blocks_parent = the gig waits for it)"`
 	Custom        map[string]any         `json:"custom,omitempty"`
@@ -73,6 +74,9 @@ func (b templateBody) apply(t *store.Template) {
 	t.Model, t.Effort, t.AlwaysRun, t.AutoArchive, t.RunTimeout = b.Model, b.Effort, b.AlwaysRun, b.AutoArchive, b.RunTimeout
 	if b.AllowedTools != nil || t.ID == 0 {
 		t.AllowedTools = b.AllowedTools
+	}
+	if b.Followers != nil || t.ID == 0 {
+		t.Followers = b.Followers
 	}
 }
 
