@@ -107,6 +107,9 @@ const (
 	errandTemplatesPerWS = 500
 )
 
+// ErrandDefaultTimeout (seconds): a timeout other than this needs the run_timeout permission.
+const ErrandDefaultTimeout = errandDefaultTimeout
+
 const ctCols = `t.id, COALESCE(t.workspace_id, 0), t.name, t.description_md, t.command, t.timeout_s, t.output, t.unsandboxed, t.command_set_by,
 	COALESCE((SELECT username FROM users WHERE id = t.command_set_by), ''), t.command_set_at, t.unsandboxed_set_by, t.created_by, t.created_at, t.version,
 	(SELECT count(*) FROM errands c WHERE c.template_id = t.id AND c.deleted_at IS NULL)`
@@ -347,7 +350,7 @@ func sandboxedFor(ctx context.Context, q Q, a Actor, ws, tplID, errandID int64, 
 	return copyErrandTemplate(ctx, q, a, t, ws, true)
 }
 
-// copyErrandTemplate copies a template into workspace ws for one errand, provenance kept (who set the
+// copyErrandTemplate copies a template into workspace ws (0: the shared library) for one errand, provenance kept (who set the
 // command and when; who turned the sandbox off, unless sandboxed makes the copy run in the sandbox).
 func copyErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ws int64, sandboxed bool) (int64, error) {
 	unsandboxed, ub := t.Unsandboxed && !sandboxed, any(nil)
@@ -355,7 +358,7 @@ func copyErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ws
 		ub = nullInt(t.UnsandboxedBy)
 	}
 	res, err := q.ExecContext(ctx, `INSERT INTO errand_templates (workspace_id, name, description_md, command, timeout_s, output, unsandboxed,
-		command_set_by, command_set_at, unsandboxed_set_by, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, ws, t.Name, t.DescriptionMD, t.Command,
+		command_set_by, command_set_at, unsandboxed_set_by, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, wsArg(ws), t.Name, t.DescriptionMD, t.Command,
 		t.TimeoutS, t.Output, unsandboxed, t.CommandSetBy, t.CommandSetAt, ub, a.UserID, Now())
 	if err != nil {
 		return 0, err
@@ -369,7 +372,7 @@ func copyErrandTemplate(ctx context.Context, q Q, a Actor, t *ErrandTemplate, ws
 	if err != nil {
 		return 0, err
 	}
-	_, err = Activity(ctx, q, a, &ws, nil, "errand_template.created", "errand_template", id, AuditSnapshot("errand_template", cp, extra))
+	_, err = Activity(ctx, q, a, wsRef(ws), nil, "errand_template.created", "errand_template", id, AuditSnapshot("errand_template", cp, extra))
 	return id, err
 }
 

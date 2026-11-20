@@ -77,6 +77,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger) *API {
 	a.registerProfile()
 	a.registerRecurrence()
 	a.registerSchedules()
+	a.registerMakeShared()
 	a.registerGroups()
 	a.registerItems()
 	a.registerFeed()
