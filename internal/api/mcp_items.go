@@ -43,7 +43,8 @@ type (
 	}
 	saveTemplateArgs struct {
 		Workspace     string         `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit to use your key's workspace"`
-		ID            int64          `json:"id,omitempty" jsonschema:"Template id to replace (omit to create)"`
+		ID            int64          `json:"id,omitempty" jsonschema:"Template id to replace (omit to create); a shared template is replaced by its id too"`
+		Shared        bool           `json:"shared,omitempty" jsonschema:"Create a shared template, usable in every workspace (needs the Shared library permission on the all-workspaces level and a key with the library:write scope that isn't limited to some places); ignored with id"`
 		Project       *int64         `json:"project_id,omitempty" jsonschema:"Limit to one project"`
 		Name          string         `json:"name"`
 		Title         string         `json:"title"`
@@ -59,6 +60,12 @@ type (
 		Effort        string         `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh or max (default: the agent's)"`
 		AlwaysRun     bool           `json:"always_run,omitempty" jsonschema:"Gigs made from it run whatever the usage budget (needs the always_run permission)"`
 		AllowedTools  []string       `json:"allowed_tools,omitempty" jsonschema:"Tool allowlist its gigs get for the runner (permission rules; on update omit to keep, [] clears; needs the allowed_tools permission)"`
+	}
+	makeSharedArgs struct {
+		Kind         string  `json:"kind" jsonschema:"schedule, template (a gig template) or errand_template"`
+		ID           int64   `json:"id" jsonschema:"Id of the workspace's item to make shared"`
+		DryRun       *bool   `json:"dry_run,omitempty" jsonschema:"Default true: only return the plan (the shared item, the identical copies it would merge, the copies it would skip and why, the recurring gigs and errands that would move). Nothing changes. Pass false, with expect_copies, to do it"`
+		ExpectCopies []int64 `json:"expect_copies,omitempty" jsonschema:"With dry_run false: the ids of the copies the reviewed plan listed (copies[].id; [] when it listed none). If the copies are others by now nothing happens (409), so you can't merge blindly. Required to confirm"`
 	}
 	notifArgs struct {
 		Unread bool `json:"unread,omitempty" jsonschema:"Only unread"`
@@ -201,9 +208,47 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 				if in.ID != 0 {
 					return toolResult(call("PUT", fmt.Sprintf("/templates/%d", in.ID), nil, b))
 				}
+				if in.Shared {
+					return toolResult(call("POST", "/shared/templates", nil, b))
+				}
 				return toolResult(call("POST", "/workspaces/"+ws(in.Workspace)+"/templates", nil, b))
 			})
 	}
+}
+
+// addMakeSharedTool: make_shared wraps POST /{schedules,templates,errand-templates}/{id}/make-shared. The
+// REST handler does every check (Shared library, library:write and the kind's scope, what deleting the
+// source and the copies and moving their users needs); the tool is listed for a key that has the scope of
+// some kind, and answers 403 naming what is missing for the rest. It plans by default and confirms only
+// with the copies the plan listed, so an agent can't merge blindly.
+func addMakeSharedTool(s *mcp.Server, p *access.Principal, call apiCall) {
+	if !p.HasScope("gigs:write") && !p.HasScope("errands:write") {
+		return
+	}
+	mcp.AddTool(s, &mcp.Tool{Name: "make_shared", Description: "Make a workspace's schedule, gig template or errand template shared (usable in every workspace), merging its identical copies in other workspaces: their recurring gigs and errands move to the shared item and the source and the copies are deleted, in one transaction. dry_run (the default) returns the plan and changes nothing; to confirm, call again with dry_run false and expect_copies set to the plan's copies[].id. Needs the Shared library permission and a key with the library:write scope.", Annotations: rw("Make shared", true)},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in makeSharedArgs) (*mcp.CallToolResult, any, error) {
+			var path string
+			switch in.Kind {
+			case "schedule":
+				path = "schedules"
+			case "template", "gig_template":
+				path = "templates"
+			case "errand_template":
+				path = "errand-templates"
+			default:
+				return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"kind must be schedule, template or errand_template."}`))
+			}
+			if in.ID <= 0 {
+				return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"id is required."}`))
+			}
+			if in.DryRun == nil || *in.DryRun {
+				return toolResult(call("POST", fmt.Sprintf("/%s/%d/make-shared", path, in.ID), nil, map[string]any{"dry_run": true}))
+			}
+			if in.ExpectCopies == nil {
+				return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"Confirming needs expect_copies: the ids of the copies the dry-run plan listed ([] if it listed none). Run the plan first (dry_run true)."}`))
+			}
+			return toolResult(call("POST", fmt.Sprintf("/%s/%d/make-shared", path, in.ID), nil, map[string]any{"expect_copies": in.ExpectCopies}))
+		})
 }
 
 // addChecklistTool: update_checklist; the API answers each part with its own permission.

@@ -16,6 +16,7 @@ type (
 	scheduleArgs struct {
 		ID            int64  `json:"id,omitempty" jsonschema:"An existing schedule to change (omit to make one); fields you omit stay as they are"`
 		Workspace     string `json:"workspace,omitempty" jsonschema:"New schedule: workspace id or slug; omit to use your key's workspace"`
+		Shared        bool   `json:"shared,omitempty" jsonschema:"New schedule: make a shared one, usable in every workspace (needs the Shared library permission on the all-workspaces level and a key with the library:write scope that isn't limited to some places); ignored with id"`
 		Name          string `json:"name,omitempty" jsonschema:"Default: described from the rule"`
 		Freq          string `json:"freq,omitempty" jsonschema:"minutes or hours (errands only), daily, weekly or monthly (required for a new schedule)"`
 		Interval      int64  `json:"interval,omitempty" jsonschema:"Every N days/weeks/months (default 1)"`
@@ -78,6 +79,9 @@ func addScheduleTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(
 			}
 			if in.ID != 0 {
 				return toolResult(call("PUT", fmt.Sprintf("/schedules/%d", in.ID), nil, b))
+			}
+			if in.Shared {
+				return toolResult(call("POST", "/shared/schedules", nil, b))
 			}
 			return toolResult(call("POST", "/workspaces/"+ws(in.Workspace)+"/schedules", nil, b))
 		})

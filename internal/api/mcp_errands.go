@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -34,6 +35,17 @@ type (
 		Worker        string `json:"worker,omitempty" jsonschema:"Username of the agent whose executor runs it (default: you)"`
 		OnFailureGig  *bool  `json:"on_failure_gig,omitempty" jsonschema:"The first failure opens a gig for the worker"`
 		Paused        bool   `json:"paused,omitempty" jsonschema:"New errand: create it paused"`
+	}
+	errandTemplateArgs struct {
+		ID            int64  `json:"id,omitempty" jsonschema:"An errand template to change (omit to make one); fields you omit stay as they are. Every errand using it changes"`
+		Workspace     string `json:"workspace,omitempty" jsonschema:"New template: workspace id or slug; omit to use your key's workspace"`
+		Shared        bool   `json:"shared,omitempty" jsonschema:"New template: make a shared one, usable in every workspace (needs the Shared library permission on the all-workspaces level and a key with the library:write scope that isn't limited to some places); ignored with id"`
+		Name          string `json:"name,omitempty" jsonschema:"Required for a new template"`
+		DescriptionMD string `json:"description_md,omitempty"`
+		Command       string `json:"command,omitempty" jsonschema:"Required for a new template; run by bash in the worker agent's sandbox"`
+		TimeoutS      int64  `json:"timeout_s,omitempty" jsonschema:"Seconds, 10-43200 (default 300; another value needs the run_timeout permission)"`
+		Output        string `json:"output,omitempty" jsonschema:"gigg (default) or host"`
+		Unsandboxed   *bool  `json:"unsandboxed,omitempty" jsonschema:"Run outside the sandbox: needs the No-sandbox errands permission"`
 	}
 	errandIDArg struct {
 		ID int64 `json:"id" jsonschema:"Errand id"`
@@ -139,6 +151,40 @@ func addErrandTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(st
 				b["paused"] = true
 			}
 			return toolResult(call("POST", "/workspaces/"+ws(in.Workspace)+"/errands", nil, b))
+		})
+	mcp.AddTool(s, &mcp.Tool{Name: "save_errand_template", Description: "Make an errand template (a command with its timeout, output and sandbox settings that errands share), in a workspace or shared (shared: true), or change one (id): every errand using it changes.", Annotations: rw("Save errand template", false)},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in errandTemplateArgs) (*mcp.CallToolResult, any, error) {
+			b := map[string]any{}
+			if in.ID != 0 {
+				code, body := call("GET", fmt.Sprintf("/errand-templates/%d", in.ID), nil, nil)
+				if code != 200 {
+					return toolResult(code, body)
+				}
+				var cur map[string]any
+				_ = json.Unmarshal(body, &cur)
+				for _, k := range []string{"name", "description_md", "command", "timeout_s", "output", "unsandboxed"} {
+					if v, ok := cur[k]; ok && v != nil {
+						b[k] = v
+					}
+				}
+			}
+			setIf(b, "name", in.Name)
+			setIf(b, "description_md", in.DescriptionMD)
+			setIf(b, "command", in.Command)
+			setIf(b, "output", in.Output)
+			if in.TimeoutS != 0 {
+				b["timeout_s"] = in.TimeoutS
+			}
+			if in.Unsandboxed != nil {
+				b["unsandboxed"] = *in.Unsandboxed
+			}
+			if in.ID != 0 {
+				return toolResult(call("PUT", fmt.Sprintf("/errand-templates/%d", in.ID), nil, b))
+			}
+			if in.Shared {
+				return toolResult(call("POST", "/shared/errand-templates", nil, b))
+			}
+			return toolResult(call("POST", "/workspaces/"+ws(in.Workspace)+"/errand-templates", nil, b))
 		})
 	mcp.AddTool(s, &mcp.Tool{Name: "pause_errand", Description: "Pause an errand, or resume it (resume: true; it starts again from its next slot, missed ones aren't caught up).", Annotations: rw("Pause errand", false)},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in errandPauseArgs) (*mcp.CallToolResult, any, error) {
