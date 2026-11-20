@@ -2,7 +2,7 @@
 import { call } from "./http";
 import { CATEGORY_COLOR, PRIORITY_COLOR, SCHEDULE_COLOR } from "./theme";
 
-export type NotificationKind = "mention" | "assigned" | "question" | "missed" | "comment";
+export type NotificationKind = "mention" | "assigned" | "question" | "failed" | "missed" | "comment";
 
 export interface Notification {
   id: number;
@@ -28,8 +28,9 @@ const KIND: Record<string, { label: string; verb: string; color: string; icon: s
   mention: { label: "mention", verb: "mentioned you on", color: PRIORITY_COLOR[1]!, icon: "@" },
   assigned: { label: "assigned", verb: "assigned you to", color: CATEGORY_COLOR.done!, icon: "☑" },
   question: { label: "question", verb: "asked a question on", color: PRIORITY_COLOR[2]!, icon: "?" },
+  failed: { label: "failed", verb: "", color: PRIORITY_COLOR[3]!, icon: "!" },
   missed: { label: "missed", verb: "", color: CATEGORY_COLOR.waiting!, icon: "◷" },
-  comment: { label: "comment", verb: "commented on", color: SCHEDULE_COLOR, icon: "✎" },
+  comment: { label: "report", verb: "reported on", color: SCHEDULE_COLOR, icon: "✎" },
 };
 
 export function kindInfo(kind: string): { label: string; verb: string; color: string; icon: string } {
@@ -40,6 +41,7 @@ export function kindInfo(kind: string): { label: string; verb: string; color: st
 export function notificationText(n: Pick<Notification, "kind" | "gig_key">, actorName: string | null): string {
   const key = n.gig_key ?? "a gig";
   if (n.kind === "missed") return `${key}: the window closed unclaimed`;
+  if (n.kind === "failed") return `${key}: ${actorName ? `${actorName}'s run` : "a run"} failed or timed out`;
   const who = actorName ?? "Someone";
   return `${who} ${kindInfo(n.kind).verb} ${key}`;
 }

@@ -20,6 +20,14 @@ import { Icon } from "./icons";
 
 export type EditorMode = "gig" | "new" | "recurring" | "template";
 
+// what the Followers row's tip says in each mode
+const FOLLOWERS_TIP: Record<EditorMode, string> = {
+  gig: "They get its bells (reports, questions, failed runs, missed windows) as their bell settings allow, like the assignees",
+  new: "They get its bells as their bell settings allow, like the assignees. You follow the gigs you create unless you turned that off in your profile",
+  recurring: "Each gig it creates starts with these followers (kept in its template)",
+  template: "Each gig made from it starts with these followers",
+};
+
 // EditorValue: what the editor shows. The keys are the gig API's, so the panel can send a change as is.
 export interface EditorValue {
   title: string;
@@ -27,6 +35,7 @@ export interface EditorValue {
   priority: number;
   labels: string[];
   assignees: number[];
+  followers: number[];
   color: string | null;
   start_at: number | null;
   due_at: number | null;
@@ -241,6 +250,20 @@ export function GigEditor(p: {
                     <UserBadge key={id} user={users.get(id)} />
                   ))}
                   {v.assignees.length === 0 && <span className="muted">nobody</span>}
+                </div>
+              )}
+            </Row>
+            )}
+            {!p.shared?.on && (
+            <Row label="Followers" wide tip={FOLLOWERS_TIP[mode]}>
+              {canWrite ? (
+                <AssigneePicker label="Followers" value={v.followers} onChange={(followers) => set({ followers })} candidates={withCurrent(p.candidates, v.followers, users)} />
+              ) : (
+                <div className="chips">
+                  {v.followers.map((id) => (
+                    <UserBadge key={id} user={users.get(id)} />
+                  ))}
+                  {v.followers.length === 0 && <span className="muted">nobody</span>}
                 </div>
               )}
             </Row>

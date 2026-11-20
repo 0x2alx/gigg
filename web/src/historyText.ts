@@ -33,6 +33,19 @@ function labelNames(v: unknown): string[] {
   return v.map((l) => (l && typeof l === "object" ? str((l as { name?: unknown }).name) : str(l)));
 }
 
+// followerChange: who started or stopped following (from {old, new}); a bare list reads as the new set.
+function followerChange(ov: Record<string, unknown> | null, v: unknown, users: Map<number, User>): string {
+  const now = Array.isArray(v) ? (v as unknown[]).map(Number) : [];
+  if (!ov || !("old" in ov) || !Array.isArray(ov.old)) return now.length ? `set the followers to ${names(now, users)}` : "removed the followers";
+  const was = (ov.old as unknown[]).map(Number);
+  const added = now.filter((id) => !was.includes(id));
+  const gone = was.filter((id) => !now.includes(id));
+  const parts: string[] = [];
+  if (added.length) parts.push(`added ${names(added, users)} as follower${added.length === 1 ? "" : "s"}`);
+  if (gone.length) parts.push(`removed ${names(gone, users)} from the followers`);
+  return parts.length ? parts.join(", ") : "changed the followers";
+}
+
 // changes: the readable parts of a gig.updated entry, one per field that changed. Entries hold
 // {old, new} per field; older ones held only the new value for some fields, read as it is.
 export function changes(d: Data, users: Map<number, User>): string[] {
@@ -54,6 +67,7 @@ export function changes(d: Data, users: Map<number, User>): string[] {
     else if (k === "parent_id") out.push(v ? "set a parent gig" : "removed the parent gig");
     else if (k === "labels") out.push(labelNames(v).length ? `set labels to ${labelNames(v).join(", ")}` : "removed the labels");
     else if (k === "assignees") out.push(Array.isArray(v) && v.length ? `assigned ${names(v, users)}` : "removed the assignees");
+    else if (k === "followers") out.push(followerChange(ov, v, users));
     else out.push(`changed ${k.replace(/_/g, " ")}`);
   }
   return out.length ? out : ["edited the gig"];

@@ -316,7 +316,7 @@ in [access.md](access.md).
 | POST | `/me/filters` | Save a filter. |
 | PUT | `/me/filters/{id}` | Replace a saved filter. |
 | DELETE | `/me/filters/{id}` | Delete a saved filter. |
-| GET | `/me/notifications` | Your notifications (mentions, assignments, questions, missed windows). |
+| GET | `/me/notifications` | Your notifications: mentions and assignments, and for the gigs you're assigned to or follow, reports, questions, failed runs and missed windows, as your bell preferences allow (`bell_finished` default off; `bell_problems`, `bell_assigned`, `bell_mentioned`, `bell_missed` default on; `follow_own_gigs`, default on, makes you follow the gigs you create). |
 | POST | `/me/notifications/read` | Mark notifications read (`ids`, or `all`). |
 
 ### users
@@ -405,11 +405,14 @@ in [access.md](access.md).
 | GET | `/gigs/{id}` | A gig, by id or key. |
 | PATCH | `/gigs/{id}` | Change a gig's fields (`null` clears). |
 | POST | `/gigs/{id}/move` | Move a gig: status, position, or another project of the workspace. |
-| POST | `/gigs/{id}/clone` | Copy a gig (optionally into another project): content, labels, assignees, dates, custom field values, and the checklist unticked. |
+| POST | `/gigs/{id}/clone` | Copy a gig (optionally into another project): content, labels, assignees, followers, dates, custom field values, and the checklist unticked. |
 | DELETE | `/gigs/{id}` | Move a gig to the trash. |
 | POST | `/gigs/{id}/restore` | Restore a gig from the trash. |
 | POST | `/gigs/{id}/archive` | Archive a gig (off the board and lists; not trash). |
 | POST | `/gigs/{id}/unarchive` | Bring an archived gig back. |
+| GET | `/gigs/{id}/follow` | Whether you follow a gig (`following`) and who does (`followers`). |
+| PUT | `/gigs/{id}/follow` | Follow a gig yourself (anyone who sees it may; `gigs:read` is enough). Its bells come to you as your bell preferences allow. |
+| DELETE | `/gigs/{id}/follow` | Stop following a gig. Setting other people's follows is an edit: `followers` on create or `PATCH`. |
 | POST | `/projects/{p}/archive-done` | Archive done and cancelled gigs finished more than N days ago (`older_than_days`); `category` (`done` or `cancelled`) limits it to one. |
 | POST | `/gigs/{id}/resume` | Ask for the gig's agent session to be resumed (records the request, moves the gig to todo). |
 | GET | `/gigs/{id}/activity` | A gig's history (old values included). |

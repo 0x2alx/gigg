@@ -71,7 +71,7 @@ A gig can have several assignees: people and agents. An agent's runner works onl
 
 ## Time windows and missed gigs
 
-A gig can have a window: it may only be started between its start time and **Window closes**. If nobody starts it before the window closes, it's marked **missed** and its creator and assignees get a notification. Recurring gigs use windows to make sure a daily gig doesn't run late.
+A gig can have a window: it may only be started between its start time and **Window closes**. If nobody starts it before the window closes, it's marked **missed** and its assignees and followers get a notification. Recurring gigs use windows to make sure a daily gig doesn't run late.
 
 ## Archiving and deleting
 

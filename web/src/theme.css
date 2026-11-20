@@ -1230,6 +1230,17 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 .tp-people .arrow { display: inline-flex; color: var(--muted); }
 .tp-people .muted { margin-left: var(--sp-3); font-size: var(--fs-sm); }
 .tp-expand { flex: none; }
+/* Follow: the open gig's bells come to you; filled with the accent while you follow it */
+.follow-toggle { flex: none; display: inline-flex; align-items: center; gap: 0.35rem; }
+.follow-toggle.following { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.follow-toggle.following svg { fill: currentColor; fill-opacity: 0.25; }
+@media (max-width: 720px) { .follow-toggle .follow-label { display: none; } .follow-toggle { padding-inline: 0.5rem; } }
+/* the profile's Bell card */
+.bell-settings { display: flex; flex-direction: column; gap: var(--sp-3); }
+.bell-settings h2, .bell-settings p { margin: 0; }
+.bell-kinds { display: flex; flex-direction: column; gap: var(--sp-3); padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line); }
+.bell-settings label.check { align-items: flex-start; color: var(--text); }
+.bell-settings label.check input { margin-top: 0.2rem; }
 .panel-full { left: 0; width: auto; box-shadow: none; }
 @container tpanel (min-width: 58rem) {
   .tp-body { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(19rem, 1fr); gap: 1.75rem; align-items: start; }

@@ -251,6 +251,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
   // time, each with the latest list (two quick clicks never undo each other)
   const [liveLabels, setLiveLabels] = useLiveList(gig?.id ?? 0, gig ? gig.labels.map((l) => l.name) : [], (v) => act(api.patchGig(gig!.id, { labels: v })));
   const [liveAssignees, setLiveAssignees] = useLiveList(gig?.id ?? 0, gig?.assignees ?? [], (v) => act(api.patchGig(gig!.id, { assignees: v })));
+  const [liveFollowers, setLiveFollowers] = useLiveList(gig?.id ?? 0, gig?.followers ?? [], (v) => act(api.patchGig(gig!.id, { followers: v })));
 
   if (!gig) {
     return (
@@ -300,6 +301,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
           {!!gig.archived_at && <span className="pill pill-muted"><Icon name="archive" /> archived</span>}
           {gig.deleted && <span className="pill pill-danger">in trash</span>}
         </div>
+        <FollowToggle following={liveFollowers.includes(me.user.id)} onToggle={(on) => act(api.followGig(gig.id, on))} />
         <button
           type="button"
           className="icon-button tp-expand"
@@ -345,6 +347,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
           priority: gig.priority,
           labels: liveLabels,
           assignees: liveAssignees,
+          followers: liveFollowers,
           color: gig.color,
           start_at: gig.start_at,
           due_at: gig.due_at,
@@ -358,6 +361,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
           else if (c.status !== undefined) act(api.moveGig(gig.id, { status: c.status }));
           else if (c.labels) setLiveLabels(c.labels);
           else if (c.assignees) setLiveAssignees(c.assignees);
+          else if (c.followers) setLiveFollowers(c.followers);
           else act(api.patchGig(gig.id, c));
         }}
         setRun={(c) => act(api.patchGig(gig.id, c))}
@@ -718,4 +722,22 @@ function useLiveList<T>(key: number, server: T[], save: (v: T[]) => Promise<unkn
     if (!busy.current) flush();
   };
   return [local ?? server, set];
+}
+
+// FollowToggle: follow the open gig for yourself (anyone who sees it may): its bells come to you as
+// your bell settings allow. Saved at once.
+function FollowToggle({ following, onToggle }: { following: boolean; onToggle: (on: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      className={"button secondary small follow-toggle" + (following ? " following" : "")}
+      aria-pressed={following}
+      aria-label={following ? "Following this gig" : "Follow this gig"}
+      onClick={() => onToggle(!following)}
+      title={following ? "Following: its questions, failed runs and missed windows ring your bell (as your bell settings allow). Click to stop" : "Follow: get this gig's bells, like its assignees"}
+    >
+      <Icon name="bell" />
+      <span className="follow-label">{following ? "Following" : "Follow"}</span>
+    </button>
+  );
 }

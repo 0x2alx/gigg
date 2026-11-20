@@ -6,7 +6,11 @@ describe("notificationText", () => {
     expect(notificationText({ kind: "mention", gig_key: "GIG-12" }, "Ada")).toBe("Ada mentioned you on GIG-12");
     expect(notificationText({ kind: "assigned", gig_key: "GIG-3" }, "Bot")).toBe("Bot assigned you to GIG-3");
     expect(notificationText({ kind: "question", gig_key: "GIG-4" }, null)).toBe("Someone asked a question on GIG-4");
-    expect(notificationText({ kind: "comment", gig_key: null }, "Ada")).toBe("Ada commented on a gig");
+    expect(notificationText({ kind: "comment", gig_key: null }, "Ada")).toBe("Ada reported on a gig");
+  });
+  it("says a run failed", () => {
+    expect(notificationText({ kind: "failed", gig_key: "GIG-9" }, "Scout")).toBe("GIG-9: Scout's run failed or timed out");
+    expect(notificationText({ kind: "failed", gig_key: "GIG-9" }, null)).toBe("GIG-9: a run failed or timed out");
   });
   it("has no actor for a missed window", () => {
     expect(notificationText({ kind: "missed", gig_key: "GIG-7" }, "Ada")).toBe("GIG-7: the window closed unclaimed");
@@ -16,8 +20,8 @@ describe("notificationText", () => {
     expect(kindInfo("weird").label).toBe("weird");
   });
   it("gives each kind its own colour", () => {
-    const colours = ["mention", "assigned", "question", "missed", "comment"].map((k) => kindInfo(k).color);
-    expect(new Set(colours).size).toBe(5);
+    const colours = ["mention", "assigned", "question", "failed", "missed", "comment"].map((k) => kindInfo(k).color);
+    expect(new Set(colours).size).toBe(6);
   });
 });
 

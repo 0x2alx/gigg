@@ -70,6 +70,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   );
   const [gigLabels, setGigLabels] = useState<string[]>(schedule?.labels ?? tpl?.labels ?? []);
   const [assignees, setAssignees] = useState<number[]>(schedule?.assignees ?? tpl?.assignees ?? []);
+  const [followers, setFollowers] = useState<number[]>(schedule?.followers ?? tpl?.followers ?? []);
   const [due, setDue] = useState<number | null>(null);
   const [start, setStart] = useState<number | null>(null);
   const [notAfter, setNotAfter] = useState<number | null>(null);
@@ -169,6 +170,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     setPickedSchedule(null);
     const ok = new Set(assignable(users, members.get(ws.id) ?? []).map((u) => u.id));
     setAssignees((a) => a.filter((id) => ok.has(id)));
+    setFollowers((a) => a.filter((id) => ok.has(id)));
     // run settings and Repeat only as far as this workspace lets you
     const always = hasCap(me, "always_run", ws.id);
     const tools = hasCap(me, "allowed_tools", ws.id);
@@ -224,7 +226,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const canTemplates = hasCap(me, "templates", ws.id);
   // a picked template (editing: the current one), unchanged: the recurring gig uses it as is
   // (a shared template has no assignees: the recurring gig names its own, so they don't count)
-  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, gigLabels, assignees: picked.shared ? (picked.assignees ?? []) : assignees, color, run, checklist, subgigs, custom });
+  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, gigLabels, assignees: picked.shared ? (picked.assignees ?? []) : assignees, followers, color, run, checklist, subgigs, custom });
   // likewise a picked schedule whose timing wasn't changed
   const usesSchedule = repeating && !!pickedSchedule && sameTiming(repeat, pickedSchedule);
   const pickSchedule = (id: number) => {
@@ -253,6 +255,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     setPriority(t.priority);
     setGigLabels(t.labels ?? []);
     if (!t.shared) setAssignees(t.assignees ?? []);
+    setFollowers(t.followers ?? []);
     setColor(t.color);
     setRun(runFrom(t));
     setChecklist(t.checklist ?? []);
@@ -262,7 +265,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   };
 
   const templateBody = (name: string): TemplateBody => {
-    const b: TemplateBody = { name, title, description_md: description, priority, labels: gigLabels, assignees: shared ? [] : assignees, ...runBody(run) };
+    const b: TemplateBody = { name, title, description_md: description, priority, labels: gigLabels, assignees: shared ? [] : assignees, followers: shared ? [] : followers, ...runBody(run) };
     if (tpl) b.allowed_tools = run.allowed_tools; // an edit sends the list, so clearing it clears it
     if (!(tplMode && (tplAnyProject || shared))) b.project_id = project;
     if (color) b.color = color;
@@ -363,6 +366,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
             priority,
             labels: gigLabels,
             assignees,
+            followers,
             ...(color ? { color } : {}),
             ...runBody(run),
             // an edit sends every setting (0 clears a timeout or auto-archive), so taking one off takes it off
@@ -388,6 +392,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           status,
           labels: gigLabels,
           assignees,
+          ...(followers.length ? { followers } : {}),
           ...(color ? { color } : {}),
           ...(due !== null ? { due_at: due } : {}),
           ...(start !== null ? { start_at: start } : {}),
@@ -438,13 +443,14 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
         {editing && schedule && <ScheduleTemplateNote schedule={schedule} />}
         <GigEditor
           mode={mode}
-          v={{ title, description_md: description, priority, labels: gigLabels, assignees, color, start_at: start, due_at: due, not_after: notAfter, project, status, run }}
+          v={{ title, description_md: description, priority, labels: gigLabels, assignees, followers, color, start_at: start, due_at: due, not_after: notAfter, project, status, run }}
           set={(c) => {
             if (c.title !== undefined) setTitle(c.title);
             if (c.description_md !== undefined) setDescription(c.description_md);
             if (c.priority !== undefined) setPriority(c.priority);
             if (c.labels) setGigLabels(c.labels);
             if (c.assignees) setAssignees(c.assignees);
+            if (c.followers) setFollowers(c.followers);
             if (c.color !== undefined) setColor(c.color);
             if (c.start_at !== undefined) setStart(c.start_at);
             if (c.due_at !== undefined) setDue(c.due_at);

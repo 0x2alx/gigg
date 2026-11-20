@@ -12,13 +12,16 @@ The envelope in the top-right corner of every page opens the inbox. Its badge sh
 
 The bell in the top-right corner collects what happened to you. Click it to open the list under it (on a phone it opens the notifications page):
 
-| Kind | When |
-|---|---|
-| mention | Someone wrote `@you` in a gig description or a comment |
-| assigned | You were assigned a gig |
-| question | Someone asked a question on a gig you created or are assigned to |
-| comment | Someone posted a report on a gig you created or are assigned to |
-| missed | A gig of yours wasn't started before its window closed |
+| Kind | When | Setting (Profile → Bell) |
+|---|---|---|
+| mention | Someone wrote `@you` in a gig description or a comment | Mentioned (on) |
+| assigned | You were assigned a gig | Assigned to you (on) |
+| question | Someone asked a question on a gig you follow or are assigned to | Needs a person (on) |
+| failed | An agent's run on such a gig ended in an error or timed out | Needs a person (on) |
+| report | Someone posted a report (a run finished cleanly) on such a gig | Finished (off) |
+| missed | Such a gig wasn't started before its window closed | Missed window (on) |
+
+**Following.** Anyone who can see a gig can follow it with **Follow** at the top of its panel, or be named in its **Followers** (in the gig form, on create or later). Followers hear about a gig as its assignees do. You follow the gigs you create, unless you turn off **Follow the gigs I create** in your profile, for example when you file gigs for others and name who should follow them. A template's followers follow every gig made from it, recurring ones included. Someone who can no longer see a gig hears nothing about it.
 
 Click one to open the gig. **Mark all read** clears the badge. The command palette (**Ctrl+K**) also has a **Notifications** page with the full list.
 

@@ -173,7 +173,7 @@ export function normSubs(xs: TemplateSubgig[]): TemplateSubgig[] {
 // sameAsTemplate: the form still holds exactly the template's content.
 export function sameAsTemplate(
   t: Template,
-  f: { title: string; description: string; priority: number; gigLabels: string[]; assignees: number[]; color: string | null; run: RunSettings; checklist: string[]; subgigs: TemplateSubgig[]; custom: Record<string, unknown> },
+  f: { title: string; description: string; priority: number; gigLabels: string[]; assignees: number[]; followers?: number[]; color: string | null; run: RunSettings; checklist: string[]; subgigs: TemplateSubgig[]; custom: Record<string, unknown> },
 ): boolean {
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const sorted = (xs: number[]) => [...xs].sort((a, b) => a - b);
@@ -183,6 +183,7 @@ export function sameAsTemplate(
     t.priority === f.priority &&
     same(t.labels ?? [], f.gigLabels) &&
     same(sorted(t.assignees ?? []), sorted(f.assignees)) &&
+    (f.followers === undefined || same(sorted(t.followers ?? []), sorted(f.followers))) &&
     (t.color ?? null) === (f.color ?? null) &&
     (t.model ?? "") === f.run.model &&
     (t.effort ?? "") === f.run.effort &&

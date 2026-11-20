@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Followers: anyone who can see a gig can follow it (**Follow** at the top of the gig panel, or named in
+  its **Followers** in the gig form, the API and MCP), and gets its bells as its assignees do. A gig's
+  bells go to its assignees and followers, no longer to its creator as such: you follow the gigs you
+  create unless you turn off **Follow the gigs I create** (Profile → Bell). Templates carry followers,
+  so gigs made from one, recurring ones included, start with them. API: `followers` on gigs,
+  templates and recurring gigs, `GET/PUT/DELETE /gigs/{id}/follow`; MCP: `follow_gig`. Existing gigs
+  start with no followers.
+- Bell settings (Profile → Bell): pick which events ring you: needs a person (questions, and the new
+  **failed** kind: a run that ended in an error or timed out), finished (reports; off by default),
+  assigned, mentioned, missed window. A timed-out run used to ring nobody.
 - Audit log: every object records the same thing. An update records each field that changed with its old
   and new value (schedules, templates, recurring gigs, errands and errand templates recorded only a few
   fields before; workspaces, projects and statuses only the new values), a create every initial value, a

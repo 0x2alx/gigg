@@ -64,11 +64,12 @@ export function LabelInput({ value, onChange, known, autosave }: { value: string
   );
 }
 
-export function AssigneePicker({ value, onChange, candidates }: { value: number[]; onChange: (v: number[]) => void; candidates: User[] }) {
+// AssigneePicker: people toggled on and off (assignees, and followers with label "Followers").
+export function AssigneePicker({ value, onChange, candidates, label = "Assignees" }: { value: number[]; onChange: (v: number[]) => void; candidates: User[]; label?: string }) {
   const toggle = (id: number) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
-  if (candidates.length === 0) return <span className="muted small">No members to assign.</span>;
+  if (candidates.length === 0) return <span className="muted small">No members to pick.</span>;
   return (
-    <div className="assignees" role="group" aria-label="Assignees">
+    <div className="assignees" role="group" aria-label={label}>
       {candidates.map((u) => (
         <button key={u.id} type="button" className={"assignee" + (value.includes(u.id) ? " on" : "")} aria-pressed={value.includes(u.id)} onClick={() => toggle(u.id)}>
           <Avatar user={u} />

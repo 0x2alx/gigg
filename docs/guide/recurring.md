@@ -17,7 +17,7 @@ You can also pick an existing **template** and an existing **schedule** in the s
 ## The timing
 
 - **Every N days, weeks** (on chosen weekdays) **or months** (on a day of the month, or the last day).
-- **Window**: when each occurrence may be worked on, for example 09:00 for 2 hours, in a time zone (by default your own, from your profile). An occurrence that nobody starts before its window closes is marked *missed*. Its creator and assignees get a notification.
+- **Window**: when each occurrence may be worked on, for example 09:00 for 2 hours, in a time zone (by default your own, from your profile). An occurrence that nobody starts before its window closes is marked *missed*. Its assignees and followers get a notification (a template's followers follow every gig made from it).
 - **Create early**: makes each occurrence some minutes before its window opens, so it's visible ahead of time.
 - **Overlap**: when the previous occurrence is still open, **skip** (the default) doesn't create the next one, while **create** makes it anyway.
 

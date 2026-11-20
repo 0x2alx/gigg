@@ -6,6 +6,7 @@ import { ColorPicker } from "./fields";
 import { Avatar } from "./ui";
 import { HelpButton } from "./help";
 import { browserTZ, setPreferredTZ } from "./recurrence";
+import { BELL_SETTINGS, FOLLOW_OWN, prefOn, prefValue } from "./bellPrefs";
 
 export function ProfilePage({ onLogout }: { onLogout: () => void }) {
   const { me, refresh } = useApp();
@@ -73,6 +74,7 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
           </button>
         </div>
       </form>
+      <BellCard />
       <Password onLogout={onLogout} />
       <Sessions />
       <About />
@@ -214,6 +216,34 @@ function Picture() {
       </div>
       <p className="muted small">PNG, JPEG, WebP or GIF, up to 2 MB. It's cropped to a square and stored as a 256 px PNG.</p>
       {err && <p className="danger">{err}</p>}
+    </section>
+  );
+}
+
+// BellCard: which events ring your bell, and whether you follow the gigs you create; each box saves
+// at once. You hear about a gig when you're assigned to it or follow it.
+function BellCard() {
+  const { prefs, setPref } = useApp();
+  return (
+    <section className="card bell-settings" aria-label="Bell">
+      <h2>Bell</h2>
+      <p className="muted small">You hear about the gigs you're assigned to or follow (Follow, on a gig's panel). Ring my bell for:</p>
+      <div className="bell-kinds">
+        {BELL_SETTINGS.map((b) => (
+          <label key={b.pref} className="check">
+            <input type="checkbox" checked={prefOn(prefs, b.pref, b.def)} onChange={(e) => setPref(b.pref, prefValue(e.target.checked, b.def))} />
+            <span>
+              {b.label} <span className="muted small">({b.hint})</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      <label className="check follow-own">
+        <input type="checkbox" checked={prefOn(prefs, FOLLOW_OWN.pref, FOLLOW_OWN.def)} onChange={(e) => setPref(FOLLOW_OWN.pref, prefValue(e.target.checked, FOLLOW_OWN.def))} />
+        <span>
+          Follow the gigs I create <span className="muted small">(turn it off if you file gigs for others and name who follows them)</span>
+        </span>
+      </label>
     </section>
   );
 }

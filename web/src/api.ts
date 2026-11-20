@@ -154,6 +154,7 @@ export interface Gig {
   priority: number;
   created_by: number;
   assignees: number[];
+  followers: number[]; // they get its bells (as their bell settings allow), like the assignees
   color: string | null;
   start_at: number | null;
   due_at: number | null;
@@ -264,6 +265,7 @@ export interface TemplateBody {
   color?: string;
   labels?: string[];
   assignees?: number[];
+  followers?: number[];
   checklist?: string[];
   subgigs?: TemplateSubgig[];
   custom?: Record<string, unknown>;
@@ -286,6 +288,7 @@ export interface Template {
   color: string | null;
   labels: string[] | null;
   assignees: number[] | null;
+  followers?: number[] | null;
   checklist: string[] | null;
   subgigs?: TemplateSubgig[] | null;
   custom: Record<string, unknown> | null;
@@ -308,6 +311,7 @@ export interface GigCreateBody {
   category?: Category;
   labels?: string[];
   assignees?: number[];
+  followers?: number[];
   color?: string;
   start_at?: number;
   due_at?: number;
@@ -339,6 +343,7 @@ export interface RecurrenceBody {
   color?: string;
   labels?: string[];
   assignees?: number[];
+  followers?: number[]; // kept in its template
   freq?: "daily" | "weekly" | "monthly";
   interval?: number;
   weekdays?: number[];
@@ -371,6 +376,7 @@ export interface Recurrence {
   color: string | null;
   labels: string[] | null;
   assignees: number[] | null;
+  followers?: number[] | null; // its template's
   freq: "daily" | "weekly" | "monthly";
   interval: number;
   weekdays: number[] | null;
@@ -609,6 +615,7 @@ export const api = {
   deleteChecklist: (id: number, item: number) =>
     call<Gig | undefined>("DELETE", `/gigs/${id}/checklist/${item}`).then((t) => t ?? call<Gig>("GET", `/gigs/${id}`)),
   archiveGig: (id: number) => call<Gig>("POST", `/gigs/${id}/archive`),
+  followGig: (id: number, on: boolean) => call<Gig>(on ? "PUT" : "DELETE", `/gigs/${id}/follow`),
   unarchiveGig: (id: number) => call<Gig>("POST", `/gigs/${id}/unarchive`),
   archiveDone: (p: number, older_than_days: number, category?: "done" | "cancelled") =>
     call<{ archived: number }>("POST", `/projects/${p}/archive-done`, category ? { older_than_days, category } : { older_than_days }),

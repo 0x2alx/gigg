@@ -203,7 +203,7 @@ POST /runs/{id}/finish
 |---|---|
 | `status` | Required: `done`, `needs_human`, `error`, `timeout`, `interrupted` or `parked`. |
 | `report_md` | Stored as a comment on the gig, linked to the run (up to 64 KiB). Needs `comments:write`. |
-| `comment_kind` | `report` (default), `question` or `comment`. Questions and reports notify the gig's creator and assignees; `@username` mentions notify those users. |
+| `comment_kind` | `report` (default), `question` or `comment`. Questions and reports notify the gig's assignees and followers (as each one's bell preferences allow: reports are off by default); `@username` mentions notify those users. A run finished as `error` or `timeout` without a question notifies them as a failed run. |
 | `move_to_category` | Move the gig there (first status of that category); empty = leave it. Needs `gigs:work`. Moving a gig that is done, cancelled or waiting back to `todo` or `doing` reopens it: like a manual move, an always-run gig then needs the *Always-run gigs* permission and a gig with a tool allowlist the *Gig tool allowlists* permission (403 otherwise). |
 | `check_at` | Only with `parked`: Unix ms, from now to 7 days ahead. The gig's `start_at` moves there, so a claim with `start_due` skips it until then. |
 | `session_id` | The session id if it changed or wasn't known at start. Also stored on the gig. |

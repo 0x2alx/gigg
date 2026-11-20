@@ -98,8 +98,9 @@ There are no MCP tools for claiming gigs or recording runs; runners use the REST
 | `unlink_gigs` | `gigs:write`, `edit_gigs` anywhere | `gig`, `other`, `direction` | Removes a dependency. |
 | `update_checklist` | `gigs:work` and `work_gigs` anywhere (ticking), or `gigs:write` and `edit_gigs` anywhere (adding, removing) | `gig`, `add?`, `check?`, `uncheck?`, `remove?` (item ids) | Applies the changes in that order and returns the checklist. Stops at the first failing step; each step needs its own permission. |
 | `archive_gig` | `gigs:write`, `archive_gigs` anywhere | `gig`, `restore?` | Archives a gig, or unarchives it with `restore: true`. |
+| `follow_gig` | `gigs:read` | `gig`, `unfollow?` | Follows a gig (or stops): its reports, questions, failed runs and missed windows ring your bell as your bell preferences allow. `create_gig` and `update_gig` take `followers` (usernames) to set other people's. |
 | `create_from_template` | `gigs:write`, `create_gigs` anywhere | `template`, `project`, `title?` | Creates a gig from a template. |
-| `save_template` | `gigs:write`, `templates` anywhere | `workspace?`, `id?` (replace), `project_id?`, `name`, `title`, `description_md?`, `priority?`, `labels?`, `assignees?`, `checklist?`, `subgigs?` (`{title, blocks_parent?}` each), `custom?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` | Creates a template, or replaces template `id`. Gigs made from it get its subgigs. |
+| `save_template` | `gigs:write`, `templates` anywhere | `workspace?`, `id?` (replace), `project_id?`, `name`, `title`, `description_md?`, `priority?`, `labels?`, `assignees?`, `followers?` (user ids; on replace, omit to keep), `checklist?`, `subgigs?` (`{title, blocks_parent?}` each), `custom?`, `model?`, `effort?`, `always_run?`, `allowed_tools?` | Creates a template, or replaces template `id`. Gigs made from it get its subgigs. |
 | `delete_gig` | `gigs:delete` | `gig` | Moves a gig to the trash. |
 | `restore_gig` | `gigs:delete` | `gig` | Restores a gig from the trash. |
 | `add_comment` | `comments:write` | `gig`, `body_md`, `kind?` (`comment`, `report`, `question`) | Comments on a gig. |

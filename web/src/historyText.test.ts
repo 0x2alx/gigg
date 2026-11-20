@@ -21,6 +21,8 @@ group("history lines", () => {
       "set labels to ui, assigned Bob",
     );
     expect(say("gig.updated", { parent_id: { old: 4, new: null } })).toBe("removed the parent gig");
+    expect(say("gig.updated", { followers: { old: [], new: [2] } })).toBe("added Bob as follower");
+    expect(say("gig.updated", { followers: { old: [2], new: [] } })).toBe("removed Bob from the followers");
     expect(say("gig.updated", { not_after: { old: null, new: 9 }, missed_at: { old: 3, new: null } })).toMatch(/^set the window close to /);
     expect(say("gig.updated", { labels: ["bug"] })).toBe("set labels to bug");
   });
