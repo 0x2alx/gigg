@@ -4,13 +4,14 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type ShareKind, type SharePlan } from "./api";
 import { Modal } from "./ui";
-import { byWorkspace, doneMessage, KIND_NAME, planSummary } from "./makeShared";
+import { byWorkspace, doneMessage, KIND_NAME, planChanged, planSummary } from "./makeShared";
 
 export function MakeSharedDialog({ kind, id, name, onClose, onDone }: {
   kind: ShareKind; id: number; name: string; onClose: () => void; onDone: (message: string) => void;
 }) {
   const [plan, setPlan] = useState<SharePlan | null>(null);
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
@@ -23,15 +24,28 @@ export function MakeSharedDialog({ kind, id, name, onClose, onDone }: {
     };
   }, [kind, id]);
   const run = () => {
+    if (!plan) return;
     setBusy(true);
     setErr("");
+    setNotice("");
     api
-      .makeShared(kind, id, false)
+      .makeShared(kind, id, false, plan.copies.map((c) => c.id))
       .then((p) => {
         onDone(doneMessage(p));
         onClose();
       })
       .catch((e: unknown) => {
+        if (e instanceof ApiError && planChanged(e)) {
+          // the copies changed since the dry run: show the new plan, the user confirms again
+          setNotice("The copies changed since you looked. Review the plan again.");
+          setPlan(null);
+          api
+            .makeShared(kind, id, true)
+            .then(setPlan)
+            .catch((e2: unknown) => setErr(e2 instanceof ApiError ? e2.message : "Couldn't plan it."))
+            .finally(() => setBusy(false));
+          return;
+        }
         setErr(e instanceof ApiError ? e.message : "Couldn't make it shared.");
         setBusy(false);
       });
@@ -43,6 +57,11 @@ export function MakeSharedDialog({ kind, id, name, onClose, onDone }: {
         <p className="small muted">
           Makes a shared {word} that every workspace can use. Identical copies in the workspaces are merged into it: what uses them moves to the shared one, and the copies are deleted. “{name}” is deleted too.
         </p>
+        {notice && (
+          <p className="small" role="status">
+            {notice}
+          </p>
+        )}
         {!plan && !err && <p className="muted">Looking for copies…</p>}
         {plan && (
           <>

@@ -447,7 +447,10 @@ export interface Schedule {
 export type ShareKind = "schedule" | "template" | "errand_template";
 const SHARE_PATH: Record<ShareKind, string> = { schedule: "/schedules", template: "/templates", errand_template: "/errand-templates" };
 export interface ShareItem { id: number; workspace_id: number; workspace: string; name: string; recurring_gigs: number; errands: number; reason?: string }
-export interface ShareUser { kind: "recurring_gig" | "errand"; id: number; workspace_id: number; workspace: string; label: string; from: number }
+export interface ShareUser { kind: "recurring_gig" | "errand"; id: number; workspace_id: number; workspace: string; project_id?: number; label: string; from: number }
+// makeSharedBody: the request body of a Make shared. A move names the copies of the plan the user
+// reviewed (expect_copies): the server refuses with 409 when the copies it finds now are others.
+export const makeSharedBody = (dry_run: boolean, expectCopies?: number[]) => (dry_run || !expectCopies ? { dry_run } : { dry_run, expect_copies: expectCopies });
 export interface SharePlan {
   kind: ShareKind; dry_run: boolean; source: ShareItem; shared?: ShareItem; copies: ShareItem[]; skipped: ShareItem[]; users: ShareUser[];
   moved: number; deleted: number; new_name: string;
@@ -623,8 +626,10 @@ export const api = {
   putSchedule: (id: number, body: ScheduleBody, version?: number) =>
     call<Schedule>("PUT", `/schedules/${id}`, body, version ? { "If-Match": `"${version}"` } : undefined),
   deleteSchedule: (id: number) => call<void>("DELETE", `/schedules/${id}`),
-  // Make shared: dry_run returns the plan (nothing changes); without it, the move is done.
-  makeShared: (kind: ShareKind, id: number, dry_run: boolean) => call<SharePlan>("POST", `${SHARE_PATH[kind]}/${id}/make-shared`, { dry_run }),
+  // Make shared: dry_run returns the plan (nothing changes); without it, the move is done (expectCopies:
+  // the copy ids of the reviewed plan; 409 when they changed).
+  makeShared: (kind: ShareKind, id: number, dry_run: boolean, expectCopies?: number[]) =>
+    call<SharePlan>("POST", `${SHARE_PATH[kind]}/${id}/make-shared`, makeSharedBody(dry_run, expectCopies)),
   wsGigs: (ws: string | number, params: Record<string, string | number>) =>
     call<{ items: Gig[]; next_cursor?: string }>("GET", `/workspaces/${ws}/gigs?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}`),
   projectGigs: (p: number, params: Record<string, string | number>) =>

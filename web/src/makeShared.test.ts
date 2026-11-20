@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { byWorkspace, doneMessage, planSummary, usersText } from "./makeShared";
-import type { ShareItem, ShareUser } from "./api";
+import { byWorkspace, doneMessage, planChanged, planSummary, usersText } from "./makeShared";
+import { makeSharedBody, type ShareItem, type ShareUser } from "./api";
 
 const u = (kind: ShareUser["kind"], id: number, workspace: string): ShareUser => ({ kind, id, workspace_id: 1, workspace, label: "x", from: 1 });
 const item = (id: number): ShareItem => ({ id, workspace_id: 1, workspace: "A", name: "n", recurring_gigs: 0, errands: 0 });
@@ -22,5 +22,20 @@ describe("make shared plan text", () => {
   it("words the toast", () => {
     expect(doneMessage({ kind: "schedule", new_name: "Mornings", copies: [item(1)], users: [u("recurring_gig", 1, "A")] })).toBe("Shared schedule “Mornings” made, 1 copy merged, 1 recurring gig moved");
     expect(doneMessage({ kind: "errand_template", new_name: "ping", copies: [], users: [] })).toBe("Shared errand template “ping” made");
+  });
+});
+
+describe("make shared request", () => {
+  it("names the reviewed copies on a move only", () => {
+    expect(makeSharedBody(true)).toEqual({ dry_run: true });
+    expect(makeSharedBody(true, [1])).toEqual({ dry_run: true });
+    expect(makeSharedBody(false)).toEqual({ dry_run: false });
+    expect(makeSharedBody(false, [])).toEqual({ dry_run: false, expect_copies: [] });
+    expect(makeSharedBody(false, [3, 4])).toEqual({ dry_run: false, expect_copies: [3, 4] });
+  });
+  it("tells a changed plan from another conflict", () => {
+    expect(planChanged({ status: 409, message: "The copies changed; review the plan again." })).toBe(true);
+    expect(planChanged({ status: 409, message: "recurring gigs #1, #2 would become the same recurring gig" })).toBe(false);
+    expect(planChanged({ status: 403, message: "review the plan again" })).toBe(false);
   });
 });

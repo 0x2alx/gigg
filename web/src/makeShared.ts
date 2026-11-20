@@ -37,3 +37,7 @@ export function doneMessage(plan: Pick<SharePlan, "kind" | "copies" | "users" | 
   const moved = usersText(plan.users);
   return `Shared ${KIND_NAME[plan.kind]} “${plan.new_name}” made${plan.copies.length ? `, ${plural(plan.copies.length, "copy", "copies")} merged` : ""}${moved ? `, ${moved} moved` : ""}`;
 }
+
+// planChanged: the answer to a move whose expect_copies no longer match (409): the copies changed since
+// the plan was shown. (Other 409s, a collision, say something else and are shown as they are.)
+export const planChanged = (e: { status: number; message: string }) => e.status === 409 && /review the plan again/i.test(e.message);
