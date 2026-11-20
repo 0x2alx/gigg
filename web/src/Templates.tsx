@@ -181,24 +181,12 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                     <>
                       <button type="button" className="button secondary small" onClick={() => void copy(t)} aria-label={`Copy ${t.name} as JSON`}>
                         <Icon name="copy" /> Copy JSON
-                      <button type="button" className="button secondary small" onClick={() => setEditing(t)} aria-label={`Edit ${t.name}`}>
-                        <Icon name="pencil" /> Edit
                       </button>
                       {!t.shared && canShare(me) && (
                         <button type="button" className="button secondary small" onClick={() => setSharing(t)} aria-label={`Make ${t.name} shared`}>
                           <Icon name="share" /> Make shared…
                         </button>
                       )}
-                      <button
-                        type="button"
-                        className="button danger-button small"
-                        onClick={() => setConfirm(t.id)}
-                        disabled={(t.recurring ?? 0) > 0}
-                        title={(t.recurring ?? 0) > 0 ? "Recurring gigs use this template: delete them or give them another template first" : undefined}
-                        aria-label={`Delete ${t.name}`}
-                      >
-                        <Icon name="trash" /> Delete
-                      </button>
                       {canEdit && (
                         <>
                           <button type="button" className="button secondary small" onClick={() => setEditing(t)} aria-label={`Edit ${t.name}`}>
