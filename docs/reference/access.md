@@ -189,8 +189,9 @@ and reported as skipped; a source whose own users fail the check is refused (403
 The risky settings of what moves (an always-run or tool-restricted recurring gig, a no-sandbox errand)
 are checked at the all-workspaces level, not in the project the user lives in. The runtime checks
 that follow the item still apply after the move: a recurring gig still creates gigs with its owner's
-permissions, and an errand still runs only while whoever set its command and turned its sandbox off
-holds the matching permission.
+permissions, a no-sandbox errand still runs only while whoever turned its sandbox off holds
+`errand_unsandboxed` there, and an executor still runs only the commands whose author it trusts (its
+own allowlist).
 
 Instance admins hold it, like every permission. A no-sandbox errand made from a shared errand template
 still runs in a workspace only while whoever turned the sandbox off holds `errand_unsandboxed` there.
