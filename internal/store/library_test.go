@@ -7,7 +7,10 @@ import (
 )
 
 // TestLibraryMigration: 0019 gives library:write to the unlimited keys of admins that carry gigs:write
-// or errands:write (what changing the shared library took before), and to no other key.
+// or errands:write (what changing the shared library took before), and to no other key. The scope alone
+// opens nothing: the API asks the scope of the kind next to it (gigs:write for gig templates and
+// schedules, errands:write for errand templates), so no key gains what it couldn't do before (see
+// TestLibraryScopePerKind in internal/api).
 func TestLibraryMigration(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -106,5 +109,26 @@ func TestLibraryGrants(t *testing.T) {
 	g = NewGrants(false, []*AccessRule{{GroupID: &gid, GroupName: "lib", Preset: "viewer", Overrides: map[string]bool{"shared_library": true}}}, workspaces, nil)
 	if !g.Has(0, "shared_library") {
 		t.Fatal("group all-workspaces rule")
+	}
+}
+
+// TestLibraryProjectViewDeny: a project rule that takes view away in one project takes the shared
+// library away too: a holder must see everything their change moves, projects included.
+func TestLibraryProjectViewDeny(t *testing.T) {
+	workspaces := []int64{1, 2}
+	projects := map[int64][]int64{1: {11, 12}, 2: {21}}
+	all := &AccessRule{UserID: new(int64), Preset: "viewer", Overrides: map[string]bool{"shared_library": true}}
+	hide := func(ws, p int64) *AccessRule {
+		return &AccessRule{UserID: new(int64), WorkspaceID: &ws, ProjectID: &p, Overrides: map[string]bool{"view": false}}
+	}
+	if g := NewGrants(false, []*AccessRule{all}, workspaces, projects); !g.Has(0, "shared_library") {
+		t.Fatal("no project hidden: not held")
+	}
+	g := NewGrants(false, []*AccessRule{all, hide(1, 12)}, workspaces, projects)
+	if !g.Has(1, "view") {
+		t.Fatal("the workspace is still viewable")
+	}
+	if d := g.Decide(0, "shared_library"); d.Allowed || d.Source != "needs_view" {
+		t.Fatalf("a project hidden: %+v", d)
 	}
 }

@@ -347,8 +347,8 @@ func (g *Grants) DecideIn(ws, project int64, perm string) Decision {
 		return Decision{Name: perm, Source: "needs_view"}
 	}
 	if global && d.Allowed {
-		for _, w := range g.workspaces { // it reaches every workspace: so must the holder's view
-			if !g.Has(w, "view") {
+		for _, w := range g.workspaces { // it reaches every workspace and project: so must the holder's view
+			if !g.Has(w, "view") || g.ProjectFilter(w) != nil {
 				return Decision{Name: perm, Source: "needs_view"}
 			}
 		}
@@ -809,6 +809,9 @@ func NewGrants(admin bool, rules []*AccessRule, workspaces []int64, projects map
 	g.workspaces = workspaces
 	for ws, ps := range projects {
 		g.projects[ws] = ps
+		for _, p := range ps {
+			g.projectWS[p] = ws
+		}
 	}
 	for _, r := range rules {
 		if r.UserID == nil && r.GroupID == nil {
