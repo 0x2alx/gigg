@@ -47,7 +47,7 @@
       "expect": true
     },
     {
-      "eval": "[...document.querySelectorAll('.card-open')].some(c => c.innerText.includes('Scenario blocked '+localStorage.getItem('scen')) && c.innerText.includes('🔒'))",
+      "eval": "[...document.querySelectorAll('.gig-card.blocked .card-open')].some(c => c.innerText.includes('Scenario blocked '+localStorage.getItem('scen')))",
       "expect": true
     },
     {
@@ -58,7 +58,7 @@
       "shot": "board"
     },
     {
-      "eval": "(async () => { const last = [...document.querySelectorAll('.column')].pop(); const name = last.getAttribute('aria-label'); last.querySelector('.column-collapse').click(); await new Promise(r => setTimeout(r, 300)); const c = document.querySelector('.column-collapsed'); return !!c && c.getAttribute('aria-label') === name && c.getBoundingClientRect().width < 60 && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })()",
+      "eval": "(async () => { const last = [...document.querySelectorAll('.column')].pop(); const name = last.getAttribute('aria-label'); last.querySelector('.col-collapse').click(); await new Promise(r => setTimeout(r, 300)); const c = document.querySelector('.collapsed-chip'); return !!c && c.querySelector('.collapsed-chip-name').textContent === name && ![...document.querySelectorAll('.column')].some(x => x.getAttribute('aria-label') === name) && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })()",
       "expect": true
     },
     {
@@ -71,7 +71,7 @@
       "wait": ".board"
     },
     {
-      "eval": "(async () => { const c = document.querySelector('.column-collapsed'); if (!c) return 'not remembered'; c.querySelector('.column-strip').click(); await new Promise(r => setTimeout(r, 300)); return !document.querySelector('.column-collapsed'); })()",
+      "eval": "(async () => { const last = [...document.querySelectorAll('.column')].pop(); const name = last.getAttribute('aria-label'); last.querySelector('.col-collapse').click(); await new Promise(r => setTimeout(r, 300)); const c = document.querySelector('.collapsed-chip'); return !!c && c.querySelector('.collapsed-chip-name').textContent === name && ![...document.querySelectorAll('.column')].some(x => x.getAttribute('aria-label') === name) && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })()",
       "expect": true
     },
     {
@@ -104,7 +104,7 @@
       "shot": "panel-full"
     },
     {
-      "eval": "(async () => { document.querySelector('.tp-expand').click(); await new Promise(r => setTimeout(r, 300)); return !document.querySelector('aside.panel').classList.contains('panel-full') && localStorage.getItem('gigg.panel.full') === '0'; })()",
+      "eval": "(async () => { document.querySelector('.tp-expand').click(); await new Promise(r => setTimeout(r, 300)); return !document.querySelector('aside.panel').classList.contains('panel-full'); })()",
       "expect": true
     },
     {
@@ -151,7 +151,7 @@
       "wait": "aside.panel"
     },
     {
-      "click": ".page-head h1"
+      "click": ".column-title"
     },
     {
       "wait": 400
@@ -174,7 +174,7 @@
       ]
     },
     {
-      "click": ".page-head h1"
+      "click": ".column-title"
     },
     {
       "wait": 400

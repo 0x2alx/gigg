@@ -75,7 +75,7 @@
    "expect": true
   },
   {
-   "click": ".more-menu > button"
+   "click": ".appbar-new"
   },
   {
    "wait": 200
@@ -116,7 +116,7 @@
    "wait": 300
   },
   {
-   "eval": "[...document.querySelectorAll('.page-head .button')].find(b => b.textContent.includes('New gig')).click(), true"
+   "eval": "(document.querySelector('.appbar-new').click(), new Promise(r => setTimeout(() => { [...document.querySelectorAll('.menu [role^=menuitem]')].find(b => b.textContent.includes('New gig')).click(); r(true); }, 300)))"
   },
   {
    "wait": ".modal"
@@ -135,7 +135,7 @@
    "press": "Escape"
   },
   {
-   "eval": "(document.querySelector('.more-menu > button').click(), new Promise(r => setTimeout(() => { [...document.querySelectorAll('.menu [role^=menuitem]')].find(b => b.textContent.includes('Schedules')).click(); r(true); }, 200)))"
+   "eval": "(document.querySelector('.account-button').click(), new Promise(r => setTimeout(() => { [...document.querySelectorAll('.menu [role^=menuitem]')].find(b => b.textContent.includes('Schedules')).click(); r(true); }, 300)))"
   },
   {
    "wait": 600
@@ -151,7 +151,7 @@
    "press": "Escape"
   },
   {
-   "eval": "(document.querySelector('.more-menu > button').click(), new Promise(r => setTimeout(() => { [...document.querySelectorAll('.menu [role^=menuitem]')].find(b => b.textContent.includes('Templates')).click(); r(true); }, 200)))"
+   "eval": "(document.querySelector('.account-button').click(), new Promise(r => setTimeout(() => { [...document.querySelectorAll('.menu [role^=menuitem]')].find(b => b.textContent.includes('Templates')).click(); r(true); }, 300)))"
   },
   {
    "wait": 600
