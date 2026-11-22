@@ -1,11 +1,16 @@
 // Markdown is stored as source and rendered here: markdown-it without HTML, then DOMPurify with a
-// small allowlist. Links are http(s)/mailto only and open in a new tab; images only from this server (imgsrc.ts).
+// small allowlist. Links are http(s)/mailto (and an attachment's file) only and open in a new tab;
+// images only from this server (imgsrc.ts). A click on an image opens it in the Lightbox.
+import { useState, type MouseEvent } from "react";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import type { User } from "./api";
 import { splitMentions } from "./items";
 import { taskLists } from "./mdtasks";
-import { imageSrcOK } from "./imgsrc";
+import { attachmentHrefOK, attachmentOf, imageSrcOK } from "./imgsrc";
+import { fileURL } from "./attachments";
+import { Lightbox } from "./Lightbox";
+import { Icon } from "./icons";
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 
@@ -14,7 +19,7 @@ md.use(taskLists);
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {
     const href = node.getAttribute("href") ?? "";
-    if (!/^(https?:|mailto:)/i.test(href)) node.removeAttribute("href");
+    if (!/^(https?:|mailto:)/i.test(href) && !attachmentHrefOK(href)) node.removeAttribute("href");
     node.setAttribute("target", "_blank");
     node.setAttribute("rel", "noopener noreferrer");
   }
@@ -82,5 +87,37 @@ export function renderMarkdown(src: string): string {
 }
 
 export function Markdown({ source, className }: { source: string; className?: string }) {
-  return <div className={"md " + (className ?? "")} dangerouslySetInnerHTML={{ __html: renderMarkdown(source) }} />;
+  const [big, setBig] = useState<{ src: string; alt: string; id: number | null } | null>(null);
+  // a click on an image (not one inside a link) opens it full size; an attachment's preview opens its file
+  const click = (e: MouseEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLElement;
+    if (t.tagName !== "IMG" || t.closest("a")) return;
+    e.preventDefault();
+    const src = t.getAttribute("src") ?? "";
+    const id = attachmentOf(src);
+    setBig({ src: id !== null ? fileURL(id) : src, alt: t.getAttribute("alt") ?? "", id });
+  };
+  return (
+    <>
+      <div className={"md " + (className ?? "")} onClick={click} dangerouslySetInnerHTML={{ __html: renderMarkdown(source) }} />
+      {big && (
+        <Lightbox
+          src={big.src}
+          title={big.alt || "Image"}
+          alt={big.alt}
+          onClose={() => setBig(null)}
+          foot={
+            big.id !== null && (
+              <div className="att-foot muted small">
+                <span>{big.alt}</span>
+                <a className="button secondary small" href={fileURL(big.id, true)} download>
+                  <Icon name="download" /> Download
+                </a>
+              </div>
+            )
+          }
+        />
+      )}
+    </>
+  );
 }

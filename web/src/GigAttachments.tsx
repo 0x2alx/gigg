@@ -5,10 +5,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { api, fmtTime, type Attachment, type AttachmentList, type Gig } from "./api";
 import { useApp } from "./App";
-import { attachmentName, canRemove, fileURL, fmtSize, groupAttachments, refKind, shortCommit, shownAs, thumbURL } from "./attachments";
+import { attachmentName, canRemove, fileURL, fmtSize, groupAttachments, refKind, shortCommit, shownAs, thumbURL, tileSrc } from "./attachments";
 import { errText, Section } from "./GigSections";
 import { Icon } from "./icons";
 import { onActivity } from "./live";
+import { Lightbox } from "./Lightbox";
 import { Markdown } from "./markdown";
 import { ConfirmModal, Modal } from "./ui";
 
@@ -133,7 +134,14 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
     zone.addEventListener("dragover", over);
     zone.addEventListener("dragleave", leave);
     zone.addEventListener("drop", drop);
+    // a drop an editor takes (it stops it there, so it is not attached twice) still ends the highlight
+    const reset = () => {
+      depth = 0;
+      set(false);
+    };
+    zone.addEventListener("drop", reset, true);
     return () => {
+      zone.removeEventListener("drop", reset, true);
       set(false);
       zone.removeEventListener("dragenter", enter);
       zone.removeEventListener("dragover", over);
@@ -183,19 +191,40 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
           {g.images.map((a) => (
             <li key={a.id} className="att-tile">
               <button type="button" className="att-thumb" onClick={() => setViewing(a)} aria-label={`Open ${attachmentName(a)}`} title={`${a.filename ?? ""} · ${fmtSize(a.size)} · ${who(a)}, ${fmtTime(a.created_at)}`}>
-                {a.has_thumb ? (
-                  <img src={thumbURL(a.id)} alt="" loading="lazy" />
-                ) : (
-                  <span className="att-nothumb">
-                    <Icon name="image" />
-                    <span>{a.filename}</span>
-                  </span>
-                )}
+                <img src={tileSrc(a)} alt="" loading="lazy" />
               </button>
               <span className="att-cap" title={attachmentName(a)}>
                 {attachmentName(a)}
               </span>
               {del(a)}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {g.media.length > 0 && (
+        <ul className="att-list att-media" aria-label="Video and audio">
+          {g.media.map((a) => (
+            <li key={a.id}>
+              <div className="att-media-head">
+                <Icon name="file" className="att-ico" />
+                <span className="att-main">
+                  <span className="att-name">{attachmentName(a)}</span>
+                  <span className="muted small att-meta">
+                    {a.label && a.filename ? `${a.filename} · ` : ""}
+                    {fmtSize(a.size)} · {who(a)} · {fmtTime(a.created_at)}
+                  </span>
+                </span>
+                <a className="icon-button att-dl" href={fileURL(a.id, true)} download={a.filename ?? true} aria-label={`Download ${a.filename ?? "the file"}`} title="Download">
+                  <Icon name="download" />
+                </a>
+                {del(a)}
+              </div>
+              {shownAs(a) === "video" ? (
+                <video className="att-video" src={fileURL(a.id)} controls preload="metadata" aria-label={attachmentName(a)} />
+              ) : (
+                <audio className="att-audio" src={fileURL(a.id)} controls preload="metadata" aria-label={attachmentName(a)} />
+              )}
             </li>
           ))}
         </ul>
@@ -208,7 +237,14 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
             const viewable = s === "markdown" || s === "text";
             return (
               <li key={a.id}>
-                <Icon name="file" className="att-ico" />
+                {a.has_thumb ? (
+                  // a preview of a file the page doesn't show (TIFF, HEIC): clicking downloads it
+                  <a className="att-rowthumb" href={fileURL(a.id, true)} download={a.filename ?? true} tabIndex={-1} aria-hidden="true">
+                    <img src={thumbURL(a.id)} alt="" loading="lazy" />
+                  </a>
+                ) : (
+                  <Icon name="file" className="att-ico" />
+                )}
                 <span className="att-main">
                   {viewable ? (
                     <button type="button" className="link att-name" onClick={() => setViewing(a)}>
@@ -310,7 +346,9 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
         </>
       )}
 
-      {viewing && shownAs(viewing) === "image" && <Lightbox a={viewing} onClose={() => setViewing(null)} />}
+      {viewing && shownAs(viewing) === "image" && (
+        <Lightbox src={fileURL(viewing.id)} title={attachmentName(viewing)} alt={viewing.label || viewing.filename || "Attached image"} foot={<FileFoot a={viewing} />} onClose={() => setViewing(null)} />
+      )}
       {viewing && shownAs(viewing) !== "image" && <TextViewer a={viewing} onClose={() => setViewing(null)} />}
       {removing && (
         <ConfirmModal title="Remove the attachment?" confirmLabel="Remove" onConfirm={() => remove(removing)} onCancel={() => setRemoving(null)}>
@@ -375,18 +413,6 @@ function AddRef({ onAdd, onCancel }: { onAdd: (value: string, label: string) => 
         </p>
       )}
     </form>
-  );
-}
-
-// Lightbox: the full image (Esc, ✕ or a click beside it closes).
-function Lightbox({ a, onClose }: { a: Attachment; onClose: () => void }) {
-  return (
-    <Modal title={attachmentName(a)} onClose={onClose} xl>
-      <div className="att-lightbox" onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <img src={fileURL(a.id)} alt={a.label || a.filename || "Attached image"} />
-      </div>
-      <FileFoot a={a} />
-    </Modal>
   );
 }
 

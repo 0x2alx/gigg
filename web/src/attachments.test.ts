@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Attachment } from "./api";
-import { attachmentName, canRemove, fileURL, fmtSize, groupAttachments, refKind, shortCommit, shownAs, thumbURL } from "./attachments";
+import { attachmentName, canRemove, fileURL, fmtSize, groupAttachments, refKind, shortCommit, shownAs, thumbURL, tileSrc } from "./attachments";
 
 const att = (p: Partial<Attachment>): Attachment => ({
   id: 1, gig_id: 1, kind: "file", label: "", value: "", filename: "a.bin", mime: "application/octet-stream", size: 10, width: null, height: null,
@@ -13,6 +13,15 @@ describe("attachments", () => {
     expect(shownAs(att({ mime: "image/png", inline: true }))).toBe("image"); // no thumb: still opens the image
     expect(shownAs(att({ mime: "text/markdown", inline: true }))).toBe("markdown");
     expect(shownAs(att({ mime: "text/plain", inline: true }))).toBe("text");
+    expect(shownAs(att({ mime: "image/avif", inline: true }))).toBe("image"); // no preview: the tile shows the file
+    expect(shownAs(att({ mime: "image/bmp", inline: true }))).toBe("image");
+    expect(shownAs(att({ mime: "video/mp4", inline: true }))).toBe("video");
+    expect(shownAs(att({ mime: "video/webm", inline: true }))).toBe("video");
+    expect(shownAs(att({ mime: "audio/mpeg", inline: true }))).toBe("audio");
+    expect(shownAs(att({ mime: "audio/ogg", inline: true }))).toBe("audio");
+    expect(shownAs(att({ mime: "image/tiff", inline: false, has_thumb: true }))).toBe("file"); // a download, with its preview
+    expect(shownAs(att({ mime: "image/heic", inline: false, has_thumb: true }))).toBe("file");
+    expect(shownAs(att({ mime: "video/quicktime", inline: false }))).toBe("file");
     expect(shownAs(att({ mime: "image/svg+xml", inline: false }))).toBe("file"); // not served in the page
     expect(shownAs(att({ mime: "application/pdf" }))).toBe("file");
     expect(shownAs(att({ mime: null }))).toBe("file");
@@ -28,10 +37,14 @@ describe("attachments", () => {
       att({ id: 4 }),
       att({ id: 5, mime: "image/jpeg", inline: true }),
       att({ id: 6, kind: "commit", value: "abcdef1" }),
+      att({ id: 7, mime: "video/mp4", inline: true }),
+      att({ id: 8, mime: "audio/wav", inline: true }),
+      att({ id: 9, mime: "image/tiff", has_thumb: true }),
     ];
     const g = groupAttachments(items);
     expect(g.images.map((a) => a.id)).toEqual([2, 5]);
-    expect(g.docs.map((a) => a.id)).toEqual([3, 4]);
+    expect(g.media.map((a) => a.id)).toEqual([7, 8]);
+    expect(g.docs.map((a) => a.id)).toEqual([3, 4, 9]);
     expect(g.refs.map((a) => a.id)).toEqual([1, 6]);
   });
 
@@ -74,5 +87,8 @@ describe("attachments", () => {
     expect(fileURL(7)).toBe("/api/v1/attachments/7/file");
     expect(fileURL(7, true)).toBe("/api/v1/attachments/7/file?download=true");
     expect(thumbURL(7)).toBe("/api/v1/attachments/7/thumb");
+    expect(tileSrc({ id: 7, has_thumb: true })).toBe("/api/v1/attachments/7/thumb");
+    expect(tileSrc({ id: 7, has_thumb: false })).toBe("/api/v1/attachments/7/file"); // AVIF: the file, scaled
+
   });
 });

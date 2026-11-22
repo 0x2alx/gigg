@@ -3,15 +3,18 @@
 import type { Attachment } from "./api";
 
 // Shown: how the section shows one attachment. image: a thumbnail tile (the lightbox opens the
-// file); markdown and text: a row that opens the viewer; file: a row with a download; link and
-// commit: a chip.
-export type Shown = "image" | "markdown" | "text" | "file" | "link" | "commit";
+// file); video and audio: a row with a player; markdown and text: a row that opens the viewer;
+// file: a row with a download (with its preview when the server made one, as for TIFF or HEIC);
+// link and commit: a chip.
+export type Shown = "image" | "video" | "audio" | "markdown" | "text" | "file" | "link" | "commit";
 
 export function shownAs(a: Pick<Attachment, "kind" | "mime" | "inline">): Shown {
   if (a.kind === "link" || a.kind === "commit") return a.kind;
   const m = a.mime ?? "";
   if (!a.inline) return "file"; // the server serves only what it marked inline in the page
   if (m.startsWith("image/")) return "image";
+  if (m.startsWith("video/")) return "video";
+  if (m.startsWith("audio/")) return "audio";
   if (m === "text/markdown") return "markdown";
   if (m === "text/plain") return "text";
   return "file";
@@ -19,16 +22,18 @@ export function shownAs(a: Pick<Attachment, "kind" | "mime" | "inline">): Shown 
 
 export interface AttachmentGroups {
   images: Attachment[];
+  media: Attachment[]; // video and audio: rows with a player
   docs: Attachment[]; // Markdown, plain text and other files: one list of rows
   refs: Attachment[]; // links and commits
 }
 
 // groupAttachments keeps the server's order (oldest first) inside each group.
 export function groupAttachments(items: Attachment[]): AttachmentGroups {
-  const g: AttachmentGroups = { images: [], docs: [], refs: [] };
+  const g: AttachmentGroups = { images: [], media: [], docs: [], refs: [] };
   for (const a of items) {
     const s = shownAs(a);
     if (s === "image") g.images.push(a);
+    else if (s === "video" || s === "audio") g.media.push(a);
     else if (s === "link" || s === "commit") g.refs.push(a);
     else g.docs.push(a);
   }
@@ -62,6 +67,10 @@ export function refKind(v: string): "commit" | "link" {
 
 export const fileURL = (id: number, download = false) => `/api/v1/attachments/${id}/file${download ? "?download=true" : ""}`;
 export const thumbURL = (id: number) => `/api/v1/attachments/${id}/thumb`;
+
+// tileSrc: what an image tile shows: the server's preview, or the file itself (scaled by CSS) when
+// there is none (AVIF, a tiny image).
+export const tileSrc = (a: Pick<Attachment, "id" | "has_thumb">) => (a.has_thumb ? thumbURL(a.id) : fileURL(a.id));
 
 // attachmentName: what a file or reference is called on screen (its label wins).
 export function attachmentName(a: Pick<Attachment, "kind" | "label" | "filename" | "value">): string {

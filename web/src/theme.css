@@ -591,6 +591,8 @@ a.pulse-item:hover { color: var(--text); }
 .md pre { background: var(--surface-variant); border-radius: var(--radius-s); padding: 0.5rem; overflow-x: auto; }
 .md pre code { background: none; padding: 0; }
 .md strong { color: var(--text); font-weight: var(--weight-strong); }
+.md img { max-width: 100%; max-height: 20rem; height: auto; border-radius: var(--radius-s); cursor: zoom-in; vertical-align: middle; }
+.md a img { cursor: pointer; }
 .md blockquote { border-left: 3px solid var(--line-strong); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--muted); }
 
 .inbox-item { margin-bottom: 0.75rem; }
@@ -1014,9 +1016,6 @@ label.check input { width: auto; accent-color: var(--accent); }
 }
 .att-thumb:hover { border-color: var(--line-strong); }
 .att-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.att-nothumb { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-2); height: 100%; padding: var(--sp-3); font-size: var(--fs-sm); }
-.att-nothumb .ico { font-size: 1.6rem; }
-.att-nothumb span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .att-cap { font-size: var(--fs-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .att-tile .att-del {
   position: absolute; top: var(--sp-2); right: var(--sp-2); background: color-mix(in srgb, var(--surface) 88%, transparent);
@@ -1031,6 +1030,12 @@ label.check input { width: auto; accent-color: var(--accent); }
 .att-list li { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; padding: var(--sp-2) var(--sp-2); border-radius: var(--radius-s); }
 .att-list li:hover { background: var(--hover); }
 .att-ico { flex: none; color: var(--muted); font-size: 1.05rem; }
+.att-rowthumb { flex: none; display: block; width: 2.5rem; height: 2.5rem; border-radius: var(--radius-s); overflow: hidden; border: 1px solid var(--line); background: var(--low); }
+.att-rowthumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.att-media li { flex-direction: column; align-items: stretch; }
+.att-media-head { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.att-video { display: block; width: 100%; max-height: 20rem; border-radius: var(--radius-s); background: #000; }
+.att-audio { display: block; width: 100%; }
 .att-main { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
 .att-name { align-self: flex-start; padding: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; text-decoration: none; }
 .att-name:hover, .att-chip > a:hover .att-chip-text { text-decoration: underline; }
@@ -1068,6 +1073,8 @@ label.check input { width: auto; accent-color: var(--accent); }
 .modal-full .att-viewer { max-height: none; }
 .att-pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-sm); background: var(--low); border-radius: var(--radius-s); padding: var(--sp-5); }
 .att-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-4); margin-top: var(--sp-5); }
+.mde.mde-drop { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: var(--radius-s); }
+.mde-err { margin: var(--sp-2) 0 0; }
 .panel.att-drop { outline: 2px dashed var(--accent); outline-offset: -6px; background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
 .panel.att-drop::after {
   content: "Drop files to attach them"; position: sticky; bottom: var(--sp-6); display: block; width: max-content; margin: calc(-1 * var(--sp-8)) auto 0;
