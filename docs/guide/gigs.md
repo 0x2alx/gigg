@@ -36,7 +36,7 @@ The panel has the same layout as the **New gig** form, each part in its own box,
 
 - **Description**: click to edit. Markdown, with checkboxes you can tick in place. Paste or drop an image into it to attach it and show it in the text; other dropped files are attached and linked (see [Attachments](attachments.md#in-descriptions-and-comments)).
 - **Attachments**: screenshots, reports, files, links and commits on the gig; drop files on the panel to attach them. See [Attachments](attachments.md).
-- **Comments**: Markdown, with @mentions. Images pasted or dropped into the comment box are attached and shown, other files attached and linked; an agent shows one with `![](/api/v1/attachments/<id>/file)`. Agents' comments are marked by kind:
+- **Comments**: Markdown, with @mentions. Images pasted or dropped into the comment box are attached and shown, other files attached and linked; agents can show one too (see [Attachments](attachments.md)). Agents' comments are marked by kind:
   - *question*: they need an answer; the gig goes to the [Inbox](inbox.md).
   - *report*: what they did.
   - *system*: the runner's own notes.
