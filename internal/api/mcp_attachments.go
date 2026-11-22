@@ -38,11 +38,11 @@ func addAttachmentTools(s *mcp.Server, p *access.Principal, call apiCall) {
 	if !p.HasScope("gigs:read") {
 		return
 	}
-	mcp.AddTool(s, &mcp.Tool{Name: "list_attachments", Description: "A gig's attachments (files, links, commits: ids, names, kinds, sizes; never the contents) and the workspace's limits.", Annotations: ro("List attachments")},
+	mcp.AddTool(s, &mcp.Tool{Name: "list_attachments", Description: "A gig's attachments (files, links, commits: ids, names, kinds, sizes; never the contents) and the workspace's limits. A file's bytes are at GET /attachments/{id}/file (Download attachments, attachments:read): save it to disk and search it there rather than reading it whole.", Annotations: ro("List attachments")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in gigArg) (*mcp.CallToolResult, any, error) {
 			return toolResult(call("GET", "/gigs/"+t(in.Gig)+"/attachments", nil, nil))
 		})
-	if !p.HasScope("attachments:write") || !p.AllowedAnywhere("work_gigs") {
+	if !p.HasScope("attachments:write") || !p.AllowedAnywhere("add_attachments") {
 		return
 	}
 	mcp.AddTool(s, &mcp.Tool{Name: "attach", Description: "Attach a link, a commit or a short Markdown report to a gig. Files (screenshots, logs, longer reports) go through the REST upload instead (POST /gigs/{id}/attachments).", Annotations: rw("Attach", false)},
@@ -77,7 +77,7 @@ func addAttachmentTools(s *mcp.Server, p *access.Principal, call apiCall) {
 			}
 			return toolResult(422, []byte(`{"status":422,"code":"invalid","detail":"kind is link, commit or report"}`))
 		})
-	mcp.AddTool(s, &mcp.Tool{Name: "delete_attachment", Description: "Remove an attachment: your own, or anyone's with Edit gigs.", Annotations: rw("Delete attachment", true)},
+	mcp.AddTool(s, &mcp.Tool{Name: "delete_attachment", Description: "Remove an attachment: your own, or anyone's with Delete attachments.", Annotations: rw("Delete attachment", true)},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in detachArgs) (*mcp.CallToolResult, any, error) {
 			return toolResult(call("DELETE", fmt.Sprintf("/attachments/%d", in.ID), nil, nil))
 		})

@@ -83,7 +83,8 @@ permission in the workspace (see [access.md](access.md#api-keys-scopes-and-permi
 | `gigs:delete` | Moving gigs to the trash and restoring them. |
 | `comments:read` | Reading comments (also needed for activity). |
 | `comments:write` | Writing comments, run reports, resume comments. |
-| `attachments:write` | Attaching files, links and commits to gigs and removing them (with Work on gigs; someone else's also needs Edit gigs). |
+| `attachments:read` | Downloading attached files and their previews (with Download attachments). Listing them needs only `gigs:read`. |
+| `attachments:write` | Attaching files, links and commits to gigs and removing them (with Add attachments; someone else's needs Delete attachments). |
 | `runs:write` | Recording runs (start, progress, finish, usage); pausing and resuming runs with the `pause_runs` permission. |
 | `errands:read` | Reading errands, errand templates and errand runs (without output). |
 | `errands:output` | Reading an errand run's output tail (with `errands:read`). |
@@ -455,9 +456,10 @@ Markdown cut to 280 characters).
 
 ### attachments
 
-Files, links and commits on a gig (see the [guide](../guide/attachments.md)). Reading needs `gigs:read`
-and view; adding needs `attachments:write` and Work on gigs; removing someone else's also needs Edit
-gigs. A gig in the trash lists none and serves none until it is restored.
+Files, links and commits on a gig (see the [guide](../guide/attachments.md)). Listing needs `gigs:read`
+and view; a file's bytes (`/file`, `/thumb`) need `attachments:read` and Download attachments; adding
+and removing your own need `attachments:write` and Add attachments; removing someone else's needs
+Delete attachments. A gig in the trash lists none and serves none until it is restored.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -467,7 +469,7 @@ gigs. A gig in the trash lists none and serves none until it is restored.
 | GET | `/attachments/{id}` | One attachment. |
 | GET | `/attachments/{id}/file` | The file. Images (PNG, JPEG, GIF, WebP, AVIF, BMP), video (MP4, WebM) and audio (MP3, M4A, Ogg, WAV) are served inline with their type; Markdown and text inline as `text/plain; charset=utf-8`; everything else (TIFF and HEIC included) as `application/octet-stream` with `Content-Disposition: attachment`. `?download=true` makes any file a download. Range requests work (`206`, for seeking in video). Every response carries a sandbox `Content-Security-Policy` and an `ETag` (`If-None-Match` gives 304). |
 | GET | `/attachments/{id}/thumb` | An image's preview (JPEG, or PNG when it has transparency; at most 480 px a side), when `has_thumb`: PNG, JPEG, GIF, WebP, BMP and TIFF up to 4096 × 4096 pixels. AVIF and HEIC get none. |
-| DELETE | `/attachments/{id}` | Remove an attachment (yours, or any with Edit gigs). |
+| DELETE | `/attachments/{id}` | Remove an attachment (yours, or any with Delete attachments). |
 | GET | `/workspaces/{ws}/attachment-limits` | The workspace's `file_max`, `quota`, `used`, and `custom` (either differs from the default). |
 | PUT | `/workspaces/{ws}/attachment-limits` | Set them (admins with `admin:workspaces`): `{"file_max": bytes or null, "quota": bytes or null}`; null is the default (10 MB, 1 GB). `file_max` is at most 50 MB. |
 

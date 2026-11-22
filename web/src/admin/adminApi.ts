@@ -148,7 +148,7 @@ export interface AuditItem {
 
 // Scopes a key can carry, grouped for the create form (admin:* only on an admin user's unbound key).
 export const SCOPE_GROUPS: { name: string; scopes: string[] }[] = [
-  { name: "Read", scopes: ["workspace:read", "gigs:read", "comments:read", "errands:read", "errands:output"] },
+  { name: "Read", scopes: ["workspace:read", "gigs:read", "comments:read", "attachments:read", "errands:read", "errands:output"] },
   {
     name: "Write",
     scopes: ["workspace:write", "gigs:work", "gigs:write", "gigs:delete", "comments:write", "attachments:write", "runs:write", "projects:write", "profile:write", "keys:self", "errands:write", "errands:run", "library:write"],

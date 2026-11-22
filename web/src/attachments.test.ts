@@ -48,6 +48,15 @@ describe("attachments", () => {
     expect(g.refs.map((a) => a.id)).toEqual([1, 6]);
   });
 
+  it("without Download attachments, lists every file by name only", () => {
+    const items = [att({ id: 1, kind: "link", mime: null }), att({ id: 2, mime: "image/png", inline: true }), att({ id: 3, mime: "video/mp4", inline: true })];
+    const g = groupAttachments(items, false);
+    expect(g.images).toEqual([]);
+    expect(g.media).toEqual([]);
+    expect(g.docs.map((a) => a.id)).toEqual([2, 3]);
+    expect(g.refs.map((a) => a.id)).toEqual([1]);
+  });
+
   it("says sizes in words", () => {
     expect(fmtSize(0)).toBe("0 B");
     expect(fmtSize(512)).toBe("512 B");

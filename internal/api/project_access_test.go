@@ -84,7 +84,7 @@ func TestProjectGrant(t *testing.T) {
 	_ = json.Unmarshal(out, &me)
 	for _, w := range me.Workspaces {
 		if w.Slug == "atlas" && (w.Whole || len(w.Permissions) != 0 || len(w.Projects) != 1 || w.Projects[0].ID != side ||
-			strings.Join(w.Projects[0].Permissions, ",") != "view,comment,work_gigs") {
+			strings.Join(w.Projects[0].Permissions, ",") != "view,comment,work_gigs,download_attachments,add_attachments") {
 			t.Fatalf("me in atlas: %+v", w)
 		}
 	}

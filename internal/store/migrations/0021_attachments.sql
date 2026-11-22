@@ -46,6 +46,11 @@ ALTER TABLE workspaces ADD COLUMN attach_file_max INTEGER CHECK (attach_file_max
 ALTER TABLE workspaces ADD COLUMN attach_quota INTEGER CHECK (attach_quota IS NULL OR attach_quota > 0);
 
 UPDATE api_keys
+   SET scopes = json_insert(scopes, '$[#]', 'attachments:read')
+ WHERE EXISTS (SELECT 1 FROM json_each(api_keys.scopes) WHERE value = 'gigs:read')
+   AND NOT EXISTS (SELECT 1 FROM json_each(api_keys.scopes) WHERE value = 'attachments:read');
+
+UPDATE api_keys
    SET scopes = json_insert(scopes, '$[#]', 'attachments:write')
  WHERE EXISTS (SELECT 1 FROM json_each(api_keys.scopes) WHERE value = 'gigs:work')
    AND NOT EXISTS (SELECT 1 FROM json_each(api_keys.scopes) WHERE value = 'attachments:write');

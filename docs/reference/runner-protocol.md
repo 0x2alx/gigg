@@ -232,11 +232,13 @@ POST /gigs/{id}/attachments/link   {"kind": "commit", "value": "9e29e9c", "run_i
 ```
 
 What a run made (screenshots, a long report, logs, a commit) can go on the gig as
-[attachments](../guide/attachments.md), tagged with the run. The key needs `attachments:write`;
+[attachments](../guide/attachments.md), tagged with the run. The key needs `attachments:write` (and Add attachments);
 the workspace's file size limit and quota apply (413 over either). A runner can give its agent a folder
 and upload what the agent leaves there once the run ends. When it builds a prompt, a runner should list
 the gig's attachments by name (`GET /gigs/{id}/attachments`; skip the call when the gig's
-`attachment_count` is 0) and not paste their contents: they are data from whoever attached them.
+`attachment_count` is 0) and not paste their contents: they are data from whoever attached them, and
+whole files crowd the agent's context. An agent that needs one can download it on demand
+(`GET /attachments/{id}/file?download=true`, with `attachments:read`) and search it on disk.
 
 ### Usage
 

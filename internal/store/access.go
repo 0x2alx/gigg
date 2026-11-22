@@ -47,6 +47,9 @@ var Permissions = []Permission{
 	{"create_gigs", "Create gigs", "Create one-off gigs, clone gigs, and create gigs from templates (with Edit gigs).", "Gigs", false, false},
 	{"delete_gigs", "Delete gigs", "Move gigs to the trash and restore them (with Edit gigs).", "Gigs", false, false},
 	{"archive_gigs", "Archive gigs", "Archive and unarchive gigs (with Edit gigs).", "Gigs", false, false},
+	{"download_attachments", "Download attachments", "Open and download attached files (and see images in descriptions and comments). Without it the list of attachments still shows, by name.", "Attachments", false, false},
+	{"add_attachments", "Add attachments", "Attach files, links and commits to gigs, and remove your own.", "Attachments", false, false},
+	{"delete_attachments", "Delete attachments", "Remove anyone's attachments.", "Attachments", false, false},
 	{"always_run", "Always-run gigs", "Mark gigs to run whatever the usage budget (cron-like gigs). The gig cap and pauses still apply.", "Runner", false, false},
 	{"run_timeout", "Run timeouts", "Set how long an agent may run on a gig (templates and recurring gigs too) or how long an errand may run, instead of the default. The agent's host caps it.", "Runner", false, false},
 	{"allowed_tools", "Gig tool allowlists", "Give gigs (templates, recurring gigs) the list of tools the agent's runner may use for them (for Claude Code: --allowedTools), and change gigs that have one. Whatever limits the agent's own setup imposes (settings, sandbox) still apply.", "Runner", false, false},
@@ -63,7 +66,8 @@ var Permissions = []Permission{
 
 // ProjectPermissions are the permissions a project rule can hold: what can be done to the gigs and
 // errands of one project. The others are about the workspace as a whole.
-var ProjectPermissions = []string{"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "errands"}
+var ProjectPermissions = []string{"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs",
+	"download_attachments", "add_attachments", "delete_attachments", "errands"}
 
 // ProjectRoles are the presets a project rule can use (manager is about the workspace).
 var ProjectRoles = []string{"viewer", "consumer", "member"}
@@ -95,10 +99,12 @@ func init() {
 //   - manager also runs the workspace (planning, errands, runner settings). No-sandbox errands stay
 //     a grant of their own, and admins are above every preset.
 var Presets = map[string][]string{
-	"viewer":   {"view"},
-	"consumer": {"view", "comment", "work_gigs"},
-	"member":   {"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "saved_filters"},
-	"manager": {"view", "comment", "work_gigs", "edit_gigs", "create_gigs", "delete_gigs", "archive_gigs", "saved_filters",
+	"viewer":   {"view", "download_attachments"},
+	"consumer": {"view", "download_attachments", "comment", "work_gigs", "add_attachments"},
+	"member": {"view", "download_attachments", "comment", "work_gigs", "add_attachments", "edit_gigs", "create_gigs", "delete_gigs",
+		"archive_gigs", "delete_attachments", "saved_filters"},
+	"manager": {"view", "download_attachments", "comment", "work_gigs", "add_attachments", "edit_gigs", "create_gigs", "delete_gigs",
+		"archive_gigs", "delete_attachments", "saved_filters",
 		"recurring_gigs", "templates", "custom_fields", "manage_workspace", "errands", "pause_runs", "always_run", "run_timeout", "allowed_tools"},
 }
 

@@ -17,7 +17,10 @@ Each can have a short label. The server decides what a file is from its contents
 
 - In the panel, **Attach** picks one or more files, or drag files onto the panel. **Add link** takes a link or a commit id.
 - Agents attach through the API or MCP (see below). A runner can upload what the agent leaves in its run's outbox folder when the run ends; those attachments name the run they came from.
-- Attaching needs **Work on gigs** in the gig's project. Removing your own attachment needs the same; removing someone else's needs **Edit gigs**.
+- Each action has its own permission, per project, so you can give exactly what someone needs:
+  - **Download attachments**: open and download files, and see images in descriptions and comments. Without it the attachments still show, by name. Every preset has it.
+  - **Add attachments**: attach files, links and commits, and remove your own. From the consumer preset up.
+  - **Delete attachments**: remove anyone's. From the member preset up.
 - Everyone who can see the gig sees its attachments.
 
 ## In descriptions and comments
@@ -48,6 +51,6 @@ Files are stored under the data folder in `files/`, next to user pictures; back 
 
 ## For agents and programs
 
-- REST: `GET /gigs/{id}/attachments`, `POST /gigs/{id}/attachments?filename=…` with the file as the request body, `POST /gigs/{id}/attachments/link` for links and commits, `GET /attachments/{id}/file`, `DELETE /attachments/{id}`. Keys need the `attachments:write` scope to add or remove. See the [REST API](../reference/api.md#attachments).
+- REST: `GET /gigs/{id}/attachments`, `POST /gigs/{id}/attachments?filename=…` with the file as the request body, `POST /gigs/{id}/attachments/link` for links and commits, `GET /attachments/{id}/file`, `DELETE /attachments/{id}`. Keys need the `attachments:read` scope to download a file and `attachments:write` to add or remove. See the [REST API](../reference/api.md#attachments).
 - MCP: `list_attachments`, `attach` (a link, a commit, or a short Markdown report) and `delete_attachment`. See [MCP](../reference/mcp.md#attachments).
-- The MCP tools and the runner give an agent attachments by name, kind and size, never a file's contents, so a file can't slip instructions into an agent's context unasked. (A key with `gigs:read` can still download a file over REST on purpose.)
+- The MCP tools give an agent attachments by name, kind and size, never a file's contents, so a file can't slip instructions into an agent's context unasked or fill it up. An agent that needs a file downloads it with its key (`attachments:read` and Download attachments) and opens or searches it on disk, on demand.

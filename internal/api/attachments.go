@@ -17,9 +17,10 @@ import (
 	"github.com/0x2alx/gigg/internal/store"
 )
 
-// Attachments: files, links and commits on a gig. Seeing them = seeing the gig; attaching = Work on
-// gigs; removing = your own (Work on gigs) or anyone's (Edit gigs). Keys need attachments:write to
-// change them. A gig in the trash hides its attachments until it is restored.
+// Attachments: files, links and commits on a gig. Listing them = seeing the gig; a file's bytes =
+// Download attachments (keys: attachments:read); attaching and removing your own = Add attachments,
+// anyone's = Delete attachments (keys: attachments:write). A gig in the trash hides its attachments
+// until it is restored.
 
 type attachmentsOut struct {
 	Body struct {
@@ -109,7 +110,7 @@ func (a *API) registerAttachments() {
 
 	huma.Register(a.h, huma.Operation{OperationID: "get-attachment", Method: "GET", Path: "/attachments/{id}", Tags: []string{"attachments"},
 		Summary: "One attachment"}, func(ctx context.Context, in *idPath) (*attachmentOut, error) {
-		_, att, _, err := a.attachment(ctx, in.ID)
+		_, att, _, err := a.attachment(ctx, in.ID, access.Viewer, "gigs:read")
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +120,7 @@ func (a *API) registerAttachments() {
 	huma.Register(a.h, huma.Operation{OperationID: "get-attachment-file", Method: "GET", Path: "/attachments/{id}/file", Tags: []string{"attachments"},
 		Summary: "An attached file's bytes: images and text in the page, everything else as a download"},
 		func(ctx context.Context, in *attachFileIn) (*huma.StreamResponse, error) {
-			_, att, _, err := a.attachment(ctx, in.ID)
+			_, att, _, err := a.attachment(ctx, in.ID, "download_attachments", "attachments:read")
 			if err != nil {
 				return nil, err
 			}
@@ -143,7 +144,7 @@ func (a *API) registerAttachments() {
 
 	huma.Register(a.h, huma.Operation{OperationID: "get-attachment-thumb", Method: "GET", Path: "/attachments/{id}/thumb", Tags: []string{"attachments"},
 		Summary: "An image's preview (at most 480 px a side)"}, func(ctx context.Context, in *idPath) (*huma.StreamResponse, error) {
-		_, att, _, err := a.attachment(ctx, in.ID)
+		_, att, _, err := a.attachment(ctx, in.ID, "download_attachments", "attachments:read")
 		if err != nil {
 			return nil, err
 		}
@@ -155,13 +156,13 @@ func (a *API) registerAttachments() {
 	})
 
 	huma.Register(a.h, huma.Operation{OperationID: "delete-attachment", Method: "DELETE", Path: "/attachments/{id}", Tags: []string{"attachments"},
-		Summary: "Remove an attachment (yours, or any with Edit gigs)", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
+		Summary: "Remove an attachment (yours, or any with Delete attachments)", DefaultStatus: 204}, func(ctx context.Context, in *idPath) (*struct{}, error) {
 		return nil, a.detach(ctx, in.ID)
 	})
 }
 
-// attachment resolves an attachment on a live gig the caller sees.
-func (a *API) attachment(ctx context.Context, id int64) (*access.Principal, *store.Attachment, *store.Gig, error) {
+// attachment resolves an attachment on a live gig the caller sees, and checks perm and scope there.
+func (a *API) attachment(ctx context.Context, id int64, perm, scope string) (*access.Principal, *store.Attachment, *store.Gig, error) {
 	p, err := me(ctx)
 	if err != nil {
 		return nil, nil, nil, err
@@ -174,7 +175,7 @@ func (a *API) attachment(ctx context.Context, id int64) (*access.Principal, *sto
 	if err != nil || t.Deleted || !p.SeesProject(t.WorkspaceID, t.ProjectID) {
 		return nil, nil, nil, errNotFound()
 	}
-	if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Viewer, "gigs:read"); err != nil {
+	if err := requireIn(p, t.WorkspaceID, t.ProjectID, perm, scope); err != nil {
 		return nil, nil, nil, err
 	}
 	return p, att, t, nil
@@ -235,7 +236,7 @@ func (a *API) attachWith(ctx context.Context, ref string, in store.AttachmentIn,
 	if t.Deleted {
 		return nil, trashErr(t)
 	}
-	if err := requireIn(p, t.WorkspaceID, t.ProjectID, access.Worker, "attachments:write"); err != nil {
+	if err := requireIn(p, t.WorkspaceID, t.ProjectID, "add_attachments", "attachments:write"); err != nil {
 		return nil, err
 	}
 	var att *store.Attachment
@@ -255,15 +256,15 @@ func (a *API) attachWith(ctx context.Context, ref string, in store.AttachmentIn,
 	return att, err
 }
 
-// detach removes an attachment: your own with Work on gigs, anyone's with Edit gigs.
+// detach removes an attachment: your own with Add attachments, anyone's with Delete attachments.
 func (a *API) detach(ctx context.Context, id int64) error {
-	p, att, t, err := a.attachment(ctx, id)
+	p, att, t, err := a.attachment(ctx, id, access.Viewer, "gigs:read")
 	if err != nil {
 		return err
 	}
-	perm := access.Worker
+	perm := "add_attachments"
 	if att.CreatedBy != p.User.ID {
-		perm = access.Editor
+		perm = "delete_attachments"
 	}
 	if err := requireIn(p, t.WorkspaceID, t.ProjectID, perm, "attachments:write"); err != nil {
 		return err

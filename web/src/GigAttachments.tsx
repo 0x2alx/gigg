@@ -19,10 +19,11 @@ interface Busy {
   name: string;
 }
 
-export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged }: {
+export function AttachmentsSection({ gig, canAdd, canDeleteAny, canDownload, dropZone, onChanged }: {
   gig: Gig;
-  canWork: boolean; // may attach (Work on gigs, and the gig isn't in the trash)
-  canEdit: boolean; // may remove anyone's (Edit gigs)
+  canAdd: boolean; // may attach and remove their own (Add attachments, and the gig isn't in the trash)
+  canDeleteAny: boolean; // may remove anyone's (Delete attachments)
+  canDownload: boolean; // may open files (Download attachments); without it, names only
   dropZone?: RefObject<HTMLElement | null>; // files dropped here are attached (the panel)
   onChanged?: () => void;
 }) {
@@ -103,7 +104,7 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
   // files dragged over the panel: it shows as a drop target; dropped, they are attached
   useEffect(() => {
     const zone = dropZone?.current;
-    if (!zone || !canWork) return;
+    if (!zone || !canAdd) return;
     let depth = 0;
     const hasFiles = (e: DragEvent) => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
     const set = (on: boolean) => zone.classList.toggle("att-drop", on);
@@ -148,7 +149,7 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
       zone.removeEventListener("dragleave", leave);
       zone.removeEventListener("drop", drop);
     };
-  }, [dropZone, canWork, gig.id]);
+  }, [dropZone, canAdd, gig.id]);
 
   const remove = (a: Attachment) => {
     setRemoving(null);
@@ -163,9 +164,9 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
   };
 
   const items = list?.items ?? [];
-  if (!canWork && items.length === 0) return null; // nothing to see and nothing to do
-  const g = groupAttachments(items);
-  const removable = (a: Attachment) => canRemove(a, me.user.id, canWork, canEdit);
+  if (!canAdd && items.length === 0) return null; // nothing to see and nothing to do
+  const g = groupAttachments(items, canDownload);
+  const removable = (a: Attachment) => canRemove(a, me.user.id, canAdd, canDeleteAny);
   const who = (a: Attachment) => {
     const u = users.get(a.created_by);
     return u?.display_name || u?.username || a.created_by_username;
@@ -237,7 +238,7 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
             const viewable = s === "markdown" || s === "text";
             return (
               <li key={a.id}>
-                {a.has_thumb ? (
+                {a.has_thumb && canDownload ? (
                   // a preview of a file the page doesn't show (TIFF, HEIC): clicking downloads it
                   <a className="att-rowthumb" href={fileURL(a.id, true)} download={a.filename ?? true} tabIndex={-1} aria-hidden="true">
                     <img src={thumbURL(a.id)} alt="" loading="lazy" />
@@ -246,7 +247,9 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
                   <Icon name="file" className="att-ico" />
                 )}
                 <span className="att-main">
-                  {viewable ? (
+                  {!canDownload ? (
+                    <span className="att-name">{attachmentName(a)}</span>
+                  ) : viewable ? (
                     <button type="button" className="link att-name" onClick={() => setViewing(a)}>
                       {attachmentName(a)}
                     </button>
@@ -260,9 +263,11 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
                     {fmtSize(a.size)} · {who(a)} · {fmtTime(a.created_at)}
                   </span>
                 </span>
-                <a className="icon-button att-dl" href={fileURL(a.id, true)} download={a.filename ?? true} aria-label={`Download ${a.filename ?? "the file"}`} title="Download">
-                  <Icon name="download" />
-                </a>
+                {canDownload && (
+                  <a className="icon-button att-dl" href={fileURL(a.id, true)} download={a.filename ?? true} aria-label={`Download ${a.filename ?? "the file"}`} title="Download">
+                    <Icon name="download" />
+                  </a>
+                )}
                 {del(a)}
               </li>
             );
@@ -292,7 +297,7 @@ export function AttachmentsSection({ gig, canWork, canEdit, dropZone, onChanged 
         </ul>
       )}
 
-      {canWork && (
+      {canAdd && (
         <>
           <div className="att-actions">
             <button type="button" className="button secondary small" onClick={() => picker.current?.click()} disabled={!!busy}>

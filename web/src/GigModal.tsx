@@ -498,7 +498,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           setRun={(c) => setRun((r) => ({ ...r, ...c, ...(c.allowed_tools ? { tools_error: null } : {}) }))}
           onToolsError={(bad) => setRun((r) => ((bad ?? null) === (r.tools_error ?? null) ? r : { ...r, tools_error: bad }))}
           canWrite
-          attach={single ? attachLater : undefined}
+          attach={single && hasCap(me, "add_attachments", ws.id, project ?? undefined) ? attachLater : undefined}
           ws={ws}
           places={!editing && !tpl ? places : undefined}
           onWorkspace={moveWs}

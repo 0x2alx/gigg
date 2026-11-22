@@ -171,7 +171,7 @@ func (k *APIKey) ReachesProject(ws, project int64) bool {
 // AllScopes is every scope a key can carry; admin:* scopes only on admin keys.
 var AllScopes = []string{
 	"workspace:read", "workspace:write", "gigs:read", "gigs:work", "gigs:write", "gigs:delete", "comments:read", "comments:write",
-	"attachments:write", "runs:write", "projects:write", "profile:write", "keys:self", "errands:read", "errands:output", "errands:write", "errands:run",
+	"attachments:read", "attachments:write", "runs:write", "projects:write", "profile:write", "keys:self", "errands:read", "errands:output", "errands:write", "errands:run",
 	"library:write", "admin:workspaces", "admin:members", "admin:users", "admin:keys", "admin:audit",
 }
 

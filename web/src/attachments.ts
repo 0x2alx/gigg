@@ -28,10 +28,11 @@ export interface AttachmentGroups {
 }
 
 // groupAttachments keeps the server's order (oldest first) inside each group.
-export function groupAttachments(items: Attachment[]): AttachmentGroups {
+// Without Download attachments every file is listed by name only (canDownload false: no previews).
+export function groupAttachments(items: Attachment[], canDownload = true): AttachmentGroups {
   const g: AttachmentGroups = { images: [], media: [], docs: [], refs: [] };
   for (const a of items) {
-    const s = shownAs(a);
+    const s = canDownload || a.kind !== "file" ? shownAs(a) : "file";
     if (s === "image") g.images.push(a);
     else if (s === "video" || s === "audio") g.media.push(a);
     else if (s === "link" || s === "commit") g.refs.push(a);
@@ -80,7 +81,7 @@ export function attachmentName(a: Pick<Attachment, "kind" | "label" | "filename"
   return a.value;
 }
 
-// canRemove: your own attachment with Work on gigs, anyone's with Edit gigs (the server's rule).
-export function canRemove(a: Pick<Attachment, "created_by">, me: number, canWork: boolean, canEdit: boolean): boolean {
-  return canEdit || (canWork && a.created_by === me);
+// canRemove: your own attachment with Add attachments, anyone's with Delete attachments (the server's rule).
+export function canRemove(a: Pick<Attachment, "created_by">, me: number, canAdd: boolean, canDeleteAny: boolean): boolean {
+  return canDeleteAny || (canAdd && a.created_by === me);
 }

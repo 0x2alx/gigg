@@ -279,7 +279,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
   const overdue = gig.due_at !== null && gig.due_at < Date.now() && gig.status_category !== "done";
   const can = (cap: string) => canWrite && hasCap(me, cap, gig.workspace_id, gig.project_id);
   // a file pasted or dropped into the description or a comment becomes an attachment of this gig
-  const canAttach = can("work_gigs") && !gig.deleted;
+  const canAttach = can("add_attachments") && !gig.deleted;
   const attachFile = (f: File) => api.uploadAttachment(gig.id, f, f.name).then((a) => fileURL(a.id));
   const onGig = (t: Gig) => {
     setGig(t);
@@ -418,7 +418,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
           <>
             <ChecklistSection key={gig.id} gig={gig} canEdit={can("edit_gigs")} onGig={onGig} />
             <SubgigsSection gig={gig} wsId={ws.id} canCreate={can("create_gigs") && !gig.deleted} canEdit={can("edit_gigs") && !gig.deleted} assignable={candidates.map((u) => u.id)} onOpen={onMoved} onGig={onGig} onChanged={onChanged} />
-            <AttachmentsSection key={"att-" + gig.id} gig={gig} canWork={can("work_gigs") && !gig.deleted} canEdit={can("edit_gigs")} dropZone={panelRef} onChanged={onChanged} />
+            <AttachmentsSection key={"att-" + gig.id} gig={gig} canAdd={canAttach} canDeleteAny={can("delete_attachments")} canDownload={can("download_attachments")} dropZone={panelRef} onChanged={onChanged} />
           </>
         }
         mainEnd={

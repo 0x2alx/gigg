@@ -55,9 +55,9 @@ func TestLibraryMigration(t *testing.T) {
 	}
 	defer s.Close()
 	for name, want := range map[string]string{
-		"adm-gigs":    `["gigs:read","gigs:write","library:write"]`,
+		"adm-gigs":    `["gigs:read","gigs:write","library:write","attachments:read"]`,
 		"adm-errands": `["errands:write","library:write"]`,
-		"adm-read":    `["gigs:read"]`,
+		"adm-read":    `["gigs:read","attachments:read"]`,
 		"adm-bound":   `["gigs:write"]`,
 		"bob":         `["gigs:write","errands:write"]`,
 	} {

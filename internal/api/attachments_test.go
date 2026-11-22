@@ -18,7 +18,7 @@ import (
 // attachKey makes scout a key that can attach (the env's runner keys predate the scope).
 func attachKey(e *env, name string) cred {
 	e.t.Helper()
-	body := fmt.Sprintf(`{"name":"attach","user_id":%d,"reach":["%s"],"scopes":["workspace:read","gigs:read","gigs:work","comments:read","attachments:write"],"allowed_listeners":["internal"]}`,
+	body := fmt.Sprintf(`{"name":"attach","user_id":%d,"reach":["%s"],"scopes":["workspace:read","gigs:read","gigs:work","comments:read","attachments:read","attachments:write"],"allowed_listeners":["internal"]}`,
 		e.ids[name+".user"], name)
 	code, out, _ := e.req("POST", "/keys", body, e.ada())
 	e.ok(code, out, 201)
@@ -188,6 +188,37 @@ func TestAttachments(t *testing.T) {
 	if code, _, out := upload(e, e.key("scout"), gig, "x.txt", []byte("hi"), ""); code != 403 || !strings.Contains(string(out), "attachments:write") {
 		t.Fatalf("no scope: %d %s", code, out)
 	}
+
+	// each action has its own permission and scope: a key without attachments:read lists the files but
+	// can't download them; without Download attachments only the names show; someone else's attachment
+	// needs Delete attachments
+	code, out, _ = e.req("POST", "/keys", fmt.Sprintf(`{"name":"names","user_id":%d,"reach":["scout"],"scopes":["workspace:read","gigs:read"],"allowed_listeners":["internal"]}`,
+		e.ids["scout.user"]), e.ada())
+	e.ok(code, out, 201)
+	var kc KeyCreated
+	_ = json.Unmarshal(out, &kc)
+	names := cred{token: kc.Token, listener: "internal"}
+	if code, out, _ := e.req("GET", fmt.Sprintf("/gigs/%d/attachments", gig), "", names); code != 200 {
+		t.Fatalf("list without attachments:read: %d %s", code, out)
+	}
+	if code, out, _ := e.req("GET", fmt.Sprintf("/attachments/%d/file", img.ID), "", names); code != 403 || !strings.Contains(string(out), "attachments:read") {
+		t.Fatalf("download without attachments:read: %d %s", code, out)
+	}
+	access := func(rule string) {
+		code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["bob"]), fmt.Sprintf(`{"workspace_id":%d,%s}`, e.ids["scout.ws"], rule), e.ada())
+		e.ok(code, out, 200)
+	}
+	access(`"preset":"consumer","overrides":{"download_attachments":false}`)
+	if code, out, _ := e.req("GET", fmt.Sprintf("/attachments/%d/thumb", img.ID), "", bob); code != 403 || !strings.Contains(string(out), "download_attachments") {
+		t.Fatalf("download without the permission: %d %s", code, out)
+	}
+	if code, _, _ := e.req("GET", fmt.Sprintf("/gigs/%d/attachments", gig), "", bob); code != 200 {
+		t.Fatalf("names without the permission: %d", code)
+	}
+	if code, out, _ := e.reqH("DELETE", fmt.Sprintf("/attachments/%d", img.ID), "", bob, map[string]string{"X-Gigg-CSRF": "1"}); code != 403 || !strings.Contains(string(out), "delete_attachments") {
+		t.Fatalf("someone else's without Delete attachments: %d %s", code, out)
+	}
+	access(`"preset":"viewer"`)
 
 	// limits: a smaller file cap and quota (admins only), then over each
 	if code, _, _ := e.req("PUT", fmt.Sprintf("/workspaces/%d/attachment-limits", e.ids["scout.ws"]), `{"file_max":100,"quota":null}`, k); code != 403 {

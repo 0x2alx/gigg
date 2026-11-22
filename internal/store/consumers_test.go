@@ -140,7 +140,7 @@ func TestConsumersMigration(t *testing.T) {
 	must(t, s.R.QueryRowContext(ctx, `SELECT overrides FROM access_rules WHERE user_id = ?`, deny).Scan(&overrides))
 	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'w'`).Scan(&scopesW))
 	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'r'`).Scan(&scopesR))
-	if overrides != `{"edit_gigs":false,"delete_gigs":false,"work_gigs":false}` || scopesW != `["gigs:read","gigs:write","gigs:work","attachments:write"]` || scopesR != `["gigs:read"]` {
+	if overrides != `{"edit_gigs":false,"delete_gigs":false,"work_gigs":false}` || scopesW != `["gigs:read","gigs:write","gigs:work","attachments:read","attachments:write"]` || scopesR != `["gigs:read","attachments:read"]` {
 		t.Fatalf("rules and keys: %s %s %s", overrides, scopesW, scopesR)
 	}
 	for _, c := range []struct{ where, want string }{
@@ -156,7 +156,7 @@ func TestConsumersMigration(t *testing.T) {
 	}
 	var scopesA string
 	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'a'`).Scan(&scopesA))
-	if scopesA != `["gigs:read"]` {
+	if scopesA != `["gigs:read","attachments:read"]` {
 		t.Fatalf("artifacts:write left: %s", scopesA)
 	}
 	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'adm'`).Scan(&scopesA))
