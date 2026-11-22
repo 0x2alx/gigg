@@ -48,5 +48,16 @@ code=$(curl -s $CA -b $jar -o /tmp/mx -w '%{http_code}' "$MAIN/metrics?bucket=we
 check "metrics: gigs, a run and its cost counted" '[ "$code" = 200 ] && jq -e ".totals.gigs_created >= 1 and .totals.runs >= 1 and .totals.cost_usd >= 0.44 and (.buckets | length) >= 5" /tmp/mx >/dev/null'
 check "metrics: the runner's key reads it on internal" '[ "$(curl -s -H "$H" -H "$K" -o /dev/null -w "%{http_code}" "$INT/metrics")" = 200 ]'
 check "metrics: a range over 400 days is refused" '[ "$(curl -s $CA -b $jar -o /dev/null -w "%{http_code}" "$MAIN/metrics?from=2020-01-01&to=2026-01-01")" = 422 ]'
+# attachments: the runner uploads a screenshot and a disguised page from its run; ada reads them
+printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' | base64 -d > /tmp/shot.png
+code=$(curl -s -H "$H" -H "$K" -H "Content-Type: image/png" -o /tmp/a1 -w '%{http_code}' --data-binary @/tmp/shot.png "$INT/gigs/GIG-1/attachments?filename=shot.png&label=After&run_id=$RID")
+check "attachments: the runner attaches a screenshot to its run" '[ "$code" = 201 ] && jq -e ".mime == \"image/png\" and .has_thumb and .run_id == $RID" /tmp/a1 >/dev/null'
+A1=$(jq -r .id /tmp/a1)
+printf '<html><script>alert(1)</script></html>' > /tmp/evil.png
+code=$(curl -s -H "$H" -H "$K" -o /tmp/a2 -w '%{http_code}' --data-binary @/tmp/evil.png "$INT/gigs/GIG-1/attachments?filename=evil.png")
+A2=$(jq -r .id /tmp/a2)
+check "attachments: a page named .png is stored as a page" '[ "$code" = 201 ] && jq -e ".mime == \"text/html\" and (.inline | not)" /tmp/a2 >/dev/null'
+check "attachments: ada lists both" 'curl -s $CA -b $jar $MAIN/gigs/GIG-1/attachments | jq -e "(.items | length) == 2 and .file_max == 10485760" >/dev/null'
+check "attachments: the image inline, its preview, the page only as a download" 'curl -s $CA -b $jar -D /tmp/h1 -o /dev/null $MAIN/attachments/$A1/file && grep -qi "^content-type: image/png" /tmp/h1 && [ "$(curl -s $CA -b $jar -o /dev/null -w "%{http_code}" $MAIN/attachments/$A1/thumb)" = 200 ] && curl -s $CA -b $jar -D /tmp/h2 -o /dev/null $MAIN/attachments/$A2/file && grep -qi "^content-type: application/octet-stream" /tmp/h2 && grep -qi "^content-disposition: attachment" /tmp/h2 && grep -qi "^content-security-policy: .*sandbox" /tmp/h2'
 check "OpenAPI served" 'curl -s -H "$H" $INT/openapi.json | jq -e ".paths[\"/gigs/{id}/move\"]" >/dev/null'
 echo "--- $pass passed, $fail failed"

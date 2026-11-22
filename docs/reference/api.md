@@ -83,6 +83,7 @@ permission in the workspace (see [access.md](access.md#api-keys-scopes-and-permi
 | `gigs:delete` | Moving gigs to the trash and restoring them. |
 | `comments:read` | Reading comments (also needed for activity). |
 | `comments:write` | Writing comments, run reports, resume comments. |
+| `attachments:write` | Attaching files, links and commits to gigs and removing them (with Work on gigs; someone else's also needs Edit gigs). |
 | `runs:write` | Recording runs (start, progress, finish, usage); pausing and resuming runs with the `pause_runs` permission. |
 | `errands:read` | Reading errands, errand templates and errand runs (without output). |
 | `errands:output` | Reading an errand run's output tail (with `errands:read`). |
@@ -451,6 +452,29 @@ Markdown cut to 280 characters).
 | POST | `/gigs/{id}/comments` | Comment (Markdown; `kind` = `comment`, `report` or `question`). |
 | PATCH | `/comments/{id}` | Edit your comment (the old text stays in the history). |
 | DELETE | `/comments/{id}` | Delete a comment (yours, or any as a manager). |
+
+### attachments
+
+Files, links and commits on a gig (see the [guide](../guide/attachments.md)). Reading needs `gigs:read`
+and view; adding needs `attachments:write` and Work on gigs; removing someone else's also needs Edit
+gigs. A gig in the trash lists none and serves none until it is restored.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/gigs/{id}/attachments` | A gig's attachments, oldest first, with the workspace's `file_max`, `quota` and `used` (bytes). |
+| POST | `/gigs/{id}/attachments?filename=…&label=…&run_id=…` | Attach a file: the request body is the file, any content type (a cookie request needs the `X-Gigg-CSRF` header). The server sniffs the type from the bytes. 413 `too_large` over the workspace's file size limit or quota. |
+| POST | `/gigs/{id}/attachments/link` | Attach a link (`{"kind":"link","value":"https://…"}`) or a commit (`{"kind":"commit","value":"<7-64 hex>"}`), with an optional `label` and `run_id`. |
+| GET | `/attachments/{id}` | One attachment. |
+| GET | `/attachments/{id}/file` | The file. PNG, JPEG, GIF and WebP are served inline with their type; Markdown and text inline as `text/plain; charset=utf-8`; everything else as `application/octet-stream` with `Content-Disposition: attachment`. `?download=true` makes any file a download. Every response carries a sandbox `Content-Security-Policy` and an `ETag` (`If-None-Match` gives 304). |
+| GET | `/attachments/{id}/thumb` | An image's preview (JPEG, or PNG when it has transparency; at most 480 px a side), when `has_thumb`. Images over 4096 × 4096 pixels get none. |
+| DELETE | `/attachments/{id}` | Remove an attachment (yours, or any with Edit gigs). |
+| GET | `/workspaces/{ws}/attachment-limits` | The workspace's `file_max`, `quota`, `used`, and `custom` (either differs from the default). |
+| PUT | `/workspaces/{ws}/attachment-limits` | Set them (admins with `admin:workspaces`): `{"file_max": bytes or null, "quota": bytes or null}`; null is the default (10 MB, 1 GB). `file_max` is at most 50 MB. |
+
+An attachment has `id`, `gig_id`, `run_id`, `kind` (`file`, `link`, `commit`), `label`, `value` (the URL
+or commit id), `filename`, `mime` (the sniffed type), `size`, `width` and `height` (images), `inline`,
+`has_thumb`, `created_by`, `created_by_username`, `key_id` and `created_at`. Gigs carry
+`attachment_count`. The activity actions are `attachment.created` and `attachment.deleted`.
 
 ### fields
 

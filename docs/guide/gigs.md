@@ -35,6 +35,7 @@ Click a card to open its panel. Its top line shows the workspace (its owner's pi
 The panel has the same layout as the **New gig** form, each part in its own box, with the same controls; the panel saves each change as you make it. The gig's content comes first: title and description, **Checklist**, **Subgigs** and **Comments**. Then the properties, in the form's order (**Where**, **When**, **Details**, **Agent run**), the agent session, and **Dependencies**, **Fields** and **History**. When the panel is expanded and wide enough, the content takes the left column and the rest the right.
 
 - **Description**: click to edit. Markdown, with checkboxes you can tick in place.
+- **Attachments**: screenshots, reports, files, links and commits on the gig; drop files on the panel to attach them. See [Attachments](attachments.md).
 - **Comments**: Markdown, with @mentions. Agents' comments are marked by kind:
   - *question*: they need an answer; the gig goes to the [Inbox](inbox.md).
   - *report*: what they did.

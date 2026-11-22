@@ -147,7 +147,7 @@ for container health checks (see [admin-cli.md](admin-cli.md#gigg-healthcheck)).
     nightly-YYYY-MM-DD.db   nightly snapshots (newest GIGG_BACKUP_KEEP kept)
     pre-NNNN.db             snapshot taken before migration NNNN (never pruned)
   files/
-    ab/cd/<sha256>     uploaded files, content-addressed (currently user pictures)
+    ab/cd/<sha256>     uploaded files, content-addressed (user pictures, attachments and their previews)
 ```
 
 All three directories are created with mode `0700` on start. The container image runs as UID/GID
@@ -161,7 +161,11 @@ Once a minute the server:
   untouched as missed;
 - deletes stored idempotency responses older than 24 hours;
 - closes runs that sent no heartbeat for `GIGG_STALE_RUN_HOURS` as `interrupted`;
-- writes the nightly snapshot if it is due.
+- writes the nightly snapshot if it is due;
+- once a day, removes stored files nothing has used for longer than `GIGG_BACKUP_KEEP` days plus one
+  (removed attachments, replaced pictures), so every snapshot still kept finds its files. Files in
+  `files/` that no row knows about (a crash between writing a file and saving its row) go after the
+  same time.
 
 The server starts no processes and opens no outbound connections.
 

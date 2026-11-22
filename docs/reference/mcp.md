@@ -129,6 +129,14 @@ Defaults for timing: every 1 period, window from 00:00 for 1440 minutes, and the
 | `pause_runs` | admin key with `admin:workspaces`, or `runs:write` and `pause_runs` anywhere | `workspaces?` (ids or slugs), `minutes` (0 = until resumed), `gigs?`, `errands?` (default true) | Pauses new gig runs and errand runs in those workspaces, or in every workspace you may pause. Errands stay paused until resumed. |
 | `resume_runs` | same | `workspaces?`, `gigs?`, `errands?` | Lifts the pause. |
 
+### Attachments
+
+| Tool | Needs | Arguments | Does |
+|---|---|---|---|
+| `list_attachments` | `gigs:read` | `gig` | The gig's attachments (ids, kinds, names, sizes, labels; never the contents) and the workspace's limits. |
+| `attach` | `attachments:write`, Work on gigs | `gig`, `kind` (`link`, `commit` or `report`), `value?` (the URL or commit id), `text?` (a report's Markdown, up to 256 KB), `filename?` (a report's name, default `report.md`), `label?`, `run_id?` | Attaches a link, a commit, or a Markdown report kept as a `.md` file. Larger files and images go through the REST upload. |
+| `delete_attachment` | `attachments:write`; someone else's also Edit gigs | `id` | Removes an attachment. |
+
 ### Errands
 
 | Tool | Needs | Arguments | Does |

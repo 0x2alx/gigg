@@ -12,6 +12,7 @@ A workspace is the unit of isolation: its own members, projects, labels, custom 
 - **Members**: who belongs and with which preset role (viewer, consumer, member, manager). **Where** adds someone to the whole workspace or to one project only (viewer, consumer or member there): they then see that project and its gigs, and nothing else of the workspace. A member's own project rules are listed under them. Admins reach every workspace without a membership.
 - **Projects**: each project has a name, a key (gig keys look like `KEY-12`), a colour, a description (what it is about; agents get it with its gigs), and its statuses (columns). Each status belongs to a category (backlog, to-do, doing, waiting, done, cancelled), has an optional WIP limit, and one status is the default for new gigs.
 - **Custom fields**: extra properties on every gig of the workspace (text, number, date, select, checkbox, link).
+- **Attachments** (admins): the largest file one attachment may be (10 MB by default, 50 MB at most) and the total for all the workspace's attachments (1 GB by default), with how much is used. See [Attachments](attachments.md).
 
 ![Admin: a workspace (Nightwalker theme)](../images/admin-workspace-night.png)
 
