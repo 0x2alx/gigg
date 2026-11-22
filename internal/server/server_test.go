@@ -80,7 +80,7 @@ func TestSecurityHeaders(t *testing.T) {
 	w := do(s.Handler(cfg.Listeners[0]), "GET", "localhost", "/")
 	h := w.Header()
 	csp := h.Get("Content-Security-Policy")
-	for _, want := range []string{"default-src 'none'", "script-src 'self'", "frame-ancestors 'none'", "https://fonts.gstatic.com", "connect-src 'self'"} {
+	for _, want := range []string{"default-src 'none'", "script-src 'self'", "frame-ancestors 'none'", "https://fonts.gstatic.com", "connect-src 'self'", "media-src 'self'"} {
 		if !strings.Contains(csp, want) {
 			t.Errorf("CSP lacks %q: %s", want, csp)
 		}

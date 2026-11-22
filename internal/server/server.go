@@ -172,7 +172,7 @@ func (s *Server) securityHeaders(l config.Listener, next http.Handler) http.Hand
 		fontSrc += " https://fonts.gstatic.com"
 	}
 	csp := "default-src 'none'; script-src 'self'; style-src " + styleSrc + "; font-src " + fontSrc +
-		"; img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		"; img-src 'self' data: blob:; media-src 'self'; connect-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("Content-Security-Policy", csp)
