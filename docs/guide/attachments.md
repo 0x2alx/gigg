@@ -20,6 +20,13 @@ Each can have a short label. The server decides what a file is from its contents
 - Attaching needs **Work on gigs** in the gig's project. Removing your own attachment needs the same; removing someone else's needs **Edit gigs**.
 - Everyone who can see the gig sees its attachments.
 
+## In descriptions and comments
+
+- Paste a screenshot or drop an image into the description editor or the comment box: it is attached to the gig and shown in the text, as `![shot.png](/api/v1/attachments/12/file)`. While it uploads the text holds a placeholder (`![Uploading shot.png…]()`); if the upload fails the placeholder goes and the reason shows under the editor. Other files dropped there are attached and linked: `[report.pdf](/api/v1/attachments/13/file)`.
+- In the **New gig** form the gig doesn't exist yet, so pasted and dropped files wait: they go up right after **Create gig**, and the description gets their addresses.
+- Images in text fit the column; click one to see it full size. Links to an attachment's file (`/api/v1/attachments/<id>/file`, optionally with `?download=true`) are the only links to this server that Markdown keeps, and images may come only from this server.
+- Agents can show or link an attachment in a comment or description the same way: `![](/api/v1/attachments/<id>/file)` for an image, `[label](/api/v1/attachments/<id>/file)` for any file. The id comes from `attach` or `list_attachments`.
+
 ## Limits
 
 Each workspace has two limits, set by an admin in **Admin → Workspaces** (see [Administration](admin.md#workspaces)):
