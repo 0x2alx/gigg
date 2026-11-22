@@ -178,6 +178,7 @@ export interface Gig {
   resume_requested_at: number | null;
   cost_usd_total: number;
   comment_count: number;
+  attachment_count?: number; // files, links and commits on it
   deleted: boolean;
   labels: Tag[];
   aliases: string[];
@@ -487,6 +488,33 @@ export function recurrenceBody(r: Recurrence, over: Partial<RecurrenceBody> = {}
   return { ...b, ...over };
 }
 
+// Attachment: a file, link or commit on a gig (see attachments.ts for how the panel shows it).
+export interface Attachment {
+  id: number;
+  gig_id: number;
+  kind: "file" | "link" | "commit";
+  label: string; // "" = none
+  value: string; // link: the URL; commit: the commit id; file: ""
+  filename: string | null;
+  mime: string | null; // what the server found in the bytes
+  size: number;
+  width: number | null;
+  height: number | null;
+  inline: boolean; // images, Markdown and plain text show in the page; the rest is a download
+  has_thumb: boolean;
+  created_by: number;
+  created_by_username: string;
+  run_id: number | null;
+  created_at: number;
+}
+
+export interface AttachmentList {
+  items: Attachment[];
+  file_max: number; // bytes
+  quota: number;
+  used: number;
+}
+
 export interface Comment {
   id: number;
   author_id: number;
@@ -588,6 +616,33 @@ export const api = {
   comments: (id: number) => call<{ items: Comment[] }>("GET", `/gigs/${id}/comments`),
   addComment: (id: number, body_md: string) => call<Comment>("POST", `/gigs/${id}/comments`, { body_md }),
   runs: (id: number) => call<{ items: Run[] }>("GET", `/gigs/${id}/runs`),
+  attachments: (id: number) => call<AttachmentList>("GET", `/gigs/${id}/attachments`),
+  // the request body is the file itself (sent as bytes: the server reads the type from them)
+  uploadAttachment: async (id: number, file: Blob, filename: string, label?: string) => {
+    const q = new URLSearchParams({ filename });
+    if (label) q.set("label", label);
+    const path = `/gigs/${id}/attachments?${q}`;
+    const r = await request("POST", path, { raw: new Blob([file], { type: "application/octet-stream" }) });
+    if (!r.ok) {
+      noteStatus(r.status, path);
+      const d = (r.data ?? {}) as { code?: string; detail?: string };
+      throw new ApiError(r.status, d.code ?? "error", d.detail ?? r.statusText);
+    }
+    return r.data as Attachment;
+  },
+  attachRef: (id: number, kind: "link" | "commit", value: string, label?: string) =>
+    call<Attachment>("POST", `/gigs/${id}/attachments/link`, label ? { kind, value, label } : { kind, value }),
+  deleteAttachment: (id: number) => call<void>("DELETE", `/attachments/${id}`),
+  // a text or Markdown file's content (served as text/plain)
+  attachmentText: async (id: number) => {
+    const path = `/attachments/${id}/file`;
+    const r = await request("GET", path);
+    if (!r.ok) {
+      noteStatus(r.status, path);
+      throw new ApiError(r.status, "error", r.statusText || "Couldn't load the file.");
+    }
+    return typeof r.data === "string" ? r.data : JSON.stringify(r.data, null, 2);
+  },
   statuses: (p: number) => call<{ items: Status[] }>("GET", `/projects/${p}/statuses`),
   members: (ws: string | number) => call<{ items: Membership[] }>("GET", `/workspaces/${ws}/members`),
   users: () => call<{ items: User[] }>("GET", "/users"),

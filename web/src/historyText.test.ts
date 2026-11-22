@@ -35,6 +35,11 @@ group("history lines", () => {
     expect(say("run.finished", { status: "needs_review" })).toBe("finished an agent run (needs review)");
     expect(say("gig.custom", { Team: "Backend" })).toBe("set Team");
     expect(say("gig.custom", { Team: null })).toBe("cleared Team");
+    expect(say("attachment.created", { gig_id: 3, kind: "file", filename: "report.md" })).toBe("attached a file “report.md”");
+    expect(say("attachment.created", { gig_id: 3, kind: "link", value: "https://example.com/pr/7" })).toBe("attached a link “https://example.com/pr/7”");
+    expect(say("attachment.created", { gig_id: 3, kind: "commit", value: "9e29e9c0ffee1234" })).toBe("attached a commit “9e29e9c”");
+    expect(say("attachment.deleted", { gig_id: 3, kind: "file", filename: "shot.png" })).toBe("removed a file “shot.png”");
+    expect(say("attachment.deleted", null)).toBe("removed a file");
     expect(say("something.new")).toBe("something new");
   });
 });

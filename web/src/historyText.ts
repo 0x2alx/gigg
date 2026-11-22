@@ -124,6 +124,13 @@ export function describe(it: Pick<ActivityItem, "action" | "data">, users: Map<n
       return "edited a comment";
     case "comment.deleted":
       return "deleted a comment";
+    case "attachment.created":
+    case "attachment.deleted": {
+      const what = d?.kind === "link" ? "a link" : d?.kind === "commit" ? "a commit" : "a file";
+      const name = d?.kind === "commit" ? str(d?.value).slice(0, 7) : str(d?.filename) || str(d?.value);
+      const verb = it.action === "attachment.created" ? "attached" : "removed";
+      return `${verb} ${what}${name ? ` ${quote(name)}` : ""}`;
+    }
     case "run.started":
       return "started an agent run";
     case "run.finished":

@@ -136,6 +136,28 @@ const P: Record<string, ReactNode> = {
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </>
   ),
+  // attachments: the section, a download, a document, a picture, a commit
+  paperclip: <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />,
+  download: <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />,
+  file: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5M9 13h6M9 17h6" />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2.5" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-4.5-4.5L5 21" />
+    </>
+  ),
+  commit: (
+    <>
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M3 12h5.5M15.5 12H21" />
+    </>
+  ),
   fields: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />

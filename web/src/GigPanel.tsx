@@ -10,6 +10,7 @@ import { runFrom } from "./runsettings";
 import { GigEditor } from "./GigEditor";
 import { Clamp } from "./Clamp";
 import { HistorySection } from "./GigHistory";
+import { AttachmentsSection } from "./GigAttachments";
 import { describeRule } from "./recurrence";
 import { CATEGORY_COLOR } from "./theme";
 import { Avatar, EXIT_MS, Pill, PriorityBadge, StatusBadge, GigBadges, UserBadge, reducedMotion } from "./ui";
@@ -412,6 +413,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
           <>
             <ChecklistSection key={gig.id} gig={gig} canEdit={can("edit_gigs")} onGig={onGig} />
             <SubgigsSection gig={gig} wsId={ws.id} canCreate={can("create_gigs") && !gig.deleted} canEdit={can("edit_gigs") && !gig.deleted} assignable={candidates.map((u) => u.id)} onOpen={onMoved} onGig={onGig} onChanged={onChanged} />
+            <AttachmentsSection key={"att-" + gig.id} gig={gig} canWork={can("work_gigs") && !gig.deleted} canEdit={can("edit_gigs")} dropZone={panelRef} onChanged={onChanged} />
           </>
         }
         mainEnd={
