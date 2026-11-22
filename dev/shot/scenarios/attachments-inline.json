@@ -1,0 +1,294 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  1440,
+  900
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => {\n  const H = {'X-Gigg-CSRF': '1'};\n  const J = {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'};\n  const g = await (await fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: J, body: JSON.stringify({title: 'Harbor redesign: review the new layout', priority: 2, description_md: 'First pass.'})})).json();\n  const pic = (w, h, a, b, text) => new Promise((ok) => {\n    const c = document.createElement('canvas'); c.width = w; c.height = h;\n    const x = c.getContext('2d');\n    const gr = x.createLinearGradient(0, 0, w, h); gr.addColorStop(0, a); gr.addColorStop(1, b);\n    x.fillStyle = gr; x.fillRect(0, 0, w, h);\n    x.fillStyle = 'rgba(255,255,255,0.18)';\n    for (let i = 0; i < 9; i++) { x.beginPath(); x.arc((i * 137) % w, (i * 211) % h, 40 + i * 14, 0, 7); x.fill(); }\n    x.fillStyle = '#fff'; x.font = 'bold ' + Math.round(h / 9) + 'px sans-serif'; x.fillText(text, w * 0.08, h * 0.88);\n    c.toBlob(ok, 'image/png');\n  });\n  // a short WAV tone, written by hand\n  const wav = (() => {\n    const n = 8000, b = new DataView(new ArrayBuffer(44 + n * 2));\n    const s = (o, t) => [...t].forEach((ch, i) => b.setUint8(o + i, ch.charCodeAt(0)));\n    s(0, 'RIFF'); b.setUint32(4, 36 + n * 2, true); s(8, 'WAVEfmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true);\n    b.setUint32(24, 8000, true); b.setUint32(28, 16000, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true); s(36, 'data'); b.setUint32(40, n * 2, true);\n    for (let i = 0; i < n; i++) b.setInt16(44 + i * 2, Math.sin(i / 3) * 8000, true);\n    return new Blob([b.buffer]);\n  })();\n  // a one-second WebM recorded from a canvas\n  const webm = await new Promise((ok) => {\n    try {\n      const c = document.createElement('canvas'); c.width = 320; c.height = 180;\n      const x = c.getContext('2d'); let f = 0;\n      const t = setInterval(() => { x.fillStyle = 'hsl(' + (f++ * 12) + ',70%,50%)'; x.fillRect(0, 0, 320, 180); x.fillStyle = '#fff'; x.font = 'bold 28px sans-serif'; x.fillText('Walkthrough', 60, 100); }, 40);\n      const r = new MediaRecorder(c.captureStream(25), {mimeType: 'video/webm'}); const parts = [];\n      r.ondataavailable = (e) => parts.push(e.data); r.onstop = () => { clearInterval(t); ok(new Blob(parts)); };\n      r.start(); setTimeout(() => r.stop(), 1200);\n    } catch (e) { ok(null); }\n  });\n  const up = async (name, body) => await (await fetch('/api/v1/gigs/' + g.id + '/attachments?' + new URLSearchParams({filename: name}), {method: 'POST', headers: {...H, 'Content-Type': 'application/octet-stream'}, body})).json();\n  const layout = await up('new-layout.png', await pic(1400, 800, '#3E63DD', '#8E4EC6', 'New layout'));\n  const phone = await up('phone.png', await pic(700, 1100, '#12A594', '#3E63DD', 'Phone'));\n  const log = await up('review.log', new Blob(['2026-11-21 review started\\n2026-11-21 3 issues found\\n']));\n  const tone = await up('chime.wav', wav);\n  const clip = webm ? await up('walkthrough.webm', webm) : null;\n  const desc = 'The new layout for **Harbor**, as agreed on Thursday:\\n\\n![new-layout.png](/api/v1/attachments/' + layout.id + '/file)\\n\\nThe full review is in [review.log](/api/v1/attachments/' + log.id + '/file).';\n  const p = await fetch('/api/v1/gigs/' + g.id, {method: 'PATCH', headers: J, body: JSON.stringify({description_md: desc})});\n  const c = await fetch('/api/v1/gigs/' + g.id + '/comments', {method: 'POST', headers: J, body: JSON.stringify({body_md: 'On a phone the header wraps, see:\\n\\n![](/api/v1/attachments/' + phone.id + '/thumb)\\n\\nI think the menu should collapse.'})});\n  return [g.id, layout.mime, phone.mime, log.mime, tone.mime + ' ' + tone.inline, clip ? clip.mime + ' ' + clip.inline : 'no webm', p.status, c.status];\n})()",
+   "expect": [
+    1,
+    "image/png",
+    "image/png",
+    "text/plain",
+    "audio/wav true",
+    "video/webm true",
+    200,
+    201
+   ]
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'daywalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "goto": "/board/p/1/g/GIG-1"
+  },
+  {
+   "wait": "section[aria-label=\"Description\"] .md img"
+  },
+  {
+   "wait": ".comments .comment .md img"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "[...document.querySelectorAll('section[aria-label=\"Description\"] .md a')].map(a => a.getAttribute('href').replace(/\\/\\d+\\//, '/N/') + ' ' + a.target)",
+   "expect": [
+    "/api/v1/attachments/N/file _blank"
+   ]
+  },
+  {
+   "eval": "(i => i.getBoundingClientRect().width <= i.closest('.md').getBoundingClientRect().width + 0.5)(document.querySelector('section[aria-label=\"Description\"] .md img'))",
+   "expect": true
+  },
+  {
+   "shot": "description-day",
+   "el": "section[aria-label=\"Gig\"]"
+  },
+  {
+   "eval": "(document.querySelector('.comments').scrollIntoView({block: 'start'}), true)",
+   "expect": true
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "comment-day",
+   "el": ".comments .comment"
+  },
+  {
+   "click": ".comments .comment .md img"
+  },
+  {
+   "wait": ".att-lightbox img"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "document.querySelector('.att-lightbox img').getAttribute('src').replace(/\\/\\d+\\//, '/N/')",
+   "expect": "/api/v1/attachments/N/file"
+  },
+  {
+   "shot": "lightbox-comment-day",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "!document.querySelector('.att-lightbox') && !!document.querySelector('aside.panel')",
+   "expect": true
+  },
+  {
+   "eval": "(document.querySelector('section[aria-label=\"Attachments\"]').scrollIntoView({block: 'start'}), true)",
+   "expect": true
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "document.querySelectorAll('.att-grid .att-tile').length + ' images, ' + document.querySelectorAll('.att-media video').length + ' video, ' + document.querySelectorAll('.att-media audio').length + ' audio, ' + document.querySelectorAll('.att-list:not(.att-media) li').length + ' files'",
+   "expect": "2 images, 1 video, 1 audio, 1 files"
+  },
+  {
+   "shot": "section-media-day",
+   "el": "section[aria-label=\"Attachments\"]"
+  },
+  {
+   "click": "button[aria-label=\"Edit title and description\"]"
+  },
+  {
+   "wait": "form[aria-label=\"Edit gig\"] textarea"
+  },
+  {
+   "eval": "(async () => {\n  const c = document.createElement('canvas'); c.width = 600; c.height = 340; const x = c.getContext('2d');\n  x.fillStyle = '#E5484D'; x.fillRect(0, 0, 600, 340); x.fillStyle = '#fff'; x.font = 'bold 40px sans-serif'; x.fillText('Pasted shot', 40, 300);\n  const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));\n  const t = document.querySelector('form[aria-label=\"Edit gig\"] textarea'); t.focus(); t.setSelectionRange(t.value.length, t.value.length);\n  const dt = new DataTransfer(); dt.items.add(new File([blob], 'shot.png', {type: 'image/png'}));\n  t.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));\n  return t.value.includes('![Uploading shot.png…]()') || t.value.includes('![shot.png](');\n})()",
+   "expect": true
+  },
+  {
+   "shot": "paste-uploading-day",
+   "el": "form[aria-label=\"Edit gig\"]"
+  },
+  {
+   "eval": "(async () => { const sel = 'form[aria-label=\"Edit gig\"] textarea'; for (let i = 0; i < 50; i++) { const t = document.querySelector(sel); if (t && /\\(\\/api\\/v1\\/attachments\\/\\d+\\/file\\)/.test(t.value) && !t.value.includes('Uploading')) return t.value.replace(/\\d+\\/file/g, 'N/file'); await new Promise((r) => setTimeout(r, 200)); } return document.querySelector(sel)?.value ?? null; })()"
+  },
+  {
+   "shot": "paste-done-day",
+   "el": "form[aria-label=\"Edit gig\"]"
+  },
+  {
+   "click": "form[aria-label=\"Edit gig\"] button[type=submit]"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "document.querySelectorAll('section[aria-label=\"Description\"] .md img').length",
+   "expect": 2
+  },
+  {
+   "eval": "document.querySelectorAll('section[aria-label=\"Attachments\"] li').length",
+   "expect": 6
+  },
+  {
+   "eval": "(() => {\n  const box = document.querySelector('.add-comment .mde');\n  const dt = new DataTransfer(); dt.items.add(new File(['meeting notes\\n'], 'notes.txt', {type: 'text/plain'}));\n  box.dispatchEvent(new DragEvent('dragover', {dataTransfer: dt, bubbles: true, cancelable: true}));\n  box.dispatchEvent(new DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true}));\n  return !document.querySelector('aside.panel').classList.contains('att-drop');\n})()",
+   "expect": true
+  },
+  {
+   "eval": "(async () => { const sel = '.add-comment textarea'; for (let i = 0; i < 50; i++) { const t = document.querySelector(sel); if (t && /\\(\\/api\\/v1\\/attachments\\/\\d+\\/file\\)/.test(t.value) && !t.value.includes('Uploading')) return t.value.replace(/\\d+\\/file/g, 'N/file'); await new Promise((r) => setTimeout(r, 200)); } return document.querySelector(sel)?.value ?? null; })()",
+   "expect": "[notes.txt](/api/v1/attachments/N/file)"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "(async () => (await (await fetch('/api/v1/gigs/1/attachments')).json()).items.length)()",
+   "expect": 7
+  },
+  {
+   "click": ".add-comment button[type=submit]"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "[...document.querySelectorAll('.comments .comment .md a')].map(a => a.textContent)",
+   "expect": [
+    "notes.txt"
+   ]
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'nightwalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/board/p/1/g/GIG-1"
+  },
+  {
+   "wait": "section[aria-label=\"Description\"] .md img"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "(p => p.scrollWidth <= p.clientWidth + 1)(document.querySelector('aside.panel'))",
+   "expect": true
+  },
+  {
+   "shot": "mobile-description-night",
+   "full": false
+  },
+  {
+   "eval": "(document.querySelector('.comments').scrollIntoView({block: 'start'}), true)",
+   "expect": true
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "mobile-comment-night",
+   "full": false
+  },
+  {
+   "click": ".comments .comment .md img"
+  },
+  {
+   "wait": ".att-lightbox img"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "mobile-lightbox-night",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "goto": "/board?new=1"
+  },
+  {
+   "wait": "form[aria-label=\"New gig\"] textarea"
+  },
+  {
+   "type": [
+    "form[aria-label=\"New gig\"] input.tp-title-input",
+    "Harbor: icons for the footer"
+   ]
+  },
+  {
+   "eval": "(async () => {\n  const c = document.createElement('canvas'); c.width = 600; c.height = 340; const x = c.getContext('2d');\n  x.fillStyle = '#E5484D'; x.fillRect(0, 0, 600, 340); x.fillStyle = '#fff'; x.font = 'bold 40px sans-serif'; x.fillText('Pasted shot', 40, 300);\n  const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));\n  const t = document.querySelector('form[aria-label=\"New gig\"] textarea'); t.focus(); t.setSelectionRange(t.value.length, t.value.length);\n  const dt = new DataTransfer(); dt.items.add(new File([blob], 'shot.png', {type: 'image/png'}));\n  t.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));\n  return t.value.includes('![Uploading shot.png…]()') || t.value.includes('![shot.png](');\n})()",
+   "expect": true
+  },
+  {
+   "eval": "(async () => { await new Promise((r) => setTimeout(r, 300)); return document.querySelector('form[aria-label=\"New gig\"] textarea').value; })()",
+   "expect": "![shot.png](pending-upload:1)"
+  },
+  {
+   "shot": "new-gig-pending-night",
+   "el": "form[aria-label=\"New gig\"]"
+  },
+  {
+   "click": "form[aria-label=\"New gig\"] button[type=submit]"
+  },
+  {
+   "wait": 2500
+  },
+  {
+   "eval": "(async () => { const l = await (await fetch('/api/v1/projects/1/gigs')).json(); const g = (l.items ?? l).find((x) => x.title.startsWith('Harbor: icons')); const r = await (await fetch('/api/v1/gigs/' + g.id)).json(); return [r.description_md.replace(/\\d+\\/file/, 'N/file'), r.attachment_count]; })()",
+   "expect": [
+    "![shot.png](/api/v1/attachments/N/file)",
+    1
+   ]
+  }
+ ]
+}
