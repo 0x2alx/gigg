@@ -1,0 +1,370 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  1440,
+  900
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => {\n  const H = {'X-Gigg-CSRF': '1'};\n  const J = {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'};\n  const g = await (await fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: J, body: JSON.stringify({title: 'Meridian launch: release notes and screenshots', priority: 2, description_md: 'Collect the release notes, the screenshots and the build for the **Meridian** launch.'})})).json();\n  const pic = (w, h, a, b, text) => new Promise((ok) => {\n    const c = document.createElement('canvas'); c.width = w; c.height = h;\n    const x = c.getContext('2d');\n    const gr = x.createLinearGradient(0, 0, w, h); gr.addColorStop(0, a); gr.addColorStop(1, b);\n    x.fillStyle = gr; x.fillRect(0, 0, w, h);\n    x.fillStyle = 'rgba(255,255,255,0.18)';\n    for (let i = 0; i < 9; i++) { x.beginPath(); x.arc((i * 137) % w, (i * 211) % h, 40 + i * 14, 0, 7); x.fill(); }\n    x.fillStyle = '#fff'; x.font = 'bold ' + Math.round(h / 9) + 'px sans-serif'; x.fillText(text, w * 0.08, h * 0.88);\n    c.toBlob(ok, 'image/png');\n  });\n  const up = async (name, body, label) => (await fetch('/api/v1/gigs/' + g.id + '/attachments?' + new URLSearchParams(label ? {filename: name, label} : {filename: name}), {method: 'POST', headers: {...H, 'Content-Type': 'application/octet-stream'}, body})).status;\n  const md = '# Weekly report: Meridian\\n\\nThe launch build passed every check on **Atlas** and **Scout**.\\n\\n## Done\\n\\n- Release notes drafted\\n- Screenshots for the store page\\n- [x] Smoke test on the staging host\\n\\n## Numbers\\n\\n| Check | Result |\\n| --- | --- |\\n| Unit tests | 284 passed |\\n| Bundle | 412 KB |\\n\\n```sh\\nmake release VERSION=1.4.0\\n```\\n\\n> Next: the changelog and the announcement.\\n';\n  const out = [];\n  out.push(await up('dashboard.png', await pic(1200, 800, '#3E63DD', '#8E4EC6', 'Dashboard'), 'New dashboard'));\n  out.push(await up('mobile-board.png', await pic(800, 1000, '#12A594', '#3E63DD', 'Board')));\n  out.push(await up('settings.png', await pic(1000, 640, '#F76B15', '#E5484D', 'Settings')));\n  out.push(await up('weekly-report.md', new Blob([md]), 'Weekly report'));\n  out.push(await up('build.log', new Blob(['2026-11-21 04:10 build started\\n2026-11-21 04:12 tests: 284 passed\\n2026-11-21 04:13 bundle 412 KB\\n2026-11-21 04:13 done\\n'])));\n  out.push(await up('meridian-1.4.0.zip', new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), new Uint8Array(180000)])));\n  out.push((await fetch('/api/v1/gigs/' + g.id + '/attachments/link', {method: 'POST', headers: J, body: JSON.stringify({kind: 'link', value: 'https://example.com/meridian/pull/42', label: 'Pull request #42'})})).status);\n  out.push((await fetch('/api/v1/gigs/' + g.id + '/attachments/link', {method: 'POST', headers: J, body: JSON.stringify({kind: 'link', value: 'https://example.com/docs/release-checklist'})})).status);\n  out.push((await fetch('/api/v1/gigs/' + g.id + '/attachments/link', {method: 'POST', headers: J, body: JSON.stringify({kind: 'commit', value: '9e29e9c4b1d2a7f00c3e5b6a8d9f1e2c3b4a5d6e', label: 'release tag'})})).status);\n  return [g.id].concat(out);\n})()",
+   "expect": [
+    1,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201
+   ]
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'daywalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "goto": "/board/p/1/g/GIG-1"
+  },
+  {
+   "wait": ".att-grid img"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(document.querySelector('section[aria-label=\"Attachments\"]').scrollIntoView({block: 'start'}), true)",
+   "expect": true
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "panel-day",
+   "full": false
+  },
+  {
+   "shot": "section-day",
+   "el": "section[aria-label=\"Attachments\"]"
+  },
+  {
+   "click": ".att-thumb"
+  },
+  {
+   "wait": ".att-lightbox img"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "lightbox-day",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "!document.querySelector('.att-lightbox') && !!document.querySelector('aside.panel')",
+   "expect": true
+  },
+  {
+   "click": ".att-list button.att-name"
+  },
+  {
+   "wait": ".att-viewer .md h1"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "shot": "viewer-day",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "(() => { const dt = new DataTransfer(); dt.items.add(new File(['x'], 'notes.txt', {type: 'text/plain'})); const p = document.querySelector('aside.panel'); p.dispatchEvent(new DragEvent('dragenter', {dataTransfer: dt, bubbles: true, cancelable: true})); return p.classList.contains('att-drop'); })()",
+   "expect": true
+  },
+  {
+   "wait": 200
+  },
+  {
+   "shot": "drag-day",
+   "full": false
+  },
+  {
+   "eval": "(() => { const dt = new DataTransfer(); dt.items.add(new File(['x'], 'notes.txt', {type: 'text/plain'})); const p = document.querySelector('aside.panel'); p.dispatchEvent(new DragEvent('dragleave', {dataTransfer: dt, bubbles: true, cancelable: true})); return p.classList.contains('att-drop'); })()",
+   "expect": false
+  },
+  {
+   "eval": "[...document.querySelectorAll('.att-refs a')].every(a => a.target === '_blank' && a.rel === 'noopener noreferrer')",
+   "expect": true
+  },
+  {
+   "eval": "[...document.querySelectorAll('.att-refs code')].map(c => c.textContent)",
+   "expect": [
+    "9e29e9c"
+   ]
+  },
+  {
+   "eval": "document.querySelectorAll('.att-grid .att-tile').length + ' images, ' + document.querySelectorAll('.att-list li').length + ' files, ' + document.querySelectorAll('.att-refs li').length + ' refs'",
+   "expect": "3 images, 3 files, 3 refs"
+  },
+  {
+   "click": ".att-list li:nth-child(2) button.att-name"
+  },
+  {
+   "wait": ".att-viewer pre"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "viewer-text-day",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "click": ".att-actions button:nth-of-type(2)"
+  },
+  {
+   "wait": ".att-addref input"
+  },
+  {
+   "type": [
+    ".att-addref input",
+    "4b1d2a7f"
+   ]
+  },
+  {
+   "wait": 200
+  },
+  {
+   "shot": "addlink-day",
+   "el": "section[aria-label=\"Attachments\"]"
+  },
+  {
+   "click": ".att-addref button[type=submit]"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "[...document.querySelectorAll('.att-refs code')].map(c => c.textContent)",
+   "expect": [
+    "9e29e9c",
+    "4b1d2a7"
+   ]
+  },
+  {
+   "click": ".att-refs li:last-child .att-del"
+  },
+  {
+   "wait": "[role=dialog] .confirm-body"
+  },
+  {
+   "shot": "confirm-day",
+   "full": false
+  },
+  {
+   "click": "[role=dialog] .row.end .button:not(.secondary)"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "document.querySelectorAll('.att-refs li').length",
+   "expect": 3
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({title: 'Atlas: nothing attached yet'})})).status)()",
+   "expect": 201
+  },
+  {
+   "goto": "/board/p/1/g/GIG-2"
+  },
+  {
+   "wait": "section[aria-label=\"Attachments\"] .att-actions"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "document.querySelectorAll('section[aria-label=\"Attachments\"] li').length",
+   "expect": 0
+  },
+  {
+   "shot": "empty-day",
+   "el": "section[aria-label=\"Attachments\"]"
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'nightwalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "goto": "/board/p/1/g/GIG-1"
+  },
+  {
+   "wait": ".att-grid img"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(document.querySelector('section[aria-label=\"Attachments\"]').scrollIntoView({block: 'start'}), true)",
+   "expect": true
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "panel-night",
+   "full": false
+  },
+  {
+   "shot": "section-night",
+   "el": "section[aria-label=\"Attachments\"]"
+  },
+  {
+   "click": ".att-thumb"
+  },
+  {
+   "wait": ".att-lightbox img"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "lightbox-night",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "!document.querySelector('.att-lightbox') && !!document.querySelector('aside.panel')",
+   "expect": true
+  },
+  {
+   "click": ".att-list button.att-name"
+  },
+  {
+   "wait": ".att-viewer .md h1"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "shot": "viewer-night",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "(() => { const dt = new DataTransfer(); dt.items.add(new File(['x'], 'notes.txt', {type: 'text/plain'})); const p = document.querySelector('aside.panel'); p.dispatchEvent(new DragEvent('dragenter', {dataTransfer: dt, bubbles: true, cancelable: true})); return p.classList.contains('att-drop'); })()",
+   "expect": true
+  },
+  {
+   "wait": 200
+  },
+  {
+   "shot": "drag-night",
+   "full": false
+  },
+  {
+   "eval": "(() => { const dt = new DataTransfer(); dt.items.add(new File(['x'], 'notes.txt', {type: 'text/plain'})); const p = document.querySelector('aside.panel'); p.dispatchEvent(new DragEvent('dragleave', {dataTransfer: dt, bubbles: true, cancelable: true})); return p.classList.contains('att-drop'); })()",
+   "expect": false
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/board/p/1/g/GIG-1"
+  },
+  {
+   "wait": ".att-grid img"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(p => p.scrollWidth <= p.clientWidth + 1)(document.querySelector('aside.panel'))",
+   "expect": true
+  },
+  {
+   "eval": "(document.querySelector('section[aria-label=\"Attachments\"]').scrollIntoView({block: 'start'}), true)",
+   "expect": true
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "mobile-night",
+   "full": false
+  },
+  {
+   "click": ".att-thumb"
+  },
+  {
+   "wait": ".att-lightbox img"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "shot": "mobile-lightbox-night",
+   "full": false
+  }
+ ]
+}
