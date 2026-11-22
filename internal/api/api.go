@@ -84,6 +84,7 @@ func New(cfg *config.Config, st *store.Store, log *slog.Logger) *API {
 	a.registerRunner()
 	a.registerMetrics()
 	a.registerErrands()
+	a.registerAttachments()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		p := fail(404, "not_found", "No such API endpoint.")
 		writeProblem(w, p)
@@ -180,6 +181,8 @@ func storeErr(err error) error {
 		return fail(422, "invalid", strings.TrimPrefix(err.Error(), "invalid: "))
 	case errors.Is(err, store.ErrConflict):
 		return fail(409, "conflict", strings.TrimPrefix(err.Error(), "conflict: "))
+	case errors.Is(err, store.ErrTooLarge):
+		return fail(413, "too_large", strings.TrimPrefix(err.Error(), "too large: "))
 	case errors.Is(err, store.ErrDenied):
 		return fail(403, "forbidden", strings.TrimPrefix(err.Error(), "forbidden: "))
 	case errors.Is(err, store.ErrPaused):

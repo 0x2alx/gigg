@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // UserTheme is a custom theme saved on a user (the theme JSON, sanitised).
@@ -106,6 +107,8 @@ func (s *Store) WriteBlob(data []byte) (string, error) {
 	sha := hex.EncodeToString(h[:])
 	p := s.BlobPath(sha)
 	if _, err := os.Stat(p); err == nil {
+		now := time.Now() // fresh again: the sweep leaves recent files alone
+		_ = os.Chtimes(p, now, now)
 		return sha, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {

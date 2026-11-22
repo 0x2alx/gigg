@@ -27,7 +27,8 @@ func TestConsumersMigration(t *testing.T) {
 	// drop them before 0016 runs
 	for _, q := range []string{`ALTER TABLE access_rules ADD COLUMN project_id INTEGER`,
 		`CREATE TABLE gig_followers (gig_id INTEGER NOT NULL, user_id INTEGER NOT NULL, PRIMARY KEY (gig_id, user_id)) STRICT`,
-		`ALTER TABLE gig_templates ADD COLUMN followers TEXT NOT NULL DEFAULT '[]'`} {
+		`ALTER TABLE gig_templates ADD COLUMN followers TEXT NOT NULL DEFAULT '[]'`,
+		`CREATE TABLE attachments (id INTEGER PRIMARY KEY, gig_id INTEGER NOT NULL) STRICT`} {
 		if _, err := s.W.ExecContext(ctx, q); err != nil {
 			t.Fatal(err)
 		}
@@ -121,6 +122,7 @@ func TestConsumersMigration(t *testing.T) {
 		`ALTER TABLE access_rules DROP COLUMN project_id`,
 		`DROP TABLE gig_followers`,
 		`ALTER TABLE gig_templates DROP COLUMN followers`,
+		`DROP TABLE attachments`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?4, 'commenter', '{}', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?2, 'member', '{"schedules":true,"checklists":false,"relations":true}', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, NULL, 'manager', '{"schedules":false}', 1)`,
@@ -138,7 +140,7 @@ func TestConsumersMigration(t *testing.T) {
 	must(t, s.R.QueryRowContext(ctx, `SELECT overrides FROM access_rules WHERE user_id = ?`, deny).Scan(&overrides))
 	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'w'`).Scan(&scopesW))
 	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE name = 'r'`).Scan(&scopesR))
-	if overrides != `{"edit_gigs":false,"delete_gigs":false,"work_gigs":false}` || scopesW != `["gigs:read","gigs:write","gigs:work"]` || scopesR != `["gigs:read"]` {
+	if overrides != `{"edit_gigs":false,"delete_gigs":false,"work_gigs":false}` || scopesW != `["gigs:read","gigs:write","gigs:work","attachments:write"]` || scopesR != `["gigs:read"]` {
 		t.Fatalf("rules and keys: %s %s %s", overrides, scopesW, scopesR)
 	}
 	for _, c := range []struct{ where, want string }{

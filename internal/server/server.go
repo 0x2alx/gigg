@@ -35,7 +35,8 @@ type Server struct {
 	log   *slog.Logger
 	ui    fs.FS // built web UI (index.html, assets/...)
 	api   *api.API
-	etags sync.Map // static file path -> ETag
+	etags sync.Map  // static file path -> ETag
+	swept time.Time // the last blob sweep (housekeeping goroutine only)
 }
 
 // New builds a server. ui is the embedded web build (web.Dist with "dist" stripped).
@@ -330,6 +331,27 @@ func (s *Server) housekeepOnce(ctx context.Context) {
 		}
 	}
 	s.nightlyBackup(ctx, time.Now())
+	s.sweepBlobs(ctx, time.Now())
+}
+
+// sweepBlobs removes stored files nothing has used for longer than the snapshot window (plus a
+// day), once a day; the first pass runs an hour after start, out of the way of a busy start-up.
+func (s *Server) sweepBlobs(ctx context.Context, now time.Time) {
+	if s.swept.IsZero() {
+		s.swept = now.Add(-23 * time.Hour)
+		return
+	}
+	if now.Sub(s.swept) < 24*time.Hour {
+		return
+	}
+	s.swept = now
+	grace := time.Duration(max(s.cfg.BackupKeep, 1)+1) * 24 * time.Hour
+	n, err := s.store.SweepBlobs(ctx, grace)
+	if err != nil {
+		s.log.Error("file sweep", "err", err)
+	} else if n > 0 {
+		s.log.Info("file sweep", "removed", n)
+	}
 }
 
 // nightlyBackup writes today's snapshot once the configured time has passed (so a server that was

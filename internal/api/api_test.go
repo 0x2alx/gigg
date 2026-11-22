@@ -124,6 +124,11 @@ func newEnv(t *testing.T) *env {
 			if err := store.AddChecklistItems(ctx, tx, a, tk, []string{name + " secret item"}); err != nil {
 				return err
 			}
+			att, err := store.AddAttachment(ctx, tx, a, tk, store.AttachmentIn{Kind: "link", Value: "https://example.com/" + name, Label: name + " secret link"})
+			if err != nil {
+				return err
+			}
+			e.ids[name+".attachment"] = att.ID
 			e.ids[name+".field"], e.ids[name+".template"], e.ids[name+".filter"] = fld.ID, tpl.ID, flt.ID
 			cr, err := store.CreateErrand(ctx, tx, a, store.NewErrand{WorkspaceID: w.ID, WorkerID: ag.ID, ScheduleID: rec.ScheduleID,
 				Template: &store.ErrandTemplate{Name: name + " secret errand", Command: "echo " + name + " secret"}}, store.ErrandEdit{})
@@ -554,6 +559,7 @@ func (e *env) fingerprint(ws int64) string {
 		`SELECT group_concat(id || template_id || schedule_id || worker_id || IFNULL(project_id, '') || version || COALESCE(paused_at,'') || COALESCE(run_now_at,'') || COALESCE(deleted_at,''), '|') FROM errands WHERE workspace_id = ?`,
 		`SELECT group_concat(id || name || command || unsandboxed || version || COALESCE(deleted_at,''), '|') FROM errand_templates WHERE workspace_id = ?`,
 		`SELECT group_concat(id || status || COALESCE(output_tail,''), '|') FROM errand_runs WHERE workspace_id = ?`,
+		`SELECT group_concat(id || kind || label || value, '|') FROM attachments WHERE workspace_id = ?`,
 	} {
 		var s sql.NullString
 		if err := e.st.R.QueryRow(q, ws).Scan(&s); err != nil {
@@ -578,6 +584,7 @@ func TestIsolationSweep(t *testing.T) {
 		"/statuses/": e.ids[b+".status"], "/keys/": e.ids[b+".key"], "/me/keys/": e.ids[b+".key"], "/users/": e.ids[b+".user"],
 		"/sessions/": 1, "/auth/sessions/": 1, "/groups/": 1, "/fields/": e.ids[b+".field"], "/templates/": e.ids[b+".template"], "/me/filters/": e.ids[b+".filter"], "/recurrences/": e.ids[b+".rec"], "/schedules/": e.ids[b+".sched"],
 		"/errands/": e.ids[b+".errand"], "/errand-templates/": e.ids[b+".errandtpl"], "/errand-runs/": e.ids[b+".errandrun"],
+		"/attachments/": e.ids[b+".attachment"],
 	}
 	// scout's key with every non-admin scope: a route must refuse atlas's objects by workspace, not by scope
 	var scopes []string

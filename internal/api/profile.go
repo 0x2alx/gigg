@@ -235,11 +235,14 @@ func (a *API) setAvatar(ctx context.Context, p *access.Principal, user int64, ra
 	if err != nil {
 		return fail(422, "invalid", err.Error())
 	}
-	sha, err := a.st.WriteBlob(png)
-	if err != nil {
-		return err
-	}
-	return a.tx(ctx, func(tx *sql.Tx) error { return store.SetAvatar(ctx, tx, p.Actor(), user, sha, len(png)) })
+	// the file is written inside the transaction, so the blob sweep (one writer) never removes it under us
+	return a.tx(ctx, func(tx *sql.Tx) error {
+		sha, err := a.st.WriteBlob(png)
+		if err != nil {
+			return err
+		}
+		return store.SetAvatar(ctx, tx, p.Actor(), user, sha, len(png))
+	})
 }
 
 // agentTarget: admins manage pictures of agents only; a person's picture is theirs to set.

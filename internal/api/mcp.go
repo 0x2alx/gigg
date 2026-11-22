@@ -40,16 +40,26 @@ func (a *API) MCPHandler() http.Handler {
 	}))
 }
 
-// apiCall runs one REST call in-process with the original request's credentials.
+// apiCall runs one REST call in-process with the original request's credentials. body is sent as
+// JSON, or as is when it is a rawBody (file uploads).
 type apiCall func(method, path string, query url.Values, body any) (int, []byte)
+
+// rawBody is a request body sent unchanged with its content type.
+type rawBody struct {
+	data  []byte
+	ctype string
+}
 
 func (a *API) caller(r *http.Request) apiCall {
 	inner := a.Handler()
 	return func(method, path string, query url.Values, body any) (code int, out []byte) {
 		var rd io.Reader = http.NoBody
-		if body != nil {
+		ctype := ""
+		if raw, ok := body.(rawBody); ok {
+			rd, ctype = bytes.NewReader(raw.data), raw.ctype
+		} else if body != nil {
 			b, _ := json.Marshal(body)
-			rd = bytes.NewReader(b)
+			rd, ctype = bytes.NewReader(b), "application/json"
 		}
 		u := Prefix + path
 		if len(query) > 0 {
@@ -62,8 +72,8 @@ func (a *API) caller(r *http.Request) apiCall {
 		for _, v := range r.Header.Values("X-Forwarded-For") {
 			req.Header.Add("X-Forwarded-For", v)
 		}
-		if body != nil {
-			req.Header.Set("Content-Type", "application/json")
+		if ctype != "" {
+			req.Header.Set("Content-Type", ctype)
 		}
 		rec := httptest.NewRecorder()
 		// MCP tools run outside the HTTP server's panic recovery: a panic here would end the process.
@@ -698,6 +708,7 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 	addErrandTools(s, p, call, ws)
 	addMakeSharedTool(s, p, call)
 	addImportTool(s, p, call, ws)
+	addAttachmentTools(s, p, call)
 	return s
 }
 

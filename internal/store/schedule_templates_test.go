@@ -283,7 +283,7 @@ func TestGigRenameMigration(t *testing.T) {
 	must(t, s.R.QueryRowContext(ctx, `SELECT scopes FROM api_keys WHERE id = 1`).Scan(&scopes))
 	must(t, s.R.QueryRowContext(ctx, `SELECT overrides FROM access_rules`).Scan(&overrides))
 	must(t, s.R.QueryRowContext(ctx, `SELECT action, entity_type, data FROM activity`).Scan(&action, &entity, &data))
-	if scopes != `["workspace:read","gigs:read","gigs:write","runs:write","gigs:work"]` || overrides != `{"create_gigs":false,"always_run":true}` {
+	if scopes != `["workspace:read","gigs:read","gigs:write","runs:write","gigs:work","attachments:write"]` || overrides != `{"create_gigs":false,"always_run":true}` {
 		t.Fatalf("scopes %s overrides %s", scopes, overrides)
 	}
 	if action != "gig.created" || entity != "gig" || data != `{"title":"a task_id: in my text","gig_key":"MRV-1","subgigs":[]}` {
