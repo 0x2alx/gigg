@@ -7,7 +7,49 @@ import (
 	"image/gif"
 	"image/png"
 	"testing"
+
+	"golang.org/x/image/bmp"
+	"golang.org/x/image/tiff"
 )
+
+func ftyp(brand string) []byte {
+	return append([]byte{0, 0, 0, 0x18, 'f', 't', 'y', 'p'}, []byte(brand+"\x00\x00\x00\x00mif1miaf")...)
+}
+
+// TestSniffMedia: more image types, video and audio, from their bytes.
+func TestSniffMedia(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 30, 20))
+	var b, tf bytes.Buffer
+	_ = bmp.Encode(&b, img)
+	_ = tiff.Encode(&tf, img, nil)
+	for _, c := range []struct {
+		name string
+		data []byte
+		mime string
+		w    int
+	}{
+		{"a.bmp", b.Bytes(), "image/bmp", 30},
+		{"scan.tif", tf.Bytes(), "image/tiff", 30},
+		{"a.avif", ftyp("avif"), "image/avif", 0},
+		{"IMG_1.HEIC", ftyp("heic"), "image/heic", 0},
+		{"clip.mp4", ftyp("isom"), "video/mp4", 0},
+		{"clip.mov", ftyp("qt  "), "video/quicktime", 0},
+		{"song.m4a", ftyp("M4A "), "audio/mp4", 0},
+		{"clip.webm", []byte{0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 0x01}, "video/webm", 0},
+		{"a.mp3", []byte("ID3\x04\x00\x00\x00\x00\x00\x00rest"), "audio/mpeg", 0},
+		{"a.wav", append([]byte("RIFF\x24\x00\x00\x00WAVEfmt "), make([]byte, 16)...), "audio/wav", 0},
+		{"a.ogg", append([]byte("OggS\x00\x02"), make([]byte, 20)...), "audio/ogg", 0},
+	} {
+		i := Sniff(c.data, c.name)
+		if i.Mime != c.mime || i.Width != c.w {
+			t.Errorf("%s: %+v, want %s (width %d)", c.name, i, c.mime, c.w)
+		}
+	}
+	// a TIFF can't show in browsers but still gets a preview
+	if _, _, err := Thumb(tf.Bytes(), Sniff(tf.Bytes(), "a.tif")); err != nil {
+		t.Errorf("tiff preview: %v", err)
+	}
+}
 
 func TestSniff(t *testing.T) {
 	var p bytes.Buffer

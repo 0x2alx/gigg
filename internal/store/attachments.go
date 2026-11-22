@@ -45,7 +45,7 @@ type Attachment struct {
 	Size              int64   `json:"size" doc:"Files: bytes"`
 	Width             *int64  `json:"width" doc:"Images: pixels"`
 	Height            *int64  `json:"height"`
-	Inline            bool    `json:"inline" doc:"Shown in the page (images, Markdown, plain text); everything else is only downloaded"`
+	Inline            bool    `json:"inline" doc:"Shown in the page (images, video, audio, Markdown, plain text); everything else is only downloaded"`
 	HasThumb          bool    `json:"has_thumb" doc:"Images: a small preview exists at /attachments/{id}/thumb"`
 	CreatedBy         int64   `json:"created_by"`
 	CreatedByUsername string  `json:"created_by_username"`
@@ -61,7 +61,9 @@ func (t *Attachment) Blob() (file, thumb string) { return t.blob, t.thumb }
 // InlineMime reports the types gigg shows in the page; anything else is a download.
 func InlineMime(m string) bool {
 	switch m {
-	case "image/png", "image/jpeg", "image/gif", "image/webp", "text/markdown", "text/plain":
+	case "image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp",
+		"video/mp4", "video/webm", "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "audio/mp4",
+		"text/markdown", "text/plain":
 		return true
 	}
 	return false

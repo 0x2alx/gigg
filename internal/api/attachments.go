@@ -8,9 +8,9 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
 	"github.com/0x2alx/gigg/internal/access"
 	"github.com/0x2alx/gigg/internal/media"
@@ -297,19 +297,15 @@ func (a *API) serveBlob(sha, ctype, disposition string) (*huma.StreamResponse, e
 	}
 	return &huma.StreamResponse{Body: func(hc huma.Context) {
 		defer f.Close()
-		tag := `"` + sha[:16] + `"`
-		hc.SetHeader("Cache-Control", "private, max-age=86400")
-		hc.SetHeader("ETag", tag)
-		if hc.Header("If-None-Match") == tag {
-			hc.SetStatus(http.StatusNotModified)
-			return
-		}
-		hc.SetHeader("Content-Type", ctype)
-		hc.SetHeader("Content-Length", strconv.FormatInt(st.Size(), 10))
-		hc.SetHeader("Content-Disposition", disposition)
-		hc.SetHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox")
-		hc.SetStatus(http.StatusOK)
-		_, _ = io.Copy(hc.BodyWriter(), f)
+		r, w := humago.Unwrap(hc)
+		h := w.Header()
+		h.Set("Cache-Control", "private, max-age=86400")
+		h.Set("ETag", `"`+sha[:16]+`"`)
+		h.Set("Content-Type", ctype)
+		h.Set("Content-Disposition", disposition)
+		h.Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox")
+		// ranges (video and audio seek), If-None-Match and HEAD, by the standard library
+		http.ServeContent(w, r, "", st.ModTime(), f)
 	}}, nil
 }
 

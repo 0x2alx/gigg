@@ -114,6 +114,26 @@ func TestAttachments(t *testing.T) {
 			t.Fatalf("%s served inline: %v", c.name, hdr)
 		}
 	}
+	// ranges (video seeking): a part of the file, 206
+	code, body, hdr = e.reqH("GET", fmt.Sprintf("/attachments/%d/file", md.ID), "", k, map[string]string{"Range": "bytes=2-5"})
+	if code != 206 || string(body) != "Done" || hdr.Get("Content-Range") != "bytes 2-5/17" {
+		t.Fatalf("range: %d %q %v", code, body, hdr)
+	}
+	// a video plays in the page; a HEIC photo (browsers can't show it) is a download
+	code, vid, out := upload(e, k, gig, "clip.mp4", append([]byte{0, 0, 0, 0x18, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm'}, make([]byte, 64)...), "")
+	e.ok(code, out, 201)
+	if *vid.Mime != "video/mp4" || !vid.Inline {
+		t.Fatalf("video: %s", out)
+	}
+	_, _, hdr = e.req("GET", fmt.Sprintf("/attachments/%d/file", vid.ID), "", k)
+	if hdr.Get("Content-Type") != "video/mp4" || hdr.Get("Accept-Ranges") != "bytes" {
+		t.Fatalf("video headers: %v", hdr)
+	}
+	code, heic, out := upload(e, k, gig, "IMG_0001.HEIC", append([]byte{0, 0, 0, 0x18, 'f', 't', 'y', 'p', 'h', 'e', 'i', 'c'}, make([]byte, 64)...), "")
+	e.ok(code, out, 201)
+	if *heic.Mime != "image/heic" || heic.Inline {
+		t.Fatalf("heic: %s", out)
+	}
 	// ?download=1 makes even an image a download
 	_, _, hdr = e.req("GET", fmt.Sprintf("/attachments/%d/file?download=true", img.ID), "", k)
 	if !strings.HasPrefix(hdr.Get("Content-Disposition"), `attachment; filename=shot.png`) {
@@ -142,11 +162,11 @@ func TestAttachments(t *testing.T) {
 	e.ok(code, out, 200)
 	var list attachmentsOut
 	_ = json.Unmarshal(out, &list.Body)
-	if len(list.Body.Items) != 10 || list.Body.FileMax != store.DefaultAttachFileMax || list.Body.Used == 0 {
+	if len(list.Body.Items) != 12 || list.Body.FileMax != store.DefaultAttachFileMax || list.Body.Used == 0 {
 		t.Fatalf("list: %d items, %s", len(list.Body.Items), out)
 	}
 	_, out, _ = e.req("GET", fmt.Sprintf("/gigs/%d", gig), "", e.ada())
-	if !strings.Contains(string(out), `"attachment_count":10`) {
+	if !strings.Contains(string(out), `"attachment_count":12`) {
 		t.Fatalf("count: %s", out)
 	}
 

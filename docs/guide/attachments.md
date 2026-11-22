@@ -4,9 +4,10 @@ A gig can carry what was made for it: screenshots, reports, logs and other files
 
 ## What you can attach
 
-- **Images** (PNG, JPEG, GIF, WebP) show as a grid of previews. Click one to see it full size.
+- **Images** (PNG, JPEG, GIF, WebP, AVIF, BMP) show as a grid of previews. Click one to see it full size. TIFF and HEIC photos get a preview too, but browsers can't show them full size, so they download.
+- **Video** (MP4, WebM) and **audio** (MP3, M4A, Ogg, WAV) play in the panel.
 - **Markdown reports** (`.md`) open in a viewer, rendered like comments. **Plain text** (logs, notes) opens as text.
-- **Other files** (PDF, archives, HTML, SVG, anything else) are listed with their size and download when clicked. gigg never shows them in the page.
+- **Other files** (PDF, archives, QuickTime video, HTML, SVG, anything else) are listed with their size and download when clicked. gigg never shows them in the page.
 - **Links** (an `http` or `https` address) open in a new tab.
 - **Commits** (a commit id, 7 to 64 hex digits) show their short id.
 

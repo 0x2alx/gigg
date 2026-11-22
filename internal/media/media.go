@@ -15,13 +15,15 @@ import (
 
 	_ "image/gif" // decoders (registered by import)
 
+	_ "golang.org/x/image/bmp"
 	"golang.org/x/image/draw"
+	_ "golang.org/x/image/tiff"
 	_ "golang.org/x/image/webp"
 )
 
 // Info is what Sniff found.
 type Info struct {
-	Mime          string // the stored type; only images, Markdown and plain text are shown inline
+	Mime          string // the stored type; store.InlineMime says which are shown in the page
 	Width, Height int    // images
 }
 
@@ -44,11 +46,24 @@ func Sniff(data []byte, filename string) Info {
 	ext := strings.ToLower(filepath.Ext(filename))
 	if cfg, format, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
 		switch format {
-		case "png", "jpeg", "gif", "webp":
+		case "png", "jpeg", "gif", "webp", "bmp", "tiff":
 			return Info{Mime: "image/" + format, Width: cfg.Width, Height: cfg.Height}
 		}
 	}
+	if m := isoMedia(data); m != "" {
+		return Info{Mime: m}
+	}
 	detected := http.DetectContentType(data)
+	switch {
+	case strings.HasPrefix(detected, "video/webm"):
+		return Info{Mime: "video/webm"}
+	case strings.HasPrefix(detected, "audio/mpeg"):
+		return Info{Mime: "audio/mpeg"}
+	case strings.HasPrefix(detected, "audio/wave"):
+		return Info{Mime: "audio/wav"}
+	case strings.HasPrefix(detected, "application/ogg"):
+		return Info{Mime: "audio/ogg"}
+	}
 	if m, ok := activeExt[ext]; ok {
 		return Info{Mime: m}
 	}
@@ -69,6 +84,27 @@ func Sniff(data []byte, filename string) Info {
 		detected = "application/octet-stream"
 	}
 	return Info{Mime: detected}
+}
+
+// isoMedia reads the brand of an ISO base media file (the "ftyp" box): AVIF and HEIF images, MP4
+// video and M4A audio. "" when it is none of those.
+func isoMedia(data []byte) string {
+	if len(data) < 12 || string(data[4:8]) != "ftyp" {
+		return ""
+	}
+	switch brand := string(data[8:12]); brand {
+	case "avif", "avis":
+		return "image/avif"
+	case "heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1":
+		return "image/heic"
+	case "M4A ", "M4B ":
+		return "audio/mp4"
+	case "qt  ":
+		return "video/quicktime"
+	case "isom", "iso2", "iso3", "iso4", "iso5", "iso6", "mp41", "mp42", "avc1", "M4V ", "dash", "mmp4", "MSNV", "f4v ":
+		return "video/mp4"
+	}
+	return ""
 }
 
 // isText: valid UTF-8 without NUL bytes.
