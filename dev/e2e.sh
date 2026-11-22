@@ -57,6 +57,7 @@ printf '<html><script>alert(1)</script></html>' > /tmp/evil.png
 code=$(curl -s -H "$H" -H "$K" -o /tmp/a2 -w '%{http_code}' --data-binary @/tmp/evil.png "$INT/gigs/GIG-1/attachments?filename=evil.png")
 A2=$(jq -r .id /tmp/a2)
 check "attachments: a page named .png is stored as a page" '[ "$code" = 201 ] && jq -e ".mime == \"text/html\" and (.inline | not)" /tmp/a2 >/dev/null'
+check "attachments: the agent downloads one on demand" 'curl -s -H "$H" -H "$K" -o /tmp/a3 "$INT/attachments/$A1/file?download=true" && cmp -s /tmp/a3 /tmp/shot.png'
 check "attachments: ada lists both" 'curl -s $CA -b $jar $MAIN/gigs/GIG-1/attachments | jq -e "(.items | length) == 2 and .file_max == 10485760" >/dev/null'
 check "attachments: the image inline, its preview, the page only as a download" 'curl -s $CA -b $jar -D /tmp/h1 -o /dev/null $MAIN/attachments/$A1/file && grep -qi "^content-type: image/png" /tmp/h1 && [ "$(curl -s $CA -b $jar -o /dev/null -w "%{http_code}" $MAIN/attachments/$A1/thumb)" = 200 ] && curl -s $CA -b $jar -D /tmp/h2 -o /dev/null $MAIN/attachments/$A2/file && grep -qi "^content-type: application/octet-stream" /tmp/h2 && grep -qi "^content-disposition: attachment" /tmp/h2 && grep -qi "^content-security-policy: .*sandbox" /tmp/h2'
 check "OpenAPI served" 'curl -s -H "$H" $INT/openapi.json | jq -e ".paths[\"/gigs/{id}/move\"]" >/dev/null'
