@@ -11,6 +11,7 @@ import { GigEditor } from "./GigEditor";
 import { Clamp } from "./Clamp";
 import { HistorySection } from "./GigHistory";
 import { AttachmentsSection } from "./GigAttachments";
+import { fileURL } from "./attachments";
 import { describeRule } from "./recurrence";
 import { CATEGORY_COLOR } from "./theme";
 import { Avatar, EXIT_MS, Pill, PriorityBadge, StatusBadge, GigBadges, UserBadge, reducedMotion } from "./ui";
@@ -277,6 +278,9 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
   const status = statuses.find((s) => s.id === gig.status_id);
   const overdue = gig.due_at !== null && gig.due_at < Date.now() && gig.status_category !== "done";
   const can = (cap: string) => canWrite && hasCap(me, cap, gig.workspace_id, gig.project_id);
+  // a file pasted or dropped into the description or a comment becomes an attachment of this gig
+  const canAttach = can("work_gigs") && !gig.deleted;
+  const attachFile = (f: File) => api.uploadAttachment(gig.id, f, f.name).then((a) => fileURL(a.id));
   const onGig = (t: Gig) => {
     setGig(t);
     setErr("");
@@ -342,6 +346,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
       <GigEditor
         key={gig.id}
         mode="gig"
+        attach={canAttach ? attachFile : undefined}
         v={{
           title: gig.title,
           description_md: gig.description_md,
@@ -444,7 +449,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
                 </article>
               );
             })}
-            {ws.role !== "viewer" && <AddComment gigId={gig.id} users={candidates} onDone={load} />}
+            {ws.role !== "viewer" && <AddComment gigId={gig.id} users={candidates} onDone={load} attach={canAttach ? attachFile : undefined} />}
           </section>
         }
         whenEnd={
@@ -646,7 +651,7 @@ function Resume({ gig, onDone }: { gig: Gig; onDone: (t: Gig) => void }) {
   );
 }
 
-function AddComment({ gigId, users, onDone }: { gigId: number; users: User[]; onDone: () => void }) {
+function AddComment({ gigId, users, onDone, attach }: { gigId: number; users: User[]; onDone: () => void; attach?: (file: File) => Promise<string> }) {
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -675,6 +680,7 @@ function AddComment({ gigId, users, onDone }: { gigId: number; users: User[]; on
         value={text}
         onChange={setText}
         users={users}
+        attach={attach}
         minRows={3}
         required
         aria-label="Comment"

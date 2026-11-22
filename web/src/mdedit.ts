@@ -149,3 +149,35 @@ export function continueList(e: Edit): Edit | null {
   const ins = "\n" + indent + next;
   return { text: text.slice(0, start) + ins + text.slice(start), start: start + ins.length, end: start + ins.length };
 }
+
+// Pasted and dropped files: each is attached, and its line goes in at the caret: an image as
+// ![name](url), anything else as a link. While it uploads a placeholder stands in its place.
+const mdText = (s: string) => s.replace(/[\\[\]]/g, "\\$&");
+
+export const isImageFile = (f: { type: string }) => f.type.startsWith("image/");
+
+export const uploadingLine = (name: string) => `![Uploading ${mdText(name)}…]()`;
+
+export const fileLine = (f: { name: string; type: string }, url: string) => `${isImageFile(f) ? "!" : ""}[${mdText(f.name)}](${url})`;
+
+// insertText: text in place of the selection, the caret after it.
+export function insertText(e: Edit, s: string): Edit {
+  const text = e.text.slice(0, e.start) + s + e.text.slice(e.end);
+  const at = e.start + s.length;
+  return { text, start: at, end: at };
+}
+
+// swapText: the first `from` replaced by `to` (nothing to do: null), the selection kept where it was
+// in the text around it. An empty `to` on a line of its own also takes that line's newline.
+export function swapText(e: Edit, from: string, to: string): Edit | null {
+  const i = e.text.indexOf(from);
+  if (i < 0) return null;
+  let a = i;
+  let b = i + from.length;
+  if (!to && e.text[b] === "\n" && (a === 0 || e.text[a - 1] === "\n")) b++;
+  else if (!to && b === e.text.length && a > 0 && e.text[a - 1] === "\n") a--;
+  const text = e.text.slice(0, a) + to + e.text.slice(b);
+  const d = to.length - (b - a);
+  const move = (p: number) => (p >= b ? p + d : p > a ? a + to.length : p);
+  return { text, start: move(e.start), end: move(e.end) };
+}

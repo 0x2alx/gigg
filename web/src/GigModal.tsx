@@ -5,9 +5,10 @@
 // occurrence) instead of a single gig. Its gig content is a template: its own one (made from this
 // form), or a picked template left unchanged, which it then uses as is.
 import { launch } from "./Launch";
+import { fileURL } from "./attachments";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { runBody, runFrom, type RunSettings } from "./runsettings";
-import { api, ApiError, canShare, hasAllCap, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isGigSchedule, type GigSchedule, type Status, type Tag, type Template, type TemplateBody, type TemplateSubgig } from "./api";
+import { api, ApiError, canShare, hasAllCap, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isGigSchedule, type GigSchedule, type Gig, type Status, type Tag, type Template, type TemplateBody, type TemplateSubgig } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { assignable } from "./fields";
 import { cleanCustom, normSubs, sameAsTemplate } from "./items";
@@ -344,6 +345,38 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     save();
   };
 
+  // files pasted or dropped into a new gig's description: kept until the gig exists, with a
+  // placeholder URL in the text; uploaded right after Create, then the text gets the real URLs (one save)
+  const pendingFiles = useRef<{ url: string; file: File }[]>([]);
+  const attachLater = (file: File) => {
+    const url = `pending-upload:${pendingFiles.current.length + 1}`;
+    pendingFiles.current.push({ url, file });
+    return Promise.resolve(url);
+  };
+  const attachPending = async (g: Gig): Promise<string | undefined> => {
+    const files = pendingFiles.current;
+    if (!files.length) return undefined;
+    let text = description;
+    const problems: string[] = [];
+    for (const p of files) {
+      try {
+        const a = await api.uploadAttachment(g.id, p.file, p.file.name);
+        text = text.split(`](${p.url})`).join(`](${fileURL(a.id)})`);
+      } catch (e) {
+        problems.push(`${p.file.name}: ${e instanceof ApiError ? e.message : "couldn't attach it"}`);
+        text = text.replace(new RegExp(`!?\\[(?:\\\\.|[^\\]\\\\])*\\]\\(${p.url}\\)\\n?`, "g"), "");
+      }
+    }
+    if (text !== description) {
+      try {
+        await api.patchGig(g.id, { description_md: text }, g.version);
+      } catch (e) {
+        problems.push(`the description: ${e instanceof ApiError ? e.message : "couldn't save it"}`);
+      }
+    }
+    return problems.length ? `Created ${g.key}, but not everything went: ${problems.join("; ")}.` : undefined;
+  };
+
   const save = () => {
     setAskDetach(false);
     setBusy(true);
@@ -405,9 +438,9 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           ...(cleanCustom(custom) ? { custom: cleanCustom(custom) } : {}),
           ...runBody(run),
         })
-        .then(() => {
+        .then((g) => {
           launch();
-          return undefined;
+          return attachPending(g);
         });
     }
     done
@@ -465,6 +498,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           setRun={(c) => setRun((r) => ({ ...r, ...c, ...(c.allowed_tools ? { tools_error: null } : {}) }))}
           onToolsError={(bad) => setRun((r) => ((bad ?? null) === (r.tools_error ?? null) ? r : { ...r, tools_error: bad }))}
           canWrite
+          attach={single ? attachLater : undefined}
           ws={ws}
           places={!editing && !tpl ? places : undefined}
           onWorkspace={moveWs}

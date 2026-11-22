@@ -56,6 +56,8 @@ export function GigEditor(p: {
   // gig version the editor opened on; none = overwrite on purpose). "conflict": the gig changed meanwhile.
   saveText?: (changes: TextChanges, version?: number) => Promise<boolean | "conflict">;
   textVersion?: number; // the gig's version now (the editor keeps the one it opened on)
+  // files pasted or dropped into the description: attached, returning the URL to link (see MarkdownEditor)
+  attach?: (file: File) => Promise<string>;
   canWrite: boolean;
   ws: WorkspaceTree;
   places?: WorkspaceTree[]; // a new gig may move to these workspaces
@@ -109,6 +111,7 @@ export function GigEditor(p: {
             onDraft={(title, description_md) => set({ title, description_md })}
             onSave={p.saveText}
             version={p.textVersion}
+            attach={p.attach}
           />
           {p.people}
         </section>
@@ -303,8 +306,9 @@ export function GigEditor(p: {
 // GigText: the title and the description, shown as the gig reads (the description folded when
 // long, "show more" opens it) with a pencil to edit. The panel saves the edit with Save; a form
 // keeps it as typed (an empty one, a new gig, starts in the editor).
-function GigText({ title, description, version, live, canWrite, users, titleLabel, titlePlaceholder, aliases, onDraft, onSave }: {
+function GigText({ title, description, version, live, canWrite, users, titleLabel, titlePlaceholder, aliases, onDraft, onSave, attach }: {
   version?: number;
+  attach?: (file: File) => Promise<string>;
   title: string;
   description: string;
   live: boolean;
@@ -334,14 +338,14 @@ function GigText({ title, description, version, live, canWrite, users, titleLabe
   };
   if (editing && canWrite) {
     return live ? (
-      <TextForm title={title} description={description} version={version} users={users} onCancel={shut} onSave={(ch, v) => onSave?.(ch, v).then((r) => {
+      <TextForm title={title} description={description} version={version} users={users} attach={attach} onCancel={shut} onSave={(ch, v) => onSave?.(ch, v).then((r) => {
         if (r === true) shut();
         return r;
       }) ?? Promise.resolve(false)} />
     ) : (
       <div className="edit tp-edit">
         <input className="tp-title-input" value={title} onChange={(e) => onDraft(e.target.value, description)} required maxLength={250} placeholder={titlePlaceholder} aria-label={titleLabel} data-autofocus="" autoFocus={touched.current} />
-        <MarkdownEditor value={description} onChange={(d) => onDraft(title, d)} users={users} minRows={6} aria-label="Description" placeholder="Description (Markdown) · @ to mention" />
+        <MarkdownEditor value={description} onChange={(d) => onDraft(title, d)} users={users} attach={attach} minRows={6} aria-label="Description" placeholder="Description (Markdown) · @ to mention" />
         <div className="row end">
           <button type="button" className="button secondary small" onClick={shut} disabled={!title.trim()}>
             Done
@@ -386,7 +390,8 @@ export type TextChanges = { title?: string; description_md?: string };
 // with stay its base while it is open, even when the gig reloads underneath: a save goes onto that
 // version, so a change someone made meanwhile is refused (412) rather than overwritten; after that
 // refusal the next Save overwrites on purpose.
-function TextForm({ title: t0, description: d0, version, users, onCancel, onSave }: {
+function TextForm({ title: t0, description: d0, version, users, attach, onCancel, onSave }: {
+  attach?: (file: File) => Promise<string>;
   title: string;
   description: string;
   version?: number;
@@ -427,6 +432,7 @@ function TextForm({ title: t0, description: d0, version, users, onCancel, onSave
         value={description}
         onChange={setDescription}
         users={users}
+        attach={attach}
         minRows={6}
         aria-label="Description (Markdown)"
         placeholder="Description (Markdown) · @ to mention"

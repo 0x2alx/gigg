@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { continueList, indentList, insertLink, toggleLines, toggleWrap, type Edit } from "./mdedit";
+import { continueList, fileLine, indentList, insertLink, insertText, swapText, toggleLines, toggleWrap, uploadingLine, type Edit } from "./mdedit";
 
 // sel: builds an Edit from text with "[" and "]" marking the selection ("|" for a caret).
 function sel(s: string): Edit {
@@ -101,5 +101,33 @@ describe("gig lists", () => {
     expect(html).toContain('<input type="checkbox" disabled> todo');
     expect(html).toContain('<input type="checkbox" disabled checked> done');
     expect(html).toContain("plain [ ] text");
+  });
+});
+
+describe("pasted and dropped files", () => {
+  it("writes the line for an image, another file and an upload in progress", () => {
+    expect(fileLine({ name: "shot.png", type: "image/png" }, "/api/v1/attachments/4/file")).toBe("![shot.png](/api/v1/attachments/4/file)");
+    expect(fileLine({ name: "build.log", type: "text/plain" }, "/api/v1/attachments/5/file")).toBe("[build.log](/api/v1/attachments/5/file)");
+    expect(fileLine({ name: "a [draft].png", type: "image/png" }, "/x")).toBe("![a \\[draft\\].png](/x)");
+    expect(uploadingLine("shot.png")).toBe("![Uploading shot.png…]()");
+  });
+  it("inserts at the caret", () => {
+    expect(insertText({ text: "ab", start: 1, end: 1 }, "X")).toEqual({ text: "aXb", start: 2, end: 2 });
+  });
+  it("swaps a placeholder, keeping the caret in the text around it", () => {
+    const ph = uploadingLine("s.png");
+    const t = `see ${ph} here`;
+    const caret = t.length; // typing went on after it
+    const r = swapText({ text: t, start: caret, end: caret }, ph, "![s.png](/u)")!;
+    expect(r.text).toBe("see ![s.png](/u) here");
+    expect(r.start).toBe(r.text.length);
+    expect(swapText({ text: "x", start: 0, end: 0 }, ph, "y")).toBe(null);
+  });
+  it("removes a failed one with its own line", () => {
+    const a = uploadingLine("a.png");
+    const b = uploadingLine("b.png");
+    expect(swapText({ text: `${a}\n${b}`, start: 0, end: 0 }, a, "")!.text).toBe(b);
+    expect(swapText({ text: `${a}\n${b}`, start: 0, end: 0 }, b, "")!.text).toBe(a);
+    expect(swapText({ text: `x ${a} y`, start: 0, end: 0 }, a, "")!.text).toBe("x  y");
   });
 });
