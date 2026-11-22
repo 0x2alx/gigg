@@ -591,7 +591,7 @@ a.pulse-item:hover { color: var(--text); }
 .md pre { background: var(--surface-variant); border-radius: var(--radius-s); padding: 0.5rem; overflow-x: auto; }
 .md pre code { background: none; padding: 0; }
 .md strong { color: var(--text); font-weight: var(--weight-strong); }
-.md img { max-width: 100%; max-height: 20rem; height: auto; border-radius: var(--radius-s); cursor: zoom-in; vertical-align: middle; }
+.md img { max-width: 100%; max-height: 12rem; height: auto; border-radius: var(--radius-s); cursor: zoom-in; vertical-align: middle; }
 .md a img { cursor: pointer; }
 .md blockquote { border-left: 3px solid var(--line-strong); margin: 0.5rem 0; padding-left: 0.75rem; color: var(--muted); }
 
