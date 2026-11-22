@@ -365,6 +365,25 @@
   {
    "shot": "mobile-lightbox-night",
    "full": false
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "goto": "/admin/workspaces/1"
+  },
+  {
+   "wait": "form[aria-label=\"Attachment limits\"]"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "shot": "admin-limits",
+   "el": "form[aria-label=\"Attachment limits\"]"
   }
  ]
 }

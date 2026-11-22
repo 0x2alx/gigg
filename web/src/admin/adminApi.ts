@@ -184,6 +184,14 @@ async function upload(method: string, path: string, body: Blob): Promise<void> {
 
 type Items<T> = { items: T[] };
 
+// AttachLimits: a workspace's attachment limits in bytes (custom: either differs from the default).
+export interface AttachLimits {
+  file_max: number;
+  quota: number;
+  used: number;
+  custom: boolean;
+}
+
 export const adminApi = {
   // workspaces
   workspaces: () => call<Items<AdminWorkspace>>("GET", "/workspaces"),
@@ -191,6 +199,8 @@ export const adminApi = {
   createWorkspace: (body: { slug: string; name: string }) => call<AdminWorkspace>("POST", "/workspaces", body),
   patchWorkspace: (w: AdminWorkspace, body: Partial<{ name: string; color: string | null; owner_id: number | null; description_md: string; archived: boolean }>) =>
     call<AdminWorkspace>("PATCH", `/workspaces/${w.id}`, body, w.version),
+  attachLimits: (ws: number) => call<AttachLimits>("GET", `/workspaces/${ws}/attachment-limits`),
+  setAttachLimits: (ws: number, body: { file_max: number | null; quota: number | null }) => call<AttachLimits>("PUT", `/workspaces/${ws}/attachment-limits`, body),
   members: (ws: number) => call<Items<AdminMembership>>("GET", `/workspaces/${ws}/members`),
   setMember: (ws: number, user: number, role: Role) => call<void>("PUT", `/workspaces/${ws}/members/${user}`, { role }),
   removeMember: (ws: number, user: number) => call<void>("DELETE", `/workspaces/${ws}/members/${user}`),

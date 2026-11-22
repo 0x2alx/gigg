@@ -5,6 +5,7 @@ import { fmtDate, type Category, type User } from "../api";
 import { useApp } from "../App";
 import { ColorPicker } from "../fields";
 import { colorFor } from "../theme";
+import { fmtSize } from "../attachments";
 import { Avatar, Modal } from "../ui";
 import {
   adminApi,
@@ -17,6 +18,7 @@ import {
   type AdminStatus,
   type AdminUser,
   type AdminWorkspace,
+  type AttachLimits,
   type ProjectRole,
   type Role,
 } from "./adminApi";
@@ -277,6 +279,7 @@ export function WorkspaceDetailPage({ wsId }: { wsId: number }) {
             refresh();
           }}
         />
+        <AttachmentLimits ws={ws} />
         <Members ws={ws} users={users} />
         <Projects ws={ws} />
         <CustomFields ws={ws} />
@@ -375,6 +378,84 @@ function WorkspaceSettings({ ws, users, onSaved }: { ws: AdminWorkspace; users: 
           Save
         </button>
       </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------- attachment limits
+
+const MB = 1 << 20;
+const GB = 1 << 30;
+
+// AttachmentLimits: the largest file and the total for the workspace's attachments, with what is used.
+// Everyone here sees them; only instance admins change them (an empty box = the default).
+function AttachmentLimits({ ws }: { ws: AdminWorkspace }) {
+  const { me } = useApp();
+  const [lim, setLim] = useState<AttachLimits | null>(null);
+  const [fileMB, setFileMB] = useState("");
+  const [quotaGB, setQuotaGB] = useState("");
+  const [error, setError] = useState("");
+  const [msg, setMsg] = useState("");
+  const show = (l: AttachLimits) => {
+    setLim(l);
+    setFileMB(l.file_max !== 10 * MB ? String(+(l.file_max / MB).toFixed(2)) : "");
+    setQuotaGB(l.quota !== GB ? String(+(l.quota / GB).toFixed(3)) : "");
+  };
+  useEffect(() => {
+    adminApi
+      .attachLimits(ws.id)
+      .then(show)
+      .catch((e: unknown) => setError(errMsg(e)));
+  }, [ws.id]);
+  if (!lim) return error ? <ErrorLine error={error} /> : null;
+  const num = (v: string, unit: number) => (v.trim() === "" ? null : Math.round(Number(v) * unit));
+  const save = (e: FormEvent) => {
+    e.preventDefault();
+    setMsg("");
+    setError("");
+    const file_max = num(fileMB, MB);
+    const quota = num(quotaGB, GB);
+    if ((file_max !== null && !(file_max > 0)) || (quota !== null && !(quota > 0))) {
+      setError("Use a number above 0, or leave the box empty for the default.");
+      return;
+    }
+    adminApi
+      .setAttachLimits(ws.id, { file_max, quota })
+      .then((l) => {
+        show(l);
+        setMsg("Saved.");
+      })
+      .catch((e: unknown) => setError(errMsg(e)));
+  };
+  const pct = lim.quota > 0 ? Math.min(100, Math.round((lim.used / lim.quota) * 100)) : 0;
+  return (
+    <form className="card form-grid" onSubmit={save} aria-label="Attachment limits">
+      <h2 className="span2">Attachments</h2>
+      <p className="span2 muted small">
+        {fmtSize(lim.used)} of {fmtSize(lim.quota)} used ({pct}%). Files up to {fmtSize(lim.file_max)} each.
+      </p>
+      {me.admin && (
+        <>
+          <label>
+            Largest file, MB <span className="muted small">default 10, at most 50</span>
+            <input type="number" min="0.01" max="50" step="any" inputMode="decimal" placeholder="10" value={fileMB} onChange={(e) => setFileMB(e.target.value)} />
+          </label>
+          <label>
+            Total for the workspace, GB <span className="muted small">default 1</span>
+            <input type="number" min="0.001" step="any" inputMode="decimal" placeholder="1" value={quotaGB} onChange={(e) => setQuotaGB(e.target.value)} />
+          </label>
+          <div className="span2">
+            <ErrorLine error={error} />
+            {msg && <p className="accent small">{msg}</p>}
+          </div>
+          <div className="row span2 admin-split">
+            <span />
+            <button className="button" type="submit">
+              Save
+            </button>
+          </div>
+        </>
+      )}
     </form>
   );
 }
