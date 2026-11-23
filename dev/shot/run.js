@@ -41,7 +41,13 @@ const puppeteer = require("puppeteer-core");
         if (step.goto !== undefined) await page.goto(sc.base + step.goto, { waitUntil: sc.waitUntil || "networkidle2" });
         else if (step.click) await page.click(step.click);
         else if (step.type) await page.type(step.type[0], step.type[1]);
-        else if (step.press) await page.keyboard.press(step.press);
+        else if (step.press) {
+          // a key, or a chord like "Control+Enter" (modifiers held while the last key is pressed)
+          const ks = step.press.split("+");
+          for (const k of ks.slice(0, -1)) await page.keyboard.down(k);
+          await page.keyboard.press(ks[ks.length - 1]);
+          for (const k of ks.slice(0, -1).reverse()) await page.keyboard.up(k);
+        }
         else if (typeof step.wait === "number") await new Promise((r) => setTimeout(r, step.wait));
         else if (step.wait) await page.waitForSelector(step.wait, { timeout: 10000 });
         else if (step.viewport) await page.setViewport({ width: step.viewport[0], height: step.viewport[1] });

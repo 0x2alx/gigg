@@ -4,13 +4,15 @@
 // Given `attach`, files pasted or dropped into it are attached one by one (a placeholder line stands
 // in while each uploads) and linked at the caret: images as ![name](url), other files as a link. The
 // description editors and the comment box all get this from here.
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type TextareaHTMLAttributes } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type TextareaHTMLAttributes, useReducer } from "react";
 import type { User } from "./api";
-import { Markdown } from "./markdown";
 import { MentionTextarea } from "./Mention";
 import { continueList, fileLine, isImageFile, indentList, insertLink, insertText, swapText, toggleLines, toggleWrap, uploadingLine, type Edit, type LineKind } from "./mdedit";
+import { RichText, richTools, type RichHandle } from "./RichText";
+import { roundTrips } from "./richmd";
+import { Icon } from "./icons";
 
-type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange"> & {
+export type MarkdownEditorProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange"> & {
   value: string;
   onChange: (v: string) => void;
   users: User[];
@@ -42,10 +44,17 @@ const TOOLS: (Tool | "|")[] = [
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 const mod = isMac ? "⌘" : "Ctrl+";
 
-export function MarkdownEditor({ value, onChange, users, minRows = 4, dirty, attach, onKeyDown, className, ...rest }: Props) {
+export function MarkdownEditor({ value, onChange, users, minRows = 4, dirty, attach, onKeyDown, className, ...rest }: MarkdownEditorProps) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const box = useRef<HTMLDivElement | null>(null);
-  const [tab, setTab] = useState<"write" | "preview">("write");
+  // Visual (as it reads) by default; Markdown (the source) when the text wouldn't come back the same
+  // from the visual editor, so saving never changes what wasn't touched
+  const [tab, setTab] = useState<"visual" | "markdown">(() => (roundTrips(value) ? "visual" : "markdown"));
+  const rich = useRef<RichHandle>(null);
+  // the visual editor's caret moved or its document changed: the toolbar shows what is on there
+  const [, redraw] = useReducer((n: number) => n + 1, 0);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<string[]>([]);
   const [attachErr, setAttachErr] = useState("");
   const id = useId();
   // the text as last set (an upload finishing changes it after the render that started it)
@@ -55,7 +64,7 @@ export function MarkdownEditor({ value, onChange, users, minRows = 4, dirty, att
   // auto-grow: fit the content, up to 60% of the viewport (then it scrolls)
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el || tab !== "write") return;
+    if (!el || tab !== "markdown") return;
     el.style.height = "auto";
     const max = Math.max(160, window.innerHeight * 0.6);
     el.style.height = `${Math.min(el.scrollHeight + 2, max)}px`;
@@ -108,12 +117,28 @@ export function MarkdownEditor({ value, onChange, users, minRows = 4, dirty, att
     const up = attachRef.current;
     if (!up || !files.length) return;
     setAttachErr("");
+    if (tab === "visual") {
+      // each file is uploaded, then put in at the caret (the line under the editor says what's on its way)
+      setUploading(files.map((f) => f.name));
+      const problems: string[] = [];
+      for (const f of files) {
+        try {
+          const url = await up(f);
+          rich.current?.insertFile(f.name, url, isImageFile(f));
+        } catch (e) {
+          problems.push(`${f.name}: ${e instanceof Error && e.message ? e.message : "Couldn't attach it."}`);
+        }
+        setUploading((u) => u.filter((n) => n !== f.name));
+      }
+      setAttachErr(problems.join(" "));
+      return;
+    }
     const holders = files.map((f) => uploadingLine(f.name));
     const cur = current();
     // an image starts a line of its own (a link to another file may sit inside a sentence)
     const own = isImageFile(files[0]!) && cur && cur.start > 0 && cur.text[cur.start - 1] !== "\n" ? "\n" : "";
     const block = own + holders.join("\n");
-    if (cur && tab === "write") {
+    if (cur && tab === "markdown") {
       const next = insertText(cur, block);
       apply(next);
       latest.current = next.text;
@@ -215,48 +240,95 @@ export function MarkdownEditor({ value, onChange, users, minRows = 4, dirty, att
     }
   };
 
+  const askLink = (): string | null => {
+    const u = window.prompt("Link to (https://…)")?.trim();
+    return u && /^(https?:\/\/|mailto:)\S+$/i.test(u) ? u : null;
+  };
+  const visualEditor = tab === "visual" ? (rich.current?.editor ?? null) : null;
+  const tools =
+    tab === "visual"
+      ? richTools(visualEditor, () => rich.current?.link())
+      : TOOLS.map((x) => (x === "|" ? x : { ...x, active: false, run: () => run(x) }));
+
   return (
     <div ref={box} className={"mde" + (className ? " " + className : "")} data-dirty={dirty ? "" : undefined}>
       <div className="mde-bar">
         <div className="mde-tabs" role="tablist" aria-label="Editor mode">
-          <button type="button" role="tab" id={id + "w"} aria-selected={tab === "write"} aria-controls={id + "p"} className={tab === "write" ? "on" : undefined} onClick={() => setTab("write")}>
-            Write
+          <button type="button" role="tab" id={id + "w"} aria-selected={tab === "visual"} aria-controls={id + "p"} className={tab === "visual" ? "on" : undefined} onClick={() => setTab("visual")} title="Edit it as it reads">
+            Visual
           </button>
-          <button type="button" role="tab" id={id + "v"} aria-selected={tab === "preview"} aria-controls={id + "p"} className={tab === "preview" ? "on" : undefined} onClick={() => setTab("preview")}>
-            Preview
+          <button type="button" role="tab" id={id + "v"} aria-selected={tab === "markdown"} aria-controls={id + "p"} className={tab === "markdown" ? "on" : undefined} onClick={() => setTab("markdown")} title="Edit the Markdown source">
+            Markdown
           </button>
         </div>
-        {tab === "write" && (
-          <div className="mde-tools" role="toolbar" aria-label="Formatting">
-            {TOOLS.map((t, i) =>
-              t === "|" ? (
-                <span key={"s" + i} className="mde-sep" aria-hidden="true" />
-              ) : (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={"mde-tool mde-" + t.id}
-                  title={t.label + (t.key ? ` (${mod}${t.key.toUpperCase()})` : "")}
-                  aria-label={t.label}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => run(t)}
-                >
-                  {t.icon}
-                </button>
-              ),
-            )}
-          </div>
-        )}
+        <div className="mde-tools" role="toolbar" aria-label="Formatting">
+          {tools.map((x, i) =>
+            x === "|" ? (
+              <span key={"s" + i} className="mde-sep" aria-hidden="true" />
+            ) : (
+              <button
+                key={x.id}
+                type="button"
+                className={"mde-tool mde-" + x.id + (x.active ? " on" : "")}
+                title={x.label + (x.key ? ` (${mod}${x.key.toUpperCase()})` : "")}
+                aria-label={x.label}
+                aria-pressed={tab === "visual" ? x.active : undefined}
+                onMouseDown={(e) => e.preventDefault()}
+                disabled={tab === "visual" && !visualEditor}
+                onClick={() => x.run()}
+              >
+                {x.icon}
+              </button>
+            ),
+          )}
+          {attach && (
+            <>
+              <span className="mde-sep" aria-hidden="true" />
+              <button type="button" className="mde-tool mde-file" title="Insert a file (images show in place)" aria-label="Insert file" onMouseDown={(e) => e.preventDefault()} onClick={() => fileInput.current?.click()}>
+                <Icon name="paperclip" />
+              </button>
+              <input
+                ref={fileInput}
+                type="file"
+                multiple
+                hidden
+                tabIndex={-1}
+                onChange={(e) => {
+                  const fs = [...(e.target.files ?? [])];
+                  e.target.value = "";
+                  void addFiles(fs);
+                }}
+              />
+            </>
+          )}
+        </div>
       </div>
-      <div id={id + "p"} role="tabpanel" aria-labelledby={id + (tab === "write" ? "w" : "v")}>
-        {tab === "write" ? (
+      <div id={id + "p"} role="tabpanel" aria-labelledby={id + (tab === "visual" ? "w" : "v")}>
+        {tab === "markdown" ? (
           <MentionTextarea {...rest} inputRef={ref} value={value} onChange={onChange} users={users} rows={minRows} onKeyDown={keys} onPaste={attach ? paste : rest.onPaste} />
-        ) : value.trim() ? (
-          <Markdown source={value} className="mde-preview" />
         ) : (
-          <p className="mde-preview muted">Nothing to preview.</p>
+          <RichText
+            ref={rich}
+            value={value}
+            onChange={onChange}
+            users={users}
+            minRows={minRows}
+            placeholder={typeof rest.placeholder === "string" ? rest.placeholder.replace("(Markdown) ", "") : undefined}
+            ariaLabel={rest["aria-label"]}
+            autoFocus={rest.autoFocus}
+            autofocusMark={"data-autofocus" in rest}
+            onKeyDown={onKeyDown ? (k) => onKeyDown(k as unknown as KeyboardEvent<HTMLTextAreaElement>) : undefined}
+            onFiles={attach ? (fs) => void addFiles(fs) : undefined}
+            onLink={askLink}
+            onState={redraw}
+          />
         )}
       </div>
+      {uploading.length > 0 && (
+        <p className="muted small mde-uploading" role="status">
+          Uploading {uploading.join(", ")}…
+        </p>
+      )}
       {attachErr && (
         <p className="danger small mde-err" role="alert">
           {attachErr}

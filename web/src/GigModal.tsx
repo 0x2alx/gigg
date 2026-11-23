@@ -20,6 +20,7 @@ import { defaultRepeat, fmtInstant, localTZ, repeatFromRule, repeatProblem, repe
 import { ConfirmModal, Modal } from "./ui";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
+import { clearPreviews, setPreview } from "./previews";
 
 export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedule, template, repeat: initialRepeat, initialStatus, initialCategory, onClose, onCreated }: {
   ws: WorkspaceTree; // where the form starts (with projectId)
@@ -348,9 +349,11 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   // files pasted or dropped into a new gig's description: kept until the gig exists, with a
   // placeholder URL in the text; uploaded right after Create, then the text gets the real URLs (one save)
   const pendingFiles = useRef<{ url: string; file: File }[]>([]);
+  useEffect(() => clearPreviews, []);
   const attachLater = (file: File) => {
     const url = `pending-upload:${pendingFiles.current.length + 1}`;
     pendingFiles.current.push({ url, file });
+    setPreview(url, file);
     return Promise.resolve(url);
   };
   const attachPending = async (g: Gig): Promise<string | undefined> => {

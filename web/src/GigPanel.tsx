@@ -4,7 +4,7 @@ import { api, ApiError, fmtTime, hasCap, resumeCommand, type Comment, type Custo
 import { useApp, type WorkspaceTree } from "./App";
 import { assignable } from "./fields";
 import { Markdown, setMentionUsers } from "./markdown";
-import { MarkdownEditor } from "./MarkdownEditor";
+import { MarkdownEditor, preloadEditor } from "./LazyEditor";
 import { ChecklistSection, CustomFieldsSection, DependenciesSection, Row, Section, SubgigsSection } from "./GigSections";
 import { runFrom } from "./runsettings";
 import { GigEditor } from "./GigEditor";
@@ -43,6 +43,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
   onMoved: (t: Gig) => void;
   onOpenSchedule?: (id: number) => void;
 }) {
+  useEffect(preloadEditor, []); // the comment box and the editors need it soon
   const { users, members, me } = useApp();
   setMentionUsers(users);
   const [gig, setGig] = useState<Gig | null>(null);

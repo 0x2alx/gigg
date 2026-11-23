@@ -132,10 +132,10 @@
    "click": "button[aria-label=\"Edit title and description\"]"
   },
   {
-   "wait": "form[aria-label=\"Edit gig\"] textarea"
+   "wait": "form[aria-label=\"Edit gig\"] .rt-content"
   },
   {
-   "eval": "(async () => {\n  const c = document.createElement('canvas'); c.width = 600; c.height = 340; const x = c.getContext('2d');\n  x.fillStyle = '#E5484D'; x.fillRect(0, 0, 600, 340); x.fillStyle = '#fff'; x.font = 'bold 40px sans-serif'; x.fillText('Pasted shot', 40, 300);\n  const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));\n  const t = document.querySelector('form[aria-label=\"Edit gig\"] textarea'); t.focus(); t.setSelectionRange(t.value.length, t.value.length);\n  const dt = new DataTransfer(); dt.items.add(new File([blob], 'shot.png', {type: 'image/png'}));\n  t.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));\n  return t.value.includes('![Uploading shot.png…]()') || t.value.includes('![shot.png](');\n})()",
+   "eval": "(async () => { const c = document.createElement('canvas'); c.width = 600; c.height = 340; const x = c.getContext('2d'); x.fillStyle = '#E5484D'; x.fillRect(0, 0, 600, 340); x.fillStyle = '#fff'; x.font = 'bold 40px sans-serif'; x.fillText('Pasted shot', 40, 300); const blob = await new Promise((ok) => c.toBlob(ok, 'image/png')); const t = document.querySelector('form[aria-label=\\\"Edit gig\\\"] .rt-content'); t.focus(); const dt = new DataTransfer(); dt.items.add(new File([blob], 'shot.png', {type: 'image/png'})); t.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true})); return true; })()",
    "expect": true
   },
   {
@@ -143,11 +143,16 @@
    "el": "form[aria-label=\"Edit gig\"]"
   },
   {
-   "eval": "(async () => { const sel = 'form[aria-label=\"Edit gig\"] textarea'; for (let i = 0; i < 50; i++) { const t = document.querySelector(sel); if (t && /\\(\\/api\\/v1\\/attachments\\/\\d+\\/file\\)/.test(t.value) && !t.value.includes('Uploading')) return t.value.replace(/\\d+\\/file/g, 'N/file'); await new Promise((r) => setTimeout(r, 200)); } return document.querySelector(sel)?.value ?? null; })()"
+   "eval": "(async () => { for (let i = 0; i < 50; i++) { const n = document.querySelectorAll('form[aria-label=\\\"Edit gig\\\"] .rt-content img[src*=\"/api/v1/attachments/\"]').length; if (n >= 2 && !document.querySelector('form[aria-label=\\\"Edit gig\\\"] .mde-uploading')) return n; await new Promise((r) => setTimeout(r, 200)); } return -1; })()",
+   "expect": 2
   },
   {
    "shot": "paste-done-day",
    "el": "form[aria-label=\"Edit gig\"]"
+  },
+  {
+   "eval": "(async () => { const f = document.querySelector('form[aria-label=\\\"Edit gig\\\"]'); [...f.querySelectorAll('.mde [role=tab]')].find((b) => b.textContent.trim() === 'Markdown').click(); await new Promise((r) => setTimeout(r, 300)); return f.querySelector('.mde textarea').value.trim().replace(/\\d+\\/file/g, 'N/file'); })().then((v) => /(^|\\n)!\\[shot\\.png\\]\\(\\/api\\/v1\\/attachments\\/N\\/file\\)(\\n|$)/.test(v))",
+   "expect": true
   },
   {
    "click": "form[aria-label=\"Edit gig\"] button[type=submit]"
@@ -168,7 +173,11 @@
    "expect": true
   },
   {
-   "eval": "(async () => { const sel = '.add-comment textarea'; for (let i = 0; i < 50; i++) { const t = document.querySelector(sel); if (t && /\\(\\/api\\/v1\\/attachments\\/\\d+\\/file\\)/.test(t.value) && !t.value.includes('Uploading')) return t.value.replace(/\\d+\\/file/g, 'N/file'); await new Promise((r) => setTimeout(r, 200)); } return document.querySelector(sel)?.value ?? null; })()",
+   "eval": "(async () => { for (let i = 0; i < 50; i++) { const a = document.querySelector('.add-comment .rt-content a[href*=\"/api/v1/attachments/\"]'); if (a && !document.querySelector('.add-comment .mde-uploading')) return a.textContent; await new Promise((r) => setTimeout(r, 200)); } return null; })()",
+   "expect": "notes.txt"
+  },
+  {
+   "eval": "(async () => { const f = document.querySelector('.add-comment'); [...f.querySelectorAll('.mde [role=tab]')].find((b) => b.textContent.trim() === 'Markdown').click(); await new Promise((r) => setTimeout(r, 300)); return f.querySelector('.mde textarea').value.trim().replace(/\\d+\\/file/g, 'N/file'); })()",
    "expect": "[notes.txt](/api/v1/attachments/N/file)"
   },
   {
@@ -257,7 +266,7 @@
    "goto": "/board?new=1"
   },
   {
-   "wait": "form[aria-label=\"New gig\"] textarea"
+   "wait": "form[aria-label=\"New gig\"] .rt-content"
   },
   {
    "type": [
@@ -266,16 +275,20 @@
    ]
   },
   {
-   "eval": "(async () => {\n  const c = document.createElement('canvas'); c.width = 600; c.height = 340; const x = c.getContext('2d');\n  x.fillStyle = '#E5484D'; x.fillRect(0, 0, 600, 340); x.fillStyle = '#fff'; x.font = 'bold 40px sans-serif'; x.fillText('Pasted shot', 40, 300);\n  const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));\n  const t = document.querySelector('form[aria-label=\"New gig\"] textarea'); t.focus(); t.setSelectionRange(t.value.length, t.value.length);\n  const dt = new DataTransfer(); dt.items.add(new File([blob], 'shot.png', {type: 'image/png'}));\n  t.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));\n  return t.value.includes('![Uploading shot.png…]()') || t.value.includes('![shot.png](');\n})()",
+   "eval": "(async () => { const c = document.createElement('canvas'); c.width = 600; c.height = 340; const x = c.getContext('2d'); x.fillStyle = '#E5484D'; x.fillRect(0, 0, 600, 340); x.fillStyle = '#fff'; x.font = 'bold 40px sans-serif'; x.fillText('Pasted shot', 40, 300); const blob = await new Promise((ok) => c.toBlob(ok, 'image/png')); const t = document.querySelector('form[aria-label=\\\"New gig\\\"] .rt-content'); t.focus(); const dt = new DataTransfer(); dt.items.add(new File([blob], 'shot.png', {type: 'image/png'})); t.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true})); return true; })()",
    "expect": true
   },
   {
-   "eval": "(async () => { await new Promise((r) => setTimeout(r, 300)); return document.querySelector('form[aria-label=\"New gig\"] textarea').value; })()",
-   "expect": "![shot.png](pending-upload:1)"
+   "eval": "(async () => { await new Promise((r) => setTimeout(r, 400)); const im = document.querySelector('form[aria-label=\\\"New gig\\\"] .rt-content img'); return !!im && im.src.startsWith('blob:') && im.naturalWidth === 600; })()",
+   "expect": true
   },
   {
    "shot": "new-gig-pending-night",
    "el": "form[aria-label=\"New gig\"]"
+  },
+  {
+   "eval": "(async () => { const f = document.querySelector('form[aria-label=\\\"New gig\\\"]'); [...f.querySelectorAll('.mde [role=tab]')].find((b) => b.textContent.trim() === 'Markdown').click(); await new Promise((r) => setTimeout(r, 300)); return f.querySelector('.mde textarea').value.trim().replace(/\\d+\\/file/g, 'N/file'); })()",
+   "expect": "![shot.png](pending-upload:1)"
   },
   {
    "click": "form[aria-label=\"New gig\"] button[type=submit]"

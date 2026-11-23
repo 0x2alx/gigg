@@ -2,19 +2,15 @@
 // small allowlist. Links are http(s)/mailto (and an attachment's file) only and open in a new tab;
 // images only from this server (imgsrc.ts). A click on an image opens it in the Lightbox.
 import { useState, type MouseEvent } from "react";
-import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import type { User } from "./api";
 import { splitMentions } from "./items";
-import { taskLists } from "./mdtasks";
+import { mdit as md } from "./mdit";
 import { attachmentHrefOK, attachmentOf, imageSrcOK } from "./imgsrc";
 import { fileURL } from "./attachments";
 import { Lightbox } from "./Lightbox";
 import { Icon } from "./icons";
 
-const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
-
-md.use(taskLists);
 
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {

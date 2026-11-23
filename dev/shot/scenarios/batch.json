@@ -165,11 +165,11 @@
       "expect": true
     },
     {
-      "wait": "textarea[aria-label='Comment']"
+      "wait": ".add-comment .rt-content"
     },
     {
       "type": [
-        "textarea[aria-label='Comment']",
+        ".add-comment .rt-content",
         "unsaved words"
       ]
     },
@@ -180,7 +180,7 @@
       "wait": 400
     },
     {
-      "eval": "!!document.querySelector('aside.panel') && document.querySelector(\"textarea[aria-label='Comment']\").value === 'unsaved words'",
+      "eval": "!!document.querySelector('aside.panel') && document.querySelector('.add-comment .rt-content').textContent === 'unsaved words' && document.querySelector('.add-comment .mde').hasAttribute('data-dirty')",
       "expect": true
     },
     {

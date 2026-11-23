@@ -1402,6 +1402,35 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 .mde textarea { border: 0; background: transparent; border-radius: 0 0 var(--radius-m) var(--radius-m); resize: none; }
 .mde textarea:focus-visible { outline: none; }
 .mde-preview { margin: 0; padding: 0.5rem 0.6rem; min-height: 4.5rem; }
+/* the visual editor (RichText): the rendered Markdown's look (.md), editable. TipTap's own CSS is
+   not injected (the CSP allows no inline style), so the few rules ProseMirror needs are here. */
+.mde-tool.on { background: var(--selected); color: var(--text); }
+.mde-file .ico { font-size: 0.85rem; }
+.mde-uploading { margin: var(--sp-2) var(--sp-3); }
+.rt { min-width: 0; }
+.rt-content { padding: 0.5rem 0.6rem; min-height: 4.5rem; max-height: 60vh; overflow-y: auto; outline: none; white-space: pre-wrap; word-wrap: break-word; font-size: var(--fs-base); }
+.rt-content.rt-tall { min-height: 8.5rem; }
+.rt-content:focus-visible { outline: none; }
+.rt-content p { margin: 0 0 0.5em; }
+.rt-content p:last-child { margin-bottom: 0; }
+.rt-content p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; color: var(--muted); pointer-events: none; }
+.rt-content img { cursor: default; display: block; margin: 0.25rem 0; }
+.rt-content img[data-blocked] { min-width: 6rem; min-height: 2rem; border: 1px dashed var(--line-strong); }
+.rt-content img.ProseMirror-selectednode { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rt-content a { color: var(--accent); text-decoration: underline; cursor: text; }
+.rt-content ul[data-type="taskList"] { list-style: none; padding-left: 0.2rem; }
+.rt-content ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.4rem; }
+.rt-content ul[data-type="taskList"] li > label { flex: none; margin-top: 0.15rem; }
+.rt-content ul[data-type="taskList"] li > label input { width: auto; margin: 0; accent-color: var(--accent); }
+.rt-content ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
+.rt-content table { border-collapse: collapse; }
+.rt-content td, .rt-content th { border: 1px solid var(--line-strong); padding: 0.2rem 0.4rem; min-width: 3rem; vertical-align: top; }
+.rt-content .ProseMirror-gapcursor { display: none; pointer-events: none; position: absolute; }
+.rt-content .ProseMirror-gapcursor::after { content: ""; display: block; position: absolute; top: -2px; width: 20px; border-top: 1px solid var(--text); }
+.rt-content.ProseMirror-focused .ProseMirror-gapcursor { display: block; }
+.rt-mentions { position: fixed; top: 0; left: 0; }
+.mde-loading .mde-bar { min-height: 2.15rem; }
+.mde-loading.mde-tall .rt-content { min-height: 8.5rem; }
 .md li:has(> input[type="checkbox"]), .md li:has(> p > input[type="checkbox"]) { list-style: none; }
 .md li > input[type="checkbox"], .md li > p > input[type="checkbox"] { width: auto; margin: 0 0.35rem 0 -1.2rem; vertical-align: middle; accent-color: var(--accent); }
 

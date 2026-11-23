@@ -11,7 +11,7 @@ import { useApp, type WorkspaceTree } from "./App";
 import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, withCurrent } from "./fields";
 import { DEFAULT_DUE_TIME, DEFAULT_START_TIME } from "./dates";
 import { Markdown } from "./markdown";
-import { MarkdownEditor } from "./MarkdownEditor";
+import { MarkdownEditor } from "./LazyEditor";
 import { Clamp } from "./Clamp";
 import { AgentRunGroup, PropGroup, Row } from "./GigSections";
 import { ARCHIVE_CHOICES, MinutesSelect, type RunSettings } from "./runsettings";

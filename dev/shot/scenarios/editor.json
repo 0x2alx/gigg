@@ -1,0 +1,234 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  1440,
+  1400
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => {\n  const J = {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'};\n  const mk = async (title, d) => (await (await fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: J, body: JSON.stringify({title, description_md: d})})).json());\n  const a = await mk('Editor check: reads as it renders', 'A **bold** start, a [link](https://example.com) and a list:\\n\\n- one\\n- two\\n\\nTo do:\\n\\n- [ ] a box to tick\\n\\n| Check | Result |\\n| --- | --- |\\n| Unit | 314 |');\n  const b = await mk('Editor check: a loose list', '- a\\n\\n- b');\n  localStorage.setItem('edA', a['key']); localStorage.setItem('edB', b['key']);\n  return 201;\n})()",
+   "expect": 201
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'nightwalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('edA'); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "click": "button[aria-label=\"Edit title and description\"]"
+  },
+  {
+   "wait": "form[aria-label=\"Edit gig\"] .rt-content"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "(() => [...document.querySelectorAll('form[aria-label=\\\"Edit gig\\\"] .mde [role=tab]')].find((b) => b.getAttribute('aria-selected') === 'true')?.textContent.trim())()",
+   "expect": "Visual"
+  },
+  {
+   "eval": "(() => { const c = document.querySelector('form[aria-label=\\\"Edit gig\\\"] .rt-content'); return [c.querySelector('strong')?.textContent, c.querySelectorAll('table td').length, c.querySelectorAll('ul[data-type=taskList] input[type=checkbox]').length, c.querySelector('a')?.getAttribute('href')]; })()",
+   "expect": [
+    "bold",
+    2,
+    1,
+    "https://example.com"
+   ]
+  },
+  {
+   "eval": "(() => { const m = document.querySelector('form[aria-label=\\\"Edit gig\\\"] .mde'); const r = m.getBoundingClientRect(); const over = [...m.querySelectorAll('*')].filter((e) => e.offsetParent && e.getBoundingClientRect().right > r.right + 1).map((e) => e.tagName + '.' + e.className).slice(0, 4); const bar = m.querySelector('.mde-bar').getBoundingClientRect().height; return over.concat(bar > 80 ? ['bar ' + bar] : []); })()",
+   "expect": []
+  },
+  {
+   "shot": "editor-visual-desk-night",
+   "el": "form[aria-label=\"Edit gig\"]"
+  },
+  {
+   "eval": "(async () => { const s = document.querySelector('form[aria-label=\\\"Edit gig\\\"] .rt-content strong'); const r = document.createRange(); document.querySelector('form[aria-label=\\\"Edit gig\\\"] .rt-content').focus(); await new Promise((ok) => setTimeout(ok, 100)); r.setStart(s.firstChild, 2); r.collapse(true); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); await new Promise((ok) => setTimeout(ok, 300)); return document.querySelector('form[aria-label=\\\"Edit gig\\\"] .mde-bold').getAttribute('aria-pressed'); })()",
+   "expect": "true"
+  },
+  {
+   "eval": "(async () => { const c = document.querySelector('form[aria-label=\\\"Edit gig\\\"] .rt-content'); c.focus(); const r = document.createRange(); r.selectNodeContents(c.querySelector('p')); r.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); await new Promise((ok) => setTimeout(ok, 200)); return true; })()",
+   "expect": true
+  },
+  {
+   "press": "End"
+  },
+  {
+   "type": [
+    "form[aria-label=\"Edit gig\"] .rt-content",
+    " ping @sco"
+   ]
+  },
+  {
+   "wait": ".rt-mentions button"
+  },
+  {
+   "shot": "editor-mention-desk-night"
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "(async () => { const f = document.querySelector('form[aria-label=\\\"Edit gig\\\"]'); [...f.querySelectorAll('.mde [role=tab]')].find((b) => b.textContent.trim() === 'Markdown').click(); await new Promise((r) => setTimeout(r, 300)); return f.querySelector('.mde textarea').value.trim(); })().then((v) => v.split('\\n')[0])",
+   "expect": "A **bold** start, a [link](https://example.com) and a list: ping @scout"
+  },
+  {
+   "eval": "(() => { [...document.querySelectorAll('form[aria-label=\\\"Edit gig\\\"] .mde [role=tab]')].find((b) => b.textContent.trim() === 'Visual').click(); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "form[aria-label=\"Edit gig\"] .rt-content"
+  },
+  {
+   "click": "form[aria-label=\"Edit gig\"] .rt-content p"
+  },
+  {
+   "press": "Control+Enter"
+  },
+  {
+   "wait": 1500
+  },
+  {
+   "eval": "!document.querySelector('form[aria-label=\\\"Edit gig\\\"]') && document.querySelector('section[aria-label=\"Description\"] .md').textContent.includes('ping @scout')",
+   "expect": true
+  },
+  {
+   "eval": "(async () => { const l = await (await fetch('/api/v1/projects/1/gigs')).json(); const g = (l.items ?? l).find((x) => x['key'] === localStorage.getItem('edA')); return (await (await fetch('/api/v1/gigs/' + g.id)).json()).description_md; })()",
+   "expect": "A **bold** start, a [link](https://example.com) and a list: ping @scout\n\n- one\n- two\n\nTo do:\n\n- [ ] a box to tick\n\n| Check | Result |\n| ----- | ------ |\n| Unit  | 314    |"
+  },
+  {
+   "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('edB'); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "click": "button[aria-label=\"Edit title and description\"]"
+  },
+  {
+   "wait": "form[aria-label=\"Edit gig\"] textarea"
+  },
+  {
+   "eval": "(() => [...document.querySelectorAll('form[aria-label=\\\"Edit gig\\\"] .mde [role=tab]')].find((b) => b.getAttribute('aria-selected') === 'true')?.textContent.trim())()",
+   "expect": "Markdown"
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "wait": ".add-comment .rt-content"
+  },
+  {
+   "eval": "!!document.querySelector('.add-comment button[aria-label=\"Insert file\"]') && (() => [...document.querySelectorAll('.add-comment .mde [role=tab]')].find((b) => b.getAttribute('aria-selected') === 'true')?.textContent.trim())() === 'Visual'",
+   "expect": true
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'daywalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('edA'); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "click": "button[aria-label=\"Edit title and description\"]"
+  },
+  {
+   "wait": "form[aria-label=\"Edit gig\"] .rt-content"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "shot": "editor-visual-desk-day",
+   "el": "form[aria-label=\"Edit gig\"]"
+  },
+  {
+   "viewport": [
+    390,
+    1600
+   ]
+  },
+  {
+   "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('edA'); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "click": "button[aria-label=\"Edit title and description\"]"
+  },
+  {
+   "wait": "form[aria-label=\"Edit gig\"] .rt-content"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "(() => { const m = document.querySelector('form[aria-label=\\\"Edit gig\\\"] .mde'); const r = m.getBoundingClientRect(); const over = [...m.querySelectorAll('*')].filter((e) => e.offsetParent && e.getBoundingClientRect().right > r.right + 1).map((e) => e.tagName + '.' + e.className).slice(0, 4); const bar = m.querySelector('.mde-bar').getBoundingClientRect().height; return over.concat(bar > 80 ? ['bar ' + bar] : []); })()",
+   "expect": []
+  },
+  {
+   "shot": "editor-visual-phone-day",
+   "el": "form[aria-label=\"Edit gig\"]"
+  }
+ ]
+}
