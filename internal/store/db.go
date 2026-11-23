@@ -100,16 +100,21 @@ const (
 func validStartCategory(c string) bool { return c == "" || c == "backlog" || c == "todo" }
 
 // startStatus: the status a template's gig starts in: the first status of category c in the project,
-// or nil (the project's default) for "" or when the project has none of that category.
-func startStatus(ctx context.Context, q Q, project int64, c string) *int64 {
+// or nil (the project's default) for "". Fails closed: a project without such a status (or a failed
+// lookup) is an error, never the default, so a Backlog gig can't land in To-Do where a runner claims it.
+func startStatus(ctx context.Context, q Q, project int64, c string) (*int64, error) {
 	if c == "" {
-		return nil
+		return nil, nil
 	}
 	var id int64
-	if err := q.QueryRowContext(ctx, `SELECT id FROM statuses WHERE project_id = ? AND category = ? ORDER BY position LIMIT 1`, project, c).Scan(&id); err != nil {
-		return nil
+	err := q.QueryRowContext(ctx, `SELECT id FROM statuses WHERE project_id = ? AND category = ? ORDER BY position LIMIT 1`, project, c).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, Invalid("start_category: this project has no %s status; add one, or let its gigs start in the project's default status", c)
 	}
-	return &id
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 // validRunTimeout checks a gig's run timeout in minutes (nil: the agent's default).

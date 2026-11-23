@@ -82,4 +82,45 @@ func TestStartCategory(t *testing.T) {
 	if SameContent(&a, &b) {
 		t.Fatal("SameContent ignores start_category")
 	}
+
+	// fail closed: a project without a Backlog status refuses a backlog template or recurring gig on
+	// save, and one whose Backlog status went away later pauses the recurring gig instead of creating
+	// its gig in To-Do
+	_, err = f.s.W.ExecContext(f.ctx, `DELETE FROM statuses WHERE project_id = ? AND category = 'backlog'`, f.p2.ID)
+	must(t, err)
+	p2 := f.p2.ID
+	if _, err := SaveTemplate(f.ctx, f.s.W, f.a, &Template{WorkspaceID: f.ws.ID, ProjectID: &p2, Name: "p2 backlog", Title: "x", StartCategory: "backlog"}, 0); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("template in a project without backlog: %v", err)
+	}
+	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := CreateRecurrence(f.ctx, tx, f.a, &Recurrence{ProjectID: f.p2.ID, Title: "p2 review", Freq: "daily", TZ: "America/New_York",
+			WindowStart: "09:00", WindowMinutes: 120, StartsOn: start, StartCategory: "backlog"})
+		return err
+	})
+	if !errors.Is(err, ErrInvalid) {
+		t.Fatalf("recurring gig in a project without backlog: %v", err)
+	}
+	if _, err := GigFromTemplate(f.ctx, f.s.W, f.a, &Template{WorkspaceID: f.ws.ID, Title: "x", StartCategory: "backlog"}, f.p2, nil, nil); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("use template in a project without backlog: %v", err)
+	}
+	// p1's Backlog status goes away (its gigs done first, so the overlap rule doesn't skip): the next occurrence pauses the recurring gig
+	_, err = f.s.W.ExecContext(f.ctx, `UPDATE recurrences SET next_at = ? WHERE id = ?`, ny(t, "2026-11-13 09:00"), r.ID)
+	must(t, err)
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(f.ctx, `UPDATE gigs SET status_id = (SELECT id FROM statuses WHERE project_id = ? AND category = 'done' LIMIT 1)
+			WHERE project_id = ?`, f.p1.ID, f.p1.ID)
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(f.ctx, `DELETE FROM statuses WHERE project_id = ? AND category = 'backlog'`, f.p1.ID)
+		return err
+	}))
+	// r's template back to backlog, directly (saving it would now be refused)
+	_, err = f.s.W.ExecContext(f.ctx, `UPDATE gig_templates SET start_category = 'backlog' WHERE id = ?`, r.TemplateID)
+	must(t, err)
+	res, err := f.s.Housekeeping(f.ctx, ny(t, "2026-11-13 09:00"))
+	must(t, err)
+	if res.Created != 0 || len(res.Paused) != 1 || res.Paused[0] != r.ID {
+		t.Fatalf("missing backlog status: %+v", res)
+	}
 }

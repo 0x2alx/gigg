@@ -375,6 +375,9 @@ func CreateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence) (*Recurr
 	if err := pairFree(ctx, q, r.ProjectID, r.TemplateID, r.ScheduleID, 0); err != nil {
 		return nil, err
 	}
+	if _, err := startStatus(ctx, q, r.ProjectID, r.StartCategory); err != nil {
+		return nil, err
+	}
 	if r.StartsOn == 0 {
 		r.StartsOn = Now()
 	}
@@ -633,6 +636,9 @@ func UpdateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence, expect i
 	if err != nil {
 		return nil, err
 	}
+	if _, err := startStatus(ctx, q, after.ProjectID, after.StartCategory); err != nil {
+		return nil, err // the whole edit rolls back with the transaction
+	}
 	if _, err := Activity(ctx, q, a, &r.WorkspaceID, &r.ProjectID, "recurrence.updated", "recurrence", r.ID, AuditDiff("recurrence", cur, after)); err != nil {
 		return nil, err
 	}
@@ -854,10 +860,14 @@ func materialize(ctx context.Context, tx *sql.Tx, r *Recurrence, now int64) (cre
 			r.SkippedCount++
 		default:
 			start, due := at, end
+			status, err := startStatus(ctx, tx, r.ProjectID, r.StartCategory) // none: the recurring gig is paused (Housekeeping)
+			if err != nil {
+				return created, skipped, err
+			}
 			t, err := CreateGig(ctx, tx, sys, NewGig{ProjectID: r.ProjectID, Title: r.Title, DescriptionMD: r.DescriptionMD, Priority: r.Priority,
 				Color: r.Color, StartAt: &start, DueAt: &due, NotAfter: &due, Labels: r.Labels, Assignees: validAssignees(ctx, tx, r),
 				Followers: whoSee(ctx, tx, r.WorkspaceID, r.ProjectID, r.Followers, MaxFollowers), RecurrenceID: &r.ID, OccurrenceAt: &start, Model: r.Model, Effort: r.Effort, AlwaysRun: r.AlwaysRun,
-				AllowedTools: r.AllowedTools, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout, StatusID: startStatus(ctx, tx, r.ProjectID, r.StartCategory)})
+				AllowedTools: r.AllowedTools, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout, StatusID: status})
 			if err != nil {
 				return created, skipped, err
 			}

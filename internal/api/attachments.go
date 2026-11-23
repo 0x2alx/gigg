@@ -274,6 +274,7 @@ func (a *API) attachWith(ctx context.Context, p *access.Principal, t *store.Gig,
 	var made []string
 	undone := false
 	err := a.tx(ctx, func(tx *sql.Tx) (err error) {
+		made, undone = nil, false // per attempt, should the transaction ever be retried
 		defer func() {
 			if err != nil {
 				for _, sha := range made {

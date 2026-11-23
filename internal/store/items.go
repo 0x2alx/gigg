@@ -763,6 +763,11 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 	if err := t.validate(); err != nil {
 		return nil, err
 	}
+	if t.ProjectID != nil { // one project: its gigs' start status must exist there (any project: checked where it's used)
+		if _, err := startStatus(ctx, q, *t.ProjectID, t.StartCategory); err != nil {
+			return nil, err
+		}
+	}
 	if t.ProjectID != nil {
 		p, err := GetProject(ctx, q, *t.ProjectID)
 		if err != nil || t.WorkspaceID == 0 || p.WorkspaceID != t.WorkspaceID {
@@ -923,8 +928,11 @@ func GigFromTemplate(ctx context.Context, q Q, a Actor, tpl *Template, p *Projec
 	n := NewGig{ProjectID: p.ID, Title: tpl.Title, DescriptionMD: tpl.DescriptionMD, Priority: tpl.Priority, Color: tpl.Color,
 		Model: tpl.Model, Effort: tpl.Effort, AlwaysRun: tpl.AlwaysRun, AllowedTools: tpl.AllowedTools, AutoArchive: tpl.AutoArchive, RunTimeout: tpl.RunTimeout,
 		Labels: tpl.Labels, Assignees: validAssignees(ctx, q, &Recurrence{WorkspaceID: p.WorkspaceID, Assignees: tpl.Assignees}),
-		Followers: whoSee(ctx, q, p.WorkspaceID, p.ID, tpl.Followers, MaxFollowers), CreatedViaKey: viaKey,
-		StatusID: startStatus(ctx, q, p.ID, tpl.StartCategory)}
+		Followers: whoSee(ctx, q, p.WorkspaceID, p.ID, tpl.Followers, MaxFollowers), CreatedViaKey: viaKey}
+	var err error
+	if n.StatusID, err = startStatus(ctx, q, p.ID, tpl.StartCategory); err != nil {
+		return nil, err
+	}
 	if title != nil && strings.TrimSpace(*title) != "" {
 		n.Title = *title
 	}

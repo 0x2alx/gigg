@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -79,9 +80,11 @@ func (b RecurrenceBody) apply(r *store.Recurrence) {
 				r.RunTimeout = nil
 			}
 		}
-		if b.StartCategory != nil {
-			r.StartCategory = *b.StartCategory
-		}
+	}
+	// where its gigs start is applied whatever template_id says: with the current template it is
+	// written to it, and naming another template with a different one is refused (startClash)
+	if b.StartCategory != nil {
+		r.StartCategory = *b.StartCategory
 	}
 	r.OwnAssignees = b.Assignees
 	if b.ScheduleID == nil {
@@ -92,6 +95,24 @@ func (b RecurrenceBody) apply(r *store.Recurrence) {
 	if b.StartsOn != 0 {
 		r.StartsOn = b.StartsOn
 	}
+}
+
+// startClash refuses a start_category that differs from the one of the template a recurring gig is
+// made from or switched to: it belongs to the template, and taking the template's silently would
+// leave someone believing the gigs start elsewhere.
+func startClash(want *string, tpl *store.Template) error {
+	if want != nil && *want != tpl.StartCategory {
+		return fail(422, "invalid", fmt.Sprintf("start_category: template %q starts its gigs in %q; change it on the template, or leave out template_id to change it on this recurring gig's own template.",
+			tpl.Name, startName(tpl.StartCategory)))
+	}
+	return nil
+}
+
+func startName(c string) string {
+	if c == "" {
+		return "the project's default status"
+	}
+	return c
 }
 
 type recurrenceOut struct {
@@ -186,6 +207,9 @@ func (a *API) registerRecurrence() {
 					return nil, storeErr(err)
 				}
 				r.TemplateID, always, tools, timeout = tpl.ID, tpl.AlwaysRun, tpl.AllowedTools, tpl.RunTimeout
+				if err := startClash(in.Body.StartCategory, tpl); err != nil {
+					return nil, err
+				}
 			} else if strings.TrimSpace(in.Body.Title) == "" {
 				return nil, fail(422, "invalid", "A recurring gig needs a title (or a template_id).")
 			}
@@ -299,11 +323,14 @@ func (a *API) registerRecurrence() {
 				return nil, storeErr(err)
 			}
 			newTimeout = tpl.RunTimeout
+			if err := startClash(in.Body.StartCategory, tpl); err != nil {
+				return nil, err
+			}
 		}
 		if err := timeoutChange(p, r.WorkspaceID, old.RunTimeout, newTimeout); err != nil {
 			return nil, err
 		}
-		if in.Body.TemplateID == nil {
+		if ch.Template == 0 { // no template_id, or the current one (start_category may still change it)
 			if strings.TrimSpace(r.Title) == "" {
 				return nil, fail(422, "invalid", "A recurring gig needs a title.")
 			}
