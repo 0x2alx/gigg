@@ -371,7 +371,8 @@ in [access.md](access.md).
 | GET | `/workspaces/{ws}/activity` | Activity, newest first. |
 | GET | `/workspaces/{ws}/changes` | Change feed: activity after an id, oldest first. |
 | GET | `/workspaces/{ws}/events` | The same as a Server-Sent Events stream (see above; not in OpenAPI). |
-| GET | `/workspaces/{ws}/summary` | Plain-text board summary: per project, each status with up to 5 gigs. |
+| GET | `/workspaces/{ws}/summary` | Plain-text board summary: per project, each status with up to 5 gigs; a last line names your gigs in Doing with no progress for 24 hours, when there are any. |
+| GET | `/workspaces/{ws}/stale` | Your gigs in a Doing status with no progress for `hours` (default 24): `{items: [{key, title, status, last_progress_at, hours}], total}`, at most 20, oldest first. Progress is a comment, report or question, a checklist tick or untick, a status change, or a run finishing, by anyone; every gig carries it as `last_progress_at` (its creation time when there is none yet). |
 
 ### labels
 

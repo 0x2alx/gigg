@@ -44,6 +44,7 @@ type Gig struct {
 	CostUSDTotal      float64        `json:"cost_usd_total"`
 	CommentCount      int64          `json:"comment_count"`
 	AttachmentCount   int64          `json:"attachment_count" doc:"Files, links and commits attached"`
+	LastProgressAt    int64          `json:"last_progress_at" doc:"Unix ms of the latest comment, checklist tick or untick, status change or finished run (the creation time when none)"`
 	RecurrenceID      *int64         `json:"recurrence_id"`
 	OccurrenceAt      *int64         `json:"occurrence_at"`
 	NotAfter          *int64         `json:"not_after"` // the window closes: not claimable after this
@@ -125,7 +126,7 @@ const gigCols = `t.id, p.key || '-' || t.number, t.workspace_id, t.project_id, t
 		WHERE r.to_gig_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled')),
 	` + blockingSubgigs + `,
 	t.model, t.effort, t.always_run, t.allowed_tools, t.blocks_parent, t.auto_archive_minutes, t.run_timeout_minutes,
-	(SELECT count(*) FROM attachments at WHERE at.gig_id = t.id)`
+	(SELECT count(*) FROM attachments at WHERE at.gig_id = t.id), coalesce(t.last_progress_at, t.created_at)`
 
 // blockingSubgigs counts t's open subgigs that hold it back (blocks_parent; not archived ones,
 // which agents never get either), except those that
@@ -152,7 +153,7 @@ func scanGig(row interface{ Scan(...any) error }) (*Gig, error) {
 		&t.StatusName, &t.StatusCategory, &t.Position, &t.Priority, &color, &start, &due, &done, &parent, &cloned,
 		&t.CreatedBy, &t.CreatedByUsername, &t.CreatedByAdmin, &viaKey, &t.CreatedAt, &t.UpdatedAt, &sess, &lastRun,
 		&resume, &t.CostUSDTotal, &t.CommentCount, &t.Deleted, &t.Version, &rec, &occ, &notAfter, &missed, &archived,
-		&t.SubgigCount, &t.SubgigDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubgigs, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent, &autoArch, &runTO, &t.AttachmentCount); err != nil {
+		&t.SubgigCount, &t.SubgigDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubgigs, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent, &autoArch, &runTO, &t.AttachmentCount, &t.LastProgressAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -1227,6 +1228,9 @@ func MoveGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, m Move) (*
 	now := Now()
 	data := map[string]any{"from_status": t.StatusName, "to_status": st.Name, "from_category": t.StatusCategory, "to_category": st.Category}
 	sets, args := []string{"status_id = ?", "position = ?", "updated_at = ?", "version = version + 1"}, []any{st.ID, pos, now}
+	if st.ID != t.StatusID {
+		sets, args = append(sets, "last_progress_at = ?"), append(args, now) // a reorder in place isn't progress
+	}
 	if st.Category == "done" && t.StatusCategory != "done" {
 		sets = append(sets, "done_at = ?")
 		args = append(args, now)

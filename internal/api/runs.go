@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -403,8 +404,46 @@ func (a *API) registerRuns() {
 			return nil, err
 		}
 		s, err := store.Summary(ctx, a.st.R, w.ID, ps, 5)
-		return &textOut{ContentType: "text/plain; charset=utf-8", Body: []byte(s)}, storeErr(err)
+		if err != nil {
+			return nil, storeErr(err)
+		}
+		// the caller's own gigs in Doing with no progress for a day
+		stale, n, err := store.StaleGigs(ctx, a.st.R, w.ID, p.ProjectFilter(w.ID), p.User.ID, store.Now()-24*3600*1000, 5)
+		if err != nil {
+			return nil, storeErr(err)
+		}
+		if n > 0 {
+			keys := make([]string, len(stale))
+			for i, g := range stale {
+				keys[i] = fmt.Sprintf("%s (%dh)", g.Key, g.Hours)
+			}
+			more := ""
+			if n > len(stale) {
+				more = fmt.Sprintf(" and %d more", n-len(stale))
+			}
+			s += fmt.Sprintf("Stale: %d of your gigs in Doing with no progress for 24h+: %s%s\n", n, strings.Join(keys, ", "), more)
+		}
+		return &textOut{ContentType: "text/plain; charset=utf-8", Body: []byte(s)}, nil
 	})
+	huma.Register(a.h, huma.Operation{OperationID: "workspace-stale", Method: "GET", Path: "/workspaces/{ws}/stale", Tags: []string{"gigs"},
+		Summary: "Your gigs in Doing with no progress (comment, checklist tick, status change or finished run) for N hours, oldest first"},
+		func(ctx context.Context, in *staleIn) (*staleOut, error) {
+			p, err := me(ctx)
+			if err != nil {
+				return nil, err
+			}
+			w, err := a.workspace(ctx, p, in.WS)
+			if err != nil {
+				return nil, err
+			}
+			if err := requireScope(p, "gigs:read"); err != nil {
+				return nil, err
+			}
+			out := &staleOut{}
+			out.Body.Items, out.Body.Total, err = store.StaleGigs(ctx, a.st.R, w.ID, p.ProjectFilter(w.ID), p.User.ID,
+				store.Now()-int64(in.Hours)*3600*1000, 20)
+			return out, storeErr(err)
+		})
 	huma.Register(a.h, huma.Operation{OperationID: "workspace-activity", Method: "GET", Path: "/workspaces/{ws}/activity", Tags: []string{"workspaces"},
 		Summary: "A workspace's activity, newest first"}, func(ctx context.Context, in *activityIn) (*activityOut, error) {
 		p, err := me(ctx)
@@ -454,6 +493,18 @@ func (a *API) registerRuns() {
 	})
 	huma.Register(a.h, huma.Operation{OperationID: "inbox", Method: "GET", Path: "/inbox", Tags: []string{"gigs"},
 		Summary: "Gigs waiting for a human across your workspaces, with the latest question"}, a.inbox)
+}
+
+type staleIn struct {
+	WS    string `path:"ws" doc:"Workspace id, slug, or current"`
+	Hours int    `query:"hours" default:"24" minimum:"0" maximum:"8760" doc:"No progress for at least this many hours"`
+}
+
+type staleOut struct {
+	Body struct {
+		Items []store.StaleGig `json:"items" doc:"At most 20, oldest progress first"`
+		Total int              `json:"total" doc:"How many match in all"`
+	}
 }
 
 type inboxOut struct {

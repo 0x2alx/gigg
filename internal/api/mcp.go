@@ -119,6 +119,10 @@ type (
 	wsArg struct {
 		Workspace string `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit for your own workspace (a limited key: its first place)"`
 	}
+	staleArgs struct {
+		Workspace string `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit for every workspace in reach (a limited key: its first place)"`
+		Hours     *int   `json:"hours,omitempty" jsonschema:"No progress for at least this many hours (default 24)"`
+	}
 	listGigsArgs struct {
 		Workspace   string `json:"workspace,omitempty" jsonschema:"Workspace id or slug; omit for every workspace in reach (a limited key: its first place)"`
 		Project     int64  `json:"project,omitempty" jsonschema:"Project id"`
@@ -377,6 +381,14 @@ func (a *API) mcpServer(r *http.Request) *mcp.Server {
 		mcp.AddTool(s, &mcp.Tool{Name: "summary", Description: "Board summary: per project, each status with up to 5 gigs (every workspace in reach when you name none and reach several).", Annotations: ro("Board summary")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in wsArg) (*mcp.CallToolResult, any, error) {
 				return toolResult(span(ctx, in.Workspace, "/summary", nil))
+			})
+		mcp.AddTool(s, &mcp.Tool{Name: "stale_gigs", Description: "Your gigs in Doing with no progress (a comment, checklist tick, status change or finished run) for at least `hours` (default 24), oldest first, at most 20, with the total.", Annotations: ro("Stale gigs")},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in staleArgs) (*mcp.CallToolResult, any, error) {
+				q := url.Values{}
+				if in.Hours != nil {
+					q.Set("hours", strconv.Itoa(*in.Hours))
+				}
+				return toolResult(span(ctx, in.Workspace, "/stale", q))
 			})
 		mcp.AddTool(s, &mcp.Tool{Name: "list_gigs", Description: "Find gigs; filters combine. Board order unless sort is given.", Annotations: ro("List gigs")},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in listGigsArgs) (*mcp.CallToolResult, any, error) {

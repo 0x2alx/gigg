@@ -206,6 +206,9 @@ func PatchChecklistItem(ctx context.Context, q Q, a Actor, t *Gig, id int64, p C
 		if err != nil {
 			return err
 		}
+		if err := touchProgress(ctx, q, t.ID); err != nil {
+			return err
+		}
 		data["done"] = *p.Done
 	}
 	if p.After != nil {

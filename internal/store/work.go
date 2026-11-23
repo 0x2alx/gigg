@@ -70,6 +70,11 @@ func AddComment(ctx context.Context, q Q, a Actor, t *Gig, kind, body string, ru
 	if _, err := q.ExecContext(ctx, `UPDATE gigs SET comment_count = comment_count + 1, updated_at = ? WHERE id = ?`, Now(), t.ID); err != nil {
 		return nil, err
 	}
+	if clientCommentKinds[kind] {
+		if err := touchProgress(ctx, q, t.ID); err != nil {
+			return nil, err
+		}
+	}
 	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "comment.created", "comment", id, map[string]any{"gig_id": t.ID, "kind": kind}); err != nil {
 		return nil, err
 	}
@@ -532,6 +537,9 @@ func FinishRun(ctx context.Context, q Q, a Actor, r *Run, f Finish) (*Run, *Gig,
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return nil, nil, Conflict("the run has already ended")
+	}
+	if err := touchProgress(ctx, q, t.ID); err != nil {
+		return nil, nil, err
 	}
 	if f.CostUSD != nil {
 		if _, err := q.ExecContext(ctx, `UPDATE gigs SET cost_usd_total = cost_usd_total + ? WHERE id = ?`, *f.CostUSD, t.ID); err != nil {
