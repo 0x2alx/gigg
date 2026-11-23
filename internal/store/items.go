@@ -763,15 +763,14 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 	if err := t.validate(); err != nil {
 		return nil, err
 	}
-	if t.ProjectID != nil { // one project: its gigs' start status must exist there (any project: checked where it's used)
-		if _, err := startStatus(ctx, q, *t.ProjectID, t.StartCategory); err != nil {
-			return nil, err
-		}
-	}
 	if t.ProjectID != nil {
 		p, err := GetProject(ctx, q, *t.ProjectID)
 		if err != nil || t.WorkspaceID == 0 || p.WorkspaceID != t.WorkspaceID {
 			return nil, Invalid("no such project in this workspace")
+		}
+		// its gigs' start status must exist there (checked after the project is known to be ours)
+		if _, err := startStatus(ctx, q, *t.ProjectID, t.StartCategory); err != nil {
+			return nil, err
 		}
 		if t.ID != 0 {
 			var n int
@@ -779,6 +778,18 @@ func SaveTemplate(ctx context.Context, q Q, a Actor, t *Template, expect int64) 
 			if n > 0 {
 				return nil, Conflict("recurring gigs in other projects use this template; keep it for any project or for theirs")
 			}
+		}
+	}
+	// a template for any project (or shared): the projects its recurring gigs run in must have the
+	// start status too, or they would pause at their next occurrence
+	if t.ID != 0 && t.StartCategory != "" {
+		var n int
+		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM recurrences r WHERE r.template_id = ? AND r.deleted_at IS NULL
+			AND NOT EXISTS (SELECT 1 FROM statuses s WHERE s.project_id = r.project_id AND s.category = ?)`, t.ID, t.StartCategory).Scan(&n); err != nil {
+			return nil, err
+		}
+		if n > 0 {
+			return nil, Invalid("start_category: %d recurring gig(s) using this template are in projects without a %s status; add one there first", n, t.StartCategory)
 		}
 	}
 	// custom values must fit this workspace's fields (as stored on a gig)
@@ -882,9 +893,15 @@ func AddSubgigs(ctx context.Context, q Q, a Actor, t *Gig, subs []TemplateSubgig
 	if err != nil {
 		return err
 	}
+	// a gig waiting in Backlog keeps its subgigs there too, out of a runner's reach; otherwise they
+	// start in the project's default status
+	var status *int64
+	if t.StatusCategory == "backlog" {
+		status = &t.StatusID
+	}
 	for _, s := range subs {
 		parent := t.ID
-		if _, err := CreateGig(ctx, q, a, NewGig{ProjectID: t.ProjectID, Title: s.Title, Priority: t.Priority, ParentID: &parent,
+		if _, err := CreateGig(ctx, q, a, NewGig{ProjectID: t.ProjectID, Title: s.Title, Priority: t.Priority, ParentID: &parent, StatusID: status,
 			BlocksParent: s.BlocksParent, StartAt: t.StartAt, DueAt: t.DueAt, NotAfter: t.NotAfter, Assignees: t.Assignees,
 			Followers: whoSee(ctx, q, t.WorkspaceID, t.ProjectID, t.Followers, MaxFollowers), CreatedViaKey: t.CreatedViaKeyID, Model: t.Model, Effort: t.Effort, AlwaysRun: t.AlwaysRun, AllowedTools: t.AllowedTools,
 			Quiet: true}); err != nil {

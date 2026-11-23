@@ -124,3 +124,44 @@ func TestStartCategory(t *testing.T) {
 		t.Fatalf("missing backlog status: %+v", res)
 	}
 }
+
+// TestStartCategorySubgigsAndAnyProject: a Backlog gig's subgigs wait in Backlog too; an
+// any-project template can't switch to a start status that a project of its recurring gigs lacks.
+func TestStartCategorySubgigsAndAnyProject(t *testing.T) {
+	f := newFixture(t)
+	tpl, err := SaveTemplate(f.ctx, f.s.W, f.a, &Template{WorkspaceID: f.ws.ID, Name: "with subs", Title: "parent", StartCategory: "backlog",
+		Subgigs: []TemplateSubgig{{Title: "child one"}, {Title: "child two", BlocksParent: true}}}, 0)
+	must(t, err)
+	g, err := GigFromTemplate(f.ctx, f.s.W, f.a, tpl, f.p1, nil, nil)
+	must(t, err)
+	kids, _, err := ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID, Category: "backlog"})
+	must(t, err)
+	n := 0
+	for _, k := range kids {
+		if k.ParentID != nil && *k.ParentID == g.ID {
+			n++
+		}
+	}
+	if g.StatusCategory != "backlog" || n != 2 {
+		t.Fatalf("parent %s, %d subgigs in backlog", g.StatusCategory, n)
+	}
+
+	// an any-project template on a recurring gig in p2, whose Backlog status is gone
+	tpl.StartCategory = ""
+	tpl, err = SaveTemplate(f.ctx, f.s.W, f.a, tpl, 0)
+	must(t, err)
+	must(t, f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		_, err := CreateRecurrence(f.ctx, tx, f.a, &Recurrence{ProjectID: f.p2.ID, TemplateID: tpl.ID, Freq: "daily", TZ: "UTC",
+			WindowStart: "09:00", WindowMinutes: 60})
+		return err
+	}))
+	_, err = f.s.W.ExecContext(f.ctx, `DELETE FROM statuses WHERE project_id = ? AND category = 'backlog'`, f.p2.ID)
+	must(t, err)
+	tpl.StartCategory = "backlog"
+	if _, err := SaveTemplate(f.ctx, f.s.W, f.a, tpl, 0); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("any-project template switched to backlog under a project without one: %v", err)
+	}
+	if !settled(Invalid("x")) || settled(errors.New("database is locked")) {
+		t.Fatal("settled")
+	}
+}

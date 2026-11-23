@@ -789,7 +789,13 @@ func (s *Store) Housekeeping(ctx context.Context, now int64) (JanitorResult, err
 				return err
 			}
 			c, sk, err := materialize(ctx, tx, r, now)
-			if err != nil {
+			if err != nil && !settled(err) {
+				// a passing failure (the database, say): undone, and tried again next pass, not paused
+				if _, e := tx.ExecContext(ctx, "ROLLBACK TO rec"); e != nil {
+					return e
+				}
+				res.Errors = append(res.Errors, fmt.Sprintf("recurrence %d: %v (will retry)", r.ID, err))
+			} else if err != nil {
 				if _, e := tx.ExecContext(ctx, "ROLLBACK TO rec"); e != nil {
 					return e
 				}
@@ -813,6 +819,13 @@ func (s *Store) Housekeeping(ctx context.Context, now int64) (JanitorResult, err
 		return nil
 	})
 	return res, err
+}
+
+// settled: an error that the next pass would hit again (a rule or state problem, such as a missing
+// start status), so the recurring gig is paused; anything else is retried.
+func settled(err error) bool {
+	return errors.Is(err, ErrInvalid) || errors.Is(err, ErrDenied) || errors.Is(err, ErrConflict) || errors.Is(err, ErrNotFound) ||
+		strings.Contains(err.Error(), "constraint failed") // the same row fails the same way next time
 }
 
 // schedulerMayRun: the schedule's owner is still active, still a member (or an admin), and still

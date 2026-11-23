@@ -63,4 +63,29 @@ func TestRecurrenceStartCategoryPut(t *testing.T) {
 	if !strings.Contains(string(out), `"start_category":""`) || !strings.Contains(string(out), fmt.Sprintf(`"template_id":%d`, plain.ID)) {
 		t.Fatalf("switch: %s", out)
 	}
+
+	// someone else's template: an echoed PUT that changes start_category still needs Gig templates
+	if code, out, _ := e.req("PUT", fmt.Sprintf("/users/%d/access", e.ids["scout.user"]), `{"workspace_id":null,"overrides":{"recurring_gigs":true,"create_gigs":true,"templates":false}}`, e.ada()); code != 200 {
+		t.Fatalf("grant: %d %s", code, out)
+	}
+	scout := e.key("scout")
+	echo := func(start *string) (int, []byte) {
+		code, out, _ := e.req("GET", fmt.Sprintf("/recurrences/%d", id), "", e.ada())
+		e.ok(code, out, 200)
+		body := map[string]any{}
+		_ = json.Unmarshal(out, &body)
+		if start != nil {
+			body["start_category"] = *start
+		}
+		b, _ := json.Marshal(body)
+		code, out, _ = e.req("PUT", fmt.Sprintf("/recurrences/%d", id), string(b), scout)
+		return code, out
+	}
+	if code, out := echo(nil); code != 200 { // unchanged content: scout may edit the recurring gig itself
+		t.Fatalf("scout's unchanged echo: %d %s", code, out)
+	}
+	backlog := "backlog"
+	if code, out := echo(&backlog); code != 403 {
+		t.Fatalf("changed ada's template without Gig templates: %d %s", code, out)
+	}
 }
