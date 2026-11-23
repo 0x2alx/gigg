@@ -1644,30 +1644,49 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
           </div>
         )}
       </button>
-      {/* the card's foot, outside the open button so it can hold buttons: the gear (the card's menu) and the
-          one-click Archive at its start, always in view, then the badges and the people; a click on the
-          rest of it opens the gig like the card does */}
+      {/* the card's foot, outside the open button so it can hold buttons: on the left the gear (the card's
+          menu) and the one-click Archive, always in view, then the badges, with the schedule / done line
+          under them; the people on the right, both left rows centred on them. A click on the rest of it
+          opens the gig like the card does */}
       <div className="card-bottom" onClick={(e) => !(e.target as HTMLElement).closest("button, a, .menu") && onOpen()}>
         <div className="card-foot">
-          {(canWrite || (canArchive && !gig.archived_at)) && <span className="card-tools">{tools}</span>}
-          <span className="meta">
-            <GigBadges gig={gig} items fields={fields} />
-            {gig.comment_count > 0 && (
-              <span className="meta-item" data-tip={`${gig.comment_count} comment${gig.comment_count === 1 ? "" : "s"}`}>
-                <Icon name="comment" /> {gig.comment_count}
+          <div className="card-foot-main">
+            <div className="card-foot-row">
+              {(canWrite || (canArchive && !gig.archived_at)) && <span className="card-tools">{tools}</span>}
+              <span className="meta">
+                <GigBadges gig={gig} items fields={fields} />
+                {gig.comment_count > 0 && (
+                  <span className="meta-item" data-tip={`${gig.comment_count} comment${gig.comment_count === 1 ? "" : "s"}`}>
+                    <Icon name="comment" /> {gig.comment_count}
+                  </span>
+                )}
+                {(run || gig.session_id) && !running && (
+                  <span className="meta-item" data-tip={run ? runWorkedTip(run, worker ? nameOf(worker) : "", Date.now()) : "An agent has worked on it: it has an agent session (see Runs in the gig)"}>
+                    <Icon name="bot" className="meta-bot" />
+                  </span>
+                )}
+                {gig.cost_usd_total > 0 && (
+                  <span className="meta-item mono" data-tip="What the agent's runs on it cost so far (API-equivalent USD, as reported by the agent)">
+                    ${gig.cost_usd_total.toFixed(2)}
+                  </span>
+                )}
               </span>
+            </div>
+            {(gig.schedule || done) && (
+              <div className="card-when">
+                {gig.schedule && (
+                  <span className="meta-item" data-tip={`Schedule: ${gig.schedule.name}`}>
+                    <Icon name="refresh" /> {gig.schedule.text}
+                  </span>
+                )}
+                {done && (
+                  <span className="meta-item card-done-at" data-tip={`Done ${fmtTime(done)}`}>
+                    <Icon name="check" /> Done {relTime(done)}
+                  </span>
+                )}
+              </div>
             )}
-            {(run || gig.session_id) && !running && (
-              <span className="meta-item" data-tip={run ? runWorkedTip(run, worker ? nameOf(worker) : "", Date.now()) : "An agent has worked on it: it has an agent session (see Runs in the gig)"}>
-                <Icon name="bot" className="meta-bot" />
-              </span>
-            )}
-            {gig.cost_usd_total > 0 && (
-              <span className="meta-item mono" data-tip="What the agent's runs on it cost so far (API-equivalent USD, as reported by the agent)">
-                ${gig.cost_usd_total.toFixed(2)}
-              </span>
-            )}
-          </span>
+          </div>
           {(assignees.length > 0 || creator) && (
             <span className="people">
               {(assignees.length === 0 || handOff) && creator && (
@@ -1686,20 +1705,6 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
             </span>
           )}
         </div>
-        {(gig.schedule || done) && (
-          <div className="card-when">
-            {gig.schedule && (
-              <span className="meta-item" data-tip={`Schedule: ${gig.schedule.name}`}>
-                <Icon name="refresh" /> {gig.schedule.text}
-              </span>
-            )}
-            {done && (
-              <span className="meta-item card-done-at" data-tip={`Done ${fmtTime(done)}`}>
-                <Icon name="check" /> Done {relTime(done)}
-              </span>
-            )}
-          </div>
-        )}
       </div>
       {state?.kind === "failed" && run && (
         <div className="card-fail">

@@ -409,7 +409,7 @@ a.pulse-item:hover { color: var(--text); }
    schedule and done lines; it opens the gig on a click too */
 .card-bottom { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3) var(--card-pad-r) var(--card-pad-y) var(--card-pad-l); cursor: pointer; }
 /* nothing to show in it: just the card's bottom padding */
-.card-bottom:not(:has(> .card-when)):has(> .card-foot > .meta:empty):not(:has(> .card-foot > :is(.people, .card-tools))) { padding-top: 0; }
+.card-bottom:not(:has(.card-when)):has(.card-foot-row > .meta:empty):not(:has(:is(.people, .card-tools))) { padding-top: 0; }
 /* the top line: the main cell wraps (priority, run state, workspace, ...); the key has the first row to
    itself in the top right corner, a fixed --card-line tall */
 .card-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: var(--card-line) auto; column-gap: 0.5rem; }
@@ -482,12 +482,15 @@ a.pulse-item:hover { color: var(--text); }
   font-size: min(0.72rem, var(--fs-xs)); font-weight: 400; background: var(--surface-variant); border-radius: var(--radius-s);
   padding: 0.05rem 0.4rem; display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%;
 }
-.card-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: var(--sp-3); }
-.card-foot:has(> .meta:empty):not(:has(> :is(.people, .card-tools))) { display: none; }
-/* the card's last line: the schedule that made it, and when it was done */
-.card-when { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.2rem var(--sp-4); margin-top: calc(-1 * var(--sp-2)); font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+/* two columns: on the left the tools and badges with the schedule / done line under them, on the right
+   the people; both left rows are centred together on the avatars */
+.card-foot { display: flex; align-items: center; gap: var(--sp-4); border-top: 1px solid var(--line); padding-top: var(--sp-3); }
+.card-foot:has(.card-foot-row > .meta:empty):not(:has(:is(.people, .card-tools, .card-when))) { display: none; }
+.card-foot-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.card-foot-row { display: flex; align-items: center; gap: var(--sp-2) var(--sp-4); flex-wrap: wrap; min-width: 0; }
+/* under the badges: the schedule that made it, and when it was done */
+.card-when { display: flex; flex-wrap: wrap; gap: 0.1rem var(--sp-4); font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 0; }
 .card-when .meta-item { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-done-at { margin-left: auto; }
 .card-top .ws-chip { max-width: 10rem; }
 .card-break { flex-basis: 100%; height: 0; }
 /* who: 20px avatars stacked with a ring of the card colour; a person handing a gig to an agent shows
@@ -1122,7 +1125,7 @@ label.check input { width: auto; accent-color: var(--accent); }
 .button.on { outline: 2px solid var(--accent); outline-offset: 1px; }
 .gig-card.archived { border-style: dashed; }
 /* an archived card fades, all but its gear */
-.gig-card.archived > :not(.card-bottom), .gig-card.archived .card-bottom > :not(.card-foot), .gig-card.archived .card-foot > :not(.card-tools) { opacity: 0.55; }
+.gig-card.archived > :not(.card-bottom), .gig-card.archived .card-foot-row > :not(.card-tools), .gig-card.archived :is(.card-when, .card-foot > .people) { opacity: 0.55; }
 .gig-card.blocked { border-color: var(--danger); }
 .card-top .pill-danger, .card-top .pill-done { flex: none; }
 

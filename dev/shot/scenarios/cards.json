@@ -72,7 +72,11 @@
    "expect": true
   },
   {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), f = c.querySelector('.card-foot'), fs = getComputedStyle(f), fb = f.getBoundingClientRect(), mid = (fb.top + parseFloat(fs.paddingTop) + parseFloat(fs.borderTopWidth) + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), fb = c.querySelector('.card-foot-row').getBoundingClientRect(), mid = (fb.top + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const m = c.querySelector('.card-foot-main').getBoundingClientRect(), w = c.querySelector('.card-when').getBoundingClientRect(), row = c.querySelector('.card-foot-row').getBoundingClientRect(), p = c.querySelector('.card-foot > .people'); if (Math.abs(w.left - row.left) > 1 || w.top < row.bottom - 1) return false; if (!p) return true; const pb = p.getBoundingClientRect(); return Math.abs((m.top + m.bottom) / 2 - (pb.top + pb.bottom) / 2) <= 1.5 && w.right <= pb.left + 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector('.card-when')))",
    "expect": true
   },
   {
@@ -224,7 +228,11 @@
    "expect": true
   },
   {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), f = c.querySelector('.card-foot'), fs = getComputedStyle(f), fb = f.getBoundingClientRect(), mid = (fb.top + parseFloat(fs.paddingTop) + parseFloat(fs.borderTopWidth) + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), fb = c.querySelector('.card-foot-row').getBoundingClientRect(), mid = (fb.top + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const m = c.querySelector('.card-foot-main').getBoundingClientRect(), w = c.querySelector('.card-when').getBoundingClientRect(), row = c.querySelector('.card-foot-row').getBoundingClientRect(), p = c.querySelector('.card-foot > .people'); if (Math.abs(w.left - row.left) > 1 || w.top < row.bottom - 1) return false; if (!p) return true; const pb = p.getBoundingClientRect(); return Math.abs((m.top + m.bottom) / 2 - (pb.top + pb.bottom) / 2) <= 1.5 && w.right <= pb.left + 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector('.card-when')))",
    "expect": true
   },
   {
@@ -475,7 +483,11 @@
    "expect": true
   },
   {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), f = c.querySelector('.card-foot'), fs = getComputedStyle(f), fb = f.getBoundingClientRect(), mid = (fb.top + parseFloat(fs.paddingTop) + parseFloat(fs.borderTopWidth) + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), fb = c.querySelector('.card-foot-row').getBoundingClientRect(), mid = (fb.top + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const m = c.querySelector('.card-foot-main').getBoundingClientRect(), w = c.querySelector('.card-when').getBoundingClientRect(), row = c.querySelector('.card-foot-row').getBoundingClientRect(), p = c.querySelector('.card-foot > .people'); if (Math.abs(w.left - row.left) > 1 || w.top < row.bottom - 1) return false; if (!p) return true; const pb = p.getBoundingClientRect(); return Math.abs((m.top + m.bottom) / 2 - (pb.top + pb.bottom) / 2) <= 1.5 && w.right <= pb.left + 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector('.card-when')))",
    "expect": true
   },
   {
@@ -551,7 +563,11 @@
    "expect": true
   },
   {
-   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), f = c.querySelector('.card-foot'), fs = getComputedStyle(f), fb = f.getBoundingClientRect(), mid = (fb.top + parseFloat(fs.paddingTop) + parseFloat(fs.borderTopWidth) + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const g = c.querySelector('.card-tools .card-menu > .icon-button'); if (!g) return false; const r = c.getBoundingClientRect(), gb = g.getBoundingClientRect(), fb = c.querySelector('.card-foot-row').getBoundingClientRect(), mid = (fb.top + fb.bottom) / 2, a = c.querySelector('.card-tools .card-archive'); const ok = getComputedStyle(g.parentElement).opacity === '1' && gb.left - r.left <= 14 && Math.abs((gb.top + gb.height / 2) - mid) <= 1; if (!a) return ok; const ab = a.getBoundingClientRect(); return ok && ab.left >= gb.right - 0.5 && Math.abs((ab.top + ab.height / 2) - mid) <= 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent))",
+   "expect": true
+  },
+  {
+   "eval": "(cs => cs.length > 0 && cs.every(c => { const m = c.querySelector('.card-foot-main').getBoundingClientRect(), w = c.querySelector('.card-when').getBoundingClientRect(), row = c.querySelector('.card-foot-row').getBoundingClientRect(), p = c.querySelector('.card-foot > .people'); if (Math.abs(w.left - row.left) > 1 || w.top < row.bottom - 1) return false; if (!p) return true; const pb = p.getBoundingClientRect(); return Math.abs((m.top + m.bottom) / 2 - (pb.top + pb.bottom) / 2) <= 1.5 && w.right <= pb.left + 1; }))([...document.querySelectorAll('.gig-card')].filter(c => c.offsetParent && c.querySelector('.card-when')))",
    "expect": true
   },
   {
