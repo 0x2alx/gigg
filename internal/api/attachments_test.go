@@ -2,12 +2,16 @@ package api
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"net/http/httptest"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -73,7 +77,7 @@ func TestAttachments(t *testing.T) {
 	code, body, hdr = e.req("GET", fmt.Sprintf("/attachments/%d/file", img.ID), "", k)
 	e.ok(code, body, 200)
 	if hdr.Get("Content-Type") != "image/png" || !strings.HasPrefix(hdr.Get("Content-Disposition"), "inline") ||
-		!strings.Contains(hdr.Get("Content-Security-Policy"), "sandbox") {
+		!strings.Contains(hdr.Get("Content-Security-Policy"), "sandbox") || hdr.Get("Cache-Control") != "private, no-cache" {
 		t.Fatalf("image headers: %v", hdr)
 	}
 	tag := hdr.Get("ETag")
@@ -239,6 +243,34 @@ func TestAttachments(t *testing.T) {
 	}
 	if code, _, _ := e.reqH("PUT", fmt.Sprintf("/workspaces/%d/attachment-limits", e.ids["scout.ws"]), `{"file_max":999999999999}`, e.ada(), map[string]string{"X-Gigg-CSRF": "1"}); code != 422 {
 		t.Fatalf("file cap over the ceiling: %d", code)
+	}
+
+	// refused uploads leave no file behind: over the quota nothing is written; a transaction that
+	// fails after writing (a run of another gig) removes the file it created
+	gone := func(data []byte) bool {
+		sum := sha256.Sum256(data)
+		_, err := os.Stat(e.st.BlobPath(hex.EncodeToString(sum[:])))
+		return os.IsNotExist(err)
+	}
+	if !gone([]byte("x")) {
+		t.Fatal("the refused over-quota upload wrote its file")
+	}
+	code, out, _ = e.reqH("PUT", fmt.Sprintf("/workspaces/%d/attachment-limits", e.ids["scout.ws"]), `{"file_max":null,"quota":null}`, e.ada(), map[string]string{"X-Gigg-CSRF": "1"})
+	e.ok(code, out, 200)
+	orphan := []byte("written, then the transaction failed")
+	if code, _, out := upload(e, k, gig, "o.txt", orphan, "&run_id=999999"); code != 422 {
+		t.Fatalf("a run of another gig: %d %s", code, out)
+	}
+	if !gone(orphan) {
+		t.Fatal("the failed upload left its file")
+	}
+	// no login, no big body: refused before it is read
+	anon := httptest.NewRequest("POST", "https://board.example"+Prefix+fmt.Sprintf("/gigs/%d/attachments?filename=a.bin", gig), bytes.NewReader(make([]byte, 2<<20)))
+	anon = anon.WithContext(WithInfo(anon.Context(), RequestInfo{Listener: "internal", RequestID: "test"}))
+	w := httptest.NewRecorder()
+	e.h.ServeHTTP(w, anon)
+	if w.Code != 401 {
+		t.Fatalf("anonymous 2 MB upload: %d %s", w.Code, w.Body.String())
 	}
 
 	// removing: your own yes; someone else's needs Edit gigs (scout is a member: has it)

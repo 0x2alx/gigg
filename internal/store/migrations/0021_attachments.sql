@@ -11,8 +11,9 @@
 -- Workspaces get two limits (NULL = the server default): the largest file and the total of all its
 -- attachments' sizes.
 --
--- Keys that can work on gigs (gigs:work) get attachments:write: attaching is part of working on a
--- gig, so runner and agent keys keep doing what their rules allow without being reissued.
+-- Keys that can read gigs (gigs:read) get attachments:read (downloading files), and keys that can
+-- work on gigs (gigs:work) get attachments:write (adding and removing them): runner and agent keys
+-- keep doing what their rules allow without being reissued.
 DROP INDEX artifacts_gig;
 DROP TABLE artifacts;
 

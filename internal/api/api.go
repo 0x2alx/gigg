@@ -293,6 +293,9 @@ func WithInfo(ctx context.Context, i RequestInfo) context.Context {
 	return context.WithValue(ctx, infoKey{}, i)
 }
 
+// anonMaxBody caps a request body sent without a login or key.
+const anonMaxBody = 1 << 20
+
 // whyUnavailable: keyPrincipal's reason when the database, not the key, failed.
 const whyUnavailable = "unavailable"
 
@@ -387,9 +390,20 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 				ctx = access.WithPrincipal(ctx, p)
 			}
 		}
-		if access.From(ctx) == nil && !a.limiter.allow("ip"+req.IP, 120) {
-			writeProblem(w, fail(429, "rate_limited", "Too many requests; slow down."))
-			return
+		if access.From(ctx) == nil {
+			if !a.limiter.allow("ip"+req.IP, 120) {
+				writeProblem(w, fail(429, "rate_limited", "Too many requests; slow down."))
+				return
+			}
+			// no login: no large bodies either (an upload route would otherwise read up to its own
+			// limit, 50 MB, before refusing). Anonymous routes (login, setup) take small JSON.
+			if r.ContentLength > anonMaxBody {
+				unauth("Log in or send a key first.")
+				return
+			}
+			if r.Body != nil {
+				r.Body = http.MaxBytesReader(w, r.Body, anonMaxBody)
+			}
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

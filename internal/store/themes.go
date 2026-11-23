@@ -103,22 +103,43 @@ func (s *Store) BlobPath(sha string) string {
 
 // WriteBlob stores data (deduplicated) and returns its sha256.
 func (s *Store) WriteBlob(data []byte) (string, error) {
+	sha, _, err := s.WriteBlobNew(data)
+	return sha, err
+}
+
+// WriteBlobNew is WriteBlob that also says whether it created the file (false: it was already there),
+// so a caller whose transaction fails can remove a file only it wrote (RemoveBlob, still inside that
+// transaction).
+func (s *Store) WriteBlobNew(data []byte) (string, bool, error) {
 	h := sha256.Sum256(data)
 	sha := hex.EncodeToString(h[:])
 	p := s.BlobPath(sha)
 	if _, err := os.Stat(p); err == nil {
 		now := time.Now() // fresh again: the sweep leaves recent files alone
 		_ = os.Chtimes(p, now, now)
-		return sha, nil
+		return sha, false, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
-		return "", err
+		return "", false, err
 	}
 	tmp := p + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return "", err
+		_ = os.Remove(tmp)
+		return "", false, err
 	}
-	return sha, os.Rename(tmp, p)
+	if err := os.Rename(tmp, p); err != nil {
+		_ = os.Remove(tmp)
+		return "", false, err
+	}
+	return sha, true, nil
+}
+
+// RemoveBlob deletes a blob file this caller just created, from inside the write transaction that
+// failed (one writer: no other upload can have started using it meanwhile).
+func (s *Store) RemoveBlob(sha string) {
+	if blobName.MatchString(sha) {
+		_ = os.Remove(s.BlobPath(sha))
+	}
 }
 
 // SetAvatar points a user at an avatar blob (sha "" removes it) and keeps blob refcounts.

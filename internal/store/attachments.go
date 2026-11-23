@@ -171,6 +171,17 @@ func SetAttachLimits(ctx context.Context, q Q, a Actor, ws int64, fileMax, quota
 	return err
 }
 
+// FitsLimits: a file of size bytes fits the workspace's per-file limit and what's left of its quota.
+func FitsLimits(fileMax, quota, used, size int64) error {
+	if size > fileMax {
+		return tooLarge("files are up to %s in this workspace", HumanBytes(fileMax))
+	}
+	if used+size > quota {
+		return tooLarge("the workspace's attachments are full (%s of %s used)", HumanBytes(used), HumanBytes(quota))
+	}
+	return nil
+}
+
 // AddAttachment attaches a file, link or commit to a live gig, within the workspace's limits.
 func AddAttachment(ctx context.Context, q Q, a Actor, t *Gig, in AttachmentIn) (*Attachment, error) {
 	if t.Deleted {
@@ -202,11 +213,8 @@ func AddAttachment(ctx context.Context, q Q, a Actor, t *Gig, in AttachmentIn) (
 		if err != nil {
 			return nil, err
 		}
-		if in.Size > fileMax {
-			return nil, tooLarge("files are up to %s in this workspace", HumanBytes(fileMax))
-		}
-		if used+in.Size > quota {
-			return nil, tooLarge("the workspace's attachments are full (%s of %s used)", HumanBytes(used), HumanBytes(quota))
+		if err := FitsLimits(fileMax, quota, used, in.Size); err != nil {
+			return nil, err
 		}
 		if err := refBlob(ctx, q, in.Blob, in.Size); err != nil {
 			return nil, err

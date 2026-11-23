@@ -83,6 +83,7 @@ func (s *Store) SweepBlobs(ctx context.Context, grace time.Duration) (int, error
 	rows.Close()
 	root := filepath.Join(s.dir, "files")
 	old := time.UnixMilli(cutoff)
+	var cands []string
 	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -104,19 +105,34 @@ func (s *Store) SweepBlobs(ctx context.Context, grace time.Duration) (int, error
 		if err != nil || info.ModTime().After(old) {
 			return nil
 		}
-		if blobName.MatchString(name) && s.isReferenced(ctx, name) {
-			return nil // committed after the snapshot of known above
-		}
-		if os.Remove(p) == nil {
-			removed++
+		cands = append(cands, p)
+		return nil
+	})
+	if err != nil || len(cands) == 0 {
+		return removed, err
+	}
+	// removed under the writer, after a fresh look: an upload of the same bytes writes (or refreshes)
+	// the file inside its own transaction, so it either committed a row by now or hasn't started
+	err = s.Tx(ctx, func(tx *sql.Tx) error {
+		for _, p := range cands {
+			name := filepath.Base(p)
+			if info, err := os.Lstat(p); err != nil || info.ModTime().After(old) {
+				continue
+			}
+			if blobName.MatchString(name) && isReferenced(ctx, tx, name) {
+				continue
+			}
+			if os.Remove(p) == nil {
+				removed++
+			}
 		}
 		return nil
 	})
 	return removed, err
 }
 
-func (s *Store) isReferenced(ctx context.Context, sha string) bool {
+func isReferenced(ctx context.Context, q Q, sha string) bool {
 	var n int
-	err := s.R.QueryRowContext(ctx, `SELECT count(*) FROM blobs WHERE sha256 = ?`, sha).Scan(&n)
+	err := q.QueryRowContext(ctx, `SELECT count(*) FROM blobs WHERE sha256 = ?`, sha).Scan(&n)
 	return err != nil || n > 0
 }

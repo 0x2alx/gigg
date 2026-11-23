@@ -28,8 +28,9 @@ import (
 // idempotency_unreplayable instead of running the request a second time.
 const (
 	idemTTL     = 24 * 3600 * 1000 // ms; Housekeeping deletes older rows
-	idemMaxBody = 4 << 20          // request bodies buffered for hashing (above every route's own limit)
 	idemMaxRows = 2000             // per principal per day; beyond that responses aren't kept
+	// request bodies buffered for hashing: above every route's own limit, uploads included
+	idemMaxBody = store.AttachFileMaxCeiling + 64<<10
 )
 
 var idemMaxResponse = 256 << 10 // a variable so tests can lower it

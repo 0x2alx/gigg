@@ -181,13 +181,25 @@ func (a *API) attachment(ctx context.Context, id int64, perm, scope string) (*ac
 	return p, att, t, nil
 }
 
-// attachFile checks and stores an uploaded file, makes an image's preview, and attaches it.
+// attachFile checks and stores an uploaded file, makes an image's preview, and attaches it. The caller's
+// rights and the workspace's limits are checked before any decoding or disk write.
 func (a *API) attachFile(ctx context.Context, ref, filename, label string, run *int64, data []byte) (*store.Attachment, error) {
 	if len(data) == 0 {
 		return nil, fail(422, "invalid", "The file is empty.")
 	}
 	if store.CleanFilename(filename) == "" {
 		return nil, fail(422, "invalid", "A file name is needed.")
+	}
+	p, t, err := a.attachTarget(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	fileMax, quota, used, err := store.AttachLimits(ctx, a.st.R, t.WorkspaceID)
+	if err == nil {
+		err = store.FitsLimits(fileMax, quota, used, int64(len(data)))
+	}
+	if err != nil {
+		return nil, storeErr(err) // checked again in the transaction, against a concurrent upload
 	}
 	info := media.Sniff(data, filename)
 	in := store.AttachmentIn{Kind: "file", Label: label, RunID: run, Size: int64(len(data)), Filename: filename,
@@ -203,50 +215,81 @@ func (a *API) attachFile(ctx context.Context, ref, filename, label string, run *
 			return nil, ctx.Err()
 		}
 	}
-	return a.attachWith(ctx, ref, in, func(in *store.AttachmentIn) error {
-		// written inside the transaction, so the blob sweep (one writer) never removes a file under us
-		var err error
-		if in.Blob, err = a.st.WriteBlob(data); err != nil {
-			return err
+	return a.attachWith(ctx, p, t, in, func(in *store.AttachmentIn) (func(), error) {
+		// written inside the transaction, so the blob sweep (one writer) never removes a file under us;
+		// undo removes the files this upload created when the transaction fails
+		var made []string
+		undo := func() {
+			for _, sha := range made {
+				a.st.RemoveBlob(sha)
+			}
+		}
+		sha, created, err := a.st.WriteBlobNew(data)
+		if err != nil {
+			return undo, err
+		}
+		in.Blob = sha
+		if created {
+			made = append(made, sha)
 		}
 		if len(thumb) > 0 {
-			if in.Thumb, err = a.st.WriteBlob(thumb); err != nil {
-				return err
+			if sha, created, err = a.st.WriteBlobNew(thumb); err != nil {
+				return undo, err
 			}
-			in.ThumbLen = int64(len(thumb))
+			in.Thumb, in.ThumbLen = sha, int64(len(thumb))
+			if created {
+				made = append(made, sha)
+			}
 		}
-		return nil
+		return undo, nil
 	})
 }
 
-// attach adds a link or commit (or a file already prepared by attachWith's callback).
+// attach adds a link or commit.
 func (a *API) attach(ctx context.Context, ref string, in store.AttachmentIn) (*store.Attachment, error) {
-	return a.attachWith(ctx, ref, in, nil)
-}
-
-func (a *API) attachWith(ctx context.Context, ref string, in store.AttachmentIn, prep func(*store.AttachmentIn) error) (*store.Attachment, error) {
-	p, err := me(ctx)
+	p, t, err := a.attachTarget(ctx, ref)
 	if err != nil {
 		return nil, err
+	}
+	return a.attachWith(ctx, p, t, in, nil)
+}
+
+// attachTarget: the caller and a live gig they may attach to (Add attachments, attachments:write).
+func (a *API) attachTarget(ctx context.Context, ref string) (*access.Principal, *store.Gig, error) {
+	p, err := me(ctx)
+	if err != nil {
+		return nil, nil, err
 	}
 	t, err := a.gig(ctx, p, ref)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if t.Deleted {
-		return nil, trashErr(t)
+		return nil, nil, trashErr(t)
 	}
 	if err := requireIn(p, t.WorkspaceID, t.ProjectID, "add_attachments", "attachments:write"); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	return p, t, nil
+}
+
+// attachWith adds the attachment in one write transaction; prep (files) writes the blobs there first
+// and returns how to remove the ones it created if the transaction fails.
+func (a *API) attachWith(ctx context.Context, p *access.Principal, t *store.Gig, in store.AttachmentIn, prep func(*store.AttachmentIn) (func(), error)) (*store.Attachment, error) {
 	var att *store.Attachment
-	err = a.tx(ctx, func(tx *sql.Tx) error {
+	err := a.tx(ctx, func(tx *sql.Tx) (err error) {
+		var undo func()
+		defer func() {
+			if err != nil && undo != nil {
+				undo() // still inside the transaction: no other writer can be using the new files
+			}
+		}()
 		cur, err := store.GetGig(ctx, tx, t.ID)
 		if err != nil {
 			return err
 		}
 		if prep != nil {
-			if err := prep(&in); err != nil {
+			if undo, err = prep(&in); err != nil {
 				return err
 			}
 		}
@@ -300,7 +343,7 @@ func (a *API) serveBlob(sha, ctype, disposition string) (*huma.StreamResponse, e
 		defer f.Close()
 		r, w := humago.Unwrap(hc)
 		h := w.Header()
-		h.Set("Cache-Control", "private, max-age=86400")
+		h.Set("Cache-Control", "private, no-cache") // revalidated (ETag, 304) each time: a revoked right stops it
 		h.Set("ETag", `"`+sha[:16]+`"`)
 		h.Set("Content-Type", ctype)
 		h.Set("Content-Disposition", disposition)
