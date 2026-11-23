@@ -400,11 +400,11 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
           <>
           {(creator || gig.assignees.length > 0) && (
               <div className="tp-people" aria-label="People">
-                {creator && <Avatar user={creator} size="l" />}
+                {creator && <Avatar user={creator} size="s" />}
                 {gig.assignees.length > 0 && <span className="arrow" aria-hidden="true"><Icon name="arrow-right" /></span>}
                 {gig.assignees.map((id) => {
                   const u = users.get(id);
-                  return u ? <Avatar key={id} user={u} size="l" /> : null;
+                  return u ? <Avatar key={id} user={u} size="s" /> : null;
                 })}
                 <span className="muted small">
                   {creator ? `${creator.display_name || creator.username}` : ""}
@@ -489,14 +489,10 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
               )}
           </>
         }
-        detailsEnd={
+        meta={
           <>
-              <Row label="Created by" wide className="created">
-                <UserBadge user={creator} /> <span className="muted small">{fmtTime(gig.created_at)}</span>
-              </Row>
-              <Row label="Updated" wide className="muted small">
-                {fmtTime(gig.updated_at)}
-              </Row>
+            Created by <UserBadge user={creator} /> {fmtTime(gig.created_at)}
+            <span aria-hidden="true"> · </span>updated {fmtTime(gig.updated_at)}
           </>
         }
         sideMid={
@@ -576,7 +572,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
             <div className="tp-actions">
               <button
                 type="button"
-                className="button secondary"
+                className="button secondary small"
                 disabled={cloning}
                 onClick={() => {
                   if (cloning) return;
@@ -589,20 +585,20 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
               {can("archive_gigs") &&
                 !gig.deleted &&
                 (gig.archived_at ? (
-                  <button type="button" className="button secondary" onClick={() => act(api.unarchiveGig(gig.id))}>
+                  <button type="button" className="button secondary small" onClick={() => act(api.unarchiveGig(gig.id))}>
                     <Icon name="undo" /> Unarchive
                   </button>
                 ) : (
-                  <button type="button" className="button secondary" onClick={() => act(api.archiveGig(gig.id))}>
+                  <button type="button" className="button secondary small" onClick={() => act(api.archiveGig(gig.id))}>
                     <Icon name="archive" /> Archive
                   </button>
                 ))}
               {gig.deleted ? (
-                <button type="button" className="button secondary" onClick={() => act(api.restoreGig(gig.id))}>
+                <button type="button" className="button secondary small" onClick={() => act(api.restoreGig(gig.id))}>
                   <Icon name="undo" /> Restore
                 </button>
               ) : (
-                <button type="button" className="button danger-button" onClick={() => act(api.deleteGig(gig.id))}>
+                <button type="button" className="button danger-button small" onClick={() => act(api.deleteGig(gig.id))}>
                   <Icon name="trash" /> Delete
                 </button>
               )}

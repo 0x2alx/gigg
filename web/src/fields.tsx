@@ -71,10 +71,9 @@ export function AssigneePicker({ value, onChange, candidates, label = "Assignees
   return (
     <div className="assignees" role="group" aria-label={label}>
       {candidates.map((u) => (
-        <button key={u.id} type="button" className={"assignee" + (value.includes(u.id) ? " on" : "")} aria-pressed={value.includes(u.id)} onClick={() => toggle(u.id)}>
+        <button key={u.id} type="button" className={"assignee" + (value.includes(u.id) ? " on" : "")} aria-pressed={value.includes(u.id)} onClick={() => toggle(u.id)} data-tip={u.kind === "agent" ? "An agent" : undefined}>
           <Avatar user={u} />
           <span>{u.display_name || u.username}</span>
-          {u.kind === "agent" && <span className="pill pill-agent">agent</span>}
         </button>
       ))}
     </div>

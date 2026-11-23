@@ -1,0 +1,148 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  1440,
+  2000
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => {\n  const J = {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'};\n  const me = await (await fetch('/api/v1/auth/me')).json();\n  const users = (await (await fetch('/api/v1/users?limit=50')).json()).items || [];\n  const scout = users.find(u => u.username === 'scout');\n  const ids = [me.user.id].concat(scout ? [scout.id] : []);\n  const due = Date.now() + 3 * 86400000;\n  const r = await fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: J, body: JSON.stringify({\n    title: 'Panel check: a gig with every setting filled in', priority: 3, color: '#3E63DD', labels: ['runtime-scan', 'ui'],\n    assignees: ids, followers: ids, due_at: due, checklist: ['Read the spec', 'Build it', 'Test it'],\n    description_md: 'A gig to look at the **panel** with: labels, people, dates, a checklist and run settings.\\n\\n- one\\n- two'})});\n  const g = await r.json();\n  await fetch('/api/v1/gigs/' + g.id, {method: 'PATCH', headers: J, body: JSON.stringify({model: 'opus', effort: 'high'})});\n  await fetch('/api/v1/gigs/' + g.id + '/comments', {method: 'POST', headers: J, body: JSON.stringify({body_md: 'Started on it.'})});\n  localStorage.setItem('panelGig', g['key']);\n  return r.status;\n})()",
+   "expect": 201
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'nightwalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    1440,
+    2000
+   ]
+  },
+  {
+   "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('panelGig'); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(() => { const p = document.querySelector('aside.panel'); const need = ['Project', 'Status', 'Priority', 'Effort', 'Run timeout', 'Auto-archive']; const miss = need.filter(n => !p.querySelector('[aria-label=\"' + n + '\"]')); const pr = p.getBoundingClientRect().right; const over = [...p.querySelectorAll('*')].filter(e => e.offsetParent && e.getBoundingClientRect().right > pr + 1).map(e => e.tagName + '.' + e.className).slice(0, 5); return miss.concat(over); })()",
+   "expect": []
+  },
+  {
+   "shot": "panel-desk-night"
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'daywalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    1440,
+    2000
+   ]
+  },
+  {
+   "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('panelGig'); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(() => { const p = document.querySelector('aside.panel'); const need = ['Project', 'Status', 'Priority', 'Effort', 'Run timeout', 'Auto-archive']; const miss = need.filter(n => !p.querySelector('[aria-label=\"' + n + '\"]')); const pr = p.getBoundingClientRect().right; const over = [...p.querySelectorAll('*')].filter(e => e.offsetParent && e.getBoundingClientRect().right > pr + 1).map(e => e.tagName + '.' + e.className).slice(0, 5); return miss.concat(over); })()",
+   "expect": []
+  },
+  {
+   "shot": "panel-desk-day"
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'nightwalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    390,
+    2600
+   ]
+  },
+  {
+   "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('panelGig'); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(() => { const p = document.querySelector('aside.panel'); const need = ['Project', 'Status', 'Priority', 'Effort', 'Run timeout', 'Auto-archive']; const miss = need.filter(n => !p.querySelector('[aria-label=\"' + n + '\"]')); const pr = p.getBoundingClientRect().right; const over = [...p.querySelectorAll('*')].filter(e => e.offsetParent && e.getBoundingClientRect().right > pr + 1).map(e => e.tagName + '.' + e.className).slice(0, 5); return miss.concat(over); })()",
+   "expect": []
+  },
+  {
+   "shot": "panel-phone-night"
+  },
+  {
+   "eval": "(async () => (await fetch('/api/v1/me/themes-selection', {method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({selected_id: 'daywalker', match_system: false})})).status)()",
+   "expect": 204
+  },
+  {
+   "viewport": [
+    390,
+    2600
+   ]
+  },
+  {
+   "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('panelGig'); return true; })()",
+   "expect": true
+  },
+  {
+   "wait": "aside.panel .tp-body"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "eval": "(() => { const p = document.querySelector('aside.panel'); const need = ['Project', 'Status', 'Priority', 'Effort', 'Run timeout', 'Auto-archive']; const miss = need.filter(n => !p.querySelector('[aria-label=\"' + n + '\"]')); const pr = p.getBoundingClientRect().right; const over = [...p.querySelectorAll('*')].filter(e => e.offsetParent && e.getBoundingClientRect().right > pr + 1).map(e => e.tagName + '.' + e.className).slice(0, 5); return miss.concat(over); })()",
+   "expect": []
+  },
+  {
+   "shot": "panel-phone-day"
+  }
+ ]
+}

@@ -13,15 +13,38 @@ import { Icon, type IconName } from "./icons";
 
 export const errText = (e: unknown, fallback = "That didn't work.") => (e instanceof ApiError ? e.message : fallback);
 
-// PropGroup: a titled box of label/value rows (Where, When, Details, Agent run).
-export function PropGroup({ icon, title, children, help }: { icon: IconName; title: string; children: ReactNode; help?: ReactNode }) {
+// PropGroup: a titled group of label/value rows (Where, When, Details, Agent run). fold: the title row
+// opens and closes it, with a one-line summary beside the title while closed (the rows stay mounted,
+// hidden, so a half-typed value survives).
+export function PropGroup({ icon, title, children, help, fold }: { icon: IconName; title: string; children: ReactNode; help?: ReactNode; fold?: { summary: ReactNode; defaultOpen?: boolean } }) {
+  const [open, setOpen] = useState(fold?.defaultOpen ?? true);
+  const bodyId = useId();
+  if (!fold) {
+    return (
+      <section className="tp-box tp-group" aria-label={title}>
+        <h4 className="tp-gh">
+          <Icon name={icon} /> {title}
+          {help}
+        </h4>
+        <div className="tp-grid">{children}</div>
+      </section>
+    );
+  }
   return (
-    <section className="tp-box tp-group" aria-label={title}>
-      <h4 className="tp-gh">
-        <Icon name={icon} /> {title}
+    <section className={"tp-box tp-group tp-fold" + (open ? " open" : "")} aria-label={title}>
+      <div className="tp-gh">
+        <button type="button" className="tp-fold-head" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(!open)}>
+          <Icon name={icon} /> <span className="tp-fold-title">{title}</span>
+          {!open && <span className="tp-fold-sum">{fold.summary}</span>}
+          <span className="tsec-caret" aria-hidden="true">
+            <Icon name={open ? "chevron-up" : "chevron-down"} strokeWidth={2.2} />
+          </span>
+        </button>
         {help}
-      </h4>
-      <div className="tp-grid">{children}</div>
+      </div>
+      <div className="tp-grid" id={bodyId} hidden={!open}>
+        {children}
+      </div>
     </section>
   );
 }
@@ -99,11 +122,12 @@ function Problem({ text }: { text: string }) {
 // AgentRunGroup: model, effort, run timeout, always run and the tool allowlist. onChange gets the one
 // setting changed. alwaysLocked: the Always run box can't be changed (no permission). timeoutLock:
 // without the Run timeouts permission ("clear": a new item may only drop the one it got).
-export function AgentRunGroup({ value, canWrite, alwaysLocked, timeoutLock, canTools, onChange, onToolsError }: {
+export function AgentRunGroup({ value, canWrite, alwaysLocked, timeoutLock, canTools, onChange, onToolsError, fold }: {
   value: RunSettings; canWrite: boolean; alwaysLocked: boolean; timeoutLock?: "clear" | "all"; canTools: boolean; onChange: (p: Partial<RunSettings>) => void; onToolsError?: (bad: string | null) => void;
+  fold?: boolean; // folded, with a summary of what's set
 }) {
   return (
-    <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run gigs" />}>
+    <PropGroup icon="bot" title="Agent run" help={<HelpButton topic="agents" label="Help: how agents run gigs" />} fold={fold ? { summary: runSummary(value), defaultOpen: false } : undefined}>
       <Row tip="Model for the agent’s run (an alias like opus or sonnet, or a full model id). Empty: the agent’s default" label="Model">
         <ModelInput value={value.model} disabled={!canWrite} onCommit={(model) => onChange({ model })} />
       </Row>
@@ -142,6 +166,17 @@ export function AgentRunGroup({ value, canWrite, alwaysLocked, timeoutLock, canT
       )}
     </PropGroup>
   );
+}
+
+// runSummary: the agent run settings in a few words ("defaults" when none is set).
+export function runSummary(v: RunSettings): string {
+  const parts: string[] = [];
+  if (v.model) parts.push(v.model);
+  if (v.effort) parts.push(v.effort + " effort");
+  if (v.run_timeout_minutes) parts.push(v.run_timeout_minutes >= 60 && v.run_timeout_minutes % 60 === 0 ? `${v.run_timeout_minutes / 60} h timeout` : `${v.run_timeout_minutes} min timeout`);
+  if (v.always_run) parts.push("always run");
+  if (v.allowed_tools.length) parts.push(`${v.allowed_tools.length} tool${v.allowed_tools.length === 1 ? "" : "s"}`);
+  return parts.length ? parts.join(" · ") : "agent defaults";
 }
 
 // ---- checklist

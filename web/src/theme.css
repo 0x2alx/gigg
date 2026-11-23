@@ -960,7 +960,7 @@ label.check input { width: auto; accent-color: var(--accent); }
 /* a folding box: the whole header row is the toggle; folded, the box is only that row */
 .tp-box.tsec { padding: 0; }
 .tsec-head {
-  display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: 2.9rem; text-align: left;
+  display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: 2.5rem; text-align: left;
   background: none; border: 0; color: var(--muted); font: inherit; font-size: var(--fs-xs); cursor: pointer; padding: var(--sp-3) var(--sp-6);
   border-radius: calc(var(--radius-l) - 1px);
 }
@@ -1274,7 +1274,41 @@ label.check input { width: auto; accent-color: var(--accent); }
 button.tp-desc-empty:hover { background: var(--hover); color: var(--text); }
 p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 .tp-edit .tp-title-input { font-size: var(--fs-lg); font-weight: var(--weight-strong); }
-.tp-props { display: contents; }
+/* the properties: one card, its groups (Where, When, Details, Agent run) parted by hairlines, compact
+   rows and controls; Agent run folds to one summary line */
+.tp-props { display: flex; flex-direction: column; background: var(--low); border: 1px solid var(--line); border-radius: var(--radius-l); min-width: 0; }
+.tp-props > .tp-box.tp-group { background: none; border: 0; border-radius: 0; padding: var(--sp-4) var(--sp-6) var(--sp-5); }
+.tp-props > .tp-group + .tp-group { border-top: 1px solid var(--line); }
+.tp-props .tp-gh { margin-bottom: var(--sp-3); }
+.tp-props .tp-grid { grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.15rem var(--sp-4); font-size: var(--fs-sm); }
+.tp-props .tp-label, .tp-props .tp-value { min-height: 1.85rem; }
+.tp-props .tp-value > select, .tp-props .tp-value > input:not([type=checkbox]), .tp-props .tp-value select, .tp-props .tp-value input[type=date],
+.tp-props .tp-value input[type=time], .tp-props .tp-value input[type=text], .tp-props .tp-value textarea { font-size: var(--fs-sm); padding-block: 0.22rem; min-height: 0; }
+.tp-props .tp-where > select { flex: 1 1 10rem; width: auto; }
+.tp-props .assignees { gap: 0.3rem; }
+.tp-props .assignee { font-size: var(--fs-xs); gap: var(--sp-2); padding: 0.08rem 0.5rem 0.08rem 0.12rem; }
+.tp-props .assignee .avatar { width: 1.3rem; height: 1.3rem; font-size: 0.55rem; }
+.tp-props .swatches { gap: 0.3rem; }
+.tp-props .swatch { width: 1.15rem; height: 1.15rem; }
+.tp-props .tp-add { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0; }
+.tp-props .tp-add .ico { font-size: 0.75rem; }
+.tp-props > .tp-fold.tp-group { padding-block: var(--sp-3); }
+.tp-props > .tp-fold.open.tp-group { padding-bottom: var(--sp-5); }
+.tp-fold > .tp-gh { margin-bottom: 0; }
+.tp-fold.open > .tp-gh { margin-bottom: var(--sp-3); }
+.tp-fold-head {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.45rem; padding: var(--sp-1) 0; background: none; border: 0; cursor: pointer;
+  font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; text-align: left;
+}
+.tp-fold-head:hover { color: var(--text); }
+.tp-fold-head > .ico { color: var(--accent); font-size: 0.95rem; }
+.tp-fold-sum { flex: 1; min-width: 0; text-transform: none; letter-spacing: 0; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-fold-head .tsec-caret { margin-left: auto; }
+.tp-fold .tp-grid[hidden] { display: none; }
+.tp-meta { margin: 0; padding: var(--sp-3) var(--sp-6); border-top: 1px solid var(--line); font-size: var(--fs-xs); color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
+.tp-meta .user-badge { margin-right: 0; color: var(--text); }
+.tp-meta .user-badge .avatar { width: 1.15rem; height: 1.15rem; font-size: 0.5rem; }
+.tp-actions .button.small { font-size: var(--fs-sm); }
 .tp-gh {
   display: flex; align-items: center; gap: 0.45rem; margin: 0 0 var(--sp-4); font-size: var(--fs-xs); font-weight: var(--weight-strong); color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -1291,21 +1325,22 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
    second label column fits its labels (Project, Effort) */
 @container tpsec (min-width: 38rem) {
   .tp-grid { grid-template-columns: 7.5rem minmax(0, 1fr) max-content minmax(0, 1fr); }
+  .tp-props .tp-grid { grid-template-columns: 6.5rem minmax(0, 1fr) max-content minmax(0, 1fr); }
 }
 @container tpsec (max-width: 24rem) {
-  .tp-grid { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
+  .tp-grid, .tp-props .tp-grid { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
   .tp-row.wide > .tp-label, .tp-row.wide > .tp-value { grid-column: 1; }
-  .tp-label { min-height: 0; margin-top: 0.4rem; }
+  .tp-label, .tp-props .tp-label { min-height: 0; margin-top: 0.4rem; }
 }
 /* order: title, description, people, comments | details, agent run, people, schedule, the folding
    sections, look, agent session (folding), actions.
    Stacked in the side panel; two columns when the panel is expanded and wide enough. */
-.tp-main, .tp-side { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-5); }
+.tp-main, .tp-side { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
 .tp-side { container: tpsec / inline-size; }
-.tp-body { margin-top: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-5); } /* a grid when wide, below */
+.tp-body { margin-top: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-4); } /* a grid when wide, below */
 .tp-box { scroll-margin-top: 5rem; } /* scrolled to, it lands below the sticky panel header */
 .tp-box > .edit { margin-top: 0; }
-.tp-people { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin: var(--sp-5) 0 0; }
+.tp-people { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin: var(--sp-4) 0 0; }
 .tp-people .arrow { display: inline-flex; color: var(--muted); }
 .tp-people .muted { margin-left: var(--sp-3); font-size: var(--fs-sm); }
 .tp-expand { flex: none; }

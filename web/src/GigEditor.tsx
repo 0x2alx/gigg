@@ -84,7 +84,8 @@ export function GigEditor(p: {
   leftSecs: ReactNode; // Checklist, Subgigs
   mainEnd?: ReactNode; // the panel's comments
   whenEnd?: ReactNode; // more When rows (missed, repeats; Repeat in a form)
-  detailsEnd?: ReactNode; // more Details rows (created by, updated)
+  detailsEnd?: ReactNode; // more Details rows
+  meta?: ReactNode; // one quiet line under the properties (the panel: who created it, when it changed)
   sideMid?: ReactNode; // the panel's agent session
   rightSecs: ReactNode; // Dependencies, Fields (and the panel's History)
   sideEnd?: ReactNode; // the panel's actions
@@ -93,6 +94,7 @@ export function GigEditor(p: {
   const { mode, v, set, canWrite, ws } = p;
   const tpl = mode === "template";
   const status = p.statuses?.find((s) => s.id === v.status);
+  const [showWindow, setShowWindow] = useState(false);
   return (
     <div className="tp-body">
       <div className="tp-main">
@@ -139,8 +141,8 @@ export function GigEditor(p: {
               </Row>
             ) : (
             <>
-            <Row label="Workspace">
-              {p.places && p.places.length > 1 && p.onWorkspace ? (
+            {p.places && p.places.length > 1 && p.onWorkspace && (
+              <Row label="Workspace">
                 <select value={ws.id} onChange={(e) => p.onWorkspace!(Number(e.target.value))} aria-label="Workspace">
                   {p.places.map((w) => (
                     <option key={w.id} value={w.id}>
@@ -148,11 +150,14 @@ export function GigEditor(p: {
                     </option>
                   ))}
                 </select>
-              ) : (
-                <span className="pill pill-ws">{ws.name}</span>
+              </Row>
+            )}
+            <Row label="Project" className="tp-where">
+              {!(p.places && p.places.length > 1 && p.onWorkspace) && (
+                <span className="pill pill-ws" data-tip="Workspace">
+                  {ws.name}
+                </span>
               )}
-            </Row>
-            <Row label="Project">
               {canWrite ? (
                 <select
                   value={p.anyProject?.on ? "any" : v.project}
@@ -206,9 +211,16 @@ export function GigEditor(p: {
                   <Row wide label={<>Due {p.overdue && <Pill color="#E5484D">overdue</Pill>}</>}>
                     <DateTimeInput value={v.due_at} defaultTime={DEFAULT_DUE_TIME} label="Due" disabled={!canWrite} live={mode !== "gig"} onChange={(x) => set({ due_at: x })} />
                   </Row>
-                  {(canWrite || !!v.not_after) && (
+                  {(!!v.not_after || (canWrite && showWindow)) && (
                     <Row tip="After this moment the gig can’t be started any more; untouched, it is marked missed" wide label="Window closes">
                       <DateTimeInput value={v.not_after} defaultTime={DEFAULT_DUE_TIME} label="Window closes" disabled={!canWrite} live={mode !== "gig"} onChange={(x) => set({ not_after: x })} />
+                    </Row>
+                  )}
+                  {canWrite && !v.not_after && !showWindow && (
+                    <Row label="" wide>
+                      <button type="button" className="link small tp-add" onClick={() => setShowWindow(true)} data-tip="A moment after which the gig can’t be started any more; untouched, it is marked missed">
+                        <Icon name="plus" /> Window closes
+                      </button>
                     </Row>
                   )}
                 </>
@@ -293,7 +305,8 @@ export function GigEditor(p: {
             {p.detailsEnd}
           </PropGroup>
 
-          <AgentRunGroup value={v.run} canWrite={canWrite} alwaysLocked={p.alwaysLocked} timeoutLock={p.timeoutLock} canTools={p.canTools} onChange={p.setRun} onToolsError={p.onToolsError} />
+          <AgentRunGroup fold value={v.run} canWrite={canWrite} alwaysLocked={p.alwaysLocked} timeoutLock={p.timeoutLock} canTools={p.canTools} onChange={p.setRun} onToolsError={p.onToolsError} />
+          {p.meta && <p className="tp-meta">{p.meta}</p>}
         </div>
         {p.sideMid}
         <div className="tsecs">{p.rightSecs}</div>
