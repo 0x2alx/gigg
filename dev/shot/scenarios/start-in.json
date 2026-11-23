@@ -1,0 +1,152 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  1440,
+  900
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => { const r = await fetch('/api/v1/projects/1/recurrences', {method:'POST', headers:{'Content-Type':'application/json','X-Gigg-CSRF':'1'}, body: JSON.stringify({title:'Weekly dependency review', freq:'weekly', weekdays:[1], window_start:'09:00', window_minutes:120, start_category:'backlog'})}); const j = await r.json(); return [r.status, j.start_category]; })()",
+   "expect": [
+    201,
+    "backlog"
+   ]
+  },
+  {
+   "goto": "/board?tool=recurring"
+  },
+  {
+   "wait": "button[aria-label='Edit Weekly dependency review']"
+  },
+  {
+   "click": "button[aria-label='Edit Weekly dependency review']"
+  },
+  {
+   "wait": "select[aria-label='Starts in']"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "document.querySelector(\"select[aria-label='Starts in']\").value",
+   "expect": "backlog"
+  },
+  {
+   "eval": "!document.querySelector(\"select[aria-label='Status']\")",
+   "expect": true
+  },
+  {
+   "shot": "recurring-edit",
+   "full": false
+  },
+  {
+   "shot": "recurring-props",
+   "el": "select[aria-label='Starts in']",
+   "margin": 220
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "goto": "/board?tool=templates"
+  },
+  {
+   "wait": "button[aria-label='Edit Weekly dependency review']"
+  },
+  {
+   "click": "button[aria-label='Edit Weekly dependency review']"
+  },
+  {
+   "wait": "select[aria-label='Starts in']"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "document.querySelector(\"select[aria-label='Starts in']\").value",
+   "expect": "backlog"
+  },
+  {
+   "shot": "template-edit",
+   "full": false
+  },
+  {
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "wait": 600
+  },
+  {
+   "shot": "template-edit-phone",
+   "full": false
+  },
+  {
+   "viewport": [
+    1440,
+    900
+   ]
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "click": "a.appbar-button"
+  },
+  {
+   "wait": "select[aria-label='Status']"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "!document.querySelector(\"select[aria-label='Starts in']\")",
+   "expect": true
+  },
+  {
+   "shot": "new-gig",
+   "full": false
+  }
+ ]
+}
