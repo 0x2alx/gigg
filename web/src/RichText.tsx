@@ -14,6 +14,7 @@ import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from "@
 import { Placeholder } from "@tiptap/extensions";
 import type { User } from "./api";
 import { parseMd, richExtensions, toMd } from "./richmd";
+import { Icon } from "./icons";
 
 // the keys the callers' onKeyDown reads (Ctrl/Cmd+Enter submits the form around the editor)
 export interface EditorKey {
@@ -261,7 +262,7 @@ export function richTools(editor: Editor | null, link: () => void) {
     { id: "heading", label: "Heading", icon: "H", active: on("heading"), run: () => c().toggleHeading({ level: 2 }).run() },
     { id: "quote", label: "Quote", icon: "❝", active: on("blockquote"), run: () => c().toggleBlockquote().run() },
     "|" as const,
-    { id: "ul", label: "Bulleted list", icon: "•", active: on("bulletList"), run: () => c().toggleBulletList().run() },
+    { id: "ul", label: "Bulleted list", icon: <Icon name="list" />, active: on("bulletList"), run: () => c().toggleBulletList().run() },
     { id: "ol", label: "Numbered list", icon: "1.", active: on("orderedList"), run: () => c().toggleOrderedList().run() },
     { id: "gig", label: "Checkbox list", icon: "☑", active: on("taskList"), run: () => c().toggleTaskList().run() },
   ];

@@ -227,8 +227,34 @@
    "expect": []
   },
   {
+   "eval": "(() => { const m = document.querySelector('form[aria-label=\\\"Edit gig\\\"] .mde'); const tabs = m.querySelector('.mde-tabs').getBoundingClientRect(), file = m.querySelector('.mde-file').getBoundingClientRect(), tools = m.querySelector('.mde-tools').getBoundingClientRect(); const bs = [...m.querySelectorAll('.mde-tools .mde-tool')].map((b) => b.getBoundingClientRect()); return [Math.abs(file.top - tabs.top) < 6, tools.height < 40, bs.every((b) => b.width >= 28 && b.height >= 28), bs.length]; })()",
+   "expect": [
+    true,
+    true,
+    true,
+    9
+   ]
+  },
+  {
    "shot": "editor-visual-phone-day",
    "el": "form[aria-label=\"Edit gig\"]"
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "wait": ".add-comment .rt-content"
+  },
+  {
+   "eval": "(() => { const s = [...document.querySelectorAll('.tp-props .swatches > *')].map((e) => Math.round(e.getBoundingClientRect().top)); const rows = {}; s.forEach((t) => (rows[t] = (rows[t] || 0) + 1)); return Object.values(rows).every((n) => n >= 3); })()",
+   "expect": true
+  },
+  {
+   "shot": "comment-box-phone-day",
+   "el": ".add-comment"
   }
  ]
 }

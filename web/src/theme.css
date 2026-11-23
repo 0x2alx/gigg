@@ -1290,6 +1290,8 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 .tp-props .assignee .avatar { width: 1.3rem; height: 1.3rem; font-size: 0.55rem; }
 .tp-props .swatches { gap: 0.3rem; }
 .tp-props .swatch { width: 1.15rem; height: 1.15rem; }
+/* a narrow panel: the swatches in even rows of six, not a row and a straggler */
+@container tpanel (max-width: 30rem) { .tp-props .swatches { display: grid; grid-template-columns: repeat(6, 1.15rem); } }
 .tp-props .tp-add { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0; }
 .tp-props .tp-add .ico { font-size: 0.75rem; }
 .tp-props > .tp-fold.tp-group { padding-block: var(--sp-3); }
@@ -1405,7 +1407,19 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 /* the visual editor (RichText): the rendered Markdown's look (.md), editable. TipTap's own CSS is
    not injected (the CSP allows no inline style), so the few rules ProseMirror needs are here. */
 .mde-tool.on { background: var(--selected); color: var(--text); }
-.mde-file .ico { font-size: 0.85rem; }
+.mde-file .ico, .mde-ul .ico { font-size: 0.85rem; }
+.mde-quote { font-size: 1.05rem; line-height: 1; }
+/* Insert file closes the toolbar (a line before it); in a narrow editor it moves up beside the tabs and
+   the formatting buttons get a full row of their own, evenly spread and big enough to tap */
+.mde { container: mde / inline-size; }
+.mde-file { border-left: 1px solid var(--line); border-radius: 0 var(--radius-s) var(--radius-s) 0; padding-left: 0.45rem; }
+@container mde (max-width: 34rem) {
+  .mde-bar { gap: 0.15rem 0.3rem; }
+  .mde-file { order: 2; margin-left: auto; border-left: 0; min-width: 2rem; min-height: 2rem; }
+  .mde-tools { order: 3; flex: 1 0 100%; margin-left: 0; flex-wrap: nowrap; justify-content: space-between; }
+  .mde-tools .mde-sep { display: none; }
+  .mde-tools .mde-tool { flex: 0 1 2rem; min-width: 1.75rem; min-height: 2rem; padding-inline: 0; }
+}
 .mde-uploading { margin: var(--sp-2) var(--sp-3); }
 .rt { min-width: 0; }
 .rt-content { padding: 0.5rem 0.6rem; min-height: 4.5rem; max-height: 60vh; overflow-y: auto; outline: none; white-space: pre-wrap; word-wrap: break-word; font-size: var(--fs-base); }

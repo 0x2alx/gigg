@@ -1,4 +1,4 @@
-// richmd: the visual editor's document model and its Markdown, in one place. The editor (RichEditor)
+// richmd: the visual editor's document model and its Markdown, in one place. The editor (RichText.tsx)
 // and the tests use the same extensions, so what is tested is what is edited. Markdown stays the
 // stored format: the editor loads it, and every change goes back out as Markdown.
 //

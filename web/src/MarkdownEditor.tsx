@@ -4,7 +4,7 @@
 // Given `attach`, files pasted or dropped into it are attached one by one (a placeholder line stands
 // in while each uploads) and linked at the caret: images as ![name](url), other files as a link. The
 // description editors and the comment box all get this from here.
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type TextareaHTMLAttributes, useReducer } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode, type TextareaHTMLAttributes, useReducer } from "react";
 import type { User } from "./api";
 import { MentionTextarea } from "./Mention";
 import { continueList, fileLine, isImageFile, indentList, insertLink, insertText, swapText, toggleLines, toggleWrap, uploadingLine, type Edit, type LineKind } from "./mdedit";
@@ -22,7 +22,7 @@ export type MarkdownEditorProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElemen
   attach?: (file: File) => Promise<string>;
 };
 
-type Tool = { id: string; label: string; icon: string; key?: string; run: (e: Edit) => Edit };
+type Tool = { id: string; label: string; icon: ReactNode; key?: string; run: (e: Edit) => Edit };
 
 const wrap = (m: string, ph: string) => (e: Edit) => toggleWrap(e, m, ph);
 const lines = (k: LineKind) => (e: Edit) => toggleLines(e, k);
@@ -36,7 +36,7 @@ const TOOLS: (Tool | "|")[] = [
   { id: "heading", label: "Heading", icon: "H", run: lines("heading") },
   { id: "quote", label: "Quote", icon: "❝", run: lines("quote") },
   "|",
-  { id: "ul", label: "Bulleted list", icon: "•", run: lines("ul") },
+  { id: "ul", label: "Bulleted list", icon: <Icon name="list" />, run: lines("ul") },
   { id: "ol", label: "Numbered list", icon: "1.", run: lines("ol") },
   { id: "gig", label: "Checkbox list", icon: "☑", run: lines("gig") },
 ];
@@ -281,10 +281,10 @@ export function MarkdownEditor({ value, onChange, users, minRows = 4, dirty, att
               </button>
             ),
           )}
-          {attach && (
-            <>
-              <span className="mde-sep" aria-hidden="true" />
-              <button type="button" className="mde-tool mde-file" title="Insert a file (images show in place)" aria-label="Insert file" onMouseDown={(e) => e.preventDefault()} onClick={() => fileInput.current?.click()}>
+        </div>
+        {attach && (
+          <>
+            <button type="button" className="mde-tool mde-file" title="Insert a file (images show in place)" aria-label="Insert file" onMouseDown={(e) => e.preventDefault()} onClick={() => fileInput.current?.click()}>
                 <Icon name="paperclip" />
               </button>
               <input
@@ -299,9 +299,8 @@ export function MarkdownEditor({ value, onChange, users, minRows = 4, dirty, att
                   void addFiles(fs);
                 }}
               />
-            </>
-          )}
-        </div>
+          </>
+        )}
       </div>
       <div id={id + "p"} role="tabpanel" aria-labelledby={id + (tab === "visual" ? "w" : "v")}>
         {tab === "markdown" ? (
