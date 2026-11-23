@@ -475,7 +475,7 @@ func ListRecurrences(ctx context.Context, q Q, ws int64, projects []int64) ([]*R
 		query += " AND r.project_id IN (" + placeholders(len(projects)) + ")"
 		args = append(args, int64Args(projects)...)
 	}
-	rows, err := q.QueryContext(ctx, query+" ORDER BY t.title COLLATE NOCASE, r.id", args...)
+	rows, err := q.QueryContext(ctx, query+" ORDER BY lower(t.title), r.id", args...)
 	if err != nil {
 		return nil, err
 	}

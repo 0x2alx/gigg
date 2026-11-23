@@ -187,7 +187,7 @@ func ListWorkspaces(ctx context.Context, q Q, ids []int64) ([]*Workspace, error)
 		query += " WHERE id IN (" + placeholders(len(ids)) + ")"
 		args = int64Args(ids)
 	}
-	rows, err := q.QueryContext(ctx, query+" ORDER BY name COLLATE NOCASE", args...)
+	rows, err := q.QueryContext(ctx, query+" ORDER BY lower(name)", args...)
 	if err != nil {
 		return nil, err
 	}

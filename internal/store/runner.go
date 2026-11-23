@@ -53,7 +53,7 @@ func GetRunnerSettings(ctx context.Context, q Q, ws int64) (*RunnerSettings, err
 }
 
 func ensureRunnerRow(ctx context.Context, q Q, ws int64) error {
-	_, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO runner_settings (workspace_id) VALUES (?)`, ws)
+	_, err := q.ExecContext(ctx, `INSERT INTO runner_settings (workspace_id) VALUES (?) ON CONFLICT DO NOTHING`, ws)
 	return err
 }
 

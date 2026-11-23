@@ -12,6 +12,7 @@ import (
 // schedules, errands:write for errand templates), so no key gains what it couldn't do before (see
 // TestLibraryScopePerKind in internal/api).
 func TestLibraryMigration(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	migrateLimit = 18

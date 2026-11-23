@@ -154,7 +154,7 @@ func ShareFind(ctx context.Context, q Q, kind string, id int64) (ShareItem, []Sh
 			return src, nil, Invalid("this schedule is shared already")
 		}
 		src = item(s.ID, s.WorkspaceID, s.Name, s.Uses, s.ErrandUses)
-		rows, err := q.QueryContext(ctx, "SELECT "+schCols+" FROM schedules WHERE workspace_id IS NOT NULL AND deleted_at IS NULL AND id != ? ORDER BY workspace_id, name COLLATE NOCASE, id", id)
+		rows, err := q.QueryContext(ctx, "SELECT "+schCols+" FROM schedules WHERE workspace_id IS NOT NULL AND deleted_at IS NULL AND id != ? ORDER BY workspace_id, lower(name), id", id)
 		if err != nil {
 			return src, nil, err
 		}
@@ -179,7 +179,7 @@ func ShareFind(ctx context.Context, q Q, kind string, id int64) (ShareItem, []Sh
 		}
 		src = item(t.ID, t.WorkspaceID, t.Name, t.Recurring, 0)
 		key := templateContent(t)
-		rows, err := q.QueryContext(ctx, "SELECT "+tplCols+" FROM gig_templates WHERE workspace_id IS NOT NULL AND deleted_at IS NULL AND id != ? ORDER BY workspace_id, name COLLATE NOCASE, id", id)
+		rows, err := q.QueryContext(ctx, "SELECT "+tplCols+" FROM gig_templates WHERE workspace_id IS NOT NULL AND deleted_at IS NULL AND id != ? ORDER BY workspace_id, lower(name), id", id)
 		if err != nil {
 			return src, nil, err
 		}
@@ -203,7 +203,7 @@ func ShareFind(ctx context.Context, q Q, kind string, id int64) (ShareItem, []Sh
 			return src, nil, Invalid("this template is shared already")
 		}
 		src = item(t.ID, t.WorkspaceID, t.Name, 0, t.Uses)
-		rows, err := q.QueryContext(ctx, "SELECT "+ctCols+" FROM errand_templates t WHERE t.workspace_id IS NOT NULL AND t.deleted_at IS NULL AND t.id != ? ORDER BY t.workspace_id, t.name COLLATE NOCASE, t.id", id)
+		rows, err := q.QueryContext(ctx, "SELECT "+ctCols+" FROM errand_templates t WHERE t.workspace_id IS NOT NULL AND t.deleted_at IS NULL AND t.id != ? ORDER BY t.workspace_id, lower(t.name), t.id", id)
 		if err != nil {
 			return src, nil, err
 		}

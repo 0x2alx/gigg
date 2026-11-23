@@ -155,6 +155,7 @@ func TestRecurringLinks(t *testing.T) {
 // TestScheduleTemplateMigration: 0007 gives every live schedule its own template with its content;
 // 0008 moves its timing into a schedule of its own, named after the rule.
 func TestScheduleTemplateMigration(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	migrateLimit = 6
@@ -205,6 +206,7 @@ func TestScheduleTemplateMigration(t *testing.T) {
 
 // TestWorkspaceOwnerMigration: 0009 gives a workspace the user named like its slug, if any.
 func TestWorkspaceOwnerMigration(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	migrateLimit = 8
@@ -253,6 +255,7 @@ func TestWorkspaceOwnerMigration(t *testing.T) {
 // TestGigRenameMigration: 0013 renames tasks to gigs, in the schema and in the names stored in data
 // user text stays as it was.
 func TestGigRenameMigration(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	migrateLimit = 12

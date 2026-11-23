@@ -416,11 +416,11 @@ func Metrics(ctx context.Context, db Q, q MetricsQuery) (*MetricsResult, error) 
 				fill             func(rows interface{ Scan(...any) error }) (*MetricGroup, error)
 				into             func(g *MetricGroup)
 			}{
-				{"r.worker_user_id, u.username, u.display_name", "JOIN users u ON u.id = r.worker_user_id", "r.worker_user_id",
+				{"r.worker_user_id, u.username, u.display_name", "JOIN users u ON u.id = r.worker_user_id", "r.worker_user_id, u.username, u.display_name",
 					scanGroup(true), func(g *MetricGroup) { merge(agents, g.ID, g) }},
 				{"0, COALESCE(r.model, ''), ''", "", "COALESCE(r.model, '')",
 					scanGroup(false), func(g *MetricGroup) { mergeName(models, g) }},
-				{"g.project_id, p.key, p.name", "JOIN projects p ON p.id = g.project_id", "g.project_id",
+				{"g.project_id, p.key, p.name", "JOIN projects p ON p.id = g.project_id", "g.project_id, p.key, p.name",
 					scanGroup(true), func(g *MetricGroup) { merge(projects, g.ID, g) }},
 			} {
 				rows, err := db.QueryContext(ctx, `SELECT `+g.sel+`, count(*), COALESCE(sum(r.cost_usd), 0), COALESCE(sum(r.tokens_in), 0),

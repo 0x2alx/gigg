@@ -62,7 +62,7 @@ func admin(args []string) int {
 	}
 	store.DefaultTZ = cfg.DefaultTZ
 	ctx := context.Background()
-	st, err := store.Open(ctx, cfg.DataDir, log)
+	st, err := store.OpenDB(ctx, cfg.DataDir, cfg.DatabaseURL, log)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "database:", err)
 		return 1

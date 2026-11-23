@@ -141,7 +141,7 @@ func UpdateGroup(ctx context.Context, q Q, a Actor, g *Group, expect int64, name
 			if _, err := GetUser(ctx, q, u); err != nil {
 				return nil, Invalid("no user %d", u)
 			}
-			if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?,?)`, g.ID, u); err != nil {
+			if _, err := q.ExecContext(ctx, `INSERT INTO group_members (group_id, user_id) VALUES (?,?) ON CONFLICT DO NOTHING`, g.ID, u); err != nil {
 				return nil, err
 			}
 		}

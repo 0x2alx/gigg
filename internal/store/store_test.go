@@ -12,6 +12,7 @@ import (
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 func TestOpenMigratesAndReopens(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	s, err := Open(ctx, dir, quiet)
@@ -73,5 +74,9 @@ func TestMigrationsAreNumbered(t *testing.T) {
 	ms, err := loadMigrations()
 	if err != nil || len(ms) == 0 {
 		t.Fatalf("%v %d", err, len(ms))
+	}
+	// every migration after the PostgreSQL baseline has its twin in migrations_pg
+	if _, _, err := loadPGMigrations(len(ms)); err != nil {
+		t.Fatal(err)
 	}
 }

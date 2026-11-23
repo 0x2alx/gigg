@@ -60,13 +60,13 @@ func serve() int {
 	store.StaleRunAfter = time.Duration(cfg.StaleRunHours) * time.Hour
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
-	st, err := store.Open(ctx, cfg.DataDir, log)
+	st, err := store.OpenDB(ctx, cfg.DataDir, cfg.DatabaseURL, log)
 	if err != nil {
 		log.Error("database", "err", err)
 		return 1
 	}
 	defer st.Close()
-	log.Info("starting", "version", version.Version, "data", cfg.DataDir)
+	log.Info("starting", "version", version.Version, "data", cfg.DataDir, "database", map[bool]string{true: "postgres", false: "sqlite"}[st.Postgres()])
 	if err := server.New(cfg, st, log, web.Dist()).Run(ctx); err != nil {
 		log.Error("server", "err", err)
 		return 1

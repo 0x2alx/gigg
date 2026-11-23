@@ -9,6 +9,8 @@ variables are read by `gigg serve`, `gigg healthcheck` and `gigg admin`. An inva
 | Variable | Default | Meaning |
 |---|---|---|
 | `GIGG_DATA_DIR` | `/data` | Data directory (database, snapshots, uploaded files). Created with mode `0700` if missing. |
+| `GIGG_DATABASE_URL` | (none) | A PostgreSQL connection URL (`postgres://user:password@host:5432/db?sslmode=require`). Unset: SQLite in the data directory. See [PostgreSQL](#postgresql). |
+| `GIGG_DATABASE_URL_FILE` | (none) | A file holding that URL (a mounted secret), instead of `GIGG_DATABASE_URL`. Setting both is an error. |
 | `GIGG_LISTEN` | `:8080` | Address of the **main** listener (`host:port` or `:port`). |
 | `GIGG_TLS_CERT` | (none) | PEM certificate file for the main listener. Set both `GIGG_TLS_CERT` and `GIGG_TLS_KEY` for HTTPS, or neither for plain HTTP. With TLS, `GIGG_PUBLIC_URL` (if set) must start with `https://`. |
 | `GIGG_TLS_KEY` | (none) | PEM private key file for the main listener. |
@@ -152,6 +154,24 @@ for container health checks (see [admin-cli.md](admin-cli.md#gigg-healthcheck)).
 
 All three directories are created with mode `0700` on start. The container image runs as UID/GID
 `65532` and uses `/data`.
+
+## PostgreSQL
+
+SQLite is the default and needs nothing. To keep the data in PostgreSQL
+instead (tested with PostgreSQL 18), set `GIGG_DATABASE_URL` (or `GIGG_DATABASE_URL_FILE`) to a `postgres://` URL.
+
+- The database must exist; gigg creates its tables on first start. The role needs to create tables
+  in its schema, and the `citext` extension must be available (it ships with PostgreSQL). If the
+  role can't create extensions, run `CREATE EXTENSION citext;` once as a superuser first.
+- Uploaded files still live in `<GIGG_DATA_DIR>/files/`: keep the data directory on a volume.
+- gigg writes through a single connection and reads through four, as with SQLite.
+- The nightly snapshot and the `pre-NNNN.db` snapshots are SQLite only. Back up PostgreSQL with its
+  own tools (`pg_dump`, or your provider's backups) together with `files/`.
+- A new database starts at the PostgreSQL baseline (a migration number); every later migration
+  runs as with SQLite.
+- There is no tool to move an existing SQLite board to PostgreSQL yet: choose before you start.
+- The `starting` log line names the database in use (`sqlite` or `postgres`); the password is
+  never logged.
 
 ## Background work
 

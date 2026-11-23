@@ -158,7 +158,7 @@ func SetAvatar(ctx context.Context, q Q, a Actor, user int64, sha string, size i
 	}
 	if sha != "" {
 		if _, err := q.ExecContext(ctx, `INSERT INTO blobs (sha256, size, refcount) VALUES (?,?,1)
-			ON CONFLICT (sha256) DO UPDATE SET refcount = refcount + 1`, sha, size); err != nil {
+			ON CONFLICT (sha256) DO UPDATE SET refcount = blobs.refcount + 1`, sha, size); err != nil {
 			return err
 		}
 	}

@@ -276,6 +276,7 @@ func TestAutoArchive(t *testing.T) {
 // TestSharedMigration: 0015 keeps every template, schedule, recurring gig and errand of an upgraded
 // instance in its workspace (the three tables are rebuilt).
 func TestSharedMigration(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	migrateLimit = 14

@@ -39,4 +39,10 @@ More detail, including the end-to-end API test and the UI scenario runner, is in
 - Text in the UI and docs: short, plain sentences. User-facing pages have a guide page in
   `docs/guide/`, which the in-app help shows too.
 - Database changes: a new numbered migration in `internal/store/migrations/`. Never edit the SQL of a
-  released migration (its comments are fine).
+  released migration (its comments are fine). Each one also needs its PostgreSQL twin with the same
+  number in `internal/store/migrations_pg/` (a test checks this). Write SQL both engines accept:
+  `ON CONFLICT ... DO NOTHING` rather than `INSERT OR IGNORE`, `lower(x)` rather than
+  `COLLATE NOCASE`, `CASE` rather than two-argument `max`/`min`, and a `CAST` on a bare `?` whose
+  type PostgreSQL can't infer (`SELECT ?`, `VALUES (?)`). Placeholders, `LIKE`, `json_extract` and
+  `group_concat` are adapted for you (`internal/store/pg.go`). Run the tests on PostgreSQL by setting
+  `GIGG_TEST_DATABASE_URL`; each test gets its own schema.

@@ -144,7 +144,7 @@ func setFollowers(ctx context.Context, q Q, ws, project, gig int64, users []int6
 		if !had[u] && !UserHasIn(ctx, q, u, ws, project, "view") {
 			return Invalid("user %d can't see this project, so can't follow its gigs", u)
 		}
-		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_followers (gig_id, user_id) VALUES (?,?)`, gig, u); err != nil {
+		if _, err := q.ExecContext(ctx, `INSERT INTO gig_followers (gig_id, user_id) VALUES (?,?) ON CONFLICT DO NOTHING`, gig, u); err != nil {
 			return err
 		}
 	}
@@ -164,7 +164,7 @@ func FollowGig(ctx context.Context, q Q, a Actor, t *Gig, user int64, on bool) (
 		if !UserHasIn(ctx, q, user, t.WorkspaceID, t.ProjectID, "view") {
 			return nil, Invalid("user %d can't see this gig", user)
 		}
-		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_followers (gig_id, user_id) VALUES (?,?)`, t.ID, user); err != nil {
+		if _, err := q.ExecContext(ctx, `INSERT INTO gig_followers (gig_id, user_id) VALUES (?,?) ON CONFLICT DO NOTHING`, t.ID, user); err != nil {
 			return nil, err
 		}
 	} else if _, err := q.ExecContext(ctx, `DELETE FROM gig_followers WHERE gig_id = ? AND user_id = ?`, t.ID, user); err != nil {

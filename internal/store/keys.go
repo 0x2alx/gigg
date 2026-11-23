@@ -210,7 +210,7 @@ func (k *APIKey) loadReach(ctx context.Context, q Q) error {
 	if !k.Bound {
 		return nil
 	}
-	rows, err := q.QueryContext(ctx, `SELECT workspace_id, project_id FROM api_key_reach WHERE key_id = ? ORDER BY position, rowid`, k.ID)
+	rows, err := q.QueryContext(ctx, `SELECT workspace_id, project_id FROM api_key_reach WHERE key_id = ? ORDER BY position, workspace_id, COALESCE(project_id, 0)`, k.ID)
 	if err != nil {
 		return err
 	}

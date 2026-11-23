@@ -31,7 +31,10 @@ func (l Listener) TLS() bool { return l.TLSCert != "" }
 
 // Config is the whole runtime configuration.
 type Config struct {
-	DataDir        string
+	DataDir string
+	// DatabaseURL: a postgres:// URL to keep the data in PostgreSQL; empty (the default) keeps it in
+	// SQLite in DataDir. From GIGG_DATABASE_URL, or the file GIGG_DATABASE_URL_FILE names (a secret).
+	DatabaseURL    string
 	PublicURL      *url.URL // expected origin of the main listener; nil only in dev
 	AllowedHosts   map[string]bool
 	TrustedProxies []netip.Prefix
@@ -57,12 +60,26 @@ func Load() (*Config, error) { return load(os.Getenv, os.Environ()) }
 func load(get func(string) string, environ []string) (*Config, error) {
 	c := &Config{
 		DataDir:      or(get("GIGG_DATA_DIR"), "/data"),
+		DatabaseURL:  get("GIGG_DATABASE_URL"),
 		AllowedHosts: map[string]bool{"localhost": true, "127.0.0.1": true, "::1": true},
 		DefaultTZ:    or(get("GIGG_DEFAULT_TZ"), "UTC"),
 		RemoteFonts:  get("GIGG_REMOTE_FONTS") != "off",
 		SourceURL:    or(get("GIGG_SOURCE_URL"), "https://github.com/0x2alx/gigg"),
 		BackupAt:     or(get("GIGG_BACKUP_AT"), "03:30"),
 		BackupKeep:   7,
+	}
+	if f := get("GIGG_DATABASE_URL_FILE"); f != "" {
+		if c.DatabaseURL != "" {
+			return nil, errors.New("set GIGG_DATABASE_URL or GIGG_DATABASE_URL_FILE, not both")
+		}
+		b, err := os.ReadFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("GIGG_DATABASE_URL_FILE: %w", err)
+		}
+		c.DatabaseURL = strings.TrimSpace(string(b))
+	}
+	if u := c.DatabaseURL; u != "" && !strings.HasPrefix(u, "postgres://") && !strings.HasPrefix(u, "postgresql://") {
+		return nil, errors.New("GIGG_DATABASE_URL: only postgres:// (or postgresql://) URLs; leave it unset for SQLite")
 	}
 	var errs []error
 	if c.BackupAt == "off" {

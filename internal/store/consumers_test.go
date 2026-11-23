@@ -15,6 +15,7 @@ import (
 // templates and recurring gigs on a shared template that had nobody (not to done gigs, not where the
 // owner can't be assigned).
 func TestConsumersMigration(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	migrateLimit = 15

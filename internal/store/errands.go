@@ -151,7 +151,7 @@ func ListErrandTemplatesIn(ctx context.Context, q Q, ws int64, projects []int64)
 		args = append(args, int64Args(projects)...)
 	}
 	rows, err := q.QueryContext(ctx, "SELECT "+ctCols+` FROM errand_templates t WHERE `+where+` AND t.deleted_at IS NULL
-		ORDER BY t.workspace_id IS NULL, t.name COLLATE NOCASE, t.id`, args...)
+		ORDER BY t.workspace_id IS NULL, lower(t.name), t.id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +484,7 @@ func ListErrands(ctx context.Context, q Q, ws int64, projects []int64) ([]*Erran
 	if projects != nil {
 		where, args = where+" AND c.project_id IN ("+placeholders(len(projects))+")", append(args, int64Args(projects)...)
 	}
-	return loadErrands(ctx, q, where+` ORDER BY c.state = 'failing' DESC, t.name COLLATE NOCASE, c.id`, args...)
+	return loadErrands(ctx, q, where+` ORDER BY c.state = 'failing' DESC, lower(t.name), c.id`, args...)
 }
 
 // ErrandRefUsedIn reports whether a live errand of one of projects uses template (column

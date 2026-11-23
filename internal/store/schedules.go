@@ -378,7 +378,7 @@ func scanSchedule(row interface{ Scan(...any) error }) (*Schedule, error) {
 // ones. ws 0: only the shared ones.
 func ListSchedules(ctx context.Context, q Q, ws int64) ([]*Schedule, error) {
 	rows, err := q.QueryContext(ctx, "SELECT "+schCols+` FROM schedules WHERE (workspace_id = ? OR workspace_id IS NULL) AND deleted_at IS NULL
-		ORDER BY workspace_id IS NULL, name COLLATE NOCASE, id`, ws)
+		ORDER BY workspace_id IS NULL, lower(name), id`, ws)
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +558,7 @@ func DeleteSchedule(ctx context.Context, q Q, a Actor, s *Schedule) error {
 // ScheduleGuards: whether a live recurring gig on the schedule makes always-run gigs, or gigs with a
 // tool allowlist (changing the schedule then needs those permissions).
 func ScheduleGuards(ctx context.Context, q Q, id int64) (alwaysRun, tools bool, err error) {
-	err = q.QueryRowContext(ctx, `SELECT COALESCE(MAX(t.always_run), 0), COALESCE(MAX(t.allowed_tools != '[]'), 0)
+	err = q.QueryRowContext(ctx, `SELECT COALESCE(MAX(t.always_run), 0), COALESCE(MAX(CASE WHEN t.allowed_tools != '[]' THEN 1 ELSE 0 END), 0)
 		FROM recurrences r JOIN gig_templates t ON t.id = r.template_id WHERE r.schedule_id = ? AND r.deleted_at IS NULL`, id).Scan(&alwaysRun, &tools)
 	return alwaysRun, tools, err
 }

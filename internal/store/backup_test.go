@@ -13,6 +13,7 @@ import (
 // TestNightlyBackup: one consistent snapshot per local day, never a temporary file left behind,
 // the newest `keep` kept, and the copy opens with the data in it.
 func TestNightlyBackup(t *testing.T) {
+	skipOnPG(t) // VACUUM INTO; PostgreSQL is backed up by its operator
 	ctx := context.Background()
 	dir := t.TempDir()
 	s, err := Open(ctx, dir, quiet)

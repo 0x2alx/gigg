@@ -289,6 +289,7 @@ func TestClaimAcross(t *testing.T) {
 // TestKeyReachMigration: 0017 turns a workspace key into a key bound to that workspace, a
 // project-narrowed one into a key bound to those projects, and keeps unbound keys unbound.
 func TestKeyReachMigration(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	migrateLimit = 16

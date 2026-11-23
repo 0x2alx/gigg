@@ -23,7 +23,7 @@ func TestStaleGigs(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	exec(`INSERT OR IGNORE INTO gig_assignees (gig_id, user_id) VALUES (?, ?)`, gig, user)
+	exec(`INSERT INTO gig_assignees (gig_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, gig, user)
 	exec(`UPDATE gigs SET status_id = (SELECT s.id FROM statuses s JOIN gigs g ON g.project_id = s.project_id
 		WHERE g.id = ? AND s.category = 'doing' ORDER BY s.position LIMIT 1), last_progress_at = ? WHERE id = ?`, gig, old, gig)
 

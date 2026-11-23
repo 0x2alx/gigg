@@ -438,7 +438,7 @@ func AttachQuestions(ctx context.Context, q Q, ts []*Gig) error {
 		return nil
 	}
 	// per gig, the newest question/report through the (gig_id, id) index, newest first, stopping at the first
-	vals := strings.TrimSuffix(strings.Repeat("(?),", len(ids)), ",")
+	vals := strings.TrimSuffix(strings.Repeat("(CAST(? AS BIGINT)),", len(ids)), ",") // typed: PostgreSQL would take text
 	args := append(int64Args(ids), questionBriefLen+1)
 	rows, err := q.QueryContext(ctx, `WITH w(tid) AS (VALUES `+vals+`),
 		qs AS (SELECT (SELECT x.id FROM comments x WHERE x.gig_id = w.tid AND x.kind IN ('question', 'report') AND x.deleted_at IS NULL
@@ -589,7 +589,7 @@ var sortCols = map[string][2]string{
 	"created":  {"t.created_at", "t.created_at DESC"},
 	"updated":  {"t.updated_at", "t.updated_at DESC"},
 	"number":   {"p.key, t.number", "p.key DESC, t.number DESC"},
-	"title":    {"t.title COLLATE NOCASE", "t.title COLLATE NOCASE DESC"},
+	"title":    {"lower(t.title)", "lower(t.title) DESC"},
 }
 
 func gigOrder(s string) (string, error) {
@@ -809,7 +809,7 @@ func setLabels(ctx context.Context, q Q, a Actor, ws, gig int64, names []string)
 		if err != nil {
 			return err
 		}
-		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_labels (gig_id, label_id) VALUES (?,?)`, gig, l.ID); err != nil {
+		if _, err := q.ExecContext(ctx, `INSERT INTO gig_labels (gig_id, label_id) VALUES (?,?) ON CONFLICT DO NOTHING`, gig, l.ID); err != nil {
 			return err
 		}
 	}
@@ -859,7 +859,7 @@ func setAssignees(ctx context.Context, q Q, ws, project, gig int64, users []int6
 		if _, g, err := UserGrants(ctx, q, u); err != nil || !g.HasIn(ws, project, "view") {
 			return Invalid("user %d can't see this project", u)
 		}
-		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_assignees (gig_id, user_id) VALUES (?,?)`, gig, u); err != nil {
+		if _, err := q.ExecContext(ctx, `INSERT INTO gig_assignees (gig_id, user_id) VALUES (?,?) ON CONFLICT DO NOTHING`, gig, u); err != nil {
 			return err
 		}
 	}
@@ -1243,7 +1243,7 @@ func MoveGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, m Move) (*
 			return nil, err
 		}
 		oldKey, oldNum := strings.SplitN(t.Key, "-", 2)[0], t.Number
-		if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_aliases (gig_id, workspace_id, project_key, number) VALUES (?,?,?,?)`,
+		if _, err := q.ExecContext(ctx, `INSERT INTO gig_aliases (gig_id, workspace_id, project_key, number) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`,
 			t.ID, t.WorkspaceID, oldKey, oldNum); err != nil {
 			return nil, err
 		}

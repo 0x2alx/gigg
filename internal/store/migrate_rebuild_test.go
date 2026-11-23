@@ -11,6 +11,7 @@ import (
 // foreign keys on would cascade-delete the events and null the comments' run_id), and foreign keys
 // must be back on afterwards.
 func TestRebuildMigrationKeepsReferences(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	dir := t.TempDir()
 	s, err := Open(ctx, dir, quiet)

@@ -167,7 +167,8 @@ func (a *API) idempotent(next http.Handler) http.Handler {
 			status, stored = http.StatusConflict, idemStored{ContentType: "application/problem+json", Body: append(pb, '\n')}
 		}
 		b, _ := json.Marshal(stored)
-		if _, err := a.st.W.ExecContext(ctx, `INSERT OR REPLACE INTO idempotency_keys (principal, key, request_hash, status, response, created_at) VALUES (?,?,?,?,?,?)`,
+		if _, err := a.st.W.ExecContext(ctx, `INSERT INTO idempotency_keys (principal, key, request_hash, status, response, created_at) VALUES (?,?,?,?,?,?)
+			ON CONFLICT (principal, key) DO UPDATE SET request_hash = excluded.request_hash, status = excluded.status, response = excluded.response, created_at = excluded.created_at`,
 			who, key, hash, status, b, store.Now()); err != nil {
 			a.log.Error("idempotency store", "err", err)
 		}

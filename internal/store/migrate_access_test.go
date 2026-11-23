@@ -9,6 +9,7 @@ import (
 // TestAccessMigrationRefusesOldRoles: a schema-5 database with only an admin goes through 0006 (and
 // the old tables are gone); one that holds roles is refused, not half-converted.
 func TestAccessMigrationRefusesOldRoles(t *testing.T) {
+	skipOnPG(t)
 	ctx := context.Background()
 	for _, withRoles := range []bool{false, true} {
 		dir := t.TempDir()

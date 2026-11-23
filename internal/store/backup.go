@@ -22,6 +22,9 @@ func NightlyName(day time.Time) string { return "nightly-" + day.Format("2006-01
 // NightlyBackup writes today's snapshot unless it exists, then prunes old ones. It returns the
 // path written ("" when today's already existed).
 func (s *Store) NightlyBackup(ctx context.Context, day time.Time, keep int) (string, error) {
+	if s.pg {
+		return "", nil // PostgreSQL is backed up by its operator (pg_dump), not by gigg
+	}
 	dir := filepath.Join(s.dir, "backups")
 	final := filepath.Join(dir, NightlyName(day))
 	if _, err := os.Stat(final); err == nil {

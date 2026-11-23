@@ -63,7 +63,7 @@ func Blocks(ctx context.Context, q Q, from, to int64) (bool, error) {
 	err := q.QueryRowContext(ctx, `WITH RECURSIVE
 		e(f, t) AS (SELECT from_gig_id, to_gig_id FROM gig_relations WHERE kind = 'blocks'
 			UNION ALL SELECT id, parent_id FROM gigs WHERE blocks_parent = 1 AND parent_id IS NOT NULL),
-		down(id) AS (SELECT ? UNION SELECT e.t FROM e JOIN down ON e.f = down.id)
+		down(id) AS (SELECT CAST(? AS BIGINT) UNION SELECT e.t FROM e JOIN down ON e.f = down.id)
 		SELECT count(*) FROM down WHERE id = ?`, from, to).Scan(&n)
 	return n > 0, err
 }
@@ -87,7 +87,7 @@ func AddRelation(ctx context.Context, q Q, a Actor, from, to *Gig, kind string) 
 			return Conflict("%s already depends on %s: that would be a cycle", from.Key, to.Key)
 		}
 	}
-	if _, err := q.ExecContext(ctx, `INSERT OR IGNORE INTO gig_relations (workspace_id, from_gig_id, to_gig_id, kind, created_by, created_at) VALUES (?,?,?,?,?,?)`,
+	if _, err := q.ExecContext(ctx, `INSERT INTO gig_relations (workspace_id, from_gig_id, to_gig_id, kind, created_by, created_at) VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
 		from.WorkspaceID, from.ID, to.ID, kind, a.UserID, Now()); err != nil {
 		return err
 	}
@@ -551,7 +551,7 @@ func SetCustomValues(ctx context.Context, q Q, a Actor, t *Gig, vals map[string]
 			return err
 		}
 		if _, err := q.ExecContext(ctx, `INSERT INTO gig_custom_values (gig_id, field_id, value) VALUES (?,?,?)
-			ON CONFLICT DO UPDATE SET value = excluded.value`, t.ID, id, mustJSON(nv)); err != nil {
+			ON CONFLICT (gig_id, field_id) DO UPDATE SET value = excluded.value`, t.ID, id, mustJSON(nv)); err != nil {
 			return err
 		}
 		changed[f.Name] = nv

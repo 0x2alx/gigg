@@ -745,7 +745,7 @@ func (a *API) registerGigs() {
 		if err := need(p, "comments:read"); err != nil {
 			return nil, err
 		}
-		items, err := a.activity(ctx, `(entity_type = 'gig' AND entity_id = ?) OR (entity_type IN ('comment','run') AND action != 'run.progress' AND json_extract(data, '$.gig_id') = ?)`, []any{t.ID, t.ID}, 0, 500)
+		items, err := a.activity(ctx, `(entity_type = 'gig' AND entity_id = ?) OR (entity_type IN ('comment','run') AND action != 'run.progress' AND CAST(json_extract(data, '$.gig_id') AS BIGINT) = ?)`, []any{t.ID, t.ID}, 0, 500)
 		if !p.IsInstanceAdmin() {
 			redactDeleted(items)
 		}

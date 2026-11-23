@@ -313,7 +313,7 @@ func TestGigOrder(t *testing.T) {
 		"due":             "t.due_at IS NULL, t.due_at, t.id",
 		"-due":            "t.due_at IS NULL, t.due_at DESC, t.id",
 		"-number":         "p.key DESC, t.number DESC, t.id",
-		"title,-priority": "t.title COLLATE NOCASE, t.priority DESC, t.id",
+		"title,-priority": "lower(t.title), t.priority DESC, t.id",
 	} {
 		got, err := gigOrder(in)
 		if err != nil || got != want {

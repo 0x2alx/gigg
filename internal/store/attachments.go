@@ -269,7 +269,7 @@ func AddAttachment(ctx context.Context, q Q, a Actor, t *Gig, in AttachmentIn) (
 // refBlob records one more user of a stored file.
 func refBlob(ctx context.Context, q Q, sha string, size int64) error {
 	_, err := q.ExecContext(ctx, `INSERT INTO blobs (sha256, size, refcount) VALUES (?,?,1)
-		ON CONFLICT (sha256) DO UPDATE SET refcount = refcount + 1, orphaned_at = NULL`, sha, size)
+		ON CONFLICT (sha256) DO UPDATE SET refcount = blobs.refcount + 1, orphaned_at = NULL`, sha, size)
 	return err
 }
 
@@ -305,7 +305,7 @@ func DeleteAttachment(ctx context.Context, q Q, a Actor, t *Gig, att *Attachment
 	}
 	for _, sha := range []string{att.blob, att.thumb} {
 		if sha != "" {
-			if _, err := q.ExecContext(ctx, `UPDATE blobs SET refcount = max(refcount - 1, 0) WHERE sha256 = ?`, sha); err != nil {
+			if _, err := q.ExecContext(ctx, `UPDATE blobs SET refcount = CASE WHEN refcount > 1 THEN refcount - 1 ELSE 0 END WHERE sha256 = ?`, sha); err != nil {
 				return err
 			}
 		}
