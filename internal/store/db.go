@@ -96,6 +96,22 @@ const (
 	ErrandTimeoutMin, ErrandTimeoutMax = 10, 43200
 )
 
+// validStartCategory: where a template's gigs start ("" = the project's default status).
+func validStartCategory(c string) bool { return c == "" || c == "backlog" || c == "todo" }
+
+// startStatus: the status a template's gig starts in: the first status of category c in the project,
+// or nil (the project's default) for "" or when the project has none of that category.
+func startStatus(ctx context.Context, q Q, project int64, c string) *int64 {
+	if c == "" {
+		return nil
+	}
+	var id int64
+	if err := q.QueryRowContext(ctx, `SELECT id FROM statuses WHERE project_id = ? AND category = ? ORDER BY position LIMIT 1`, project, c).Scan(&id); err != nil {
+		return nil
+	}
+	return &id
+}
+
 // validRunTimeout checks a gig's run timeout in minutes (nil: the agent's default).
 func validRunTimeout(m *int64) error {
 	if m != nil && (*m < RunTimeoutMin || *m > RunTimeoutMax) {

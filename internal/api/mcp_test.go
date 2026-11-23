@@ -149,6 +149,18 @@ func TestMCP(t *testing.T) {
 		!strings.Contains(text(r), `"labels":["routine"]`) || !strings.Contains(text(r), `"paused":true`) || !strings.Contains(text(r), `"checklist":["draft","send"]`) {
 		t.Fatalf("update_recurring: %s", text(r))
 	}
+	// where its gigs start: set alone (a content change), kept by a later timing-only edit, refused when unknown
+	r = call("update_recurring", map[string]any{"id": created.ID, "start_category": "backlog"})
+	if r.IsError || !strings.Contains(text(r), `"start_category":"backlog"`) || !strings.Contains(text(r), `"title":"Weekly report"`) {
+		t.Fatalf("update_recurring start_category: %s", text(r))
+	}
+	r = call("update_recurring", map[string]any{"id": created.ID, "window_minutes": 120})
+	if r.IsError || !strings.Contains(text(r), `"start_category":"backlog"`) || !strings.Contains(text(r), `"window_minutes":120`) {
+		t.Fatalf("timing edit dropped start_category: %s", text(r))
+	}
+	if r = call("update_recurring", map[string]any{"id": created.ID, "start_category": "doing"}); !r.IsError {
+		t.Fatalf("start_category doing accepted: %s", text(r))
+	}
 	r = call("list_recurring", map[string]any{})
 	if r.IsError || !strings.Contains(text(r), "Weekly report") || strings.Contains(text(r), "atlas secret") {
 		t.Fatalf("list_recurring: %s", text(r))

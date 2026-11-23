@@ -66,12 +66,13 @@ type templateBody struct {
 	AllowedTools  []string               `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its gigs get for the runner (permission rules); on update, omit to keep, [] clears. Needs the allowed_tools permission"`
 	AutoArchive   *int64                 `json:"auto_archive_minutes,omitempty" minimum:"5" maximum:"527040" doc:"Gigs made from it archive themselves this many minutes after done or cancelled (omit: never)"`
 	RunTimeout    *int64                 `json:"run_timeout_minutes,omitempty" minimum:"5" maximum:"300" doc:"Its gigs' run timeout in minutes (omit: the agent's default). Needs the run_timeout permission"`
+	StartCategory string                 `json:"start_category,omitempty" enum:"backlog,todo," doc:"Where its gigs start: backlog or todo (the first status of that category in the gig's project); omit for the project's default status. A recurring gig made from it creates its gigs there, so backlog keeps them from the runner until someone moves them"`
 }
 
 func (b templateBody) apply(t *store.Template) {
 	t.ProjectID, t.Name, t.Title, t.DescriptionMD, t.Priority, t.Color = b.Project, b.Name, b.Title, b.DescriptionMD, b.Priority, b.Color
 	t.Labels, t.Assignees, t.Checklist, t.Custom, t.Subgigs = b.Labels, b.Assignees, b.Checklist, b.Custom, b.Subgigs
-	t.Model, t.Effort, t.AlwaysRun, t.AutoArchive, t.RunTimeout = b.Model, b.Effort, b.AlwaysRun, b.AutoArchive, b.RunTimeout
+	t.Model, t.Effort, t.AlwaysRun, t.AutoArchive, t.RunTimeout, t.StartCategory = b.Model, b.Effort, b.AlwaysRun, b.AutoArchive, b.RunTimeout, b.StartCategory
 	if b.AllowedTools != nil || t.ID == 0 {
 		t.AllowedTools = b.AllowedTools
 	}

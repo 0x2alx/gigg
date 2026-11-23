@@ -6,7 +6,7 @@
 // Create/Save. A mode hides the boxes and rows that don't apply (a template has no When) and the
 // caller adds its own (comments, the agent session and history in the panel; Repeat in a form).
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { priorityNames, type Status, type Tag, type User } from "./api";
+import { priorityNames, type Status, type Tag, type User, type StartCategory } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, withCurrent } from "./fields";
 import { DEFAULT_DUE_TIME, DEFAULT_START_TIME } from "./dates";
@@ -68,6 +68,8 @@ export function GigEditor(p: {
   shared?: { on: boolean; set?: (on: boolean) => void };
   projectLocked?: boolean;
   statuses?: Status[]; // the status row (none for a template or a recurring gig)
+  // a template or recurring gig: where its gigs start (Backlog keeps them from the runner)
+  startIn?: { value: StartCategory; set: (v: StartCategory) => void };
   statusBusy?: boolean;
   currentStatus?: { name: string; category: Status["category"] }; // shown read-only when it isn't in statuses (cancelled)
   labelTags?: Tag[]; // the gig's own labels (their colours, when the workspace list is stale)
@@ -183,6 +185,20 @@ export function GigEditor(p: {
               )}
             </Row>
             </>
+            )}
+            {p.startIn && (
+              <Row label="Starts in">
+                <select
+                  value={p.startIn.value}
+                  onChange={(e) => p.startIn!.set(e.target.value as StartCategory)}
+                  aria-label="Starts in"
+                  data-tip="Where its gigs start. Backlog: they wait there for someone to move them to To-Do, so an agent's runner doesn't pick them up on its own."
+                >
+                  <option value="">Project default</option>
+                  <option value="backlog">Backlog</option>
+                  <option value="todo">To-Do</option>
+                </select>
+              </Row>
             )}
             {p.statuses && (
               <Row label="Status">

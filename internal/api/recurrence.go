@@ -34,6 +34,7 @@ type RecurrenceBody struct {
 	Followers     []int64                `json:"followers,omitempty" maxItems:"50" doc:"Who follows each of its gigs (kept in its template); omit to keep, [] clears"`
 	AutoArchive   *int64                 `json:"auto_archive_minutes,omitempty" minimum:"0" maximum:"527040" doc:"Its gigs archive themselves this many minutes after done or cancelled (kept in its template); omit to keep, 0 clears"`
 	RunTimeout    *int64                 `json:"run_timeout_minutes,omitempty" minimum:"0" maximum:"300" doc:"Its gigs' run timeout in minutes (kept in its template); omit to keep, 0 clears (the agent's default). Needs the run_timeout permission"`
+	StartCategory *string                `json:"start_category,omitempty" enum:"backlog,todo," doc:"Where its gigs start (kept in its template): backlog or todo, \"\" for the project's default status; omit to keep. backlog keeps them from the runner until someone moves them to To-Do"`
 	Model         string                 `json:"model,omitempty" maxLength:"64" doc:"Model a runner should ask for (default: the agent's)"`
 	Effort        string                 `json:"effort,omitempty" enum:"low,medium,high,xhigh,max," doc:"Effort level a runner should ask for (default: the agent's)"`
 	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Its gigs run whatever the usage budget (needs the always_run permission)"`
@@ -77,6 +78,9 @@ func (b RecurrenceBody) apply(r *store.Recurrence) {
 			if *b.RunTimeout == 0 {
 				r.RunTimeout = nil
 			}
+		}
+		if b.StartCategory != nil {
+			r.StartCategory = *b.StartCategory
 		}
 	}
 	r.OwnAssignees = b.Assignees

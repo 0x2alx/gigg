@@ -32,6 +32,7 @@ type Recurrence struct {
 	Followers     []int64  `json:"followers" doc:"Who follows each of its gigs (its template's), besides the creator's own setting"`
 	RunTimeout    *int64   `json:"run_timeout_minutes" doc:"Its gigs' run timeout in minutes (the template's; null: the agent's default)"`
 	AutoArchive   *int64   `json:"auto_archive_minutes" doc:"Its gigs archive themselves this many minutes after done or cancelled (the template's; null: never)"`
+	StartCategory string   `json:"start_category" doc:"Where its gigs start (the template's): backlog, todo, or empty for the project's default status"`
 	Model         string   `json:"model"`
 	Effort        string   `json:"effort"`
 	AlwaysRun     bool     `json:"always_run"`
@@ -79,7 +80,7 @@ const recCols = `r.id, r.workspace_id, r.project_id, r.created_by, t.title, t.de
 	t.always_run, t.allowed_tools, t.id, t.name, t.created_by, t.checklist, t.custom, t.subgigs,
 	(SELECT count(*) FROM recurrences u WHERE u.template_id = t.id AND u.deleted_at IS NULL),
 	s.id, s.name, (SELECT count(*) FROM recurrences u WHERE u.schedule_id = s.id AND u.deleted_at IS NULL),
-	r.assignees IS NOT NULL, t.auto_archive_minutes, t.workspace_id IS NULL, s.workspace_id IS NULL, t.run_timeout_minutes`
+	r.assignees IS NOT NULL, t.auto_archive_minutes, t.workspace_id IS NULL, s.workspace_id IS NULL, t.run_timeout_minutes, t.start_category`
 
 const recFrom = `recurrences r JOIN gig_templates t ON t.id = r.template_id JOIN schedules s ON s.id = r.schedule_id`
 
@@ -92,7 +93,7 @@ func scanRecurrence(row interface{ Scan(...any) error }) (*Recurrence, error) {
 		&r.Freq, &r.Interval, &weekdays, &md, &r.TZ, &r.WindowStart, &r.WindowMinutes, &r.LeadMinutes, &r.StartsOn, &ends, &max, &r.Overlap,
 		&next, &r.CreatedCount, &r.SkippedCount, &last, &r.Paused, &r.CreatedAt, &r.Version, &r.Model, &r.Effort, &r.AlwaysRun, &tools,
 		&r.TemplateID, &r.TemplateName, &r.TemplateBy, &checklist, &custom, &subs, &r.TemplateUses,
-		&r.ScheduleID, &r.ScheduleName, &r.ScheduleUses, &r.AssigneesOwn, &autoArch, &r.TemplateShared, &r.ScheduleShared, &runTO); err != nil {
+		&r.ScheduleID, &r.ScheduleName, &r.ScheduleUses, &r.AssigneesOwn, &autoArch, &r.TemplateShared, &r.ScheduleShared, &runTO, &r.StartCategory); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -440,7 +441,7 @@ func (r *Recurrence) fromTemplate(t *Template) {
 	r.TemplateID, r.TemplateName, r.TemplateBy = t.ID, t.Name, t.CreatedBy
 	r.Title, r.DescriptionMD, r.Priority, r.Color, r.Labels, r.Assignees = t.Title, t.DescriptionMD, t.Priority, t.Color, t.Labels, t.Assignees
 	r.Checklist, r.Custom, r.Model, r.Effort, r.AlwaysRun, r.AllowedTools = t.Checklist, t.Custom, t.Model, t.Effort, t.AlwaysRun, t.AllowedTools
-	r.Subgigs, r.AutoArchive, r.RunTimeout, r.TemplateShared = t.Subgigs, t.AutoArchive, t.RunTimeout, t.Shared
+	r.Subgigs, r.AutoArchive, r.RunTimeout, r.TemplateShared, r.StartCategory = t.Subgigs, t.AutoArchive, t.RunTimeout, t.Shared, t.StartCategory
 	r.Followers = t.Followers
 }
 
@@ -455,7 +456,8 @@ func (r *Recurrence) newTemplate() *Template {
 	project := r.ProjectID
 	return &Template{WorkspaceID: r.WorkspaceID, ProjectID: &project, Name: templateName(r.Title), Title: r.Title, DescriptionMD: r.DescriptionMD,
 		Priority: r.Priority, Color: r.Color, Labels: r.Labels, Assignees: r.Assignees, Followers: r.Followers, Checklist: r.Checklist, Custom: r.Custom,
-		Model: r.Model, Effort: r.Effort, AlwaysRun: r.AlwaysRun, AllowedTools: r.AllowedTools, Subgigs: r.Subgigs, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout}
+		Model: r.Model, Effort: r.Effort, AlwaysRun: r.AlwaysRun, AllowedTools: r.AllowedTools, Subgigs: r.Subgigs, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout,
+		StartCategory: r.StartCategory}
 }
 
 // GetRecurrence loads a live recurring gig.
@@ -555,7 +557,7 @@ func UpdateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence, expect i
 		if !probe.sameContent(r) || !eqIntPtr(tpl.AutoArchive, r.AutoArchive) || !eqIntPtr(tpl.RunTimeout, r.RunTimeout) {
 			cp := &Template{WorkspaceID: r.WorkspaceID, Name: tpl.Name, Title: r.Title, DescriptionMD: r.DescriptionMD, Priority: r.Priority,
 				Color: r.Color, Labels: r.Labels, Assignees: r.Assignees, Followers: r.Followers, Checklist: r.Checklist, Custom: r.Custom, Model: r.Model, Effort: r.Effort,
-				AlwaysRun: r.AlwaysRun, AllowedTools: r.AllowedTools, Subgigs: r.Subgigs, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout}
+				AlwaysRun: r.AlwaysRun, AllowedTools: r.AllowedTools, Subgigs: r.Subgigs, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout, StartCategory: r.StartCategory}
 			saved, err := SaveTemplate(ctx, q, a, cp, 0)
 			if err != nil {
 				return nil, err
@@ -573,7 +575,7 @@ func UpdateRecurrence(ctx context.Context, q Q, a Actor, r *Recurrence, expect i
 		}
 		tpl.Title, tpl.DescriptionMD, tpl.Priority, tpl.Color, tpl.Labels, tpl.Assignees = r.Title, r.DescriptionMD, r.Priority, r.Color, r.Labels, r.Assignees
 		tpl.Checklist, tpl.Custom, tpl.Model, tpl.Effort, tpl.AlwaysRun = r.Checklist, r.Custom, r.Model, r.Effort, r.AlwaysRun
-		tpl.Subgigs, tpl.AutoArchive, tpl.RunTimeout = r.Subgigs, r.AutoArchive, r.RunTimeout
+		tpl.Subgigs, tpl.AutoArchive, tpl.RunTimeout, tpl.StartCategory = r.Subgigs, r.AutoArchive, r.RunTimeout, r.StartCategory
 		if r.AllowedTools != nil {
 			tpl.AllowedTools = r.AllowedTools
 		}
@@ -643,7 +645,7 @@ func (t *Template) sameContent(r *Recurrence) bool {
 		mustJSON(t.Labels) == mustJSON(r.Labels) && mustJSON(t.Assignees) == mustJSON(r.Assignees) &&
 		mustJSON(t.Checklist) == mustJSON(r.Checklist) && mustJSON(t.Custom) == mustJSON(r.Custom) && sameSubgigs(t.Subgigs, r.Subgigs) &&
 		t.Model == r.Model && t.Effort == r.Effort && t.AlwaysRun == r.AlwaysRun && (r.AllowedTools == nil || SameTools(t.AllowedTools, r.AllowedTools)) &&
-		(r.Followers == nil || sameIDs(t.Followers, r.Followers))
+		(r.Followers == nil || sameIDs(t.Followers, r.Followers)) && t.StartCategory == r.StartCategory
 }
 
 // sameIDs compares two id lists as sets.
@@ -679,7 +681,7 @@ func SameContent(a, b *Recurrence) bool {
 	}
 	t := Template{Title: a.Title, DescriptionMD: a.DescriptionMD, Priority: a.Priority, Color: a.Color, Labels: a.Labels, Assignees: a.Assignees,
 		Followers: a.Followers, Checklist: a.Checklist, Custom: a.Custom, Model: a.Model, Effort: a.Effort, AlwaysRun: a.AlwaysRun, AllowedTools: a.AllowedTools,
-		Subgigs: a.Subgigs}
+		Subgigs: a.Subgigs, StartCategory: a.StartCategory}
 	return t.sameContent(&c) && eqIntPtr(a.AutoArchive, c.AutoArchive) && eqIntPtr(a.RunTimeout, c.RunTimeout)
 }
 
@@ -855,7 +857,7 @@ func materialize(ctx context.Context, tx *sql.Tx, r *Recurrence, now int64) (cre
 			t, err := CreateGig(ctx, tx, sys, NewGig{ProjectID: r.ProjectID, Title: r.Title, DescriptionMD: r.DescriptionMD, Priority: r.Priority,
 				Color: r.Color, StartAt: &start, DueAt: &due, NotAfter: &due, Labels: r.Labels, Assignees: validAssignees(ctx, tx, r),
 				Followers: whoSee(ctx, tx, r.WorkspaceID, r.ProjectID, r.Followers, MaxFollowers), RecurrenceID: &r.ID, OccurrenceAt: &start, Model: r.Model, Effort: r.Effort, AlwaysRun: r.AlwaysRun,
-				AllowedTools: r.AllowedTools, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout})
+				AllowedTools: r.AllowedTools, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout, StatusID: startStatus(ctx, tx, r.ProjectID, r.StartCategory)})
 			if err != nil {
 				return created, skipped, err
 			}

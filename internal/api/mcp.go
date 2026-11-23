@@ -249,6 +249,7 @@ type (
 		Model         *string     `json:"model,omitempty" jsonschema:"Model a runner should ask for; empty = the agent's default"`
 		Effort        *string     `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh, max; empty = the agent's default"`
 		AlwaysRun     *bool       `json:"always_run,omitempty" jsonschema:"Its gigs run whatever the usage budget (needs the always_run permission)"`
+		StartCategory *string     `json:"start_category,omitempty" jsonschema:"Where its gigs start (kept in its template): backlog or todo, empty for the project's default status. backlog keeps them from the runner until someone moves them"`
 		AllowedTools  []string    `json:"allowed_tools,omitempty" jsonschema:"Tool allowlist its gigs get for the runner (permission rules; [] clears; needs the allowed_tools permission)"`
 		TemplateID    *int64      `json:"template_id,omitempty" jsonschema:"Make each gig from this template (see list_templates); content fields are then ignored. update_recurring: switches to it"`
 		Checklist     []string    `json:"checklist,omitempty" jsonschema:"Checklist items each gig gets (stored in the template)"`
@@ -769,6 +770,9 @@ func (in recArgs) merge(b map[string]any) map[string]any {
 	if in.AlwaysRun != nil {
 		b["always_run"] = *in.AlwaysRun
 	}
+	if in.StartCategory != nil {
+		b["start_category"] = *in.StartCategory
+	}
 	if in.AllowedTools != nil {
 		b["allowed_tools"] = in.AllowedTools
 	}
@@ -802,7 +806,7 @@ func (in recArgs) merge(b map[string]any) map[string]any {
 // content: the call changes the gig content.
 func (in recArgs) content() bool {
 	return in.Title != "" || in.DescriptionMD != nil || in.Priority != nil || in.Labels != nil || in.Assignees != nil || in.Followers != nil || in.Model != nil ||
-		in.Effort != nil || in.AlwaysRun != nil || in.AllowedTools != nil || in.Checklist != nil || in.Subgigs != nil
+		in.Effort != nil || in.AlwaysRun != nil || in.AllowedTools != nil || in.Checklist != nil || in.Subgigs != nil || in.StartCategory != nil
 }
 
 // timing: the call changes the timing.

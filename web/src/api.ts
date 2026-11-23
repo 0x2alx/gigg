@@ -262,12 +262,17 @@ export interface TemplateSubgig {
   blocks_parent?: boolean;
 }
 
+// where a template's (or a recurring gig's) gigs start: the first status of that category in the
+// gig's project; "" = the project's default status. Backlog keeps them from the runner.
+export type StartCategory = "" | "backlog" | "todo";
+
 export interface TemplateBody {
   model?: string;
   effort?: string;
   always_run?: boolean;
   run_timeout_minutes?: number | null;
   auto_archive_minutes?: number | null;
+  start_category?: StartCategory; // where its gigs start; "" = the project's default status
   allowed_tools?: string[]; // runner tool allowlist (permission rules)
   name: string;
   project_id?: number;
@@ -289,6 +294,7 @@ export interface Template {
   always_run?: boolean;
   run_timeout_minutes?: number | null;
   auto_archive_minutes?: number | null;
+  start_category?: StartCategory; // where its gigs start; "" = the project's default status
   allowed_tools?: string[]; // runner tool allowlist (permission rules)
   id: number;
   workspace_id: number;
@@ -348,6 +354,7 @@ export interface RecurrenceBody {
   always_run?: boolean;
   run_timeout_minutes?: number | null;
   auto_archive_minutes?: number | null;
+  start_category?: StartCategory; // where its gigs start; "" = the project's default status
   allowed_tools?: string[]; // runner tool allowlist (permission rules)
   title?: string;
   description_md?: string;
@@ -377,6 +384,7 @@ export interface Recurrence {
   always_run?: boolean;
   run_timeout_minutes?: number | null;
   auto_archive_minutes?: number | null;
+  start_category?: StartCategory; // where its gigs start; "" = the project's default status
   allowed_tools?: string[]; // runner tool allowlist (permission rules)
   id: number;
   workspace_id: number;

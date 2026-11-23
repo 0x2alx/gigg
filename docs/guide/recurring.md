@@ -3,6 +3,7 @@
 Three separate objects work together:
 
 - A **template** is the content of a gig: title, description, priority, labels, assignees, checklist, subgigs, custom fields and agent run settings. Every gig made from it gets its subgigs, each made like the gig (same window, assignees and run settings) and, when marked **blocks parent**, holding the gig back until it's done. You can also start an ordinary gig from a template.
+  - **Starts in** sets where its gigs start: **Project default** (the project's default status), **Backlog** or **To-Do** (the first status of that category in the gig's project; the default when the project has none). Backlog suits a recurring job a person should look at first: its gigs wait there, and an agent's runner, which only picks up To-Do gigs, leaves them alone until someone moves them.
 - A **schedule** is a timing: "every day 09:00–11:00", "every Friday", "the last day of every month". Several recurring gigs can share one.
 - A **recurring gig** links one template to one schedule in a project. It has its own start date, end date or maximum count, an overlap rule and a pause switch. The same template can be linked to several schedules, but each template–schedule pair appears only once per project.
 
@@ -46,7 +47,7 @@ Identical templates and schedules pile up when each workspace makes its own. Wit
 What counts as identical (the name, the workspace and the dates never do):
 
 - **Schedules**: the whole timing (frequency, interval, days, month day, time zone, window start and length, create-early).
-- **Templates**: the project it is limited to, title, description, priority, colour, labels, checklist, subgigs, custom field values, followers, model, effort, always-run, tool allowlist, auto-archive and run timeout. The assignees don't count: a recurring gig that took them from its template keeps them as its own.
+- **Templates**: the project it is limited to, title, description, priority, colour, labels, checklist, subgigs, custom field values, followers, model, effort, always-run, tool allowlist, auto-archive, run timeout and where its gigs start. The assignees don't count: a recurring gig that took them from its template keeps them as its own.
 - **Errand templates**: the notes, command, timeout, output setting and sandbox setting, and who set the command and who turned the sandbox off (a copy written by someone else isn't merged).
 
 Things to know:

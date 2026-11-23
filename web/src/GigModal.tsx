@@ -8,7 +8,7 @@ import { launch } from "./Launch";
 import { fileURL } from "./attachments";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { runBody, runFrom, type RunSettings } from "./runsettings";
-import { api, ApiError, canShare, hasAllCap, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isGigSchedule, type GigSchedule, type Gig, type Status, type Tag, type Template, type TemplateBody, type TemplateSubgig } from "./api";
+import { api, ApiError, canShare, hasAllCap, hasCap, type Category, type CustomField, type Recurrence, type RecurrenceBody, isGigSchedule, type GigSchedule, type Gig, type Status, type Tag, type Template, type TemplateBody, type TemplateSubgig, type StartCategory } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { assignable } from "./fields";
 import { cleanCustom, normSubs, sameAsTemplate } from "./items";
@@ -69,6 +69,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const [title, setTitle] = useState(schedule?.title ?? tpl?.title ?? "");
   const [description, setDescription] = useState(schedule?.description_md ?? tpl?.description_md ?? "");
   const [priority, setPriority] = useState(schedule?.priority ?? tpl?.priority ?? 0);
+  const [startCategory, setStartCategory] = useState<StartCategory>(schedule?.start_category ?? tpl?.start_category ?? "");
   const [status, setStatus] = useState<number>(
     (initialStatus !== undefined && statuses.some((s) => s.id === initialStatus) ? initialStatus : undefined) ?? statuses.find((s) => s.category === "todo")?.id ?? statuses[0]?.id ?? 0,
   );
@@ -230,7 +231,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const canTemplates = hasCap(me, "templates", ws.id);
   // a picked template (editing: the current one), unchanged: the recurring gig uses it as is
   // (a shared template has no assignees: the recurring gig names its own, so they don't count)
-  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, gigLabels, assignees: picked.shared ? (picked.assignees ?? []) : assignees, followers, color, run, checklist, subgigs, custom });
+  const usesPicked = repeating && !!picked && sameAsTemplate(picked, { title, description, priority, gigLabels, assignees: picked.shared ? (picked.assignees ?? []) : assignees, followers, color, run, checklist, subgigs, custom, startCategory });
   // likewise a picked schedule whose timing wasn't changed
   const usesSchedule = repeating && !!pickedSchedule && sameTiming(repeat, pickedSchedule);
   const pickSchedule = (id: number) => {
@@ -266,6 +267,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     if (t.checklist?.length) setChecklistFilled((n) => n + 1);
     setSubgigs(normSubs(t.subgigs ?? []));
     setCustom(t.custom ?? {});
+    setStartCategory(t.start_category ?? "");
   };
 
   const templateBody = (name: string): TemplateBody => {
@@ -275,6 +277,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     if (color) b.color = color;
     if (checklist.length) b.checklist = checklist;
     if (subgigs.length) b.subgigs = normSubs(subgigs);
+    if (startCategory) b.start_category = startCategory;
     const c = cleanCustom(custom);
     if (c && !shared) b.custom = c;
     return b;
@@ -407,6 +410,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
             followers,
             ...(color ? { color } : {}),
             ...runBody(run),
+            start_category: startCategory,
             // an edit sends every setting (0 clears a timeout or auto-archive), so taking one off takes it off
             ...(editing
               ? { model: run.model, effort: run.effort, always_run: run.always_run, allowed_tools: run.allowed_tools, run_timeout_minutes: run.run_timeout_minutes ?? 0, auto_archive_minutes: run.auto_archive_minutes ?? 0 }
@@ -509,6 +513,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           shared={tplMode && (canShare(me) || shared) ? { on: shared, set: canShare(me) && !tpl && !shareOnly ? setShared : undefined } : undefined}
           projectLocked={editing}
           statuses={!repeating && !tplMode ? projectStatuses : undefined}
+          startIn={repeating || tplMode ? { value: startCategory, set: setStartCategory } : undefined}
           statusBusy={!statusReady && !statusErr}
           dates={!repeating}
           knownLabels={known}

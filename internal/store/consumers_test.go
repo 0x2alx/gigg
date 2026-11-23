@@ -29,7 +29,8 @@ func TestConsumersMigration(t *testing.T) {
 		`CREATE TABLE gig_followers (gig_id INTEGER NOT NULL, user_id INTEGER NOT NULL, PRIMARY KEY (gig_id, user_id)) STRICT`,
 		`ALTER TABLE gig_templates ADD COLUMN followers TEXT NOT NULL DEFAULT '[]'`,
 		`CREATE TABLE attachments (id INTEGER PRIMARY KEY, gig_id INTEGER NOT NULL) STRICT`,
-		`ALTER TABLE gigs ADD COLUMN last_progress_at INTEGER`} {
+		`ALTER TABLE gigs ADD COLUMN last_progress_at INTEGER`,
+		`ALTER TABLE gig_templates ADD COLUMN start_category TEXT NOT NULL DEFAULT ''`} {
 		if _, err := s.W.ExecContext(ctx, q); err != nil {
 			t.Fatal(err)
 		}
@@ -125,6 +126,7 @@ func TestConsumersMigration(t *testing.T) {
 		`ALTER TABLE gig_templates DROP COLUMN followers`,
 		`DROP TABLE attachments`,
 		`ALTER TABLE gigs DROP COLUMN last_progress_at`,
+		`ALTER TABLE gig_templates DROP COLUMN start_category`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?4, 'commenter', '{}', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, ?2, 'member', '{"schedules":true,"checklists":false,"relations":true}', 1)`,
 		`INSERT INTO access_rules (group_id, workspace_id, preset, overrides, created_at) VALUES (90, NULL, 'manager', '{"schedules":false}', 1)`,

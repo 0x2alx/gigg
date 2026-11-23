@@ -59,6 +59,7 @@ type (
 		Model         string         `json:"model,omitempty" jsonschema:"Model a runner should ask for (default: the agent's)"`
 		Effort        string         `json:"effort,omitempty" jsonschema:"low, medium, high, xhigh or max (default: the agent's)"`
 		AlwaysRun     bool           `json:"always_run,omitempty" jsonschema:"Gigs made from it run whatever the usage budget (needs the always_run permission)"`
+		StartCategory string         `json:"start_category,omitempty" jsonschema:"Where its gigs start: backlog or todo (default: the project's default status). backlog keeps a recurring gig's gigs from the runner until someone moves them"`
 		AllowedTools  []string       `json:"allowed_tools,omitempty" jsonschema:"Tool allowlist its gigs get for the runner (permission rules; on update omit to keep, [] clears; needs the allowed_tools permission)"`
 	}
 	makeSharedArgs struct {
@@ -199,6 +200,7 @@ func addItemTools(s *mcp.Server, p *access.Principal, call apiCall, ws func(stri
 				}
 				setIf(b, "model", in.Model)
 				setIf(b, "effort", in.Effort)
+				setIf(b, "start_category", in.StartCategory)
 				if in.AlwaysRun {
 					b["always_run"] = true
 				}

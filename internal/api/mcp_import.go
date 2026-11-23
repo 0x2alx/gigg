@@ -52,11 +52,11 @@ func impCat(parts ...[]string) []string {
 // impFields: what each kind's create call accepts (the kind itself aside); anything else is dropped.
 var impFields = map[string][]string{
 	kSchedule:       impCat([]string{"name"}, impRule),
-	kGigTemplate:    impCat([]string{"name", "title", "description_md", "priority", "color", "labels", "assignees", "followers", "checklist", "subgigs", "custom"}, impRun),
+	kGigTemplate:    impCat([]string{"name", "title", "description_md", "priority", "color", "labels", "assignees", "followers", "checklist", "subgigs", "custom", "start_category"}, impRun),
 	kErrandTemplate: impErrandItems,
 	kGig:            impCat([]string{"title", "description_md", "priority", "category", "labels", "assignees", "followers", "color", "start_at", "due_at", "not_after", "checklist", "subgigs", "custom"}, impRun),
 	kErrand:         impCat(impErrandItems, []string{"rule", "worker", "on_failure_gig", "paused"}),
-	kRecurring: impCat([]string{"template_id", "schedule_id", "title", "description_md", "priority", "color", "labels", "assignees", "followers", "checklist", "subgigs", "custom"}, impRun, impRule,
+	kRecurring: impCat([]string{"template_id", "schedule_id", "title", "description_md", "priority", "color", "labels", "assignees", "followers", "checklist", "subgigs", "custom", "start_category"}, impRun, impRule,
 		[]string{"starts_on", "ends_on", "max_count", "overlap", "paused"}),
 }
 

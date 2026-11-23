@@ -18,7 +18,7 @@ import (
 //     window_start, window_minutes, lead_minutes), compared as Rule.Same does.
 //   - Gig template: project (a template for one project is not the same as one for any), title,
 //     description, priority, color, labels, checklist, subgigs, custom values, followers, model, effort,
-//     always_run, allowed_tools (as a set), auto_archive_minutes and run_timeout_minutes. Left out:
+//     always_run, allowed_tools (as a set), auto_archive_minutes, run_timeout_minutes and start_category. Left out:
 //     assignees. They name people of one workspace's projects and a shared template holds none: every
 //     recurring gig moved to the shared template keeps the assignees it had (as its own), so two copies
 //     that differ only in who they assign are still the same template.
@@ -115,7 +115,7 @@ func templateContent(t *Template) string {
 	followers := slices.Clone(uniqIDs(t.Followers))
 	slices.Sort(followers)
 	return mustJSON([]any{t.ProjectID, t.Title, t.DescriptionMD, t.Priority, t.Color, normStrs(t.Labels), normStrs(t.Checklist), subs, custom,
-		followers, t.Model, t.Effort, t.AlwaysRun, tools, t.AutoArchive, t.RunTimeout})
+		followers, t.Model, t.Effort, t.AlwaysRun, tools, t.AutoArchive, t.RunTimeout, t.StartCategory})
 }
 
 // errandTemplateSame: the content, and who set the command and turned the sandbox off (what the
