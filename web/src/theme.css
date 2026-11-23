@@ -1280,7 +1280,8 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 .tp-props > .tp-box.tp-group { background: none; border: 0; border-radius: 0; padding: var(--sp-4) var(--sp-6) var(--sp-5); }
 .tp-props > .tp-group + .tp-group { border-top: 1px solid var(--line); }
 .tp-props .tp-gh { margin-bottom: var(--sp-3); }
-.tp-props .tp-grid { grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.15rem var(--sp-4); font-size: var(--fs-sm); }
+.tp-props .tp-grid { grid-template-columns: 7rem minmax(0, 1fr); gap: 0.15rem var(--sp-4); font-size: var(--fs-sm); }
+.tp-props .tp-label { white-space: nowrap; } /* one line in every theme's font (Auto-archive) */
 .tp-props .tp-label, .tp-props .tp-value { min-height: 1.85rem; }
 .tp-props .tp-value > select, .tp-props .tp-value > input:not([type=checkbox]), .tp-props .tp-value select, .tp-props .tp-value input[type=date],
 .tp-props .tp-value input[type=time], .tp-props .tp-value input[type=text], .tp-props .tp-value textarea { font-size: var(--fs-sm); padding-block: 0.22rem; min-height: 0; }
@@ -1327,7 +1328,7 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
    second label column fits its labels (Project, Effort) */
 @container tpsec (min-width: 38rem) {
   .tp-grid { grid-template-columns: 7.5rem minmax(0, 1fr) max-content minmax(0, 1fr); }
-  .tp-props .tp-grid { grid-template-columns: 6.5rem minmax(0, 1fr) max-content minmax(0, 1fr); }
+  .tp-props .tp-grid { grid-template-columns: 7rem minmax(0, 1fr) max-content minmax(0, 1fr); }
 }
 @container tpsec (max-width: 24rem) {
   .tp-grid, .tp-props .tp-grid { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
