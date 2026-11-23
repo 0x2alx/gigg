@@ -112,24 +112,35 @@ func (s *Store) SweepBlobs(ctx context.Context, grace time.Duration) (int, error
 		return removed, err
 	}
 	// removed under the writer, after a fresh look: an upload of the same bytes writes (or refreshes)
-	// the file inside its own transaction, so it either committed a row by now or hasn't started
-	err = s.Tx(ctx, func(tx *sql.Tx) error {
-		for _, p := range cands {
-			name := filepath.Base(p)
-			if info, err := os.Lstat(p); err != nil || info.ModTime().After(old) {
-				continue
+	// the file inside its own transaction, so it either committed a row by now or hasn't started.
+	// In short batches, so a big clean-up doesn't hold up every other write while it runs.
+	for len(cands) > 0 {
+		batch := cands[:min(sweepBatch, len(cands))]
+		cands = cands[len(batch):]
+		err = s.Tx(ctx, func(tx *sql.Tx) error {
+			for _, p := range batch {
+				name := filepath.Base(p)
+				if info, err := os.Lstat(p); err != nil || info.ModTime().After(old) {
+					continue
+				}
+				if blobName.MatchString(name) && isReferenced(ctx, tx, name) {
+					continue
+				}
+				if os.Remove(p) == nil {
+					removed++
+				}
 			}
-			if blobName.MatchString(name) && isReferenced(ctx, tx, name) {
-				continue
-			}
-			if os.Remove(p) == nil {
-				removed++
-			}
+			return nil
+		})
+		if err != nil {
+			return removed, err
 		}
-		return nil
-	})
-	return removed, err
+	}
+	return removed, nil
 }
+
+// sweepBatch: how many unknown files one write transaction of the sweep looks at.
+const sweepBatch = 100
 
 func isReferenced(ctx context.Context, q Q, sha string) bool {
 	var n int

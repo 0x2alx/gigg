@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -84,6 +85,26 @@ func TestBlobSweep(t *testing.T) {
 	f.s.SweepBlobs(f.ctx, time.Hour)
 	if _, err := os.Stat(other); err != nil {
 		t.Fatal("foreign file removed")
+	}
+	// more strays than one write transaction looks at: all go, batch by batch; a stray that a row
+	// points at by then (an upload reused it) stays
+	n := sweepBatch*2 + 7
+	var kept string
+	for i := 0; i < n; i++ {
+		sha, err := f.s.WriteBlob([]byte(fmt.Sprintf("stray %d", i)))
+		must(t, err)
+		must(t, os.Chtimes(f.s.BlobPath(sha), old, old))
+		if i == n-1 {
+			kept = sha
+		}
+	}
+	_, err = f.s.W.ExecContext(f.ctx, `INSERT INTO blobs (sha256, size, refcount) VALUES (?, 1, 1)`, kept)
+	must(t, err)
+	if got, err := f.s.SweepBlobs(f.ctx, time.Hour); err != nil || got != n-1 {
+		t.Fatalf("batched sweep: removed %d of %d (%v)", got, n-1, err)
+	}
+	if _, err := os.Stat(f.s.BlobPath(kept)); err != nil {
+		t.Fatal("a stray a row points at was removed")
 	}
 }
 

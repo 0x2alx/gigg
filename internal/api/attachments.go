@@ -215,33 +215,27 @@ func (a *API) attachFile(ctx context.Context, ref, filename, label string, run *
 			return nil, ctx.Err()
 		}
 	}
-	return a.attachWith(ctx, p, t, in, func(in *store.AttachmentIn) (func(), error) {
+	return a.attachWith(ctx, p, t, in, func(in *store.AttachmentIn, made *[]string) error {
 		// written inside the transaction, so the blob sweep (one writer) never removes a file under us;
-		// undo removes the files this upload created when the transaction fails
-		var made []string
-		undo := func() {
-			for _, sha := range made {
-				a.st.RemoveBlob(sha)
-			}
-		}
+		// made lists the files this upload created, for attachWith to remove if the attachment fails
 		sha, created, err := a.st.WriteBlobNew(data)
 		if err != nil {
-			return undo, err
+			return err
 		}
 		in.Blob = sha
 		if created {
-			made = append(made, sha)
+			*made = append(*made, sha)
 		}
 		if len(thumb) > 0 {
 			if sha, created, err = a.st.WriteBlobNew(thumb); err != nil {
-				return undo, err
+				return err
 			}
 			in.Thumb, in.ThumbLen = sha, int64(len(thumb))
 			if created {
-				made = append(made, sha)
+				*made = append(*made, sha)
 			}
 		}
-		return undo, nil
+		return nil
 	})
 }
 
@@ -274,14 +268,18 @@ func (a *API) attachTarget(ctx context.Context, ref string) (*access.Principal, 
 }
 
 // attachWith adds the attachment in one write transaction; prep (files) writes the blobs there first
-// and returns how to remove the ones it created if the transaction fails.
-func (a *API) attachWith(ctx context.Context, p *access.Principal, t *store.Gig, in store.AttachmentIn, prep func(*store.AttachmentIn) (func(), error)) (*store.Attachment, error) {
+// and lists the ones it created, which are removed again if the attachment doesn't make it.
+func (a *API) attachWith(ctx context.Context, p *access.Principal, t *store.Gig, in store.AttachmentIn, prep func(*store.AttachmentIn, *[]string) error) (*store.Attachment, error) {
 	var att *store.Attachment
+	var made []string
+	undone := false
 	err := a.tx(ctx, func(tx *sql.Tx) (err error) {
-		var undo func()
 		defer func() {
-			if err != nil && undo != nil {
-				undo() // still inside the transaction: no other writer can be using the new files
+			if err != nil {
+				for _, sha := range made {
+					a.st.RemoveBlob(sha) // still inside the transaction: no other writer can be using the new files
+				}
+				undone = true
 			}
 		}()
 		cur, err := store.GetGig(ctx, tx, t.ID)
@@ -289,13 +287,24 @@ func (a *API) attachWith(ctx context.Context, p *access.Principal, t *store.Gig,
 			return err
 		}
 		if prep != nil {
-			if undo, err = prep(&in); err != nil {
+			if err = prep(&in, &made); err != nil {
 				return err
 			}
 		}
 		att, err = store.AddAttachment(ctx, tx, p.Actor(), cur, in)
 		return err
 	})
+	if err != nil && !undone && len(made) > 0 {
+		// the commit itself failed: no row points at the new files. Remove them under the writer again,
+		// unless an upload of the same bytes has started using them meanwhile (the sweep would get them later anyway)
+		bg := context.WithoutCancel(ctx) // a cancelled request still cleans up
+		_ = a.st.Tx(bg, func(tx *sql.Tx) error {
+			for _, sha := range made {
+				a.st.RemoveUnusedBlob(bg, tx, sha)
+			}
+			return nil
+		})
+	}
 	return att, err
 }
 

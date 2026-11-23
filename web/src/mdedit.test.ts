@@ -111,6 +111,17 @@ describe("pasted and dropped files", () => {
     expect(fileLine({ name: "a [draft].png", type: "image/png" }, "/x")).toBe("![a \\[draft\\].png](/x)");
     expect(uploadingLine("shot.png")).toBe("![Uploading shot.png…]()");
   });
+  it("keeps a hostile file name a plain label", () => {
+    const name = "x](javascript:alert(1)) *b* `c` <i>i</i> ![p](/q) &amp; ~~s~~ | t\nline.log";
+    const html = renderRaw(fileLine({ name, type: "text/plain" }, "/api/v1/attachments/5/file"));
+    expect(html.match(/<a /g)?.length).toBe(1);
+    expect(html).toContain('href="/api/v1/attachments/5/file"');
+    expect(html).not.toMatch(/<(em|code|i|img|s|del|strong)\b/);
+    expect(html).not.toContain("javascript:alert(1)\"");
+    const img = renderRaw(fileLine({ name: "a](b) *c*.png", type: "image/png" }, "/x"));
+    expect(img.match(/<img /g)?.length).toBe(1);
+    expect(img).toContain('src="/x"');
+  });
   it("inserts at the caret", () => {
     expect(insertText({ text: "ab", start: 1, end: 1 }, "X")).toEqual({ text: "aXb", start: 2, end: 2 });
   });

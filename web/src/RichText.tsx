@@ -52,7 +52,8 @@ const people = (users: () => User[]) =>
               .slice(0, 6);
           },
           command: ({ editor, range, props }) => {
-            editor.chain().focus().insertContentAt(range, "@" + props.username + " ").run();
+            // a text node, not a string: insertContent parses strings as HTML
+            editor.chain().focus().insertContentAt(range, { type: "text", text: "@" + props.username + " " }).run();
           },
           render: () => {
             let list: HTMLUListElement | null = null;

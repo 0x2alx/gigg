@@ -142,6 +142,14 @@ func (s *Store) RemoveBlob(sha string) {
 	}
 }
 
+// RemoveUnusedBlob deletes a blob file no row points at; call it inside a write transaction (one
+// writer: an upload that reuses the file does so inside its own).
+func (s *Store) RemoveUnusedBlob(ctx context.Context, q Q, sha string) {
+	if blobName.MatchString(sha) && !isReferenced(ctx, q, sha) {
+		_ = os.Remove(s.BlobPath(sha))
+	}
+}
+
 // SetAvatar points a user at an avatar blob (sha "" removes it) and keeps blob refcounts.
 func SetAvatar(ctx context.Context, q Q, a Actor, user int64, sha string, size int) error {
 	var old sql.NullString
