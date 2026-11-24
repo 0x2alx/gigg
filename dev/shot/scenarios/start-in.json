@@ -147,6 +147,25 @@
   {
    "shot": "new-gig",
    "full": false
+  },
+  {
+   "eval": "(() => { const s = document.querySelector(\"select[aria-label='Status']\"); return s.options[s.selectedIndex].text; })()",
+   "expect": "To-Do"
+  },
+  {
+   "eval": "(() => { const s = document.querySelector(\"select[aria-label='From template']\"); const o = [...s.options].find((x) => x.text.includes('Weekly dependency review')); if (!o) return 'no option'; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, o.value); s.dispatchEvent(new Event('change', { bubbles: true })); return 'picked'; })()",
+   "expect": "picked"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "eval": "(() => { const s = document.querySelector(\"select[aria-label='Status']\"); return s.options[s.selectedIndex].text; })()",
+   "expect": "Backlog"
+  },
+  {
+   "shot": "new-gig-from-template",
+   "full": false
   }
  ]
 }

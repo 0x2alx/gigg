@@ -12,6 +12,7 @@ import { TableKit } from "@tiptap/extension-table";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import HardBreak from "@tiptap/extension-hard-break";
 import { attachmentHrefOK, imageSrcOK } from "./imgsrc";
+import { mdText } from "./mdedit";
 import { mdit } from "./mdit";
 import { previewOf } from "./previews";
 
@@ -29,6 +30,17 @@ const ServerImage = Image.extend({
     const local = previewOf(src);
     if (local) return ["img", { ...HTMLAttributes, src: local }];
     return ["img", { ...HTMLAttributes, src: null, "data-blocked": "", title: "Only images on this server show" }];
+  },
+  // the alt text is written as literal text (as the Markdown editor writes a file name), so a name like
+  // "a]b*c.png" can't end the image early or turn into emphasis
+  // ...and read back as the text it stands for (the parser leaves some backslash escapes in alt text)
+  parseMarkdown: (token, helpers) =>
+    helpers.createNode("image", { src: token.href, title: token.title, alt: String(token.text ?? "").replace(/\\([!-/:-@[-`{-~])/g, "$1") }),
+  renderMarkdown: (node) => {
+    const src = String(node.attrs?.src ?? "");
+    const alt = mdText(String(node.attrs?.alt ?? ""));
+    const title = String(node.attrs?.title ?? "");
+    return title ? `![${alt}](${src} "${title.replace(/"/g, '\\"')}")` : `![${alt}](${src})`;
   },
 });
 

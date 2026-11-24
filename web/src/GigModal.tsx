@@ -111,14 +111,20 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const shownStatuses = useRef(projectStatuses);
   shownStatuses.current = projectStatuses;
   const noStatus = tplMode || editing;
+  // a picked template's start stage (backlog, todo) waiting for the project's statuses to come in
+  const wantStage = useRef<Category | null>(null);
   useEffect(() => {
     if (noStatus) return;
     const settle = (open: Status[]) => {
       const was = shownStatuses.current;
+      const want = wantStage.current;
+      wantStage.current = null;
       setProjectStatuses(open);
       setStatusesOf(project);
       setStatusErr("");
       setStatus((cur) => {
+        const wanted = want && open.find((x) => x.category === want);
+        if (wanted) return wanted.id;
         if (open.some((x) => x.id === cur)) return cur;
         // back in the start project: the exact status it started in (the column's)
         if (project === projectId && initialStatus !== undefined && open.some((x) => x.id === initialStatus)) return initialStatus;
@@ -268,6 +274,14 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
     setSubgigs(normSubs(t.subgigs ?? []));
     setCustom(t.custom ?? {});
     setStartCategory(t.start_category ?? "");
+    // the gig starts where the template says (that stage's first status); a template on the project's
+    // default leaves it where the form opened (the column's status, else To-Do)
+    const opened = project === projectId ? projectStatuses.find((x) => x.id === initialStatus) : undefined;
+    const target = t.start_category
+      ? projectStatuses.find((x) => x.category === t.start_category)
+      : (opened ?? projectStatuses.find((x) => x.category === (initialCategory ?? "todo")));
+    if (statusReady && target) setStatus(target.id);
+    else if (t.start_category) wantStage.current = t.start_category;
   };
 
   const templateBody = (name: string): TemplateBody => {

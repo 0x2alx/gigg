@@ -45,6 +45,19 @@ describe("richmd", () => {
     expect(toMd(parseMd("one\ntwo"))).toBe("one\ntwo");
   });
 
+  it("writes a file name as literal text in an image or link (GIGG-39)", () => {
+    const name = "a]b*c_[x](y).png";
+    const img = toMd({ type: "doc", content: [{ type: "image", attrs: { src: "/api/v1/attachments/8/file", alt: name } }] });
+    expect(img).toBe("![a\\]b\\*c\\_\\[x\\](y).png](/api/v1/attachments/8/file)");
+    expect(mdit.render(img)).toContain(`<img src="/api/v1/attachments/8/file" alt="${name}"`);
+    // opening it again and saving gives the same Markdown (no double escaping)
+    expect(toMd(parseMd(img))).toBe(img);
+    expect(roundTrips(img)).toBe(true);
+    const link = toMd({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "a]b*c.txt", marks: [{ type: "link", attrs: { href: "/api/v1/attachments/9/file" } }] }] }] });
+    expect(mdit.render(link)).toContain('<a href="/api/v1/attachments/9/file">a]b*c.txt</a>');
+    expect(roundTrips(link)).toBe(true);
+  });
+
   it("empty is empty", () => {
     expect(roundTrips("")).toBe(true);
     expect(roundTrips("   ")).toBe(true);

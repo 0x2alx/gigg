@@ -1411,15 +1411,14 @@ p.tp-desc-empty { cursor: default; border: 0; padding: 0; }
 .mde-file .ico, .mde-ul .ico { font-size: 0.85rem; }
 .mde-quote { font-size: 1.05rem; line-height: 1; }
 /* Insert file closes the toolbar (a line before it); in a narrow editor it moves up beside the tabs and
-   the formatting buttons get a full row of their own, evenly spread and big enough to tap */
+   the formatting buttons get a row of their own, packed from the left in their groups, big enough to tap */
 .mde { container: mde / inline-size; }
 .mde-file { border-left: 1px solid var(--line); border-radius: 0 var(--radius-s) var(--radius-s) 0; padding-left: 0.45rem; }
 @container mde (max-width: 34rem) {
   .mde-bar { gap: 0.15rem 0.3rem; }
   .mde-file { order: 2; margin-left: auto; border-left: 0; min-width: 2rem; min-height: 2rem; }
-  .mde-tools { order: 3; flex: 1 0 100%; margin-left: 0; flex-wrap: nowrap; justify-content: space-between; }
-  .mde-tools .mde-sep { display: none; }
-  .mde-tools .mde-tool { flex: 0 1 2rem; min-width: 1.75rem; min-height: 2rem; padding-inline: 0; }
+  .mde-tools { order: 3; flex: 1 0 100%; margin-left: 0; flex-wrap: wrap; justify-content: flex-start; gap: 0.1rem; }
+  .mde-tools .mde-tool { flex: none; min-width: 2rem; min-height: 2rem; padding-inline: 0; }
 }
 .mde-uploading { margin: var(--sp-2) var(--sp-3); }
 .rt { min-width: 0; }

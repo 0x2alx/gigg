@@ -155,7 +155,7 @@ export function continueList(e: Edit): Edit | null {
 // mdText: a file name as literal link text: every character that could start inline Markdown (emphasis,
 // code, a nested link or image, HTML, an entity, strikethrough, a table cell) is escaped and line
 // breaks become spaces, so a name like "x](y) *z*" stays one plain link label.
-const mdText = (s: string) => s.replace(/[\r\n]+/g, " ").replace(/[\\`*_[\]<>!&~|]/g, "\\$&");
+export const mdText = (s: string) => s.replace(/[\r\n]+/g, " ").replace(/[\\`*_[\]<>!&~|]/g, "\\$&");
 
 export const isImageFile = (f: { type: string }) => f.type.startsWith("image/");
 
