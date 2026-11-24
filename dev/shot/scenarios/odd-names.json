@@ -1,0 +1,96 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [
+  1440,
+  900
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => { const r = await fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'}, body: JSON.stringify({title: 'Odd file names'})}); const made = await r.json(); location.href = '/board/p/1/g/' + made['key']; return r.status; })()",
+   "expect": 201
+  },
+  {
+   "wait": ".add-comment .rt-content"
+  },
+  {
+   "wait": 1000
+  },
+  {
+   "eval": "(async () => {\n  const c = document.createElement('canvas'); c.width = 64; c.height = 40;\n  const x = c.getContext('2d'); x.fillStyle = '#7b4fd6'; x.fillRect(0, 0, 64, 40);\n  const png = await new Promise((ok) => c.toBlob(ok, 'image/png'));\n  const box = document.querySelector('.add-comment .mde');\n  const dt = new DataTransfer();\n  dt.items.add(new File([png], 'a]b*c.png', {type: 'image/png'}));\n  box.dispatchEvent(new DragEvent('dragover', {dataTransfer: dt, bubbles: true, cancelable: true}));\n  box.dispatchEvent(new DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true}));\n  for (let i = 0; i < 50; i++) {\n    const img = document.querySelector('.add-comment .rt-content img[src*=\"/api/v1/attachments/\"]');\n    if (img && !document.querySelector('.add-comment .mde-uploading')) return img.getAttribute('alt');\n    await new Promise((r) => setTimeout(r, 200));\n  }\n  return document.querySelector('.add-comment .rt-content').innerHTML.slice(0, 300);\n})()",
+   "expect": "a]b*c.png"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "(async () => { const f = document.querySelector('.add-comment'); [...f.querySelectorAll('.mde [role=tab]')].find((b) => b.textContent.trim() === 'Markdown').click(); await new Promise((r) => setTimeout(r, 300)); const v = f.querySelector('.mde textarea').value.trim().replace(/\\d+\\/file/g, 'N/file'); [...f.querySelectorAll('.mde [role=tab]')].find((b) => b.textContent.trim() === 'Visual').click(); return v; })()",
+   "expect": "![a\\]b\\*c.png](/api/v1/attachments/N/file)"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "click": ".add-comment button[type=submit]"
+  },
+  {
+   "wait": ".comments .comment .md img"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "[...document.querySelectorAll('.comments .comment .md')].map((m) => [m.querySelector('img')?.getAttribute('alt') ?? null, m.textContent.includes('![')])",
+   "expect": [
+    [
+     "a]b*c.png",
+     false
+    ]
+   ]
+  },
+  {
+   "shot": "odd-names-comment",
+   "el": ".comments .comment"
+  },
+  {
+   "eval": "(async () => {\n  const c = document.createElement('canvas'); c.width = 64; c.height = 40;\n  const x = c.getContext('2d'); x.fillStyle = '#7b4fd6'; x.fillRect(0, 0, 64, 40);\n  const png = await new Promise((ok) => c.toBlob(ok, 'image/png'));\n  const box = document.querySelector('.add-comment .mde');\n  const dt = new DataTransfer();\n  dt.items.add(new File([png], 'shot.png', {type: 'image/png'})); dt.items.add(new File(['x'], 'notes.txt', {type: 'text/plain'}));\n  box.dispatchEvent(new DragEvent('dragover', {dataTransfer: dt, bubbles: true, cancelable: true}));\n  box.dispatchEvent(new DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true}));\n  for (let i = 0; i < 50; i++) {\n    const img = document.querySelector('.add-comment .rt-content img[src*=\"/api/v1/attachments/\"]');\n    const a = document.querySelector('.add-comment .rt-content a[href*=\"/api/v1/attachments/\"]'); if (img && a && !document.querySelector('.add-comment .mde-uploading')) return [img.getAttribute('alt'), a.textContent];\n    await new Promise((r) => setTimeout(r, 200));\n  }\n  return document.querySelector('.add-comment .rt-content').innerHTML.slice(0, 300);\n})()",
+   "expect": [
+    "shot.png",
+    "notes.txt"
+   ]
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "(async () => { const f = document.querySelector('.add-comment'); [...f.querySelectorAll('.mde [role=tab]')].find((b) => b.textContent.trim() === 'Markdown').click(); await new Promise((r) => setTimeout(r, 300)); const v = f.querySelector('.mde textarea').value.trim().replace(/\\d+\\/file/g, 'N/file'); [...f.querySelectorAll('.mde [role=tab]')].find((b) => b.textContent.trim() === 'Visual').click(); return v; })()",
+   "expect": "![shot.png](/api/v1/attachments/N/file)\n\n[notes.txt](/api/v1/attachments/N/file)"
+  }
+ ]
+}

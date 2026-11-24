@@ -12,6 +12,7 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { Extension, type JSONContent } from "@tiptap/core";
 import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from "@tiptap/suggestion";
 import { Placeholder } from "@tiptap/extensions";
+import { Selection, TextSelection } from "@tiptap/pm/state";
 import type { User } from "./api";
 import { parseMd, richExtensions, toMd } from "./richmd";
 import { Icon } from "./icons";
@@ -240,7 +241,25 @@ export const RichText = forwardRef<RichHandle, {
       link,
       insertFile: (name, url, image) => {
         if (!editor) return;
-        if (image) editor.chain().focus().insertContent({ type: "image", attrs: { src: url, alt: name } }).run();
+        // an image is a block: the caret goes to the text after it (a new paragraph when there is none),
+        // else the next file of the same drop would replace the image, left selected by the insert
+        if (image)
+          editor
+            .chain()
+            .focus()
+            .insertContent({ type: "image", attrs: { src: url, alt: name } })
+            .command(({ tr, state }) => {
+              const end = tr.selection.to;
+              let after = Selection.findFrom(tr.doc.resolve(end), 1, true);
+              if (!after) {
+                // nothing to type into after it yet: a paragraph for the caret
+                tr.insert(end, state.schema.nodes.paragraph!.create());
+                after = TextSelection.create(tr.doc, end + 1);
+              }
+              tr.setSelection(after);
+              return true;
+            })
+            .run();
         else editor.chain().focus().insertContent([{ type: "text", text: name, marks: [{ type: "link", attrs: { href: url } }] }, { type: "text", text: " " }]).run();
       },
     }),
