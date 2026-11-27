@@ -20,7 +20,7 @@ var auditSkipAll = map[string]bool{"version": true, "updated_at": true}
 // auditSkip: per object, fields that aren't its own settings.
 var auditSkip = map[string][]string{
 	"gig": {"key", "status_name", "status_category", "created_by_username", "created_by_admin", "cost_usd_total", "comment_count",
-		"subgig_count", "subgig_done", "checklist_total", "checklist_done", "blocked_by", "blocked_by_subgigs", "schedule", "last_run",
+		"subgig_count", "subgig_done", "checklist_total", "checklist_done", "blocked_by", "blocked_by_subgigs", "parent_key", "schedule", "last_run",
 		"question", "aliases"},
 	"schedule":        {"uses", "errand_uses"},
 	"template":        {"recurring"},

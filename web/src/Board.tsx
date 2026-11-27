@@ -37,7 +37,7 @@ import { GigModal, lastProject } from "./GigModal";
 import { GigPanel } from "./GigPanel";
 import { backTo, copyGigLink, relTime, viewsApi } from "./views/viewsApi";
 import { ALWAYS_RUN_COLOR, CATEGORY_COLOR, colorFor, readableOn } from "./theme";
-import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, MoreMenu, PriorityIcon, PrioritySelect, GigBadges, ALWAYS_RUN_TIP, Pill, WorkspaceChip, reducedMotion } from "./ui";
+import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, MoreMenu, ParentMark, PriorityIcon, PrioritySelect, GigBadges, ALWAYS_RUN_TIP, Pill, WorkspaceChip, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { WherePicker } from "./WherePicker";
 import { HelpButton } from "./help";
@@ -1673,6 +1673,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
         <div className="card-top">
           <div className="card-top-main">
           <PriorityIcon priority={gig.priority} />
+          <ParentMark gig={gig} />
           {!!gig.recurrence_id && (
             <span className="rec-badge" data-tip="Made by a recurring gig">
               <Icon name="refresh" strokeWidth={2.4} />

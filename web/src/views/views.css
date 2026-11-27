@@ -80,6 +80,7 @@
 .vw-title-link { color: var(--text); text-decoration: none; box-shadow: inset 3px 0 0 var(--row-c, transparent); padding-left: 0.5rem; margin-left: -0.5rem; display: inline-block; }
 .vw-title-link:not([style]) { padding-left: 0; margin-left: 0; }
 .vw-title-link:hover { text-decoration: underline; }
+.vw-marks { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: 0.5rem; vertical-align: middle; }
 .vw-chips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
 .vw-people { display: inline-flex; align-items: center; }
 .vw-people .avatar + .avatar { margin-left: -0.3rem; }

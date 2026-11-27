@@ -464,6 +464,30 @@ function writeFull(on: boolean) {
 
 export const ALWAYS_RUN_TIP = "Always run: the runner takes it any time, outside the night window and the budget";
 
+// BlockedMark: the lock with the number of open blockers (cards and table rows); nothing when free.
+export function BlockedMark({ gig }: { gig: Partial<Pick<Gig, "blocked_by">> }) {
+  if (!gig.blocked_by) return null;
+  return (
+    <span className="pill pill-danger blocked-mark" title={`${blockedWords(gig.blocked_by)}: agents won't pick it up`}>
+      {/* the number is for the eye; screen readers get the same in words */}
+      <Icon name="lock" strokeWidth={2.2} /> <span aria-hidden="true">{gig.blocked_by}</span>
+      <span className="sr-only">{blockedWords(gig.blocked_by)}</span>
+    </span>
+  );
+}
+
+// ParentMark: a subgig's "↳ KEY", naming its parent (cards and table rows); nothing on a top-level gig.
+export function ParentMark({ gig }: { gig: Partial<Pick<Gig, "parent_key">> }) {
+  if (!gig.parent_key) return null;
+  return (
+    <span className="parent-mark" title={`Subgig of ${gig.parent_key}`}>
+      <span aria-hidden="true">↳ </span>
+      <span className="sr-only">Subgig of </span>
+      {gig.parent_key}
+    </span>
+  );
+}
+
 // GigBadges: the schedule, time-window and missed badges (cards and the gig panel). With items
 // (cards): also blocked, checklist and subgig progress, and up to two select/checkbox values. On a card
 // the progress and window marks are quiet text (icon and numbers, no box); only "blocked" and "missed"
@@ -481,12 +505,7 @@ export function GigBadges({ gig, now = Date.now(), items, fields }: {
   return (
     <>
       {/* the numbers are for the eye; screen readers get the same in words */}
-      {items && !!gig.blocked_by && (
-        <span className="pill pill-danger" title={`${blockedWords(gig.blocked_by)}: agents won't pick it up`}>
-          <Icon name="lock" strokeWidth={2.2} /> <span aria-hidden="true">{gig.blocked_by}</span>
-          <span className="sr-only">{blockedWords(gig.blocked_by)}</span>
-        </span>
-      )}
+      {items && <BlockedMark gig={gig} />}
       {items && ck > 0 && (
         <span className={quiet(gig.checklist_done === ck)} title="Checklist">
           <Icon name="checklist" /> <span aria-hidden="true">{gig.checklist_done ?? 0}/{ck}</span>

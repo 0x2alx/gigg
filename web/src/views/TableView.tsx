@@ -14,7 +14,7 @@ import { RecurringModal } from "../Recurring";
 import { useApp, type WorkspaceTree } from "../App";
 import { assignable } from "../fields";
 import { CATEGORY_COLOR, colorFor } from "../theme";
-import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, PriorityIcon, PrioritySelect, StatusDot } from "../ui";
+import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, BlockedMark, ParentMark, PriorityIcon, PrioritySelect, StatusDot } from "../ui";
 import { WorkspaceBadge } from "../WorkspaceBadge";
 import { Icon } from "../icons";
 import { CATEGORY_LABEL, FLAG_FILTERS } from "../boardModel";
@@ -563,6 +563,13 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
                   {t.title}
                 </Link>
               );
+              // the marks a card has: blocked (with its open blockers) and a subgig's parent
+              const marks = (!!t.blocked_by || !!t.parent_key) && (
+                <span className="vw-marks">
+                  <BlockedMark gig={t} />
+                  <ParentMark gig={t} />
+                </span>
+              );
               const prio = t.priority > 0 && (
                 <span className="vw-prio">
                   <PriorityIcon priority={t.priority} />
@@ -610,7 +617,10 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
                     {check}
                     <td className="vw-card">
                       <div className="vw-card-top">
-                        <span className="vw-title">{title}</span>
+                        <span className="vw-title">
+                          {title}
+                          {marks}
+                        </span>
                         <span className="vw-key">{t.key}</span>
                       </div>
                       <div className="vw-card-meta">
@@ -644,7 +654,10 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
                 <tr key={t.id} {...rowProps}>
                   {check}
                   <td className="vw-nowrap vw-key">{t.key}</td>
-                  <td className="vw-title">{title}</td>
+                  <td className="vw-title">
+                    {title}
+                    {marks}
+                  </td>
                   <td className="vw-nowrap">
                     <StatusDot name={t.status_name} category={t.status_category} />
                   </td>

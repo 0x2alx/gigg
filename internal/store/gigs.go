@@ -31,6 +31,7 @@ type Gig struct {
 	DueAt             *int64         `json:"due_at"`
 	DoneAt            *int64         `json:"done_at"`
 	ParentID          *int64         `json:"parent_id"`
+	ParentKey         *string        `json:"parent_key,omitempty" doc:"A subgig: its parent's key"`
 	ClonedFromID      *int64         `json:"cloned_from_id"`
 	CreatedBy         int64          `json:"created_by"`
 	CreatedByUsername string         `json:"created_by_username"`
@@ -126,7 +127,8 @@ const gigCols = `t.id, p.key || '-' || t.number, t.workspace_id, t.project_id, t
 		WHERE r.to_gig_id = t.id AND r.kind = 'blocks' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND bs.category NOT IN ('done','cancelled')),
 	` + blockingSubgigs + `,
 	t.model, t.effort, t.always_run, t.allowed_tools, t.blocks_parent, t.auto_archive_minutes, t.run_timeout_minutes,
-	(SELECT count(*) FROM attachments at WHERE at.gig_id = t.id), coalesce(t.last_progress_at, t.created_at)`
+	(SELECT count(*) FROM attachments at WHERE at.gig_id = t.id), coalesce(t.last_progress_at, t.created_at),
+	(SELECT pp.key || '-' || pg.number FROM gigs pg JOIN projects pp ON pp.id = pg.project_id WHERE pg.id = t.parent_id)`
 
 // blockingSubgigs counts t's open subgigs that hold it back (blocks_parent; not archived ones,
 // which agents never get either), except those that
@@ -146,20 +148,20 @@ const gigFrom = ` FROM gigs t JOIN projects p ON p.id = t.project_id JOIN status
 
 func scanGig(row interface{ Scan(...any) error }) (*Gig, error) {
 	var t Gig
-	var color, sess sql.NullString
+	var color, sess, parentKey sql.NullString
 	var start, due, done, parent, cloned, viaKey, lastRun, resume, rec, occ, notAfter, missed, archived, autoArch, runTO sql.NullInt64
 	var tools string
 	if err := row.Scan(&t.ID, &t.Key, &t.WorkspaceID, &t.ProjectID, &t.Number, &t.Title, &t.DescriptionMD, &t.StatusID,
 		&t.StatusName, &t.StatusCategory, &t.Position, &t.Priority, &color, &start, &due, &done, &parent, &cloned,
 		&t.CreatedBy, &t.CreatedByUsername, &t.CreatedByAdmin, &viaKey, &t.CreatedAt, &t.UpdatedAt, &sess, &lastRun,
 		&resume, &t.CostUSDTotal, &t.CommentCount, &t.Deleted, &t.Version, &rec, &occ, &notAfter, &missed, &archived,
-		&t.SubgigCount, &t.SubgigDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubgigs, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent, &autoArch, &runTO, &t.AttachmentCount, &t.LastProgressAt); err != nil {
+		&t.SubgigCount, &t.SubgigDone, &t.ChecklistTotal, &t.ChecklistDone, &t.BlockedBy, &t.BlockedBySubgigs, &t.Model, &t.Effort, &t.AlwaysRun, &tools, &t.BlocksParent, &autoArch, &runTO, &t.AttachmentCount, &t.LastProgressAt, &parentKey); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
-	t.Color, t.SessionID = ptrStr(color), ptrStr(sess)
+	t.Color, t.SessionID, t.ParentKey = ptrStr(color), ptrStr(sess), ptrStr(parentKey)
 	t.StartAt, t.DueAt, t.DoneAt, t.ParentID, t.ClonedFromID = ptrInt(start), ptrInt(due), ptrInt(done), ptrInt(parent), ptrInt(cloned)
 	t.CreatedViaKeyID, t.LastRunID, t.ResumeRequestedAt = ptrInt(viaKey), ptrInt(lastRun), ptrInt(resume)
 	t.RecurrenceID, t.OccurrenceAt, t.NotAfter, t.MissedAt = ptrInt(rec), ptrInt(occ), ptrInt(notAfter), ptrInt(missed)

@@ -191,6 +191,7 @@ export interface Gig {
   done_at?: number | null; // when it entered a done status (null when it isn't done)
   schedule?: { name: string; text: string }; // made by a recurring gig: its schedule, in words
   parent_id?: number | null;
+  parent_key?: string | null; // a subgig: its parent's key
   subgig_count?: number;
   subgig_done?: number;
   checklist_total?: number;

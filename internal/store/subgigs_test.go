@@ -190,3 +190,24 @@ func TestSubgigGateTrashAndArchive(t *testing.T) {
 		t.Fatalf("archived gate still blocks: %d", got.BlockedBy)
 	}
 }
+
+// A subgig names its parent's key (cards show "↳ KEY"); a top-level gig has none.
+func TestSubgigParentKey(t *testing.T) {
+	f := newFixture(t)
+	parent := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "release"})
+	pid := parent.ID
+	sub := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "notes", ParentID: &pid})
+	if parent.ParentKey != nil {
+		t.Fatalf("top-level gig has parent_key %q", *parent.ParentKey)
+	}
+	got, _ := GetGig(f.ctx, f.s.R, sub.ID)
+	if got.ParentKey == nil || *got.ParentKey != parent.Key {
+		t.Fatalf("parent_key %v, want %s", got.ParentKey, parent.Key)
+	}
+	ts, _, _ := ListGigs(f.ctx, f.s.R, GigFilter{WorkspaceID: f.ws.ID})
+	for _, g := range ts {
+		if g.ID == sub.ID && (g.ParentKey == nil || *g.ParentKey != parent.Key) {
+			t.Fatalf("list: parent_key %v, want %s", g.ParentKey, parent.Key)
+		}
+	}
+}
