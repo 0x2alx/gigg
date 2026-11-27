@@ -23,8 +23,19 @@ type User struct {
 	CreatedAt   int64           `json:"created_at"`
 	LastLoginAt *int64          `json:"last_login_at,omitempty"`
 	Version     int64           `json:"version"`
+	// HasPassword is filled in for admins only, on human users (see ShowPasswordState)
+	HasPassword *bool `json:"has_password,omitempty" doc:"Admins only, humans only: whether the user has a password (without one they can't log in)"`
 
 	PasswordHash string `json:"-"`
+}
+
+// ShowPasswordState fills in HasPassword on a human user (for an admin's view of the user list).
+func (u *User) ShowPasswordState() {
+	if u.Kind != "human" {
+		return
+	}
+	has := u.PasswordHash != ""
+	u.HasPassword = &has
 }
 
 var usernameRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{1,31}$`)

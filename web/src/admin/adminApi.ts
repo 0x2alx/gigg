@@ -88,6 +88,7 @@ export interface AdminUser {
   disabled: boolean;
   created_at: number;
   last_login_at?: number | null;
+  has_password?: boolean; // humans, in an admin's view: false = can't log in until a password is set
   version: number;
 }
 

@@ -123,6 +123,11 @@ export function UsersPage() {
                     <span className="chips admin-flags">
                       {u.is_admin && <span className="pill pill-accent">admin</span>}
                       {u.disabled && <span className="pill pill-danger">disabled</span>}
+                      {u.has_password === false && (
+                        <span className="pill pill-warn" data-tip="Can't log in until a password is set: use Password to set one">
+                          no password
+                        </span>
+                      )}
                       {u.id === me.user.id && <span className="pill pill-ws">you</span>}
                     </span>
                   </td>

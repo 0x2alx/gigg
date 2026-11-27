@@ -650,6 +650,7 @@ a.pulse-item:hover { color: var(--text); }
 .pill-agent { --c: var(--accent); }
 /* solid, on purpose: the few things that mean something is wrong */
 .pill-danger { background: var(--danger); color: var(--on-danger); border-color: var(--danger); }
+.pill-warn { --c: var(--danger); } /* a quieter warning than pill-danger: the danger colour as an outline tint */
 .chip-label {
   display: inline-flex; align-items: center; gap: 0.15rem; font-size: var(--fs-xs); font-weight: var(--weight-strong);
   padding: 0 0.4rem; border-radius: var(--radius-s); line-height: 1.65; max-width: 100%; min-width: 0; overflow-wrap: anywhere;

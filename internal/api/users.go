@@ -70,7 +70,9 @@ func (a *API) registerUsers() {
 			out.Body.Items = []*store.User{}
 		}
 		for _, u := range out.Body.Items {
-			if !p.AdminWith("admin:users") && u.ID != p.User.ID {
+			if p.AdminWith("admin:users") {
+				u.ShowPasswordState() // the admin's user list flags people who can't log in yet
+			} else if u.ID != p.User.ID {
 				u.Preferences = nil
 			}
 		}
@@ -95,7 +97,9 @@ func (a *API) registerUsers() {
 		if err != nil {
 			return nil, storeErr(err)
 		}
-		if !p.AdminWith("admin:users") && u.ID != p.User.ID {
+		if p.AdminWith("admin:users") {
+			u.ShowPasswordState()
+		} else if u.ID != p.User.ID {
 			u.Preferences = nil
 		}
 		return &userOut{ETag: etag(u.Version), Body: u}, nil
