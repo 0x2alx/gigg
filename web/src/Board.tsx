@@ -27,6 +27,7 @@ import { loadCollapsed, saveCollapsed, toggleId } from "./collapse";
 import { loadSorts, saveSorts, sortGigs, sortsFor, SORT_LABEL, type ColumnSort } from "./columnSort";
 import { applyMove, reorderIndex, type MoveBody } from "./dnd";
 import { useNarrow } from "./narrow";
+import { Toast, unarchiveUndo, useToast } from "./toast";
 import { setMentionUsers } from "./markdown";
 import { RecurringModal } from "./Recurring";
 import { SchedulesModal } from "./Schedules";
@@ -101,7 +102,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const [archived, setArchived] = useState<Gig[]>([]);
   const [fields, setFields] = useState<Map<number, CustomField[]>>(new Map());
   // the toast: a short message, with an Undo when the change can be taken back in one click
-  const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
+  const [toast, showToast, clearToast] = useToast();
   const [archivingCol, setArchivingCol] = useState<string | null>(null); // the Done column archiving its gigs
   const [moveErr, setMoveErr] = useState("");
   const [drag, setDrag] = useState<number | null>(null);
@@ -243,18 +244,13 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
     };
   }, [wsKey, gigPid, projOf]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), toast.undo ? 6000 : 4000);
-    return () => clearTimeout(t);
-  }, [toast]);
   const changed = useCallback(
     (message?: string, undo?: () => void) => {
       load();
       refresh();
-      if (message) setToast({ text: message, undo });
+      if (message) showToast(message, undo);
     },
-    [load, refresh],
+    [load, refresh, showToast],
   );
 
   // a new gig opens straight in the form, which offers every project you can add to: it starts in the
@@ -919,24 +915,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
           onOpenSchedule={(id) => setRecurring({ highlight: id })}
         />
       )}
-      {toast && (
-        <div className="toast" role="status">
-          {toast.text}
-          {toast.undo && (
-            <button
-              type="button"
-              className="toast-undo"
-              onClick={() => {
-                const undo = toast.undo;
-                setToast(null);
-                undo?.();
-              }}
-            >
-              Undo
-            </button>
-          )}
-        </div>
-      )}
+      <Toast toast={toast} onClose={clearToast} />
     </div>
   );
 }
@@ -1469,14 +1448,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
     setErr("");
     api
       .archiveGig(gig.id)
-      .then(() =>
-        onChanged(`Archived ${gig.key}`, () =>
-          api
-            .unarchiveGig(gig.id)
-            .then(() => onChanged(`${gig.key} is back on the board`))
-            .catch((e: unknown) => onChanged(`Couldn't unarchive ${gig.key}: ${e instanceof ApiError ? e.message : "try again from the gig"}`)),
-        ),
-      )
+      .then(() => onChanged(`Archived ${gig.key}`, unarchiveUndo(gig, onChanged)))
       .catch((e: unknown) => {
         setErr(e instanceof ApiError ? e.message : "Archive failed.");
         setArchiving(false);

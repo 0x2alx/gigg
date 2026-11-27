@@ -17,6 +17,7 @@ import { CATEGORY_COLOR } from "./theme";
 import { Avatar, EXIT_MS, Pill, PriorityBadge, StatusBadge, GigBadges, UserBadge, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { Icon } from "./icons";
+import { unarchiveUndo } from "./toast";
 
 const kindBadge: Record<Comment["kind"], [string, string] | null> = {
   comment: null,
@@ -39,7 +40,8 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
   labels: Tag[];
   canWrite: boolean;
   onClose: () => void;
-  onChanged: () => void;
+  // a change was saved: refresh what lists the gig; a message (and its Undo) goes in the page's toast
+  onChanged: (message?: string, undo?: () => void) => void;
   onMoved: (t: Gig) => void;
   onOpenSchedule?: (id: number) => void;
 }) {
@@ -217,18 +219,19 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
     if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
   }, [gigKey]);
 
-  // act: saves a change; resolves to whether it worked (the error shows at the top)
-  const act = (p: Promise<Gig>, after?: (t: Gig) => void): Promise<boolean> => {
+  // act: saves a change; resolves to whether it worked (the error shows at the top). A toast message
+  // (with its Undo) goes to the page once it's saved.
+  const act = (p: Promise<Gig>, after?: (t: Gig) => void, toast?: { text: string; undo?: () => void }): Promise<boolean> => {
     const asked = gigKey;
     return p
       .then((t) => {
         if (keyRef.current !== asked) {
-          onChanged(); // saved, but another gig is on screen now: only the board refreshes
+          onChanged(toast?.text, toast?.undo); // saved, but another gig is on screen now: only the board refreshes
           return true;
         }
         setGig(t);
         setErr("");
-        onChanged();
+        onChanged(toast?.text, toast?.undo);
         after?.(t);
         load();
         return true;
@@ -590,7 +593,20 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
                     <Icon name="undo" /> Unarchive
                   </button>
                 ) : (
-                  <button type="button" className="button secondary small" onClick={() => act(api.archiveGig(gig.id))}>
+                  <button
+                    type="button"
+                    className="button secondary small"
+                    onClick={() =>
+                      // the same toast and Undo as the card's Archive (the panel's own banner sits at the top, out of sight)
+                      act(api.archiveGig(gig.id), undefined, {
+                        text: `Archived ${gig.key}`,
+                        undo: unarchiveUndo(gig, (m) => {
+                          onChanged(m);
+                          if (keyRef.current === gig.key) load();
+                        }),
+                      })
+                    }
+                  >
                     <Icon name="archive" /> Archive
                   </button>
                 ))}

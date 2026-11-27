@@ -25,6 +25,7 @@ import { parse, PASSTHROUGH, savedViewsApi, summary, toQuery, toSearch, viewHref
 import "./views.css";
 import { HelpButton } from "../help";
 import { useNarrow } from "../narrow";
+import { Toast, useToast } from "../toast";
 
 interface Sort {
   key: SortKey;
@@ -51,6 +52,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const [loc, navigate] = useLocation();
   const search = useSearch();
   const narrow = useNarrow();
+  const [toast, showToast, clearToast] = useToast(); // the board's toast: bulk moves and the panel's archive, with Undo
   const project = ws && pid ? ws.projects.find((p) => p.id === pid) : undefined;
   const scope = useMemo(() => (ws ? [ws] : tree), [ws, tree]);
   const scopeKey = scope.map((w) => w.slug).join(",");
@@ -468,9 +470,10 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           labels={labels}
           candidates={bulkCandidates}
           onClear={() => setSelected(new Set())}
-          onDone={() => {
+          onDone={(message, undo) => {
             load();
             refresh();
+            if (message) showToast(message, undo);
           }}
         />
       )}
@@ -644,12 +647,16 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           labels={openBoard.labels}
           canWrite={canWriteIn(openWs, openGig.pid)}
           onClose={() => setOpenGig(null)}
-          onChanged={() => refreshRow(openGig.key)}
+          onChanged={(message, undo) => {
+            refreshRow(openGig.key);
+            if (message) showToast(message, undo);
+          }}
           onMoved={(t) => setOpenGig({ pid: t.project_id, key: t.key })}
           onOpenSchedule={(id) => setRecurring(id)}
         />
       )}
       {recurring !== null && <RecurringModal highlight={recurring} onClose={() => setRecurring(null)} onChanged={load} />}
+      <Toast toast={toast} onClose={clearToast} />
     </div>
   );
 }
@@ -792,7 +799,8 @@ interface Progress {
 }
 
 function BulkBar({ gigs, labels, candidates, onClear, onDone }: {
-  gigs: Gig[]; labels: Tag[]; candidates: ReturnType<typeof assignable>; onClear: () => void; onDone: () => void;
+  gigs: Gig[]; labels: Tag[]; candidates: ReturnType<typeof assignable>; onClear: () => void;
+  onDone: (message?: string, undo?: () => void) => void; // a message (and its Undo) goes in the page's toast
 }) {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [labelText, setLabelText] = useState("");
@@ -802,12 +810,14 @@ function BulkBar({ gigs, labels, candidates, onClear, onDone }: {
 
   const run = (op: Op, title: string) => {
     const batch = [...gigs];
+    const changed: Gig[] = []; // the gigs this op changed (a move skips those already there), as they were before
     setProgress({ title, total: batch.length, done: 0, errors: [], running: true });
-    void pool(batch, 4, (t) => apply(t, op), (t, err) =>
+    void pool(batch, 4, (t) => apply(t, op).then((r) => void (r !== undefined && changed.push(t))), (t, err) =>
       setProgress((p) => p && { ...p, done: p.done + 1, errors: err ? [...p.errors, { key: t.key, msg: err }] : p.errors }),
     ).then(() => {
       setProgress((p) => p && { ...p, running: false });
-      onDone();
+      if (op.kind === "move" && changed.length > 0) onDone(`${gigCount(changed.length)} moved to ${CATEGORY_LABEL[op.category]}`, moveBack(changed, onDone));
+      else onDone();
     });
   };
 
@@ -950,6 +960,19 @@ function ProgressLine({ p, onDismiss }: { p: Progress; onDismiss: () => void }) 
       )}
     </div>
   );
+}
+
+const gigCount = (n: number) => `${n} gig${n === 1 ? "" : "s"}`;
+
+// moveBack: the Undo of a bulk move: each gig back to the status it had (the copies are from before
+// the move), then a toast saying how many made it.
+function moveBack(gigs: Gig[], report: (message: string) => void): () => void {
+  return () => {
+    let ok = 0;
+    void pool(gigs, 4, (t) => api.moveGig(t.id, { status: t.status_id }), (_, err) => void (err === null && ok++)).then(() =>
+      report(ok === gigs.length ? `${gigCount(ok)} moved back` : `${ok} of ${gigCount(gigs.length)} moved back; move the rest from each gig`),
+    );
+  };
 }
 
 // apply runs one bulk op on one gig. Label and assignee changes re-read the gig first so a
