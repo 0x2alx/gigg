@@ -213,7 +213,8 @@ export function TimeInput({ value, onChange, className, invalid, ...rest }: {
 
 // DateTimeInput: a local date plus a time (unix ms out). Picking only a date fills in defaultTime
 // (shown, so the user sees it). live: report every valid change (forms); otherwise commit when focus
-// leaves the pair or on Enter (the gig panel, which saves each commit).
+// leaves the date field (also into its time field: a reload then keeps the picked date), when it
+// leaves the pair, or on Enter (the gig panel, which saves each commit).
 export function DateTimeInput({ value, onChange, defaultTime, label, disabled, live }: {
   value: number | null;
   onChange: (v: number | null) => void;
@@ -224,12 +225,18 @@ export function DateTimeInput({ value, onChange, defaultTime, label, disabled, l
 }) {
   const [v, setV] = useState(() => splitDateTime(value));
   const box = useRef<HTMLDivElement>(null);
+  const sent = useRef<number | null | undefined>(undefined); // the last value committed, until `value` catches up
   useEffect(() => {
+    sent.current = undefined;
     if (!box.current?.contains(document.activeElement)) setV(splitDateTime(value));
   }, [value]);
   const emit = (next: { date: string; time: string }) => {
     const ms = joinDateTime(next.date, next.time, defaultTime);
-    if (ms !== (value ?? null) && (ms !== null || !next.date)) onChange(ms);
+    if (ms === (sent.current === undefined ? (value ?? null) : sent.current)) return; // nothing new (two blurs, one change)
+    if (ms !== null || !next.date) {
+      sent.current = ms;
+      onChange(ms);
+    }
   };
   const set = (next: { date: string; time: string }) => {
     setV(next);
@@ -251,13 +258,24 @@ export function DateTimeInput({ value, onChange, defaultTime, label, disabled, l
         }
       }}
     >
-      <input type="date" value={v.date} disabled={disabled} aria-label={`${label} date`} onChange={(e) => set({ date: e.target.value, time: fillTime(e.target.value, v.time, defaultTime) })} />
+      <input
+        type="date"
+        value={v.date}
+        disabled={disabled}
+        aria-label={`${label} date`}
+        onChange={(e) => set({ date: e.target.value, time: fillTime(e.target.value, v.time, defaultTime) })}
+        onFocus={() => (sent.current = undefined)} // a save that failed can be sent again
+        onBlur={() => !live && emit(v)}
+      />
       <input type="time" value={v.time} disabled={disabled || !v.date} aria-label={`${label} time`} onChange={(e) => set({ ...v, time: e.target.value })} />
       {!disabled && v.date && (
         <button type="button" className="icon-button dt-clear" aria-label={`Clear ${label.toLowerCase()}`} title="Clear" onClick={() => {
           const next = { date: "", time: "" };
           setV(next);
-          if (value !== null) onChange(null);
+          if (value !== null) {
+            sent.current = null;
+            onChange(null);
+          }
         }}>
           ×
         </button>
