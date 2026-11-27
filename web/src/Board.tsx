@@ -1560,11 +1560,17 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
                   onOpen();
                 }}
               >
-                <Icon name="arrow-right" /> Open
+                <span className="menu-ico">
+                  <Icon name="arrow-right" />
+                </span>{" "}
+                Open
               </button>
               {canAssign && (
                 <button type="button" role="menuitem" onClick={assignMe}>
-                  <Icon name="users" /> Assign to me
+                  <span className="menu-ico">
+                    <Icon name="users" />
+                  </span>{" "}
+                  Assign to me
                 </button>
               )}
               {canReorder && !(first && last) && <div className="menu-label">Order</div>}
@@ -1597,7 +1603,10 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
                   copyGigLink(gig).then((m) => onChanged(m), (e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't copy."));
                 }}
               >
-                <Icon name="link" /> Copy link
+                <span className="menu-ico">
+                  <Icon name="link" />
+                </span>{" "}
+                Copy link
               </button>
               <button
                 type="button"
