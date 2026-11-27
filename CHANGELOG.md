@@ -14,7 +14,7 @@
   - Archiving from the gig panel and a bulk move in the table get the same Undo toast as a card's Archive. The table's Undo puts each gig back in the status it had.
   - The phone table gets a Sort select and Select all (its header row is hidden there). In the rows layout, a lane with cards past its edge fades out and shows a "+N" button that scrolls it.
   - In the gig panel, a date picked before moving on to its time field is saved at once, so a reload keeps it. Custom fields show a new value straight away (a checkbox flips on the click), and the checkbox sits left like the other fields.
-  - The profile saves every field as you change it (the Save button is gone). Its guide no longer promises a crop step: the picture is cut to a square around its centre.
+  - The profile saves every field as you change it (the Save button is gone).
   - Admin: categories read "To-Do", "Waiting" and so on, the new key dialog lists people by name, and a person without a password is marked **no password** (users gain `has_password`, sent to admins only, on humans only). `/admin/workspaces/<slug>` works with a slug as well as an id.
   - Smaller fixes:
     - the card menu's labels line up behind one icon column;
