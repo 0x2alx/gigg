@@ -1,0 +1,207 @@
+{
+ "base": "https://gigg-dev:8443",
+ "viewport": [1440, 900],
+ "steps": [
+  { "wait": 3000 },
+  { "goto": "/" },
+  { "wait": "input[autocomplete=username]" },
+  { "type": ["input[autocomplete=username]", "ada"] },
+  { "type": ["input[autocomplete=current-password]", "gigg-dev-password"] },
+  { "press": "Enter" },
+  { "wait": ".board" },
+  {
+   "eval": "(async () => {\n  const J = {'Content-Type': 'application/json', 'X-Gigg-CSRF': '1'};\n  const mk = (b) => fetch('/api/v1/projects/1/gigs', {method: 'POST', headers: J, body: JSON.stringify(b)}).then(r => r.json());\n  for (let i = 1; i <= 9; i++) await mk({title: 'Lane card ' + i, category: 'todo'});\n  const rb = await mk({title: 'QA runbook check', category: 'waiting'});\n  const dt = await mk({title: 'Date field check', category: 'doing', checklist: ['Check the date']});\n  localStorage.setItem('qaRb', rb.key); localStorage.setItem('qaDt', dt.key); localStorage.setItem('qaDtId', String(dt.id));\n  const f = await fetch('/api/v1/workspaces/scout/fields', {method: 'POST', headers: J, body: JSON.stringify({name: 'Reviewed', kind: 'checkbox'})});\n  const e = await fetch('/api/v1/workspaces/scout/errands', {method: 'POST', headers: J, body: JSON.stringify({name: 'QA disk check', command: 'true', worker: 'scout', rule: {freq: 'daily', interval: 1, window_start: '03:00', window_minutes: 60, lead_minutes: 0, tz: 'UTC'}})});\n  const ej = await e.json(); localStorage.setItem('qaErrand', String(ej.id));\n  const u = await fetch('/api/v1/users', {method: 'POST', headers: J, body: JSON.stringify({username: 'carol', kind: 'human', display_name: 'Carol'})});\n  return [!!rb.key, !!dt.key, f.status, e.status, u.status];\n})()",
+   "expect": [true, true, 201, 201, 201]
+  },
+
+  { "goto": "/board" },
+  { "wait": ".board" },
+  { "wait": 1200 },
+  { "click": ".gig-card .card-tools .card-menu > .icon-button" },
+  { "wait": ".card-menu-pop" },
+  { "wait": 400 },
+  {
+   "eval": "(() => { const items = [...document.querySelectorAll('.card-menu-pop [role=menuitem]')]; const xs = items.map(b => { const i = b.querySelector('.menu-ico'); return i ? Math.round(i.getBoundingClientRect().right) : null; }); return items.length > 2 && xs.every(x => x !== null && x === xs[0]); })()",
+   "expect": true
+  },
+  { "shot": "card-menu-1440", "el": ".card-menu-pop" },
+  { "press": "Escape" },
+
+  { "click": "button[data-tip^='Statuses as rows']" },
+  { "wait": ".board-rows" },
+  { "wait": 1000 },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll('.lane-more-button')]; return b.length > 0 && /^\\+\\d+$/.test(b[0].textContent.trim()) && !!document.querySelector('.column.lane-more'); })()",
+   "expect": true
+  },
+  { "shot": "rows-more-1440", "full": false },
+  { "click": ".lane-more-button" },
+  { "wait": 900 },
+  {
+   "eval": "[...document.querySelectorAll('.board-rows .cards')].some(c => c.scrollLeft > 0)",
+   "expect": true
+  },
+  { "click": "button[data-tip='Statuses as columns']" },
+  { "wait": 600 },
+
+  { "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('qaDt'); return true; })()", "expect": true },
+  { "wait": "aside.panel .tp-body" },
+  { "wait": 1200 },
+  {
+   "eval": "(() => { const d = document.querySelector('aside.panel input[aria-label=\"Start date\"]'); const t = document.querySelector('aside.panel input[aria-label=\"Start time\"]'); if (!d || !t) return 'no date pair'; d.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(d, '2026-12-14'); d.dispatchEvent(new Event('input', {bubbles: true})); return new Promise(r => setTimeout(() => { t.focus(); r(document.activeElement === t); }, 200)); })()",
+   "expect": true
+  },
+  { "wait": 1200 },
+  {
+   "eval": "(async () => { const g = await (await fetch('/api/v1/gigs/' + localStorage.getItem('qaDtId'))).json(); return [g.start_at !== null, document.activeElement?.getAttribute('aria-label')]; })()",
+   "expect": [true, "Start time"]
+  },
+  {
+   "eval": "(() => { const u = document.querySelector('aside.panel .att-usage'); return u ? u.textContent.trim().startsWith('Workspace:') : 'no usage line'; })()",
+   "expect": true
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll('aside.panel button')].find(x => x.textContent.trim() === 'Archive'); if (!b) return 'no archive button'; b.click(); return new Promise(r => setTimeout(() => { const t = document.querySelector('.toast'); r(!!t && t.textContent.includes('Archived') && !!t.querySelector('.toast-undo')); }, 1200)); })()",
+   "expect": true
+  },
+  { "shot": "panel-archive-toast-1440", "full": false },
+  { "click": ".toast-undo" },
+  { "wait": 1500 },
+  {
+   "eval": "(async () => { const g = await (await fetch('/api/v1/gigs/' + localStorage.getItem('qaDtId'))).json(); return !g.archived_at; })()",
+   "expect": true
+  },
+
+  { "goto": "/admin/workspaces/scout" },
+  { "wait": 2000 },
+  {
+   "eval": "(() => [!!document.querySelector('h1') && document.querySelector('h1').textContent.includes('Scout'), document.body.innerText.includes('Not found')])()",
+   "expect": [true, false]
+  },
+  { "goto": "/admin/users" },
+  { "wait": 1500 },
+  {
+   "eval": "[...document.querySelectorAll('.pill-warn')].filter(p => p.textContent.includes('no password')).length",
+   "expect": 1
+  },
+  { "shot": "admin-users-1440", "full": false },
+
+  { "goto": "/errands" },
+  { "wait": 1800 },
+  {
+   "eval": "[...document.querySelectorAll('.errand-worker-name')].some(e => [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() === 'Scout')",
+   "expect": true
+  },
+  { "eval": "(() => { location.href = '/errands/' + localStorage.getItem('qaErrand'); return true; })()", "expect": true },
+  { "wait": ".errand-panel" },
+  { "wait": 600 },
+  {
+   "eval": "[...document.querySelector('.errand-props dd.errand-worker').childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim()",
+   "expect": "Scout"
+  },
+
+  { "goto": "/errands?new=1" },
+  { "wait": "[role=dialog] .seg[aria-label=Repeat]" },
+  { "wait": 600 },
+  {
+   "eval": "(() => { const bs = [...document.querySelectorAll('[role=dialog] .seg[aria-label=Repeat] button')]; return [bs.length, new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))).size]; })()",
+   "expect": [5, 1]
+  },
+  { "press": "Escape" },
+  { "wait": 400 },
+
+  { "viewport": [390, 844] },
+  { "goto": "/errands?new=1" },
+  { "wait": "[role=dialog] select.seg-select[aria-label=Repeat]" },
+  { "wait": 600 },
+  {
+   "eval": "(() => { const s = document.querySelector('[role=dialog] select.seg-select[aria-label=Repeat]'); const d = s.closest('[role=dialog]').getBoundingClientRect(); const r = s.getBoundingClientRect(); return [[...s.options].map(o => o.text).join(','), r.right <= d.right]; })()",
+   "expect": ["Minutes,Hours,Daily,Weekly,Monthly", true]
+  },
+  { "shot": "errand-repeat-390", "el": "[role=dialog] .repeat" },
+  { "press": "Escape" },
+  { "wait": 400 },
+
+  { "goto": "/board?q=runbook" },
+  { "wait": ".board" },
+  { "wait": 1200 },
+  {
+   "eval": "(() => { const on = document.querySelector('.col-tab.on'); return [!!on && on.classList.contains('has-match'), document.querySelectorAll('.col-tab.has-match').length, !!document.querySelector('.column .gig-card')]; })()",
+   "expect": [true, 1, true]
+  },
+  { "shot": "phone-search-390", "full": false },
+  { "eval": "(document.querySelector('.col-tab.no-match').click(), true)", "expect": true },
+  { "wait": 500 },
+  {
+   "eval": "(() => { const e = document.querySelector('.column .empty'); return !!e && e.textContent.includes('No matches in') && !!e.querySelector('button.link'); })()",
+   "expect": true
+  },
+  { "shot": "phone-search-empty-tab-390", "full": false },
+
+  { "goto": "/board" },
+  { "wait": ".board" },
+  { "wait": 800 },
+  { "click": ".account-button" },
+  { "wait": 600 },
+  {
+   "eval": "(() => { const items = [...document.querySelectorAll('.menu [role^=menuitem]')]; const svg = (t) => items.find(i => i.textContent.includes(t))?.querySelector('svg')?.innerHTML; return [!!svg('Templates'), !!svg('Import JSON'), svg('Templates') !== svg('Import JSON')]; })()",
+   "expect": [true, true, true]
+  },
+  { "shot": "account-menu-390", "full": false },
+  { "press": "Escape" },
+
+  { "eval": "(() => { location.href = '/board/p/1/g/' + localStorage.getItem('qaDt'); return true; })()", "expect": true },
+  { "wait": "aside.panel .tp-body" },
+  { "wait": 1200 },
+  {
+   "eval": "document.querySelector('aside.panel .ck-add')?.placeholder",
+   "expect": "Add an item…"
+  },
+  {
+   "eval": "(() => { const b = [...document.querySelectorAll('aside.panel button[aria-expanded]')].find(x => x.textContent.includes('Fields')); if (!b) return 'no fields section'; if (b.getAttribute('aria-expanded') !== 'true') b.click(); return new Promise(r => setTimeout(() => { const cb = document.querySelector('aside.panel .custom-props input[type=checkbox]'); if (!cb) return r('no checkbox'); cb.scrollIntoView({block: 'center'}); const left = Math.abs(cb.getBoundingClientRect().left - cb.closest('dd').getBoundingClientRect().left) < 2; cb.click(); r([left, cb.checked]); }, 500)); })()",
+   "expect": [true, true]
+  },
+  { "wait": 1000 },
+  { "shot": "fields-checkbox-390", "el": "aside.panel .custom-props" },
+  { "press": "Escape" },
+  { "wait": 500 },
+
+  { "goto": "/themes" },
+  { "wait": ".tg-card" },
+  { "wait": 800 },
+  {
+   "eval": "(() => { const e = document.querySelector('.tg-empty'); const h = document.querySelector('#tg-yours'); return !e || parseFloat(getComputedStyle(e).fontSize) <= parseFloat(getComputedStyle(h).fontSize); })()",
+   "expect": true
+  },
+  {
+   "eval": "(() => { const c = [...document.querySelectorAll('.tg-card')].find(x => !x.classList.contains('selected')); const name = c.querySelector('.tg-name').textContent; c.querySelector('.tg-name').click(); return new Promise(r => setTimeout(() => r(document.querySelector('.tg-card.selected .tg-name')?.textContent === name), 800)); })()",
+   "expect": true
+  },
+  { "shot": "themes-390", "full": false },
+
+  { "goto": "/w/scout/table" },
+  { "wait": ".vw-phone-bar" },
+  { "wait": 1200 },
+  {
+   "eval": "(() => { const s = document.querySelector('.vw-phone-sort select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'title'); s.dispatchEvent(new Event('change', {bubbles: true})); return [!!document.querySelector('.vw-phone-bar input[type=checkbox]'), s.options.length]; })()",
+   "expect": [true, 12]
+  },
+  { "wait": 1200 },
+  {
+   "eval": "(() => { const t = [...document.querySelectorAll('.vw-table tbody .vw-title')].map(x => x.textContent.trim()).slice(0, 4); return [document.querySelector('.vw-phone-sort select').value, t.length > 1 && t.every((x, i) => i === 0 || t[i - 1].localeCompare(x) <= 0)]; })()",
+   "expect": ["title", true]
+  },
+  { "shot": "phone-table-390", "full": false },
+  {
+   "eval": "(() => { [...document.querySelectorAll('.vw-table tbody input[type=checkbox]')].slice(0, 2).forEach(c => c.click()); return new Promise(r => setTimeout(() => { const s = document.querySelector('.vw-bulk select[aria-label^=\"Move selected\"]'); if (!s) return r('no bulk bar'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'cancelled'); s.dispatchEvent(new Event('change', {bubbles: true})); setTimeout(() => { const t = document.querySelector('.toast'); r(!!t && t.textContent.includes('moved to Cancelled') && !!t.querySelector('.toast-undo')); }, 2500); }, 400)); })()",
+   "expect": true
+  },
+  { "shot": "bulk-move-toast-390", "full": false },
+  { "click": ".toast-undo" },
+  { "wait": 2000 },
+  {
+   "eval": "document.querySelector('.toast')?.textContent.includes('moved back')",
+   "expect": true
+  }
+ ]
+}
