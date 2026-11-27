@@ -94,6 +94,9 @@
   `IN ()`, which PostgreSQL refuses); they now see an empty list. Every dynamic `IN` list goes
   through one helper, `dev/check.sh` refuses hand-built ones, and the new `dev/check-pg.sh` runs the
   store and api tests against a throwaway PostgreSQL.
+- Errands every N minutes or hours: on the days clocks change, the daily window now ends at its local
+  clock time, not after a fixed number of minutes. A whole-day hourly errand lost its 23:00 run on
+  the day clocks go back; a window running past the change ended an hour off.
 
 ## 0.1.0 (2026-11-19)
 

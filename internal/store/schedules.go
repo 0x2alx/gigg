@@ -167,7 +167,10 @@ func (r Rule) Next(startsOn, after int64) (int64, bool) {
 			}
 		}
 		open := time.Date(d.Year(), d.Month(), d.Day(), hm.Hour(), hm.Minute(), 0, 0, loc).UnixMilli()
-		end := open + r.WindowMinutes*60_000
+		// the window ends at its local wall-clock time (00:00 for 1440 min), not after a fixed count of
+		// minutes, so a 23 or 25 hour DST day neither runs into the next day's window nor ends an hour
+		// early; ticks still step in real time from the opening, so a 25 hour day gets 25 hourly ticks
+		end := time.Date(d.Year(), d.Month(), d.Day(), hm.Hour(), hm.Minute()+int(r.WindowMinutes), 0, 0, loc).UnixMilli()
 		t := open
 		if after > open {
 			t = open + (after-open+step-1)/step*step
