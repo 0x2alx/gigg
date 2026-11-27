@@ -10,6 +10,7 @@ import { EffortSelect, MinutesSelect, ModelInput, TIMEOUT_CHOICES, ToolsInput, t
 import { Pill, StatusBadge } from "./ui";
 import { HelpButton } from "./help";
 import { Icon, type IconName } from "./icons";
+import { useNarrow } from "./narrow";
 
 export const errText = (e: unknown, fallback = "That didn't work.") => (e instanceof ApiError ? e.message : fallback);
 
@@ -195,6 +196,7 @@ function ChecklistBox({ rows, canEdit, checkable, busy, err, onToggle, onEdit, o
 }) {
   const [text, setText] = useState("");
   const [editing, setEditing] = useState<{ key: string; text: string } | null>(null);
+  const narrow = useNarrow(); // the long placeholder is cut mid-word on a phone: the paste hint moves to the tooltip
   const add = (lines: string[]) => {
     if (!lines.length) return;
     setText("");
@@ -263,7 +265,8 @@ function ChecklistBox({ rows, canEdit, checkable, busy, err, onToggle, onEdit, o
           className="ck-add"
           value={text}
           data-dirty={text.trim() ? "" : undefined}
-          placeholder="Add an item… (paste several lines to add many)"
+          placeholder={narrow ? "Add an item…" : "Add an item… (paste several lines to add many)"}
+          title="Paste several lines to add many items at once"
           aria-label="Add checklist item"
           maxLength={500}
           onChange={(e) => setText(e.target.value)}
