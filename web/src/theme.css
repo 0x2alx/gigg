@@ -705,6 +705,8 @@ a.pulse-item:hover { color: var(--text); }
 .assignee.on { background: var(--selected); color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .assignee .avatar { border-width: 0; }
 .swatches { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+/* the radio group inside a row of swatches doesn't add a box: its swatches lay out as the row's own */
+.swatch-group { display: contents; }
 .swatch {
   width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 2px solid var(--surface); cursor: pointer; padding: 0;
   outline: 2px solid transparent; outline-offset: 2px; display: inline-block;

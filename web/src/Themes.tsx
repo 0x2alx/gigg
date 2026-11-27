@@ -9,6 +9,8 @@ import {
   colourOf as roleColour, laneBorderOf, laneOf, logoOf, parseColour, ratio, readableOn, sane, secondaryOf, themeJSON, type ColourKey, type Theme,
 } from "./theme";
 import { Modal } from "./ui";
+import { SwatchGroup } from "./fields";
+import { swatchList } from "./swatches";
 import { LogoMark } from "./Logo";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
@@ -343,6 +345,28 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
   useEffect(() => {
     if (fontsAllowed) loadPreviewFont(t.font);
   }, [fontsAllowed, t.font]);
+  // Esc leaves the editor like Cancel, but with changes it asks once first ("Esc again to discard"),
+  // as the New gig form does. Not while a dialog (the custom colour) is open: Esc closes that.
+  const dirty = JSON.stringify(t) !== JSON.stringify(initial);
+  const [discardAsked, setDiscardAsked] = useState(false);
+  const escape = useRef(() => {});
+  escape.current = () => {
+    if (dirty && !discardAsked) {
+      setDiscardAsked(true);
+      setErr("You have unsaved changes. Press Esc again to discard them, or Save.");
+      return;
+    }
+    onCancel();
+  };
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      e.preventDefault();
+      escape.current();
+    };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, []);
 
   return (
     <div className="theme-editor">
@@ -355,7 +379,11 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
           Save
         </button>
       </div>
-      {err && <p className="danger">{err}</p>}
+      {err && (
+        <p className="danger" role="alert">
+          {err}
+        </p>
+      )}
       <Preview t={t} flash={flash} />
       <div className="editor-rows">
         <label className="editor-row">
@@ -368,40 +396,23 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
         </label>
         {([...COLOUR_KEYS.filter((k) => k !== "accent" && k !== "onAccent" && k !== "text" && k !== "mutedText" && k !== "danger"), "accent", "onAccent", "secondary", "text", "mutedText", "danger", "laneColor", "laneBorder", "logoColor"] as ColourKey[]).map((k) => (
           <div key={k} className="editor-row">
-            <span>{ROLE_LABEL[k]}</span>
+            <span id={`role-${k}`}>{ROLE_LABEL[k]}</span>
             <div className="swatches">
-              {k === "secondary" && (
-                <button type="button" className={"swatch auto" + (t.secondary === null ? " on" : "")} aria-label={`${ROLE_LABEL[k]}: Auto${t.secondary === null ? ", selected" : ""}`}
-                  title="Auto: a deeper shade of the accent; it follows the accent when you change it." style={{ background: secondaryOf({ ...t, secondary: null }) }}
-                  onClick={() => set({ secondary: null }, k)}>
-                  A
-                </button>
-              )}
-              {k === "laneColor" && (
-                <button type="button" className={"swatch auto" + (!t.laneColor ? " on" : "")} aria-label={`${ROLE_LABEL[k]}: Auto${!t.laneColor ? ", selected" : ""}`}
-                  title="Auto: halfway between the background and the cards; it follows them when you change them." style={{ background: laneOf({ ...t, laneColor: null }) }}
-                  onClick={() => set({ laneColor: null }, k)}>
-                  A
-                </button>
-              )}
-              {k === "laneBorder" && (
-                <button type="button" className={"swatch auto" + (!t.laneBorder ? " on" : "")} aria-label={`${ROLE_LABEL[k]}: None${!t.laneBorder ? ", selected" : ""}`}
-                  title="None: columns without an outline." style={{ background: laneOf(t) }}
-                  onClick={() => set({ laneBorder: null }, k)}>
-                  ∅
-                </button>
-              )}
-              {k === "logoColor" && (
-                <button type="button" className={"swatch auto" + (!t.logoColor ? " on" : "")} aria-label={`${ROLE_LABEL[k]}: Auto${!t.logoColor ? ", selected" : ""}`}
-                  title="Auto: the accent; it follows the accent when you change it." style={{ background: t.accent }}
-                  onClick={() => set({ logoColor: null }, k)}>
-                  A
-                </button>
-              )}
-              {dedupe([colourOf(k), ...PRESETS]).map((c) => (
-                <button key={c} type="button" className={"swatch" + (colourOf(k) === c && !auto(k) ? " on" : "")} style={{ background: c }}
-                  aria-label={`${ROLE_LABEL[k]}: ${c}${colourOf(k) === c && !auto(k) ? ", selected" : ""}`} onClick={() => set({ [k]: c } as Partial<Theme>, k)} />
-              ))}
+              <SwatchGroup
+                labelledBy={`role-${k}`}
+                options={[
+                  ...(k === "secondary"
+                    ? [{ id: "auto", name: "Auto", face: "A", on: t.secondary === null, background: secondaryOf({ ...t, secondary: null }), title: "Auto: a deeper shade of the accent; it follows the accent when you change it.", pick: () => set({ secondary: null }, k) }]
+                    : k === "laneColor"
+                      ? [{ id: "auto", name: "Auto", face: "A", on: !t.laneColor, background: laneOf({ ...t, laneColor: null }), title: "Auto: halfway between the background and the cards; it follows them when you change them.", pick: () => set({ laneColor: null }, k) }]
+                      : k === "laneBorder"
+                        ? [{ id: "auto", name: "None", face: "∅", on: !t.laneBorder, background: laneOf(t), title: "None: columns without an outline.", pick: () => set({ laneBorder: null }, k) }]
+                        : k === "logoColor"
+                          ? [{ id: "auto", name: "Auto", face: "A", on: !t.logoColor, background: t.accent, title: "Auto: the accent; it follows the accent when you change it.", pick: () => set({ logoColor: null }, k) }]
+                          : []),
+                  ...swatchList(colourOf(k), PRESETS).map((c) => ({ id: c, name: c, on: colourOf(k).toUpperCase() === c && !auto(k), background: c, pick: () => set({ [k]: c } as Partial<Theme>, k) })),
+                ]}
+              />
               <button type="button" className="swatch custom" aria-label={`${ROLE_LABEL[k]}: custom colour`} onClick={() => setDialog(k)}>
                 ✎
               </button>
@@ -509,10 +520,6 @@ function Editor({ initial, onCancel, onSave }: { initial: Theme; onCancel: () =>
       )}
     </div>
   );
-}
-
-function dedupe(cs: string[]): string[] {
-  return [...new Set(cs.map((c) => c.toUpperCase()))];
 }
 
 // loadPreviewFont: a font the editor shows that gigg doesn't bundle (only once Google Fonts are allowed).

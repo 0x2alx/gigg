@@ -1,7 +1,8 @@
 // Inputs shared by the new-gig modal and the gig panel: labels, assignees, colour.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type { Tag, User } from "./api";
 import { fillTime, joinDateTime, splitDateTime } from "./dates";
+import { rovingNext } from "./swatches";
 
 import { colorFor } from "./theme";
 import { Avatar, LabelChip } from "./ui";
@@ -84,21 +85,69 @@ const SWATCHES = ["#E5484D", "#F76B15", "#FFC53D", "#46A758", "#12A594", "#0090F
 
 export function ColorPicker({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
   return (
-    <div className="swatches" role="radiogroup" aria-label="Colour">
-      <button type="button" className={"swatch none" + (value === null ? " on" : "")} aria-checked={value === null} role="radio" aria-label="No colour" onClick={() => onChange(null)}>
-        ∅
-      </button>
-      {SWATCHES.map((c) => (
+    <div className="swatches">
+      <SwatchGroup
+        label="Colour"
+        options={[
+          { id: "none", name: "No colour", face: "∅", className: "none", on: value === null, pick: () => onChange(null) },
+          ...SWATCHES.map((c) => ({ id: c, name: `Colour ${c}`, on: value?.toUpperCase() === c, background: colorFor("", c), pick: () => onChange(c) })),
+        ]}
+      />
+    </div>
+  );
+}
+
+export interface SwatchOption {
+  id: string;
+  name: string; // what a screen reader says ("Auto", "#E5484D")
+  on: boolean;
+  pick: () => void;
+  background?: string;
+  face?: ReactNode; // a letter or sign on the swatch (A for Auto, ∅ for none)
+  title?: string;
+  className?: string;
+}
+
+// SwatchGroup: a row of colour swatches as one radio group: one tab stop (the picked swatch, else the
+// first), the arrow keys move and pick, Home and End jump to the ends. It sits inside a .swatches row
+// without changing its layout (display: contents).
+export function SwatchGroup({ options, label, labelledBy }: { options: SwatchOption[]; label?: string; labelledBy?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const stop = Math.max(0, options.findIndex((o) => o.on));
+  // focus by id after the pick re-rendered the row (the list can change when a colour is picked)
+  useEffect(() => {
+    if (focusId === null) return;
+    [...(ref.current?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [])].find((b) => b.dataset.id === focusId)?.focus();
+    setFocusId(null);
+  }, [focusId]);
+  const key = (e: ReactKeyboardEvent, i: number) => {
+    const next = rovingNext(e.key, i, options.length);
+    if (next < 0) return;
+    e.preventDefault();
+    const o = options[next]!;
+    if (!o.on) o.pick();
+    setFocusId(o.id);
+  };
+  return (
+    <div className="swatch-group" role="radiogroup" aria-label={label} aria-labelledby={labelledBy} ref={ref}>
+      {options.map((o, i) => (
         <button
-          key={c}
+          key={o.id}
           type="button"
           role="radio"
-          aria-checked={value?.toUpperCase() === c}
-          aria-label={`Colour ${c}`}
-          className={"swatch" + (value?.toUpperCase() === c ? " on" : "")}
-          style={{ background: colorFor("", c) }}
-          onClick={() => onChange(c)}
-        />
+          data-id={o.id}
+          aria-checked={o.on}
+          tabIndex={i === stop ? 0 : -1}
+          aria-label={o.name}
+          title={o.title}
+          className={"swatch" + (o.className ? " " + o.className : "") + (o.on ? " on" : "")}
+          style={o.background ? { background: o.background } : undefined}
+          onClick={o.pick}
+          onKeyDown={(e) => key(e, i)}
+        >
+          {o.face}
+        </button>
       ))}
     </div>
   );
