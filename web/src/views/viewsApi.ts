@@ -109,6 +109,20 @@ export function gigHref(tree: WorkspaceTree[], t: Pick<Gig, "workspace_id" | "pr
   return tree.some((w) => w.id === t.workspace_id) ? `/board/p/${t.project_id}/g/${t.key}` : "/";
 }
 
+// withParam: path?search with one more parameter.
+export function withParam(path: string, search: string, key: string, value: string): string {
+  const s = new URLSearchParams(search);
+  s.set(key, value);
+  return path + "?" + s.toString();
+}
+
+// boardToolHref: where a board tool (recurring, schedules, templates, import, archive, trash) opens:
+// on the board, over the projects in view; from any other page, on the board with every project.
+export function boardToolHref(loc: string, search: string, tool: string): string {
+  const onBoard = loc === "/board" || loc.startsWith("/board/");
+  return onBoard ? withParam(loc, search, "tool", tool) : `/board?tool=${tool}`;
+}
+
 // gigLink: the gig's full link (the board with its panel open), to paste into a chat or a note.
 export const gigLink = (t: Pick<Gig, "project_id" | "key">): string => `${location.origin}/board/p/${t.project_id}/g/${t.key}`;
 

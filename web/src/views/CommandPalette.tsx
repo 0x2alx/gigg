@@ -1,14 +1,14 @@
 // Command palette (Ctrl+K / Cmd+K): jump to a gig by key, to a project or workspace, run a
 // navigation command, or search gig text across every workspace.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
-import { useLocation } from "wouter";
-import { api, type Gig } from "../api";
+import { useLocation, useSearch } from "wouter";
+import { api, canShare, errandMakers, hasCap, type Gig } from "../api";
 import { useApp, type WorkspaceTree } from "../App";
 import { colorFor } from "../theme";
 import { Kbd, Pill, PriorityBadge, StatusBadge, rememberOpener } from "../ui";
 import { OPEN_PALETTE, openShortcuts } from "../keyboard";
 import { summary, viewHref } from "./savedViews";
-import { errMsg, fromHere, fuzzy, gigHref, gigsAcross } from "./viewsApi";
+import { boardToolHref, errMsg, fromHere, fuzzy, gigHref, gigsAcross } from "./viewsApi";
 import "./views.css";
 
 interface Item {
@@ -57,6 +57,7 @@ function context(loc: string, tree: WorkspaceTree[]) {
 function Palette({ onClose }: { onClose: () => void }) {
   const { me, tree, savedViews } = useApp();
   const [loc, navigate] = useLocation();
+  const search = useSearch();
   const [text, setText] = useState("");
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState("");
@@ -87,6 +88,8 @@ function Palette({ onClose }: { onClose: () => void }) {
     const firstBoard = tree.find((w) => w.projects.length > 0);
     const boardHref = here && pid ? `/w/${here.slug}/p/${pid}` : here?.projects[0] ? `/w/${here.slug}/p/${here.projects[0].id}` : firstBoard ? `/w/${firstBoard.slug}/p/${firstBoard.projects[0]!.id}` : null;
     const tableWs = here ?? tree[0];
+    const anyTemplates = canShare(me) || tree.some((w) => hasCap(me, "templates", w.id));
+    const canErrand = errandMakers(me, tree).length > 0;
 
     // 1. gig key
     if (KEY_RE.test(q)) {
@@ -185,6 +188,12 @@ function Palette({ onClose }: { onClose: () => void }) {
         label: here && pid ? "Table view (this project)" : `Table view (${tableWs.name})`,
         run: () => go(here && pid ? `/w/${here.slug}/p/${pid}/table` : `/w/${tableWs.slug}/table`),
       });
+    // the board's tools, as the account menu opens them; errands have their own page
+    cmds.push({ id: "c-recurring", group: "Commands", icon: "↻", label: "Recurring", run: () => go(boardToolHref(loc, search, "recurring")) });
+    if (anyTemplates) cmds.push({ id: "c-templates", group: "Commands", icon: "▤", label: "Templates", run: () => go(boardToolHref(loc, search, "templates")) });
+    cmds.push({ id: "c-schedules", group: "Commands", icon: "◷", label: "Schedules", run: () => go(boardToolHref(loc, search, "schedules")) });
+    cmds.push({ id: "c-errands", group: "Commands", icon: "⏲", label: "Errands", run: () => go("/errands") });
+    if (canErrand) cmds.push({ id: "c-new-errand", group: "Commands", icon: "+", label: "New errand", run: () => go("/errands?new=1") });
     cmds.push({ id: "c-themes", group: "Commands", icon: "◐", label: "Themes", run: () => go("/themes") });
     cmds.push({ id: "c-profile", group: "Commands", icon: "☺", label: "Profile", run: () => go("/profile") });
     if (me.admin) cmds.push({ id: "c-admin", group: "Commands", icon: "⚙", label: "Admin", run: () => go("/admin") });
@@ -258,7 +267,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       });
     }
     return out;
-  }, [text, loc, tree, me.admin, me.user.id, savedViews, results, go]);
+  }, [text, loc, search, tree, me, savedViews, results, go]);
 
   // keep the highlight in range and visible
   useEffect(() => {

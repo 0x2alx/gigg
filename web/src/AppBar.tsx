@@ -11,6 +11,7 @@ import { TopBell } from "./Bell";
 import { badgeCount } from "./notifications";
 import { ADMIN_TABS } from "./admin/common";
 import { viewHref } from "./views/savedViews";
+import { boardToolHref, withParam } from "./views/viewsApi";
 import { LogoMark } from "./Logo";
 import { useNarrow } from "./narrow";
 import { Avatar, MoreMenu } from "./ui";
@@ -91,13 +92,6 @@ export function AppBar({ inboxCount, onLogout }: { inboxCount: number; onLogout:
   );
 }
 
-// withParam: path?search with one more parameter.
-function withParam(path: string, search: string, key: string, value: string): string {
-  const s = new URLSearchParams(search);
-  s.set(key, value);
-  return path + "?" + s.toString();
-}
-
 // PageTab: one of the two pages. Gigs is on for the board and the table views too.
 function PageTab({ href, also = [], icon, label, iconOnly }: { href: string; also?: string[]; icon: string; label: string; iconOnly: boolean }) {
   const [loc] = useLocation();
@@ -174,8 +168,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
   };
 
   // the board's tools open on the board (the projects in view, or every project from another page)
-  const onBoard = loc === "/board" || loc.startsWith("/board/");
-  const tool = (t: string) => (onBoard ? withParam(loc, search, "tool", t) : `/board?tool=${t}`);
+  const tool = (t: string) => boardToolHref(loc, search, t);
   const anyTemplates = canShare(me) || tree.some((w) => hasCap(me, "templates", w.id));
   const canImport = importKinds(tree, me).length > 0;
   const anyArchive = tree.some((w) => w.projects.some((p) => canWriteIn(w, p.id) && hasCap(me, "archive_gigs", w.id, p.id)));
