@@ -24,7 +24,7 @@
     - the attachments usage line reads "Workspace: 109 KB of 1 GB";
     - a click anywhere on a theme card applies it;
     - the empty theme list uses body text;
-    - segmented controls (such as Repeat) scroll sideways instead of wrapping;
+    - on a phone the Repeat choice (errands, recurring gigs) is a select, and other segmented controls stay on one row instead of wrapping;
     - **Clear filters** only shows when something is filtered;
     - the template editor's help opens the templates help.
 
