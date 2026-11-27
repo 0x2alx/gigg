@@ -4,12 +4,25 @@
 // Steps: {"goto": "/path"}, {"click": "css"}, {"type": ["css", "text"]}, {"press": "Enter"},
 //        {"wait": "css"} or {"wait": 500}, {"viewport": [w, h]}, {"hover": "css"},
 //        {"shot": "name"} (full page; "full": false = the viewport; "el": "css" = one element, "margin": px),
-//        {"dom": "name"} (HTML + accessibility tree), {"eval": "js expression", "expect": value}.
+//        {"dom": "name"} (HTML + accessibility tree), {"eval": "js expression", "expect": value},
+//        {"mouse": [action, ...]} real mouse input, each action ["move"|"down"|"up"|"click"|"dblclick", ...at]
+//          or ["wheel", deltaY, ...at]; at is x, y in page pixels or "css", fx, fy (a point of that
+//          element's box as fractions: 0.5, 0.5 = its centre),
+//        {"touch": [action, ...]} real touch input (multi-finger): ["start"|"move", [at], [at]...] or ["end"],
+//          each at as above; a "move" is sent in a few steps, like a finger.
 // Always written: log.json with console messages, page errors, failed requests, CSP violations and
 // the result of every step. Exit 1 if a step fails or an "expect" doesn't match.
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer-core");
+
+// point: [x, y] in viewport pixels, or ["css", fx, fy] = that fraction of the element's box
+async function point(page, at) {
+  if (typeof at[0] !== "string") return [at[0], at[1]];
+  const el = await page.waitForSelector(at[0], { timeout: 10000 });
+  const b = await el.boundingBox();
+  return [b.x + b.width * (at[1] ?? 0.5), b.y + b.height * (at[2] ?? 0.5)];
+}
 
 (async () => {
   const [scenarioPath, outDir] = process.argv.slice(2);
@@ -22,6 +35,8 @@ const puppeteer = require("puppeteer-core");
     args: ["--no-sandbox", "--disable-gpu", "--ignore-certificate-errors"],
   });
   let failed = false;
+  let touch = null; // a CDP session, made on the first touch step
+  let fingers = [];
   try {
     const page = await browser.newPage();
     const [w, h] = sc.viewport || [1440, 900];
@@ -63,6 +78,49 @@ const puppeteer = require("puppeteer-core");
         else if (step.dom) {
           fs.writeFileSync(path.join(outDir, step.dom + ".html"), await page.content());
           fs.writeFileSync(path.join(outDir, step.dom + ".a11y.json"), JSON.stringify(await page.accessibility.snapshot(), null, 1));
+        } else if (step.mouse) {
+          for (const [kind, ...rest] of step.mouse) {
+            if (kind === "wheel") {
+              const [x, y] = await point(page, rest.slice(1));
+              await page.mouse.move(x, y);
+              await page.mouse.wheel({ deltaY: rest[0] });
+            } else {
+              const [x, y] = rest.length ? await point(page, rest) : [undefined, undefined];
+              if (kind === "move") await page.mouse.move(x, y, { steps: 5 });
+              else if (kind === "down") await page.mouse.down();
+              else if (kind === "up") await page.mouse.up();
+              else if (kind === "click") await page.mouse.click(x, y);
+              else if (kind === "dblclick") await page.mouse.click(x, y, { count: 2 });
+              else throw new Error(`unknown mouse action ${kind}`);
+            }
+            await new Promise((r) => setTimeout(r, 60));
+          }
+        } else if (step.touch) {
+          // CDP touch events: several fingers at once (puppeteer's touchscreen has only one)
+          if (!touch) {
+            touch = await page.createCDPSession();
+            await touch.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+          }
+          for (const [kind, ...ats] of step.touch) {
+            const pts = [];
+            for (const at of ats) pts.push(await point(page, at));
+            if (kind === "start") {
+              fingers = pts;
+              await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
+            } else if (kind === "move") {
+              const from = fingers;
+              for (let k = 1; k <= 6; k++) {
+                const now = pts.map(([x, y], id) => [from[id][0] + ((x - from[id][0]) * k) / 6, from[id][1] + ((y - from[id][1]) * k) / 6]);
+                await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: now.map(([x, y], id) => ({ x, y, id })) });
+                await new Promise((r) => setTimeout(r, 16));
+              }
+              fingers = pts;
+            } else if (kind === "end") {
+              await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+              fingers = [];
+            } else throw new Error(`unknown touch action ${kind}`);
+            await new Promise((r) => setTimeout(r, 40));
+          }
         } else if (step.eval) {
           rec.value = await page.evaluate(step.eval);
           if ("expect" in step && JSON.stringify(rec.value) !== JSON.stringify(step.expect)) {
