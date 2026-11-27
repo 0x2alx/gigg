@@ -18,6 +18,7 @@ import { Avatar, EXIT_MS, Pill, PriorityBadge, StatusBadge, GigBadges, UserBadge
 import { WorkspaceBadge } from "./WorkspaceBadge";
 import { Icon } from "./icons";
 import { unarchiveUndo } from "./toast";
+import { copyGigLink } from "./views/viewsApi";
 
 const kindBadge: Record<Comment["kind"], [string, string] | null> = {
   comment: null,
@@ -311,6 +312,7 @@ export function GigPanel({ gigKey, ws, statuses, labels, canWrite, onClose, onCh
           {gig.deleted && <span className="pill pill-danger">in trash</span>}
         </div>
         <FollowToggle following={liveFollowers.includes(me.user.id)} onToggle={(on) => act(api.followGig(gig.id, on))} />
+        <CopyLinkButton gig={gig} onError={setErr} />
         <button
           type="button"
           className="icon-button tp-expand"
@@ -747,6 +749,30 @@ function useLiveList<T>(key: number, server: T[], save: (v: T[]) => Promise<unkn
 
 // FollowToggle: follow the open gig for yourself (anyone who sees it may): its bells come to you as
 // your bell settings allow. Saved at once.
+// Copy link: the gig's link to the clipboard in one click; the icon turns into a tick for a moment
+function CopyLinkButton({ gig, onError }: { gig: Gig; onError: (msg: string) => void }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
+  return (
+    <button
+      type="button"
+      className="icon-button tp-copy-link"
+      aria-label={`Copy the link to ${gig.key}`}
+      title={copied ? "Link copied" : "Copy link"}
+      onClick={() => copyGigLink(gig).then(() => setCopied(true), (e: unknown) => onError(e instanceof Error ? e.message : "Couldn't copy."))}
+    >
+      <Icon name={copied ? "check" : "link"} />
+      <span className="sr-only" role="status">
+        {copied ? "Link copied" : ""}
+      </span>
+    </button>
+  );
+}
+
 function FollowToggle({ following, onToggle }: { following: boolean; onToggle: (on: boolean) => void }) {
   return (
     <button

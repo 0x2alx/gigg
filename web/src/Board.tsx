@@ -35,7 +35,7 @@ import { TemplatesModal } from "./Templates";
 import { copyJson, ImportJsonModal, importKinds } from "./ImportJsonModal";
 import { GigModal, lastProject } from "./GigModal";
 import { GigPanel } from "./GigPanel";
-import { backTo, relTime, viewsApi } from "./views/viewsApi";
+import { backTo, copyGigLink, relTime, viewsApi } from "./views/viewsApi";
 import { ALWAYS_RUN_COLOR, CATEGORY_COLOR, colorFor, readableOn } from "./theme";
 import { ClearFilters, Avatar, AssigneeSelect, FilterField, FlagSelect, LabelChip, LabelSelect, Modal, MoreFilters, MoreMenu, PriorityIcon, PrioritySelect, GigBadges, ALWAYS_RUN_TIP, Pill, WorkspaceChip, reducedMotion } from "./ui";
 import { WorkspaceBadge } from "./WorkspaceBadge";
@@ -1403,7 +1403,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
   onChanged: (message?: string, undo?: () => void) => void;
   fields?: CustomField[];
 }) {
-  const { users } = useApp();
+  const { users, me } = useApp();
   const [menu, setMenu] = useState(false);
   const [err, setErr] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -1469,6 +1469,15 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
     setMenu(false);
     onReorder(where);
   };
+  // Assign to me: adds you to its assignees (the others stay), like picking yourself in the gig
+  const canAssign = canWrite && !gig.deleted && !gig.assignees.includes(me.user.id) && hasCap(me, "edit_gigs", ws.id, gig.project_id);
+  const assignMe = () => {
+    setMenu(false);
+    api
+      .patchGig(gig.id, { assignees: [...gig.assignees, me.user.id] })
+      .then(() => onChanged(`Assigned ${gig.key} to you`))
+      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't assign it."));
+  };
   const overdue = gig.due_at !== null && gig.due_at < Date.now() && gig.status_category !== "done";
   const creator = users.get(gig.created_by);
   const labelFor = (l: Tag) => labels.find((x) => x.id === l.id) ?? l;
@@ -1527,7 +1536,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
     <>
       {canWrite && (
         <div className="card-menu" ref={ref}>
-          <button type="button" className="icon-button" aria-label={`Move ${gig.key}`} aria-expanded={menu} data-tip="Move or reorder" onClick={() => setMenu(!menu)}>
+          <button type="button" className="icon-button" aria-label={`Actions for ${gig.key}`} aria-haspopup="menu" aria-expanded={menu} data-tip="Open, assign, copy, move or reorder" onClick={() => setMenu(!menu)}>
             <Icon name="gear" />
           </button>
           {menu &&
@@ -1543,6 +1552,21 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
               }}
               style={pos ? { left: pos.left, top: pos.top ?? "auto", bottom: pos.bottom ?? "auto" } : { visibility: "hidden", left: 0, top: 0 }}
             >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(false);
+                  onOpen();
+                }}
+              >
+                <Icon name="arrow-right" /> Open
+              </button>
+              {canAssign && (
+                <button type="button" role="menuitem" onClick={assignMe}>
+                  <Icon name="users" /> Assign to me
+                </button>
+              )}
               {canReorder && !(first && last) && <div className="menu-label">Order</div>}
               {canReorder && !first && (
                 <>
@@ -1565,6 +1589,16 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
                 </>
               )}
               <div className="menu-label">Copy</div>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(false);
+                  copyGigLink(gig).then((m) => onChanged(m), (e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't copy."));
+                }}
+              >
+                <Icon name="link" /> Copy link
+              </button>
               <button
                 type="button"
                 role="menuitem"
@@ -1729,6 +1763,11 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
                 {gig.comment_count > 0 && (
                   <span className="meta-item" data-tip={`${gig.comment_count} comment${gig.comment_count === 1 ? "" : "s"}`}>
                     <Icon name="comment" /> {gig.comment_count}
+                  </span>
+                )}
+                {!!gig.attachment_count && (
+                  <span className="meta-item" data-tip={`${gig.attachment_count} attachment${gig.attachment_count === 1 ? "" : "s"}`}>
+                    <Icon name="paperclip" /> {gig.attachment_count}
                   </span>
                 )}
                 {(run || gig.session_id) && !running && (

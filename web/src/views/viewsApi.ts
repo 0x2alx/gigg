@@ -109,7 +109,17 @@ export function gigHref(tree: WorkspaceTree[], t: Pick<Gig, "workspace_id" | "pr
   return tree.some((w) => w.id === t.workspace_id) ? `/board/p/${t.project_id}/g/${t.key}` : "/";
 }
 
-export const OPEN_CATEGORIES: Category[] = ["backlog", "todo", "doing", "waiting"];
+// gigLink: the gig's full link (the board with its panel open), to paste into a chat or a note.
+export const gigLink = (t: Pick<Gig, "project_id" | "key">): string => `${location.origin}/board/p/${t.project_id}/g/${t.key}`;
+
+// copyGigLink: the gig's link to the clipboard; resolves to the message for a toast.
+export async function copyGigLink(t: Pick<Gig, "project_id" | "key">): Promise<string> {
+  if (!navigator.clipboard?.writeText) throw new Error("This browser doesn't allow copying here.");
+  await navigator.clipboard.writeText(gigLink(t));
+  return `Copied the link to ${t.key}`;
+}
+
+export const OPEN_CATEGORIES: Category[] =["backlog", "todo", "doing", "waiting"];
 export const ALL_CATEGORIES: Category[] = ["backlog", "todo", "doing", "waiting", "done", "cancelled"];
 export const isClosed = (c: Category) => c === "done" || c === "cancelled";
 export const isOverdue = (t: Pick<Gig, "due_at" | "status_category">) => t.due_at !== null && t.due_at < Date.now() && !isClosed(t.status_category);
