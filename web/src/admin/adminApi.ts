@@ -195,7 +195,7 @@ export interface AttachLimits {
 export const adminApi = {
   // workspaces
   workspaces: () => call<Items<AdminWorkspace>>("GET", "/workspaces"),
-  workspace: (ws: number) => call<AdminWorkspace>("GET", `/workspaces/${ws}`),
+  workspace: (ws: number | string) => call<AdminWorkspace>("GET", `/workspaces/${encodeURIComponent(String(ws))}`),
   createWorkspace: (body: { slug: string; name: string }) => call<AdminWorkspace>("POST", "/workspaces", body),
   patchWorkspace: (w: AdminWorkspace, body: Partial<{ name: string; color: string | null; owner_id: number | null; description_md: string; archived: boolean }>) =>
     call<AdminWorkspace>("PATCH", `/workspaces/${w.id}`, body, w.version),

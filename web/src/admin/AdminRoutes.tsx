@@ -30,7 +30,7 @@ export function AdminRoutes() {
       <Route path="/workspaces">
         <WorkspacesPage />
       </Route>
-      <Route path="/workspaces/:ws">{(p) => <WorkspaceDetailPage wsId={Number(p.ws)} />}</Route>
+      <Route path="/workspaces/:ws">{(p) => <WorkspaceDetailPage wsRef={p.ws} />}</Route>
       <Route path="/users">
         <UsersPage />
       </Route>

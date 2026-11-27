@@ -233,7 +233,8 @@ function CreateWorkspace({ onClose, onDone }: { onClose: () => void; onDone: () 
 
 // ---------------------------------------------------------------- one workspace
 
-export function WorkspaceDetailPage({ wsId }: { wsId: number }) {
+// wsRef is the URL segment: a numeric id or a slug (the API takes either).
+export function WorkspaceDetailPage({ wsRef }: { wsRef: string }) {
   const { refresh } = useApp();
   const [ws, setWs] = useState<AdminWorkspace | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -241,7 +242,7 @@ export function WorkspaceDetailPage({ wsId }: { wsId: number }) {
 
   const load = useCallback(() => {
     adminApi
-      .workspace(wsId)
+      .workspace(wsRef)
       .then((w) => {
         setWs(w);
         setError("");
@@ -251,7 +252,7 @@ export function WorkspaceDetailPage({ wsId }: { wsId: number }) {
       .users()
       .then((r) => setUsers(r.items))
       .catch(() => undefined);
-  }, [wsId]);
+  }, [wsRef]);
   useEffect(load, [load]);
 
   if (!ws)
