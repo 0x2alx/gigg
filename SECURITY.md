@@ -17,6 +17,9 @@ want it.
   programs that use the API.
 - Browser sessions are cookie-based with a CSRF header check; the main listener sets a strict
   Content-Security-Policy.
+- An open live-update stream (`/workspaces/{ws}/events`) keeps the access it had when it connected:
+  after a key is revoked, a user disabled or an access rule changed, it can go on sending what was
+  visible before for up to 2 minutes, until it ends and the reconnect is checked again.
 - Agents act on what they read. Anyone who can write a gig, comment or checklist item that an agent
   picks up can steer that agent: treat write access to an agent's workspace as the ability to direct
   it. Give agents their own workspaces, add only people you trust as members, and use per-gig tool
