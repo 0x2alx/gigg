@@ -1257,6 +1257,13 @@ func MoveGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, m Move) (*
 	if _, err := Activity(ctx, q, a, &t.WorkspaceID, &tp.ID, "gig.moved", "gig", t.ID, data); err != nil {
 		return nil, err
 	}
+	if tp.ID != t.ProjectID {
+		// the move is logged under the target project; someone who sees only the source project needs
+		// an entry of their own, so their live board drops the card. It says nothing of the target.
+		if _, err := Activity(ctx, q, a, &t.WorkspaceID, &t.ProjectID, "gig.moved_out", "gig", t.ID, map[string]any{"old_key": t.Key}); err != nil {
+			return nil, err
+		}
+	}
 	return GetGig(ctx, q, t.ID)
 }
 

@@ -97,6 +97,9 @@
 - Errands every N minutes or hours: on the days clocks change, the daily window now ends at its local
   clock time, not after a fixed number of minutes. A whole-day hourly errand lost its 23:00 run on
   the day clocks go back; a window running past the change ended an hour off.
+- A gig moved to another project now also logs `gig.moved_out` in the project it left, so someone
+  who sees only that project gets the change on the feed and the live board drops the card (before,
+  it stayed until a reload). The entry names only the old key.
 
 ## 0.1.0 (2026-11-19)
 

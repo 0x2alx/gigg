@@ -277,6 +277,11 @@ as `text/event-stream`, with the same visibility as the change feed (viewer, and
 Instance admins see key, member and access events; others don't, and edited or deleted comment text is
 removed from their entries.
 
+Entries belong to one project. A gig moved to another project logs `gig.moved` in the target project
+and `gig.moved_out` (only `old_key` in its data) in the project it left, so someone who sees only the
+old project still learns that the gig is gone. A gig's own history (`/gigs/{id}/activity`) leaves
+`gig.moved_out` out.
+
 ## Endpoints
 
 Paths are relative to `/api/v1`. "Admin" means an instance admin (with the matching `admin:*` scope
