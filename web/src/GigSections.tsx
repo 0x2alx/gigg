@@ -970,21 +970,38 @@ function FieldsBox({ fields, values, canEdit, err, onSave }: { fields: CustomFie
 
 export function CustomFieldsSection({ gig, fields, canEdit, onGig }: { gig: Gig; fields: CustomField[]; canEdit: boolean; onGig: (t: Gig) => void }) {
   const [err, setErr] = useState("");
+  // values on their way to the server, shown at once (a checkbox flips on the click, not on the
+  // answer); a failed save drops its value, so the field shows the stored one again
+  const [pending, setPending] = useState<Record<string, unknown>>({});
   if (fields.length === 0) return null;
   const save = (f: CustomField, v: unknown) => {
     if (v === undefined) {
       setErr(`${f.name}: not a valid ${f.kind}.`);
       return;
     }
-    const cur = gig.custom?.[String(f.id)] ?? null;
+    const id = String(f.id);
+    const cur = id in pending ? pending[id] : (gig.custom?.[id] ?? null);
     if (v === cur) return;
     setErr("");
+    setPending((p) => ({ ...p, [id]: v }));
+    const done = () =>
+      setPending((p) => {
+        if (p[id] !== v) return p; // a newer click is still on its way
+        const { [id]: _gone, ...rest } = p;
+        return rest;
+      });
     api
-      .setCustom(gig.id, { [String(f.id)]: v })
-      .then(onGig)
-      .catch((e: unknown) => setErr(errText(e)));
+      .setCustom(gig.id, { [id]: v })
+      .then((t) => {
+        onGig(t);
+        done();
+      })
+      .catch((e: unknown) => {
+        setErr(errText(e));
+        done();
+      });
   };
-  return <FieldsBox fields={fields} values={gig.custom ?? {}} canEdit={canEdit} err={err} onSave={save} />;
+  return <FieldsBox fields={fields} values={{ ...(gig.custom ?? {}), ...pending }} canEdit={canEdit} err={err} onSave={save} />;
 }
 
 // FieldsDraft: custom field values for a gig (or template) not saved yet.

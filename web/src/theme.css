@@ -1036,6 +1036,8 @@ label.check input { width: auto; accent-color: var(--accent); }
 .sub-parent .link { text-align: left; overflow-wrap: anywhere; }
 .custom-props { margin: 0; align-items: center; }
 .custom-props dd input:not([type="checkbox"]), .custom-props dd select { width: 100%; max-width: 18rem; }
+/* left-aligned like the other fields (the global input width: 100% centred it in a full-width box) */
+.custom-props dd input[type="checkbox"] { display: block; width: auto; margin: 0; accent-color: var(--accent); }
 .url-row { display: inline-flex; align-items: center; gap: 0.2rem; min-width: 0; max-width: 100%; }
 .url-link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; color: var(--accent); }
 /* attachments: image tiles, file rows, link and commit chips, the add row; the panel as a drop target */
