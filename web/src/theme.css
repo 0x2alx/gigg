@@ -866,6 +866,7 @@ a.pulse-item:hover { color: var(--text); }
   padding: 0.2rem 0.7rem; min-height: 1.6rem; flex: 0 0 auto; white-space: nowrap;
 }
 .seg button:hover { background: var(--hover); color: var(--text); }
+.seg-select { width: auto; max-width: 100%; } /* a segmented choice on a phone (Segmented selectWhenNarrow) */
 .seg button.on { background: var(--selected); color: var(--text); font-weight: var(--weight-strong); }
 label.inline { flex-direction: row; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
 label.inline select { width: auto; }

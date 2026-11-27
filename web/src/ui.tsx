@@ -29,6 +29,39 @@ export function ClearFilters({ active, onClear, className }: { active: boolean; 
   );
 }
 
+// Segmented: one choice among a few, as a segmented control (.seg). With selectWhenNarrow, a phone
+// gets a select instead: five pills don't fit beside their label at phone width, and a row cut off
+// at the edge hides options.
+export function Segmented<T extends string>({ options, value, onChange, label, selectWhenNarrow }: {
+  options: [T, string][];
+  value: T;
+  onChange: (v: T) => void;
+  label: string;
+  selectWhenNarrow?: boolean;
+}) {
+  const narrow = useNarrow();
+  if (narrow && selectWhenNarrow) {
+    return (
+      <select className="seg-select" value={value} aria-label={label} onChange={(e) => onChange(e.target.value as T)}>
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  return (
+    <div className="seg" role="radiogroup" aria-label={label}>
+      {options.map(([v, l]) => (
+        <button key={v} type="button" role="radio" aria-checked={value === v} className={value === v ? "on" : ""} onClick={() => onChange(v)}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // FlagSelect: the one picker of a yes/no filter (recurring, always run) on the board and in the table:
 // every gig, hide the gigs with the flag, or only those.
 export function FlagSelect({ flag, value, onChange, className }: { flag: FlagKey; value: FlagFilter; onChange: (v: FlagFilter) => void; className?: string }) {

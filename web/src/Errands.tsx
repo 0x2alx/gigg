@@ -16,7 +16,7 @@ import { HelpButton } from "./help";
 import { Icon } from "./icons";
 import { copyJson, ImportJsonModal, importTargets } from "./ImportJsonModal";
 import { MakeSharedDialog } from "./MakeSharedDialog";
-import { Avatar, ClearFilters, ConfirmModal, Modal } from "./ui";
+import { Avatar, ClearFilters, ConfirmModal, Modal, Segmented } from "./ui";
 import { PRIORITY_COLOR } from "./theme";
 import {
   RUN_STATUS_TEXT,
@@ -937,20 +937,13 @@ function ErrandEditor({ errand, template, choices, initialWs, initialProject = 0
         <div className="repeat span2" role="group" aria-label="Schedule">
           <div className="rf">
             <RfRow label="Repeat">
-              <div className="seg" role="radiogroup" aria-label="Repeat">
-                {FREQS.map(([v, label]) => (
-                  <button
-                    key={v}
-                    type="button"
-                    role="radio"
-                    aria-checked={f.freq === v}
-                    className={f.freq === v ? "on" : ""}
-                    onClick={() => set({ freq: v, interval: v === f.freq ? f.interval : v === "minutes" ? 15 : 1, weekdays: v === "weekly" && f.weekdays.length === 0 ? [1] : frequent(v) && f.freq === "weekly" ? [] : f.weekdays })}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                label="Repeat"
+                options={FREQS}
+                value={f.freq}
+                onChange={(v) => set({ freq: v, interval: v === f.freq ? f.interval : v === "minutes" ? 15 : 1, weekdays: v === "weekly" && f.weekdays.length === 0 ? [1] : frequent(v) && f.freq === "weekly" ? [] : f.weekdays })}
+                selectWhenNarrow
+              />
             </RfRow>
             <RfRow label="Every">
               <input type="number" className="num" min={1} max={fr ? (f.freq === "minutes" ? 360 : 24) : 365} value={f.interval} onChange={(e) => set({ interval: int(e.target.value, 1) })} aria-label="Repeat every" />

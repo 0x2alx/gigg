@@ -2,6 +2,7 @@
 // preview of the next occurrences (computed client-side, same rules as the server).
 import { useId, useMemo, type ReactNode } from "react";
 import { TimeInput } from "./fields";
+import { Segmented } from "./ui";
 import { WEEKDAYS, fmtWallWindow, localTZ, numIn, ordinal, previewOccurrences, repeatIssue, ruleOf, windowMinutes, type Freq, type RepeatField, type RepeatState } from "./recurrence";
 
 const FREQS: [Freq, string][] = [
@@ -42,18 +43,13 @@ export function RepeatFields({ value: s, onChange, allowNever = true, showPaused
     <div className="repeat span2" role="group" aria-label="Repeat">
       <div className="rf">
         <RfRow label={timingOnly ? "Timing" : "Repeat"}>
-          <div className="seg" role="radiogroup" aria-label="Repeat">
-            {allowNever && (
-              <button type="button" role="radio" aria-checked={!s.freq} className={!s.freq ? "on" : ""} onClick={() => set({ freq: "" })}>
-                Never
-              </button>
-            )}
-            {FREQS.map(([f, label]) => (
-              <button key={f} type="button" role="radio" aria-checked={s.freq === f} className={s.freq === f ? "on" : ""} onClick={() => set({ freq: f })}>
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented<Freq | "">
+            label="Repeat"
+            options={allowNever ? [["", "Never"], ...FREQS] : FREQS}
+            value={s.freq}
+            onChange={(freq) => set({ freq })}
+            selectWhenNarrow
+          />
         </RfRow>
         {s.freq && (
           <>
