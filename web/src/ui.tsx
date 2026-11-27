@@ -250,6 +250,32 @@ export function trapTab(e: KeyboardEvent, box: HTMLElement | null) {
   }
 }
 
+// Focus return. A dialog opened from a menu loses its opener with the menu (the item leaves the page
+// when the menu closes), and one that renders a beat late finds the focus already on <body>. So the
+// last element that had focus is tracked here, with its ancestors, and on close the focus goes back
+// to the opener or, if that left the page, to the button of the menu it was in (the nearest ancestor
+// still on the page that has an aria-haspopup / aria-expanded button as a direct child).
+let lastFocus: HTMLElement | null = null;
+if (typeof document !== "undefined")
+  document.addEventListener("focusin", (e) => {
+    if (e.target instanceof HTMLElement && e.target !== document.body) lastFocus = e.target;
+  });
+
+export function rememberOpener(): (inside?: HTMLElement | null) => void {
+  const active = document.activeElement;
+  const el = active instanceof HTMLElement && active !== document.body ? active : lastFocus;
+  const chain: HTMLElement[] = [];
+  for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) chain.push(p);
+  return (inside) => {
+    // leave the focus alone if something else took it on purpose (a dialog that opened the gig panel)
+    const now = document.activeElement;
+    if (now && now !== document.body && !inside?.contains(now)) return;
+    let target = el?.isConnected ? el : null;
+    if (!target) target = chain.find((p) => p.isConnected)?.querySelector<HTMLElement>(":scope > [aria-haspopup], :scope > [aria-expanded]") ?? null;
+    target?.focus();
+  };
+}
+
 // EXIT_MS: how long a dialog or the gig panel takes to animate out before it really closes
 export const EXIT_MS = 150;
 
@@ -304,7 +330,8 @@ export function Modal({ title, onClose, children, wide, xl, help, tools, expanda
     };
   }, []);
   useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
+    const back = rememberOpener();
+    const box = ref.current;
     (ref.current?.querySelector<HTMLElement>("[autofocus], [data-autofocus]") ??
       ref.current?.querySelector<HTMLElement>("input, textarea, select, button:not(.help-button)"))?.focus();
     // only the top dialog (the last one opened) answers Esc and keeps the focus
@@ -318,7 +345,7 @@ export function Modal({ title, onClose, children, wide, xl, help, tools, expanda
     document.addEventListener("keydown", esc);
     return () => {
       document.removeEventListener("keydown", esc);
-      prev?.focus();
+      back(box);
     };
   }, []);
   // Rendered into <body>, not where it's used: a dialog opened from a table cell inherited the cell's

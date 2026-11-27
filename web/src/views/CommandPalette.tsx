@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { api, type Gig } from "../api";
 import { useApp, type WorkspaceTree } from "../App";
 import { colorFor } from "../theme";
-import { Pill, PriorityBadge, StatusBadge } from "../ui";
+import { Pill, PriorityBadge, StatusBadge, rememberOpener } from "../ui";
 import { summary, viewHref } from "./savedViews";
 import { errMsg, fromHere, fuzzy, gigHref, gigsAcross } from "./viewsApi";
 import "./views.css";
@@ -58,11 +58,11 @@ function Palette({ onClose }: { onClose: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  // focus the input on open, give focus back on close
+  // focus the input on open, give focus back on close (to what opened it, as the dialogs do)
   useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
+    const back = rememberOpener();
     inputRef.current?.focus();
-    return () => prev?.focus();
+    return () => back();
   }, []);
 
   const go = useCallback(
