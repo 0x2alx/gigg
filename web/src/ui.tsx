@@ -224,6 +224,11 @@ export function UserBadge({ user }: { user: Pick<User, "username" | "display_nam
   );
 }
 
+// Kbd: a key as a small keycap (the command palette's hints, the shortcuts overlay).
+export function Kbd({ children }: { children: ReactNode }) {
+  return <kbd className="kbd">{children}</kbd>;
+}
+
 // reducedMotion: the user asked the system for less motion (exit animations then close at once)
 export const reducedMotion = (): boolean => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -255,17 +260,24 @@ export function trapTab(e: KeyboardEvent, box: HTMLElement | null) {
 // last element that had focus is tracked here, with its ancestors, and on close the focus goes back
 // to the opener or, if that left the page, to the button of the menu it was in (the nearest ancestor
 // still on the page that has an aria-haspopup / aria-expanded button as a direct child).
-let lastFocus: HTMLElement | null = null;
+// The ancestors are taken when the element gets the focus: by the time a dialog opens, a menu that
+// closed has already left the page, and a detached item no longer knows which menu it was in.
+const ancestors = (el: HTMLElement | null): HTMLElement[] => {
+  const out: HTMLElement[] = [];
+  for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) out.push(p);
+  return out;
+};
+let lastFocus: { el: HTMLElement; chain: HTMLElement[] } | null = null;
 if (typeof document !== "undefined")
   document.addEventListener("focusin", (e) => {
-    if (e.target instanceof HTMLElement && e.target !== document.body) lastFocus = e.target;
+    if (e.target instanceof HTMLElement && e.target !== document.body) lastFocus = { el: e.target, chain: ancestors(e.target) };
   });
 
 export function rememberOpener(): (inside?: HTMLElement | null) => void {
   const active = document.activeElement;
-  const el = active instanceof HTMLElement && active !== document.body ? active : lastFocus;
-  const chain: HTMLElement[] = [];
-  for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) chain.push(p);
+  const live = active instanceof HTMLElement && active !== document.body ? active : null;
+  const el = live ?? lastFocus?.el ?? null;
+  const chain = live ? (lastFocus?.el === live ? lastFocus.chain : ancestors(live)) : (lastFocus?.chain ?? []);
   return (inside) => {
     // leave the focus alone if something else took it on purpose (a dialog that opened the gig panel)
     const now = document.activeElement;
