@@ -287,7 +287,7 @@ export function ErrandsPage({ open }: { open?: number }) {
                     <td className="errand-worker" data-label="Agent">
                       <span className="errand-worker-name">
                         {worker ? <Avatar user={worker} size="xs" tip={c.worker_username} /> : null}
-                        {c.worker_username}
+                        {worker ? worker.display_name || worker.username : c.worker_username}
                       </span>
                     </td>
                     <td className="errand-last" data-label="Last run">
@@ -532,7 +532,7 @@ function ErrandPanel({ errand: c, canEdit, canUnsandbox, onClose, onEdit, onChan
         <dd>{c.paused ? "paused" : c.run_now_at ? "now (requested)" : c.next_at ? fmtTime(c.next_at) : "none"}</dd>
         <dt>Agent</dt>
         <dd className="errand-worker">
-          {worker && <Avatar user={worker} size="xs" />} {c.worker_username}
+          {worker && <Avatar user={worker} size="xs" />} {worker ? worker.display_name || worker.username : c.worker_username}
         </dd>
         <dt>Project</dt>
         <dd>{c.project_id ? (tree.flatMap((w) => w.projects).find((p) => p.id === c.project_id)?.name ?? `#${c.project_id}`) : <span className="muted">none (its project is gone)</span>}</dd>
