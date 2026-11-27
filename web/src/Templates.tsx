@@ -3,10 +3,10 @@
 // Shared templates (every workspace's) come with each workspace's list: shown once, under any filter,
 // changed only with the Shared library permission (on the all-workspaces level).
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { api, ApiError, canShare, canWriteIn, hasCap, type Tag, type Template } from "./api";
+import { api, ApiError, canShare, canWriteIn, gigChoices, hasCap, type Tag, type Template } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { WorkspaceBadge } from "./WorkspaceBadge";
-import { PlaceFilter, placeMatch, placeStart, type Place } from "./places";
+import { PlaceFilter, placeMatch, placeStart, templateStart, type Place } from "./places";
 import { GigModal } from "./GigModal";
 import { ClearFilters, Avatar, LabelChip, Modal, PriorityBadge } from "./ui";
 import { HelpButton } from "./help";
@@ -29,7 +29,9 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
   const [confirm, setConfirm] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
   const [sharing, setSharing] = useState<Template | null>(null); // Make shared…
+  const [making, setMaking] = useState<Template | null>(null); // New gig from this
   const closeEdit = useCallback(() => setEditing(null), []);
+  const closeMaking = useCallback(() => setMaking(null), []);
 
   const wsKey = tree.map((w) => w.id).join(",");
   const loadSeq = useRef(0);
@@ -55,6 +57,7 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
   const canEditIn = useCallback((w: WorkspaceTree) => canWriteIn(w) && hasCap(me, "templates", w.id), [me]);
   const shown = useMemo(() => (items ?? []).filter((t) => t.shared || placeMatch(place, tree, t.workspace_id, t.project_id)), [items, place, tree]);
   const editable = useMemo(() => tree.filter(canEditIn), [tree, canEditIn]);
+  const gigPlaces = useMemo(() => gigChoices(me, tree), [me, tree]); // where you may create gigs
   // with Shared library and no workspace to make templates in, a new template can only be shared
   const start = placeStart(place, tree, (w) => editable.includes(w)) ?? (canShare(me) ? placeStart("", tree, () => true) : null);
 
@@ -82,6 +85,22 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
         }}
       />
     );
+  // New gig from this: the New gig form, filled from the template as New gig → From template does
+  const makeAt = making ? templateStart(making, place, gigPlaces) : null;
+  if (making && makeAt) {
+    return (
+      <GigModal
+        ws={makeAt.ws}
+        projectId={makeAt.projectId}
+        statuses={[]}
+        labels={labelsOf.get(makeAt.ws.id) ?? []}
+        choices={gigPlaces}
+        fromTemplate={making}
+        onClose={closeMaking}
+        onCreated={onChanged}
+      />
+    );
+  }
   // a shared template is edited in the first workspace the editor may edit (for its labels and members)
   const editWs = editing && editing !== "new" ? (editing.shared ? (editable[0] ?? tree[0]) : wsOf(editing.workspace_id)) : undefined;
   if (editing && (editing === "new" ? start : editWs)) {
@@ -179,6 +198,11 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                     </>
                   ) : (
                     <>
+                      {templateStart(t, place, gigPlaces) && (
+                        <button type="button" className="button small" onClick={() => setMaking(t)} aria-label={`New gig from ${t.name}`}>
+                          <Icon name="plus" /> New gig
+                        </button>
+                      )}
                       <button type="button" className="button secondary small" onClick={() => void copy(t)} aria-label={`Copy ${t.name} as JSON`}>
                         <Icon name="copy" /> Copy JSON
                       </button>

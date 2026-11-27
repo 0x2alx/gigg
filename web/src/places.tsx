@@ -34,6 +34,19 @@ export function placeStart(place: Place, tree: WorkspaceTree[], ok: (w: Workspac
   return ws ? { ws, projectId: ws.projects[0]!.id } : null;
 }
 
+// templateStart: where a new gig made from a template starts, among the places you may create gigs
+// in (`choices`, each with only those projects): the template's own project; a template for any
+// project starts in the filtered project of its workspace, else that workspace's first; a shared
+// one under the filter (placeStart). null: nowhere you may create its gig.
+export function templateStart(t: { shared?: boolean; workspace_id: number; project_id: number | null }, place: Place, choices: WorkspaceTree[]): { ws: WorkspaceTree; projectId: number } | null {
+  if (t.shared) return placeStart(place, choices, () => true);
+  const ws = choices.find((w) => w.id === t.workspace_id);
+  if (!ws || ws.projects.length === 0) return null;
+  if (t.project_id !== null) return ws.projects.some((p) => p.id === t.project_id) ? { ws, projectId: t.project_id } : null;
+  const want = place.startsWith("p:") ? Number(place.slice(2)) : NaN;
+  return { ws, projectId: ws.projects.some((p) => p.id === want) ? want : ws.projects[0]!.id };
+}
+
 // optionOf: the option showing a place. A project of a workspace listed without its projects (just one,
 // or projects off) shows as that workspace.
 export function optionOf(place: Place, tree: WorkspaceTree[], projects = true): Place {

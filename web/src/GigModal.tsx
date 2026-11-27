@@ -22,7 +22,7 @@ import { HelpButton } from "./help";
 import { Icon } from "./icons";
 import { clearPreviews, setPreview } from "./previews";
 
-export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedule, template, repeat: initialRepeat, initialStatus, initialCategory, onClose, onCreated }: {
+export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedule, template, fromTemplate, repeat: initialRepeat, initialStatus, initialCategory, onClose, onCreated }: {
   ws: WorkspaceTree; // where the form starts (with projectId)
   projectId: number;
   statuses: Status[]; // the start project's open statuses ([]: fetched)
@@ -32,6 +32,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   choices?: WorkspaceTree[]; // the workspaces (and their projects) the form may move it to; default: just ws
   schedule?: Recurrence; // edit this schedule
   template?: Template | "new"; // edit (or create) a template instead of a gig
+  fromTemplate?: Template; // a new gig, filled from this template (as picking it in "From template")
   repeat?: RepeatState["freq"]; // preset the Repeat control (new schedule)
   onClose: () => void;
   onCreated: (message?: string) => void;
@@ -88,6 +89,15 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   // once ("close again to discard") instead of losing the text; Cancel closes at once
   const typed = JSON.stringify([title, description, checklist, subgigs, deps]);
   const typed0 = useRef(typed);
+  // filled from fromTemplate: what it filled in counts as the starting point, not as typed
+  const prefilled = useRef(false); // filled once
+  const retakeTyped = useRef(false); // the render after the fill: take what it shows as the start
+  useEffect(() => {
+    if (retakeTyped.current) {
+      retakeTyped.current = false;
+      typed0.current = typed;
+    }
+  });
   const [discardAsked, setDiscardAsked] = useState(false);
   const guardedClose = () => {
     if (typed !== typed0.current && !discardAsked && !busy) {
@@ -206,13 +216,19 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
         setTemplates(r.items);
         // editing: the recurring gig's own template is the one picked
         if (schedule) setPicked(r.items.find((t) => t.id === schedule.template_id) ?? null);
+        // opened from a template (Templates → New gig): filled from it once, as picking it here does
+        if (fromTemplate && !prefilled.current) {
+          prefilled.current = true;
+          retakeTyped.current = true;
+          pick(r.items.find((t) => t.id === fromTemplate.id) ?? fromTemplate);
+        }
       },
       () => live && setTemplates([]),
     );
     return () => {
       live = false;
     };
-  }, [ws.id, project, tplMode, schedule]);
+  }, [ws.id, project, tplMode, schedule]); // eslint-disable-line react-hooks/exhaustive-deps
   const wantSchedules = !tplMode && (editing || !!repeat.freq);
   useEffect(() => {
     if (!wantSchedules) return;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceTree } from "./App";
-import { optionOf, placeMatch, placeStart } from "./places";
+import { optionOf, placeMatch, placeStart, templateStart } from "./places";
 
 const ws = (id: number, pids: number[], role = "member") => ({ id, slug: `w${id}`, name: `W${id}`, role, projects: pids.map((p) => ({ id: p, key: `P${p}`, name: `p${p}` })) }) as unknown as WorkspaceTree;
 const tree = [ws(1, [10, 11]), ws(2, [20], "viewer"), ws(3, [30])];
@@ -31,6 +31,26 @@ describe("placeStart", () => {
   it("skips places that aren't allowed", () => {
     expect(placeStart("w:2", tree, ok)).toMatchObject({ projectId: 10 });
     expect(placeStart("", [tree[1]!], ok)).toBeNull();
+  });
+});
+
+describe("templateStart", () => {
+  // the places you may create gigs in: project 11 isn't one of them
+  const choices = [ws(1, [10]), ws(3, [30])];
+  it("starts in the template's own project, if you may create gigs there", () => {
+    expect(templateStart({ workspace_id: 1, project_id: 10 }, "", choices)).toMatchObject({ projectId: 10 });
+    expect(templateStart({ workspace_id: 1, project_id: 11 }, "", choices)).toBeNull();
+    expect(templateStart({ workspace_id: 2, project_id: 20 }, "", choices)).toBeNull();
+  });
+  it("an any-project template starts in the filtered project of its workspace, else its first", () => {
+    expect(templateStart({ workspace_id: 3, project_id: null }, "", choices)).toMatchObject({ projectId: 30 });
+    expect(templateStart({ workspace_id: 3, project_id: null }, "p:10", choices)).toMatchObject({ projectId: 30 });
+    expect(templateStart({ workspace_id: 1, project_id: null }, "p:10", choices)).toMatchObject({ projectId: 10 });
+  });
+  it("a shared one starts under the filter", () => {
+    expect(templateStart({ shared: true, workspace_id: 0, project_id: null }, "w:3", choices)).toMatchObject({ projectId: 30 });
+    expect(templateStart({ shared: true, workspace_id: 0, project_id: null }, "", choices)).toMatchObject({ projectId: 10 });
+    expect(templateStart({ shared: true, workspace_id: 0, project_id: null }, "", [])).toBeNull();
   });
 });
 
