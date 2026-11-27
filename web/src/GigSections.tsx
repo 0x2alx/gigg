@@ -592,8 +592,33 @@ export function SubgigsSection({ gig, wsId, canCreate, canEdit, assignable, onOp
 
 // SubgigsDraft: subgigs for a gig (or template) not saved yet; created with it.
 // canGate: may tick "blocks parent" (Edit gigs).
+// Like the checklist draft: click a title to rename it (Enter or leaving saves, Esc cancels), ↑ ↓ reorder.
 export function SubgigsDraft({ items, onChange, canGate, note = SUB_NOTE }: { items: TemplateSubgig[]; onChange: (v: TemplateSubgig[]) => void; canGate: boolean; note?: string }) {
   const gates = items.filter((s) => s.blocks_parent).length;
+  // stable keys for the rows, so a title being edited keeps its box and focus follows a moved row
+  const ids = useRef<string[]>([]);
+  const seq = useRef(0);
+  while (ids.current.length < items.length) ids.current.push("s" + seq.current++);
+  ids.current.length = items.length;
+  const [editing, setEditing] = useState<{ key: string; text: string } | null>(null);
+  const saveEdit = () => {
+    if (!editing) return;
+    const i = ids.current.indexOf(editing.key);
+    const t = editing.text.trim();
+    setEditing(null);
+    if (i < 0 || !t || t === items[i]!.title) return;
+    onChange(items.map((x, j) => (j === i ? { ...x, title: t } : x)));
+  };
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= items.length) return;
+    const key = ids.current[i]!;
+    const xs = [...items];
+    [xs[i], xs[j]] = [xs[j]!, xs[i]!];
+    [ids.current[i], ids.current[j]] = [ids.current[j]!, ids.current[i]!];
+    onChange(xs);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-sub="${key}"] .ck-${dir < 0 ? "up" : "down"}`)?.focus());
+  };
   return (
     <Section
       defaultOpen={false}
@@ -614,17 +639,58 @@ export function SubgigsDraft({ items, onChange, canGate, note = SUB_NOTE }: { it
       <p className="muted small tsec-note">{note}</p>
       {items.length > 0 && (
         <ul className="rel-list sub-list">
-          {items.map((s, i) => (
-            <li key={i}>
-              <span className="rel-open rel-static">
-                <span className="rel-title">{s.title}</span>
-              </span>
-              <GateBox on={!!s.blocks_parent} disabled={!canGate && !s.blocks_parent} title={s.title} onChange={(on) => onChange(items.map((x, j) => (j === i ? { ...x, blocks_parent: on } : x)))} />
-              <button type="button" className="icon-button" onClick={() => onChange(items.filter((_, j) => j !== i))} aria-label={`Remove subgig: ${s.title}`}>
-                <Icon name="x" />
-              </button>
-            </li>
-          ))}
+          {items.map((s, i) => {
+            const key = ids.current[i]!;
+            return (
+              <li key={key} data-sub={key}>
+                {editing?.key === key ? (
+                  <input
+                    className="ck-edit sub-edit"
+                    value={editing.text}
+                    autoFocus
+                    maxLength={250}
+                    aria-label="Rename subgig"
+                    onChange={(e) => setEditing({ key, text: e.target.value })}
+                    onBlur={saveEdit}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        saveEdit();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setEditing(null);
+                      }
+                    }}
+                  />
+                ) : (
+                  <button type="button" className="rel-open sub-rename" onClick={() => setEditing({ key, text: s.title })} aria-label={`Rename subgig: ${s.title}`} title="Rename">
+                    <span className="rel-title">{s.title}</span>
+                  </button>
+                )}
+                <GateBox on={!!s.blocks_parent} disabled={!canGate && !s.blocks_parent} title={s.title} onChange={(on) => onChange(items.map((x, j) => (j === i ? { ...x, blocks_parent: on } : x)))} />
+                <span className="ck-actions">
+                  <button type="button" className="icon-button ck-up" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move up: ${s.title}`}>
+                    ↑
+                  </button>
+                  <button type="button" className="icon-button ck-down" disabled={i === items.length - 1} onClick={() => move(i, 1)} aria-label={`Move down: ${s.title}`}>
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={() => {
+                      ids.current.splice(i, 1);
+                      onChange(items.filter((_, j) => j !== i));
+                    }}
+                    aria-label={`Remove subgig: ${s.title}`}
+                  >
+                    <Icon name="x" />
+                  </button>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
       {items.length < 50 ? <SubgigAdd onAdd={(title) => onChange([...items, { title, blocks_parent: false }])} /> : <p className="muted small tsec-note">That's the most it can have (50).</p>}

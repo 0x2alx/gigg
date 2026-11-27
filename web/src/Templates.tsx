@@ -178,6 +178,11 @@ export function TemplatesModal({ initialPlace = "", onClose, onChanged }: {
                   </span>
                 )}
                 {(t.checklist?.length ?? 0) > 0 && <span className="pill pill-muted">☑ {t.checklist!.length} items</span>}
+                {(t.subgigs?.length ?? 0) > 0 && (
+                  <span className="pill pill-muted" title={t.subgigs!.map((s) => (s.blocks_parent ? "⛔ " : "") + s.title).join("\n")}>
+                    <Icon name="subgigs" /> {t.subgigs!.length} subgig{t.subgigs!.length === 1 ? "" : "s"}
+                  </span>
+                )}
                 {Object.keys(t.custom ?? {}).length > 0 && <span className="pill pill-muted">⚑ {Object.keys(t.custom!).length} fields</span>}
                 {(t.labels ?? []).map((n) => (
                   <LabelChip key={n} label={labels.find((l) => l.name.toLowerCase() === n.toLowerCase()) ?? { id: 0, name: n, color: null }} />

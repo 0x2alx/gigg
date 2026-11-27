@@ -1026,6 +1026,8 @@ label.check input { width: auto; accent-color: var(--accent); }
 .rel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
 .rel-list li { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
 .rel-list li.archived { opacity: 0.6; }
+.sub-rename { cursor: text; }
+.sub-list .sub-edit { flex: 1; }
 .rel-open {
   display: flex; align-items: center; gap: 0.35rem; flex: 1; min-width: 0; text-align: left; cursor: pointer;
   background: none; border: 1px solid transparent; border-radius: var(--radius-s); padding: 0.15rem 0.25rem; color: var(--text); font: inherit;
