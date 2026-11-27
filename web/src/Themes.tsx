@@ -289,7 +289,15 @@ function ThemeChips({ t }: { t: Theme }) {
 
 function ThemeCard({ t, selected, onPick, actions }: { t: Theme; selected: boolean; onPick: () => void; actions: CardAction[] }) {
   return (
-    <article className={"tg-card" + (selected ? " selected" : "")} aria-label={t.name}>
+    // a click anywhere on the card picks the theme (name and description included), except on its
+    // tool buttons; keyboard and screen readers keep the one preview button, so no extra tab stop
+    <article
+      className={"tg-card" + (selected ? " selected" : "")}
+      aria-label={t.name}
+      onClick={(e) => {
+        if (!(e.target as Element).closest("button, a, input")) onPick();
+      }}
+    >
       <button type="button" className="tg-preview" onClick={onPick} aria-pressed={selected} aria-label={selected ? `${t.name}, current theme` : `Use ${t.name}`} title={selected ? "Current theme" : `Use ${t.name}`}>
         <MiniPreview t={t} flush />
         {selected && (
