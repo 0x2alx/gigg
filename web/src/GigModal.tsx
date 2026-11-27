@@ -507,7 +507,20 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
   const timeoutLock = runCap("run_timeout") ? undefined : editing || tpl ? "all" : "clear";
   const mode: EditorMode = tplMode ? "template" : repeating || editing ? "recurring" : "new";
   return (
-    <Modal title={heading} onClose={guardedClose} wide expandable help={<HelpButton topic={repeating || editing ? "recurring" : "gigs"} label={repeating || editing ? "Help: recurring gigs" : "Help: gigs"} />}>
+    <Modal
+      title={heading}
+      onClose={guardedClose}
+      wide
+      expandable
+      help={
+        // templates live in the recurring help (as the Templates list's button says)
+        tplMode ? (
+          <HelpButton topic="recurring" label="Help: templates, schedules and recurring gigs" />
+        ) : (
+          <HelpButton topic={repeating || editing ? "recurring" : "gigs"} label={repeating || editing ? "Help: recurring gigs" : "Help: gigs"} />
+        )
+      }
+    >
       <form className="tm-form" onSubmit={submit} aria-label={heading}>
         {tpl && (tpl.recurring ?? 0) > 0 && (
           <p className="small muted sched-tpl" role="note">
