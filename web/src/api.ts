@@ -232,6 +232,8 @@ export interface Relation {
   kind: "blocks" | "relates";
   open: boolean; // the other gig is not done or cancelled
   title: string; // the other gig's title
+  status_name: string; // the other gig's status
+  status_category: Category;
   created_at: number;
 }
 

@@ -3,7 +3,7 @@
 // recurring gigs: the "draft" versions hold the values until Create or Save). Both lay a gig out
 // the same way: the property groups (PropGroup of Rows) and the folding boxes (Section).
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, type ChecklistItem, type CustomField, type Relation, type RelationDirection, type Gig, type TemplateSubgig } from "./api";
+import { api, ApiError, type Category, type ChecklistItem, type CustomField, type Relation, type RelationDirection, type Gig, type TemplateSubgig } from "./api";
 import { formatCustom, fromInput, moveAfter, progress, reorder, splitLines, toInput } from "./items";
 import { CATEGORY_COLOR } from "./theme";
 import { EffortSelect, MinutesSelect, ModelInput, TIMEOUT_CHOICES, ToolsInput, type RunSettings } from "./runsettings";
@@ -636,6 +636,8 @@ interface Dep {
   key: string;
   title: string;
   open: boolean;
+  status_name?: string; // the other gig's status, named as everywhere else (an older server sends none)
+  status_category?: Category;
   dir: RelationDirection; // seen from this gig
   subgig?: boolean; // an open subgig that blocks its parent (not a link: untick it in Subgigs)
 }
@@ -647,9 +649,14 @@ export function splitRelations(gigId: number, rels: Relation[]): Record<Relation
     const other = fromMe ? r.to_gig_id : r.from_gig_id;
     const key = fromMe ? r.to_key : r.from_key;
     const dir: RelationDirection = r.kind === "relates" ? "relates" : fromMe ? "blocks" : "blocked_by";
-    out[dir].push({ other, key, title: r.title, open: r.open, dir });
+    out[dir].push({ other, key, title: r.title, open: r.open, status_name: r.status_name, status_category: r.status_category, dir });
   }
   return out;
+}
+
+// linkedIds: the gigs a dependency list already names (any direction), which the picker leaves out.
+export function linkedIds(groups: Record<RelationDirection, Dep[]>): Set<number> {
+  return new Set([...groups.blocked_by, ...groups.blocks, ...groups.relates].map((d) => d.other));
 }
 
 const DIR_LABEL: Record<RelationDirection, string> = { blocked_by: "🔒 Blocked by", blocks: "⛔ Blocks", relates: "↔ Related" };
@@ -668,7 +675,13 @@ function DepList({ groups, canEdit, onOpen, onRemove }: { groups: Record<Relatio
                   const body = (
                     <>
                       <span className="pill pill-key">{x.key}</span>
-                      {x.other < 0 ? null : x.open ? <Pill color={d === "blocked_by" ? "#E5484D" : CATEGORY_COLOR.todo!}>open</Pill> : <Pill color={CATEGORY_COLOR.done!}>done</Pill>}
+                      {x.other < 0 ? null : x.status_name && x.status_category ? (
+                        <StatusBadge name={x.status_name} category={x.status_category} />
+                      ) : x.open ? (
+                        <Pill color={d === "blocked_by" ? "#E5484D" : CATEGORY_COLOR.todo!}>open</Pill>
+                      ) : (
+                        <Pill color={CATEGORY_COLOR.done!}>done</Pill>
+                      )}
                       <span className="rel-title">{x.title}</span>
                       {x.subgig && <span className="pill pill-muted">subgig</span>}
                     </>
@@ -699,7 +712,8 @@ function DepList({ groups, canEdit, onOpen, onRemove }: { groups: Record<Relatio
 }
 
 // DepPicker: "+ Dependency", then a direction and a gig search. onPick resolves when it was added.
-function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; onPick: (ref: string, dir: RelationDirection, t?: Gig) => Promise<unknown> }) {
+// The search leaves out this gig (exclude) and the gigs already linked to it (linked).
+function DepPicker({ wsId, exclude, linked, onPick }: { wsId: number; exclude?: number; linked: Set<number>; onPick: (ref: string, dir: RelationDirection, t?: Gig) => Promise<unknown> }) {
   const [adding, setAdding] = useState(false);
   const [dir, setDir] = useState<RelationDirection>("blocked_by");
   const [q, setQ] = useState("");
@@ -719,6 +733,7 @@ function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; 
         .catch(() => setFound([]));
     }, 250);
   }, [q, wsId, exclude]);
+  const shown = found.filter((t) => !linked.has(t.id));
   const pick = (ref: string, t?: Gig) =>
     onPick(ref, dir, t).then(
       () => {
@@ -753,7 +768,7 @@ function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; 
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault(); // never submits the form around it
-              if (q.trim()) void pick(found[0]?.key ?? q.trim(), found[0]);
+              if (q.trim()) void pick(shown[0]?.key ?? q.trim(), shown[0]);
             } else if (e.key === "Escape") {
               e.preventDefault();
               e.stopPropagation();
@@ -762,9 +777,9 @@ function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; 
           }}
         />
       </div>
-      {found.length > 0 && (
+      {shown.length > 0 && (
         <ul className="rel-list search-results" aria-label="Matching gigs">
-          {found.map((t) => (
+          {shown.map((t) => (
             <li key={t.id}>
               <button type="button" className="rel-open" onClick={() => void pick(t.key, t)}>
                 <span className="pill pill-key">{t.key}</span>
@@ -781,8 +796,6 @@ function DepPicker({ wsId, exclude, onPick }: { wsId: number; exclude?: number; 
     </div>
   );
 }
-
-const cycleText = (e: unknown) => (e instanceof ApiError && e.status === 409 ? `That would make a cycle: ${e.message}` : errText(e));
 
 export function DependenciesSection({ gig, wsId, canEdit, onGig, onOpen }: { gig: Gig; wsId: number; canEdit: boolean; onGig: (t: Gig) => void; onOpen: (t: Gig) => void }) {
   const [rels, setRels] = useState<Relation[] | null>(null);
@@ -816,7 +829,8 @@ export function DependenciesSection({ gig, wsId, canEdit, onGig, onOpen }: { gig
     };
   }, [gig.id, gig.version, wsId, nGates]);
 
-  const fail = (e: unknown) => setErr(cycleText(e));
+  // a refused cycle comes as a whole sentence ("That would make a cycle: …"), shown as is
+  const fail = (e: unknown) => setErr(errText(e));
   const remove = (d: Dep) => {
     setErr("");
     api
@@ -830,7 +844,9 @@ export function DependenciesSection({ gig, wsId, canEdit, onGig, onOpen }: { gig
   const open = (d: Dep) => void api.gig(d.other).then(onOpen, fail);
 
   const groups = splitRelations(gig.id, rels ?? []);
-  groups.blocked_by.push(...gates.map((s) => ({ other: s.id, key: s.key, title: s.title, open: true, dir: "blocked_by" as const, subgig: true })));
+  groups.blocked_by.push(
+    ...gates.map((s) => ({ other: s.id, key: s.key, title: s.title, open: true, status_name: s.status_name, status_category: s.status_category, dir: "blocked_by" as const, subgig: true })),
+  );
   const count = (rels ?? []).length + gates.length;
   if (!canEdit && count === 0) return null;
   return (
@@ -856,6 +872,7 @@ export function DependenciesSection({ gig, wsId, canEdit, onGig, onOpen }: { gig
         <DepPicker
           wsId={wsId}
           exclude={gig.id}
+          linked={linkedIds(groups)}
           onPick={(ref, dir) => {
             setErr("");
             return api.addRelation(gig.id, ref, dir).then(
@@ -880,6 +897,8 @@ export interface DraftDep {
   key: string;
   title: string;
   open: boolean;
+  status_name?: string;
+  status_category?: Category;
   dir: RelationDirection;
 }
 
@@ -887,7 +906,7 @@ export interface DraftDep {
 export function DependenciesDraft({ wsId, items, onChange }: { wsId: number; items: DraftDep[]; onChange: (v: DraftDep[]) => void }) {
   const [err, setErr] = useState("");
   const groups: Record<RelationDirection, Dep[]> = { blocked_by: [], blocks: [], relates: [] };
-  for (const d of items) groups[d.dir].push({ other: d.id, key: d.key, title: d.title, open: d.open, dir: d.dir });
+  for (const d of items) groups[d.dir].push({ other: d.id, key: d.key, title: d.title, open: d.open, status_name: d.status_name, status_category: d.status_category, dir: d.dir });
   const blockers = items.filter((d) => d.dir === "blocked_by" && d.open).length;
   return (
     <Section
@@ -910,6 +929,7 @@ export function DependenciesDraft({ wsId, items, onChange }: { wsId: number; ite
       <DepList groups={groups} canEdit onRemove={(d) => onChange(items.filter((x) => !(x.id === d.other && x.dir === d.dir)))} />
       <DepPicker
         wsId={wsId}
+        linked={linkedIds(groups)}
         onPick={(ref, dir, found) => {
           setErr("");
           return (found ? Promise.resolve(found) : api.gig(ref)).then(
@@ -917,7 +937,7 @@ export function DependenciesDraft({ wsId, items, onChange }: { wsId: number; ite
               if (t.workspace_id !== wsId) throw new ApiError(422, "invalid", `${t.key} is in another workspace.`);
               if (items.some((x) => x.id === t.id && x.dir === dir)) return;
               const open = t.status_category !== "done" && t.status_category !== "cancelled";
-              onChange([...items, { id: t.id, key: t.key, title: t.title, open, dir }]);
+              onChange([...items, { id: t.id, key: t.key, title: t.title, open, status_name: t.status_name, status_category: t.status_category, dir }]);
             },
           ).catch((e: unknown) => {
             setErr(e instanceof ApiError && e.status === 404 ? `No gig ${ref}.` : errText(e));

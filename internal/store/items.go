@@ -18,26 +18,30 @@ import (
 
 // Relation links two gigs of one workspace: From blocks To, or they relate.
 type Relation struct {
-	From      int64  `json:"from_gig_id"`
-	FromKey   string `json:"from_key"`
-	To        int64  `json:"to_gig_id"`
-	ToKey     string `json:"to_key"`
-	Kind      string `json:"kind"`
-	Open      bool   `json:"open" doc:"The other gig is not done or cancelled"`
-	Title     string `json:"title" doc:"The other gig's title"`
-	CreatedAt int64  `json:"created_at"`
+	From    int64  `json:"from_gig_id"`
+	FromKey string `json:"from_key"`
+	To      int64  `json:"to_gig_id"`
+	ToKey   string `json:"to_key"`
+	Kind    string `json:"kind"`
+	Open    bool   `json:"open" doc:"The other gig is not done or cancelled"`
+	Title   string `json:"title" doc:"The other gig's title"`
+	// the other gig's status, as gigs name theirs (status_name, status_category)
+	StatusName     string `json:"status_name" doc:"The other gig's status"`
+	StatusCategory string `json:"status_category" doc:"The other gig's status category"`
+	CreatedAt      int64  `json:"created_at"`
 }
 
 // GigRelations lists the relations touching a gig (the other side's title and state included).
 func GigRelations(ctx context.Context, q Q, gig int64) ([]Relation, error) {
 	rows, err := q.QueryContext(ctx, `SELECT r.from_gig_id, pf.key || '-' || f.number, r.to_gig_id, pt.key || '-' || t.number, r.kind, r.created_at,
 		CASE WHEN r.from_gig_id = ? THEN t.title ELSE f.title END,
+		CASE WHEN r.from_gig_id = ? THEN st.name ELSE sf.name END,
 		CASE WHEN r.from_gig_id = ? THEN st.category ELSE sf.category END
 		FROM gig_relations r
 		JOIN gigs f ON f.id = r.from_gig_id JOIN projects pf ON pf.id = f.project_id JOIN statuses sf ON sf.id = f.status_id
 		JOIN gigs t ON t.id = r.to_gig_id JOIN projects pt ON pt.id = t.project_id JOIN statuses st ON st.id = t.status_id
 		WHERE (r.from_gig_id = ? OR r.to_gig_id = ?) AND f.deleted_at IS NULL AND t.deleted_at IS NULL
-		ORDER BY r.created_at`, gig, gig, gig, gig)
+		ORDER BY r.created_at`, gig, gig, gig, gig, gig)
 	if err != nil {
 		return nil, err
 	}
@@ -45,10 +49,10 @@ func GigRelations(ctx context.Context, q Q, gig int64) ([]Relation, error) {
 	out := []Relation{}
 	for rows.Next() {
 		var r Relation
-		var cat string
-		if err := rows.Scan(&r.From, &r.FromKey, &r.To, &r.ToKey, &r.Kind, &r.CreatedAt, &r.Title, &cat); err != nil {
+		if err := rows.Scan(&r.From, &r.FromKey, &r.To, &r.ToKey, &r.Kind, &r.CreatedAt, &r.Title, &r.StatusName, &r.StatusCategory); err != nil {
 			return nil, err
 		}
+		cat := r.StatusCategory
 		r.Open = cat != "done" && cat != "cancelled"
 		out = append(out, r)
 	}
@@ -84,7 +88,7 @@ func AddRelation(ctx context.Context, q Q, a Actor, from, to *Gig, kind string) 
 		if cyc, err := Blocks(ctx, q, to.ID, from.ID); err != nil {
 			return err
 		} else if cyc {
-			return Conflict("%s already depends on %s: that would be a cycle", from.Key, to.Key)
+			return Conflict("That would make a cycle: %s already depends on %s.", from.Key, to.Key)
 		}
 	}
 	if _, err := q.ExecContext(ctx, `INSERT INTO gig_relations (workspace_id, from_gig_id, to_gig_id, kind, created_by, created_at) VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING`,

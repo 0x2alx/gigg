@@ -32,15 +32,19 @@ func TestWorkItems(t *testing.T) {
 	// blocks: b can't be claimed while a is open; cycles refused
 	code, out, _ := e.req("POST", "/gigs/"+ak+"/relations", `{"gig":"`+bk+`","direction":"blocks"}`, scout)
 	e.ok(code, out, 200)
-	if code, out, _ := e.req("POST", "/gigs/"+bk+"/relations", `{"gig":"`+ak+`","direction":"blocks"}`, scout); code != 409 {
+	// the message says it once, as a sentence a client can show as is
+	if code, out, _ := e.req("POST", "/gigs/"+bk+"/relations", `{"gig":"`+ak+`","direction":"blocks"}`, scout); code != 409 ||
+		!strings.Contains(string(out), "That would make a cycle: "+bk+" already depends on "+ak+".") || strings.Count(string(out), "cycle") != 1 {
 		t.Fatalf("cycle: %d %s", code, out)
 	}
 	code, out, _ = e.req("GET", "/gigs/"+bk, "", scout)
 	if !strings.Contains(string(out), `"blocked_by":1`) {
 		t.Fatalf("blocked_by: %s", out)
 	}
+	// each relation names the other gig's status, as the gig search does
 	code, out, _ = e.req("GET", "/gigs/"+bk+"/relations", "", scout)
-	if code != 200 || !strings.Contains(string(out), `"kind":"blocks"`) || !strings.Contains(string(out), `"title":"blocker"`) {
+	if code != 200 || !strings.Contains(string(out), `"kind":"blocks"`) || !strings.Contains(string(out), `"title":"blocker"`) ||
+		!strings.Contains(string(out), `"status_category":"todo"`) || !strings.Contains(string(out), `"status_name":"To-Do"`) {
 		t.Fatalf("relations: %d %s", code, out)
 	}
 	claimSeq := func() []string {

@@ -1013,7 +1013,7 @@ func PatchGig(ctx context.Context, q Q, a Actor, t *Gig, expect int64, p GigPatc
 		if cyc, err := Blocks(ctx, q, *parent, t.ID); err != nil {
 			return nil, err
 		} else if cyc {
-			return nil, Conflict("the parent already depends on %s: blocking it would be a cycle", t.Key)
+			return nil, Conflict("That would make a cycle: the parent already depends on %s.", t.Key)
 		}
 	}
 	if p.AutoArchive != nil && !eqIntPtr(*p.AutoArchive, t.AutoArchive) {
