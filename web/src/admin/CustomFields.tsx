@@ -32,6 +32,7 @@ const fieldsApi = {
   create: (ws: number, body: { name: string; kind: FieldKind; options?: string[] }) => call<CustomField>("POST", `/workspaces/${ws}/fields`, body),
   update: (f: CustomField, body: { name: string; kind: FieldKind; options?: string[] }) => call<CustomField>("PUT", `/fields/${f.id}`, body, f.version),
   remove: (id: number) => call<void>("DELETE", `/fields/${id}`),
+  reorder: (ws: number, ids: number[]) => call<void>("POST", `/workspaces/${ws}/fields/reorder`, { ids }),
 };
 
 // cleanOptions: trimmed, non-empty, unique (case-insensitive) choices in order.
@@ -74,6 +75,19 @@ export function CustomFields({ ws }: { ws: AdminWorkspace }) {
   }, [ws.id]);
   useEffect(load, [load]);
 
+  // the order gigs show their fields in (the panel, cards, forms): ↑ ↓ as with statuses
+  const move = (i: number, d: -1 | 1) => {
+    if (!items) return;
+    const ids = items.map((f) => f.id);
+    const j = i + d;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    fieldsApi
+      .reorder(ws.id, ids)
+      .then(load)
+      .catch((err: unknown) => setError(errMsg(err)));
+  };
+
   const add = (e: FormEvent) => {
     e.preventDefault();
     if (kind === "select" && cleanOptions(options).length === 0) {
@@ -99,11 +113,21 @@ export function CustomFields({ ws }: { ws: AdminWorkspace }) {
       </div>
       <ErrorLine error={error} />
       {items && items.length === 0 && <Empty>No custom fields yet.</Empty>}
-      <ul className="admin-list">
-        {(items ?? []).map((f) => {
+      <ol className="admin-list">
+        {(items ?? []).map((f, i) => {
           const k = kindOf(f.kind);
           return (
             <li key={f.id} className="admin-list-row">
+              {allowed && (items?.length ?? 0) > 1 && (
+                <span className="admin-order">
+                  <button type="button" className="icon-button" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${f.name} up`}>
+                    ↑
+                  </button>
+                  <button type="button" className="icon-button" disabled={i === (items?.length ?? 0) - 1} onClick={() => move(i, 1)} aria-label={`Move ${f.name} down`}>
+                    ↓
+                  </button>
+                </span>
+              )}
               <span className="admin-name">
                 <span className="nav-icon" aria-hidden="true">
                   {k.icon}
@@ -139,7 +163,7 @@ export function CustomFields({ ws }: { ws: AdminWorkspace }) {
             </li>
           );
         })}
-      </ul>
+      </ol>
       {allowed && (
         <form className="admin-add cf-add" onSubmit={add} aria-label="Add a custom field">
           <div className="row">

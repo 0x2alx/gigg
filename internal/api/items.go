@@ -393,6 +393,29 @@ func (a *API) registerItems() {
 		})
 		return &struct{ Body *store.CustomField }{f}, err
 	})
+	huma.Register(a.h, huma.Operation{OperationID: "reorder-fields", Method: "POST", Path: "/workspaces/{ws}/fields/reorder", Tags: []string{"fields"},
+		Summary: "Set the order of the workspace's custom fields (manager)", DefaultStatus: 204}, func(ctx context.Context, in *struct {
+		WS   string `path:"ws"`
+		Body struct {
+			IDs []int64 `json:"ids" maxItems:"100" doc:"Every field id of the workspace, in the new order"`
+		}
+	}) (*struct{}, error) {
+		p, err := me(ctx)
+		if err != nil {
+			return nil, err
+		}
+		w, err := a.workspace(ctx, p, in.WS)
+		if err != nil {
+			return nil, err
+		}
+		if err := require(p, w.ID, "custom_fields", "workspace:write"); err != nil {
+			return nil, err
+		}
+		if err := allowed(p, w.ID, "custom_fields"); err != nil {
+			return nil, err
+		}
+		return nil, a.tx(ctx, func(tx *sql.Tx) error { return store.ReorderCustomFields(ctx, tx, p.Actor(), w.ID, in.Body.IDs) })
+	})
 	huma.Register(a.h, huma.Operation{OperationID: "update-field", Method: "PUT", Path: "/fields/{id}", Tags: []string{"fields"},
 		Summary: "Rename a custom field or change its options (manager)"}, func(ctx context.Context, in *struct {
 		ID      int64  `path:"id"`

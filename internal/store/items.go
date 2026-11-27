@@ -466,6 +466,33 @@ func DeleteCustomField(ctx context.Context, q Q, a Actor, f *CustomField) error 
 	return err
 }
 
+// ReorderCustomFields sets the order of a workspace's custom fields (all ids, in order), as
+// ReorderStatuses does for a project's statuses.
+func ReorderCustomFields(ctx context.Context, q Q, a Actor, ws int64, ids []int64) error {
+	cur, err := CustomFields(ctx, q, ws)
+	if err != nil {
+		return err
+	}
+	if len(ids) != len(cur) {
+		return Invalid("send every field id of the workspace, in the new order")
+	}
+	have := map[int64]bool{}
+	for _, f := range cur {
+		have[f.ID] = true
+	}
+	for i, id := range ids {
+		if !have[id] {
+			return Invalid("field %d is not in this workspace (or listed twice)", id)
+		}
+		delete(have, id)
+		if _, err := q.ExecContext(ctx, `UPDATE custom_fields SET position = ?, version = version + 1 WHERE id = ?`, float64(i+1)*1024, id); err != nil {
+			return err
+		}
+	}
+	_, err = Activity(ctx, q, a, &ws, nil, "field.reordered", "workspace", ws, map[string]any{"order": ids})
+	return err
+}
+
 // normValue checks a value against its field; nil clears.
 func (f *CustomField) normValue(v any) (any, error) {
 	bad := func(want string) error { return Invalid("%s: expects %s", f.Name, want) }
