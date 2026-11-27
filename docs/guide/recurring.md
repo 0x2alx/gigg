@@ -17,10 +17,13 @@ You can also pick an existing **template** and an existing **schedule** in the s
 
 ## The timing
 
-- **Every N days, weeks** (on chosen weekdays) **or months** (on a day of the month, or the last day).
-- **Window**: when each occurrence may be worked on, for example 09:00 for 2 hours, in a time zone (by default your own, from your profile). An occurrence that nobody starts before its window closes is marked *missed*. Its assignees and followers get a notification (a template's followers follow every gig made from it).
-- **Create early**: makes each occurrence some minutes before its window opens, so it's visible ahead of time.
+- **Every N days, weeks** (on chosen weekdays) **or months** (on a day of the month, or the last day). N is 1 to 365.
+- **Window**: when each occurrence may be worked on, for example 09:00 for 2 hours, in a time zone (by default your own, from your profile). The start is typed on the 24-hour clock (`9:30`, `0930` and `21.30` work too); the window lasts 5 minutes to 31 days. An occurrence that nobody starts before its window closes is marked *missed*. Its assignees and followers get a notification (a template's followers follow every gig made from it).
+- **Create early**: makes each occurrence some minutes before its window opens (0 to 10080, a week), so it's visible ahead of time.
 - **Overlap**: when the previous occurrence is still open, **skip** (the default) doesn't create the next one, while **create** makes it anyway.
+- A value out of range is marked on its field with what's allowed, and the form can't be saved until it's fixed; nothing is quietly changed. The API refuses it too (422 naming the field): leave `interval` or `window_minutes` out for the default, don't send 0.
+- **Next** lists the coming occurrences; a paused recurring gig says it makes none until it's resumed.
+- A recurring gig stays in the project it was made in (the edit form says so by the locked **Project**). For another project, make a new recurring gig there; it can use the same template.
 
 ## Changing things later
 
@@ -63,7 +66,7 @@ Things to know:
 
 **Recurring**, **Schedules** and **Templates** (in the account menu) list everything across your workspaces, each row with its workspace and project. A recurring gig's card shows its title, place and priority on top, then its timing and facts (next gig, how many it made, how early each is created); its actions sit at the bottom left and the pictures of who gets its gigs at the bottom right. **Show** at the top narrows the list to one workspace or one project; a project also shows its workspace's templates for every project.
 
-**Templates** lists the templates. You can create one there, edit it, or start a gig from it. A template can be limited to one project or usable in all projects of its workspace. Shared templates (see above) are listed once, under any **Show** choice.
+**Templates** lists the templates. You can create one there, edit it, or start a gig from it (**+ New gig** on its row opens the New gig form filled from it, in its project, or for an any-project template the project you're looking at). A template can be limited to one project or usable in all projects of its workspace. Shared templates (see above) are listed once, under any **Show** choice.
 
 ## Schedules
 

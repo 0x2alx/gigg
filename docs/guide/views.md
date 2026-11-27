@@ -10,8 +10,11 @@ Your own gigs: the board's **More filters** › **Assignee** › **Assigned to m
 
 - Sort by any column header.
 - Filter by status category, label, assignee, minimum priority, recurring (hide the gigs a recurring gig made, or show only those), always run (hide the always-run gigs, or show only those), custom fields, or text (titles, descriptions and comments).
+- **Custom fields** in **More filters**: a choice field by one of its options, a checkbox by ticked or not, a number by a comparison (=, ≥, ≤, >, <) and a value, a text or URL field by the words it contains; **No value** finds the gigs where the field is empty. Date fields can't be filtered yet. Across workspaces, a filter on one workspace's field leaves out the gigs of the others.
+- **Columns** (in **More filters**) adds a custom field's values as a column (on a phone, a line on each card). **Clear filters** keeps the columns.
+- By default the table hides done and cancelled gigs; the count says how many (*N done or cancelled hidden*). **Include done** shows them.
 - Select rows to act on several gigs at once: move to a status, set the priority, add a label, assign or unassign someone, or delete.
-- **Save view** keeps the current filters under a name. Saved views appear in the account menu (your picture, top right).
+- **Save view** keeps the current filters (and the field columns) under a name. Saved views appear in the account menu (your picture, top right).
 
 ## The command palette
 

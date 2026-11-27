@@ -321,7 +321,7 @@ in [access.md](access.md).
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/me/filters` | Your saved filters. |
-| POST | `/me/filters` | Save a filter. |
+| POST | `/me/filters` | Save a filter: `query` holds the gig list filters by name, `field.<field id>` for a custom field filter and `cols` (field ids, comma-separated) for the table's field columns. |
 | PUT | `/me/filters/{id}` | Replace a saved filter. |
 | DELETE | `/me/filters/{id}` | Delete a saved filter. |
 | GET | `/me/notifications` | Your notifications: mentions and assignments, and for the gigs you're assigned to or follow, reports, questions, failed runs and missed windows, as your bell preferences allow (`bell_finished` default off; `bell_problems`, `bell_assigned`, `bell_mentioned`, `bell_missed` default on; `follow_own_gigs`, default on, makes you follow the gigs you create). |
@@ -425,7 +425,7 @@ in [access.md](access.md).
 | POST | `/projects/{p}/archive-done` | Archive done and cancelled gigs finished more than N days ago (`older_than_days`); `category` (`done` or `cancelled`) limits it to one. |
 | POST | `/gigs/{id}/resume` | Ask for the gig's agent session to be resumed (records the request, moves the gig to todo). |
 | GET | `/gigs/{id}/activity` | A gig's history (old values included). |
-| GET | `/gigs/{id}/relations` | Gigs this one blocks, is blocked by, or relates to. |
+| GET | `/gigs/{id}/relations` | Gigs this one blocks, is blocked by, or relates to, each with its `status_name` and `status_category`. |
 | POST | `/gigs/{id}/relations` | Link two gigs (`blocks`, `blocked_by`, `relates`). |
 | DELETE | `/gigs/{id}/relations` | Unlink two gigs (`?gig=...&direction=...`). |
 | GET | `/gigs/{id}/checklist` | A gig's checklist. |
@@ -439,6 +439,10 @@ Gig list filters: `project` (workspace list only), `status`, `category`, `label`
 `updated_since`, `include_deleted`, `deleted`, `archived` (`only` or `include`), `parent`, `blocked`,
 `recurring` (`hide` leaves out the gigs a recurring gig made, `only` keeps just those; default all),
 `always_run` (`hide` leaves out the always-run gigs, `only` keeps just those; default all),
+`field` (`<field id>:<value>`, repeatable up to 20, all must hold: a select field equals the option, a
+checkbox is `true` or `false`, a number is `8` or a comparison `>=3`, `<=3`, `>3`, `<3`, `=3`, a text or URL
+field contains the value, case-insensitive; an empty value matches gigs without a value; a date field or a
+field of another workspace is a 422),
 `sort` (`board`, or a comma list of `priority`, `due`, `created`, `updated`, `number`, `title`, each
 optionally prefixed with `-` for descending), `limit`, `cursor`.
 
