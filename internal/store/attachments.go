@@ -131,7 +131,9 @@ func CleanFilename(s string) string {
 	return s
 }
 
-// AttachLimits returns a workspace's file size limit, its quota, and how much of it is used.
+// AttachLimits returns a workspace's file size limit, its quota, and how much of it is used: the bytes
+// its attachments take on disk, each stored file and image preview once (identical files are stored
+// once, however many attachments share them).
 func AttachLimits(ctx context.Context, q Q, ws int64) (fileMax, quota, used int64, err error) {
 	var fm, qu sql.NullInt64
 	if err = q.QueryRowContext(ctx, `SELECT attach_file_max, attach_quota FROM workspaces WHERE id = ?`, ws).Scan(&fm, &qu); err != nil {
@@ -147,8 +149,30 @@ func AttachLimits(ctx context.Context, q Q, ws int64) (fileMax, quota, used int6
 	if qu.Valid {
 		quota = qu.Int64
 	}
-	err = q.QueryRowContext(ctx, `SELECT coalesce(sum(size), 0) FROM attachments WHERE workspace_id = ?`, ws).Scan(&used)
+	err = q.QueryRowContext(ctx, `SELECT coalesce(sum(size), 0) FROM blobs WHERE sha256 IN (
+		SELECT blob_sha256 FROM attachments WHERE workspace_id = ? AND blob_sha256 IS NOT NULL
+		UNION SELECT thumb_sha256 FROM attachments WHERE workspace_id = ? AND thumb_sha256 IS NOT NULL)`, ws, ws).Scan(&used)
 	return
+}
+
+// AttachAdds is how much a workspace's use grows when it attaches the given stored files (sha256 →
+// bytes; "" is skipped): a file or preview the workspace already stores adds nothing.
+func AttachAdds(ctx context.Context, q Q, ws int64, blobs map[string]int64) (int64, error) {
+	var adds int64
+	for sha, size := range blobs {
+		if sha == "" {
+			continue
+		}
+		var n int
+		if err := q.QueryRowContext(ctx, `SELECT count(*) FROM attachments WHERE workspace_id = ? AND (blob_sha256 = ? OR thumb_sha256 = ?)`,
+			ws, sha, sha).Scan(&n); err != nil {
+			return 0, err
+		}
+		if n == 0 {
+			adds += size
+		}
+	}
+	return adds, nil
 }
 
 // SetAttachLimits changes a workspace's limits (nil = back to the default).
@@ -171,12 +195,13 @@ func SetAttachLimits(ctx context.Context, q Q, a Actor, ws int64, fileMax, quota
 	return err
 }
 
-// FitsLimits: a file of size bytes fits the workspace's per-file limit and what's left of its quota.
-func FitsLimits(fileMax, quota, used, size int64) error {
+// FitsLimits: a file of size bytes fits the workspace's per-file limit, and the adds bytes it puts on
+// disk (AttachAdds: the file and its preview, unless already stored) fit what's left of its quota.
+func FitsLimits(fileMax, quota, used, size, adds int64) error {
 	if size > fileMax {
 		return tooLarge("files are up to %s in this workspace", HumanBytes(fileMax))
 	}
-	if used+size > quota {
+	if adds > 0 && used+adds > quota {
 		return tooLarge("the workspace's attachments are full (%s of %s used)", HumanBytes(used), HumanBytes(quota))
 	}
 	return nil
@@ -213,7 +238,11 @@ func AddAttachment(ctx context.Context, q Q, a Actor, t *Gig, in AttachmentIn) (
 		if err != nil {
 			return nil, err
 		}
-		if err := FitsLimits(fileMax, quota, used, in.Size); err != nil {
+		adds, err := AttachAdds(ctx, q, t.WorkspaceID, map[string]int64{in.Blob: in.Size, in.Thumb: in.ThumbLen})
+		if err != nil {
+			return nil, err
+		}
+		if err := FitsLimits(fileMax, quota, used, in.Size, adds); err != nil {
 			return nil, err
 		}
 		if err := refBlob(ctx, q, in.Blob, in.Size); err != nil {

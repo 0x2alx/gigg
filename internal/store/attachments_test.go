@@ -108,25 +108,72 @@ func TestBlobSweep(t *testing.T) {
 	}
 }
 
-// TestAttachmentQuotaIsPerWorkspace: sizes add up per workspace; the defaults apply until set.
+// TestAttachmentQuota: the defaults apply until set; use is what the workspace's attachments take on
+// disk: each stored file and image preview once, so a preview counts and a file attached twice
+// doesn't count twice; the quota check counts the same way, preview included.
 func TestAttachmentQuota(t *testing.T) {
 	f := newFixture(t)
 	g := f.gig(t, NewGig{ProjectID: f.p1.ID, Title: "q"})
-	fm, q, used, err := AttachLimits(f.ctx, f.s.R, f.ws.ID)
-	if err != nil || fm != DefaultAttachFileMax || q != DefaultAttachQuota || used != 0 {
-		t.Fatalf("defaults: %d %d %d %v", fm, q, used, err)
+	usedIs := func(want int64) {
+		t.Helper()
+		fm, q, used, err := AttachLimits(f.ctx, f.s.R, f.ws.ID)
+		if err != nil || fm != DefaultAttachFileMax || used != want {
+			t.Fatalf("limits: file max %d, quota %d, used %d (want %d), %v", fm, q, used, want, err)
+		}
+	}
+	usedIs(0)
+	if _, q, _, _ := AttachLimits(f.ctx, f.s.R, f.ws.ID); q != DefaultAttachQuota {
+		t.Fatalf("default quota %d", q)
 	}
 	f.attachFile(t, g, "12345")
-	quota := int64(8)
+	usedIs(5)
+	f.attachFile(t, g, "12345") // stored once
+	usedIs(5)
+	image := func(data, thumb string) error {
+		return f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+			sha, _ := f.s.WriteBlob([]byte(data))
+			th, _ := f.s.WriteBlob([]byte(thumb))
+			_, err := AddAttachment(f.ctx, tx, f.a, g, AttachmentIn{Kind: "file", Blob: sha, Size: int64(len(data)), Filename: "i.png",
+				Mime: "image/png", Width: 1, Height: 1, Thumb: th, ThumbLen: int64(len(thumb))})
+			return err
+		})
+	}
+	must(t, image("abc", "thumbbytes"))
+	usedIs(5 + 3 + 10)
+
+	quota := int64(20)
 	f.tx(t, func(tx *sql.Tx) error { return SetAttachLimits(f.ctx, tx, f.a, f.ws.ID, nil, &quota) })
-	err = f.s.Tx(f.ctx, func(tx *sql.Tx) error {
-		sha, _ := f.s.WriteBlob([]byte("6789"))
-		_, err := AddAttachment(f.ctx, tx, f.a, g, AttachmentIn{Kind: "file", Blob: sha, Size: 4, Filename: "b.txt", Mime: "text/plain"})
+	// 2 bytes left: a 2-byte image fits, but not with its 8-byte preview
+	if err := image("de", "preview!"); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("over quota with the preview: %v", err)
+	}
+	// the same image and preview again add nothing, so it fits even when full
+	must(t, image("abc", "thumbbytes"))
+	quota = 18
+	f.tx(t, func(tx *sql.Tx) error { return SetAttachLimits(f.ctx, tx, f.a, f.ws.ID, nil, &quota) })
+	f.attachFile(t, g, "12345")
+	err := f.s.Tx(f.ctx, func(tx *sql.Tx) error {
+		sha, _ := f.s.WriteBlob([]byte("6"))
+		_, err := AddAttachment(f.ctx, tx, f.a, g, AttachmentIn{Kind: "file", Blob: sha, Size: 1, Filename: "b.txt", Mime: "text/plain"})
 		return err
 	})
-	if err == nil || !errors.Is(err, ErrTooLarge) {
+	if !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("over quota: %v", err)
 	}
+	// another workspace's use is its own: the same bytes count there too, and not here again
+	var p *Project
+	f.tx(t, func(tx *sql.Tx) error {
+		w, err := CreateWorkspace(f.ctx, tx, f.a, "other", "Other", nil)
+		if err == nil {
+			p, err = CreateProject(f.ctx, tx, f.a, w.ID, "main", "Main", "OTH", nil)
+		}
+		return err
+	})
+	f.attachFile(t, f.gig(t, NewGig{ProjectID: p.ID, Title: "elsewhere"}), "12345")
+	if _, _, used, _ := AttachLimits(f.ctx, f.s.R, p.WorkspaceID); used != 5 {
+		t.Fatalf("other workspace uses %d, want 5", used)
+	}
+	usedIs(18)
 }
 
 func TestCleanFilename(t *testing.T) {

@@ -101,6 +101,12 @@ func (s *Store) BlobPath(sha string) string {
 	return filepath.Join(s.dir, "files", sha[:2], sha[2:4], sha)
 }
 
+// BlobID is the name data is stored under: its sha256, in hex.
+func BlobID(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
+}
+
 // WriteBlob stores data (deduplicated) and returns its sha256.
 func (s *Store) WriteBlob(data []byte) (string, error) {
 	sha, _, err := s.WriteBlobNew(data)
@@ -111,8 +117,7 @@ func (s *Store) WriteBlob(data []byte) (string, error) {
 // so a caller whose transaction fails can remove a file only it wrote (RemoveBlob, still inside that
 // transaction).
 func (s *Store) WriteBlobNew(data []byte) (string, bool, error) {
-	h := sha256.Sum256(data)
-	sha := hex.EncodeToString(h[:])
+	sha := BlobID(data)
 	p := s.BlobPath(sha)
 	if _, err := os.Stat(p); err == nil {
 		now := time.Now() // fresh again: the sweep leaves recent files alone

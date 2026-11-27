@@ -27,7 +27,7 @@ type attachmentsOut struct {
 		Items   []*store.Attachment `json:"items"`
 		FileMax int64               `json:"file_max" doc:"The largest file this workspace takes, in bytes"`
 		Quota   int64               `json:"quota" doc:"The workspace's total for attachments, in bytes"`
-		Used    int64               `json:"used" doc:"Bytes the workspace's attachments use"`
+		Used    int64               `json:"used" doc:"Bytes the workspace's attachments take on disk (each stored file and image preview once)"`
 	}
 }
 
@@ -194,12 +194,17 @@ func (a *API) attachFile(ctx context.Context, ref, filename, label string, run *
 	if err != nil {
 		return nil, err
 	}
+	// the preview isn't made yet: the transaction checks again with it (and against a concurrent upload)
 	fileMax, quota, used, err := store.AttachLimits(ctx, a.st.R, t.WorkspaceID)
+	var adds int64
 	if err == nil {
-		err = store.FitsLimits(fileMax, quota, used, int64(len(data)))
+		adds, err = store.AttachAdds(ctx, a.st.R, t.WorkspaceID, map[string]int64{store.BlobID(data): int64(len(data))})
+	}
+	if err == nil {
+		err = store.FitsLimits(fileMax, quota, used, int64(len(data)), adds)
 	}
 	if err != nil {
-		return nil, storeErr(err) // checked again in the transaction, against a concurrent upload
+		return nil, storeErr(err)
 	}
 	info := media.Sniff(data, filename)
 	in := store.AttachmentIn{Kind: "file", Label: label, RunID: run, Size: int64(len(data)), Filename: filename,
@@ -375,7 +380,7 @@ type attachLimitsOut struct {
 	Body struct {
 		FileMax int64 `json:"file_max"`
 		Quota   int64 `json:"quota"`
-		Used    int64 `json:"used"`
+		Used    int64 `json:"used" doc:"Bytes the workspace's attachments take on disk (each stored file and image preview once)"`
 		Custom  bool  `json:"custom" doc:"Either limit differs from the default"`
 	}
 }

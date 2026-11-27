@@ -100,6 +100,9 @@
 - A gig moved to another project now also logs `gig.moved_out` in the project it left, so someone
   who sees only that project gets the change on the feed and the live board drops the card (before,
   it stayed until a reload). The entry names only the old key.
+- Attachment quota: a workspace's use is now what its attachments take on disk. Image previews
+  count, and a file attached several times in a workspace (stored once) counts once; the upload
+  check counts the same way, preview included.
 
 ## 0.1.0 (2026-11-19)
 
