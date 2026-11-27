@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DUE_TIME, DEFAULT_START_TIME, fillTime, fmtDue, joinDateTime, splitDateTime } from "./dates";
+import { DEFAULT_DUE_TIME, DEFAULT_START_TIME, fillTime, fmtDue, joinDateTime, parseHM, splitDateTime } from "./dates";
+
+describe("parseHM (the 24-hour time box)", () => {
+  it("reads the usual ways of typing a time", () => {
+    expect(parseHM("23:00")).toBe("23:00");
+    expect(parseHM("9:30")).toBe("09:30");
+    expect(parseHM("0930")).toBe("09:30");
+    expect(parseHM("930")).toBe("09:30");
+    expect(parseHM("9.30")).toBe("09:30");
+    expect(parseHM(" 7 ")).toBe("07:00");
+    expect(parseHM("00:00")).toBe("00:00");
+  });
+  it("refuses what isn't a time of day, never wrapping it", () => {
+    for (const v of ["", "24:00", "23:60", "11:00 PM", "abc", "1:2", "12345"]) expect(parseHM(v)).toBeNull();
+  });
+});
 
 describe("date and time inputs", () => {
   it("fills the default time when only a date is picked", () => {

@@ -9,7 +9,9 @@ import {
   fmtInstant,
   fmtWallWindow,
   fromDateTimeInput,
+  numIn,
   ordinal,
+  repeatIssue,
   previewOccurrences,
   repeatFromRule,
   repeatProblem,
@@ -115,6 +117,33 @@ describe("form state", () => {
     expect(repeatProblem({ ...s, allDay: false, len: 2, unit: "m" })).toMatch(/5 minutes/);
     expect(repeatProblem({ ...s, endMode: "date", endDate: "" })).toMatch(/end date/);
     expect(repeatProblem({ ...s, interval: 0 })).toMatch(/1 to 365/);
+  });
+  it("names the field a typed value is wrong on, never taking another value instead", () => {
+    const s = { ...defaultRepeat(), freq: "weekly" as const, allDay: false, start: "23:00", len: 1, unit: "h" as const };
+    // the QA case: every 0, a window of 0, created -5 min early
+    expect(repeatIssue({ ...s, interval: 0 })?.field).toBe("interval");
+    expect(repeatIssue({ ...s, len: 0 })?.field).toBe("len");
+    expect(repeatIssue({ ...s, lead: -5 })?.field).toBe("lead");
+    // an empty box (NaN) or a fraction is wrong too
+    expect(repeatIssue({ ...s, interval: NaN })?.field).toBe("interval");
+    expect(repeatIssue({ ...s, interval: 1.5 })?.field).toBe("interval");
+    expect(repeatIssue({ ...s, lead: NaN })?.field).toBe("lead");
+    expect(repeatIssue({ ...s, len: NaN })?.field).toBe("len");
+    expect(repeatIssue({ ...s, endMode: "count", count: 0 })?.field).toBe("count");
+    // a start time that isn't one
+    expect(repeatIssue({ ...s, start: "" })?.field).toBe("start");
+    expect(repeatIssue({ ...s, start: "24:00" })?.field).toBe("start");
+    expect(repeatIssue({ ...s, weekdays: [] })?.field).toBe("weekdays");
+    // half an hour in hours is fine
+    expect(repeatIssue({ ...s, len: 0.5 })).toBeNull();
+    expect(repeatIssue(s)).toBeNull();
+  });
+  it("reads number boxes as typed", () => {
+    expect(numIn("0")).toBe(0);
+    expect(numIn("-5")).toBe(-5);
+    expect(numIn("2.5")).toBe(2.5);
+    expect(numIn("")).toBeNaN();
+    expect(numIn("  ")).toBeNaN();
   });
 });
 

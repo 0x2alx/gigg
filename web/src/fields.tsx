@@ -1,7 +1,7 @@
 // Inputs shared by the new-gig modal and the gig panel: labels, assignees, colour.
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type { Tag, User } from "./api";
-import { fillTime, joinDateTime, splitDateTime } from "./dates";
+import { fillTime, joinDateTime, parseHM, splitDateTime } from "./dates";
 import { rovingNext } from "./swatches";
 
 import { colorFor } from "./theme";
@@ -161,6 +161,54 @@ export function toDateInput(ms: number | null): string {
 
 export function fromDateInput(v: string): number | null {
   return v ? new Date(v + "T12:00:00").getTime() : null;
+}
+
+// TimeInput: a time of day typed on the 24-hour clock ("HH:MM" out, "" while what's typed isn't a
+// time), as the app shows every time. The browser's own time picker follows the device's locale (it
+// may read "11:00 PM" next to a schedule named "23:00"), so schedule timings use this one. What's
+// typed stays as typed; leaving the field writes it out in full ("930" -> "09:30").
+export function TimeInput({ value, onChange, className, invalid, ...rest }: {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+  invalid?: boolean;
+  "aria-label"?: string;
+  "aria-describedby"?: string;
+  disabled?: boolean;
+}) {
+  const [text, setText] = useState(value);
+  const sent = useRef(value); // the value this field last reported
+  useEffect(() => {
+    // changed from outside (a schedule picked): show it
+    if (value !== sent.current) {
+      sent.current = value;
+      setText(value);
+    }
+  }, [value]);
+  return (
+    <input
+      {...rest}
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      placeholder="HH:MM"
+      maxLength={5}
+      size={5}
+      className={className}
+      value={text}
+      aria-invalid={invalid || undefined}
+      onChange={(e) => {
+        setText(e.target.value);
+        const v = parseHM(e.target.value) ?? "";
+        sent.current = v;
+        if (v !== value) onChange(v);
+      }}
+      onBlur={() => {
+        const v = parseHM(text);
+        if (v) setText(v);
+      }}
+    />
+  );
 }
 
 // DateTimeInput: a local date plus a time (unix ms out). Picking only a date fills in defaultTime

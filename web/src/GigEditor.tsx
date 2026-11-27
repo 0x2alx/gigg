@@ -5,7 +5,7 @@
 // What differs is only where a change goes (`set`): the panel saves it at once, a form keeps it until
 // Create/Save. A mode hides the boxes and rows that don't apply (a template has no When) and the
 // caller adds its own (comments, the agent session and history in the panel; Repeat in a form).
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { priorityNames, type Status, type Tag, type User, type StartCategory } from "./api";
 import { useApp, type WorkspaceTree } from "./App";
 import { AssigneePicker, ColorPicker, DateTimeInput, LabelInput, withCurrent } from "./fields";
@@ -66,7 +66,7 @@ export function GigEditor(p: {
   // a template shared by every workspace (Shared library): set given = the scope can still be chosen.
   // Shared: no workspace, any project, no assignees (each recurring gig names its own)
   shared?: { on: boolean; set?: (on: boolean) => void };
-  projectLocked?: boolean;
+  projectLocked?: string; // the project can't change: why (shown under it)
   statuses?: Status[]; // the status row (none for a template or a recurring gig)
   // a template or recurring gig: where its gigs start (Backlog keeps them from the runner)
   startIn?: { value: StartCategory; set: (v: StartCategory) => void };
@@ -97,6 +97,7 @@ export function GigEditor(p: {
   const tpl = mode === "template";
   const status = p.statuses?.find((s) => s.id === v.status);
   const [showWindow, setShowWindow] = useState(false);
+  const lockId = useId();
   return (
     <div className="tp-body">
       <div className="tp-main">
@@ -170,8 +171,9 @@ export function GigEditor(p: {
                       set({ project: Number(e.target.value) });
                     }
                   }}
-                  disabled={p.projectLocked}
+                  disabled={!!p.projectLocked}
                   aria-label="Project"
+                  aria-describedby={p.projectLocked ? lockId : undefined}
                 >
                   {p.anyProject && <option value="any">Any project</option>}
                   {ws.projects.map((x) => (
@@ -182,6 +184,11 @@ export function GigEditor(p: {
                 </select>
               ) : (
                 ws.projects.find((x) => x.id === v.project)?.name
+              )}
+              {canWrite && p.projectLocked && (
+                <span className="muted small rf-note" id={lockId}>
+                  {p.projectLocked}
+                </span>
               )}
             </Row>
             </>

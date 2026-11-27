@@ -855,9 +855,16 @@ label.inline { flex-direction: row; align-items: center; gap: 0.35rem; flex-wrap
 label.inline select { width: auto; }
 .repeat .num { width: 4.2rem; }
 .repeat .time, .repeat .date { width: auto; max-width: 100%; }
-.wd-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+/* the 24-hour time box (TimeInput): room for "23:00" at any font size (16px on a phone): five tabular digits' worth plus the padding */
+.repeat .time[inputmode], .tp-grid .rf-c .time[inputmode] { width: calc(5ch + 2 * var(--ctl-px, 0.6rem) + 2px); font-variant-numeric: tabular-nums; }
+/* a value out of range: the field is marked and says why on its own line under it */
+input[aria-invalid="true"] { border-color: var(--danger); }
+.wd-chips[aria-invalid="true"] .wd-chip:not(.on) { border-color: var(--danger); }
+.rf-err { margin: 0; }
+/* the weekdays stay on one row, the chips narrowing on a slim screen */
+.wd-chips { display: flex; flex-wrap: nowrap; gap: 0.25rem; min-width: 0; }
 .wd-chip {
-  min-width: 2.1rem; padding: 0.2rem 0.35rem; font: inherit; font-size: var(--fs-sm); cursor: pointer;
+  flex: 0 1 2.1rem; min-width: 1.6rem; padding: 0.2rem 0; font: inherit; font-size: var(--fs-sm); cursor: pointer; text-align: center;
   background: transparent; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 999px;
 }
 .wd-chip.on { background: var(--selected); color: var(--text); border-color: var(--accent); font-weight: var(--weight-strong); }
@@ -2052,6 +2059,12 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
   .tm-foot { margin: var(--sp-5) -0.9rem calc(-1rem - env(safe-area-inset-bottom)); padding: var(--sp-4) 0.9rem calc(var(--sp-4) + env(safe-area-inset-bottom)); bottom: calc(-1rem - env(safe-area-inset-bottom)); }
   .modal-backdrop:has(> .modal-full) { padding: 0; }
   .modal.modal-full { height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  /* one control size in the form on a phone: the panel's dense small fields (.tp-value) would sit
+     next to the repeat rows' 16px ones (16px so tapping a field doesn't zoom the page) */
+  .tm-form .tp-props .tp-value select, .tm-form .tp-props .tp-value input:not([type=checkbox], [type=radio]),
+  .tm-form .tp-props .tp-value textarea, .tm-form .tp-props .rf-c select, .tm-form .tp-props .rf-c input:not([type=checkbox], [type=radio]) {
+    font-size: max(16px, 1em); padding-block: 0.3rem; min-height: var(--ctl-h);
+  }
 }
 
 /* the lists that span every workspace (recurring gigs, templates, schedules): a filter bar on top */

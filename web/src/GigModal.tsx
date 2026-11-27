@@ -525,7 +525,7 @@ export function GigModal({ ws: ws0, projectId, statuses, labels, choices, schedu
           onWorkspace={moveWs}
           anyProject={tplMode ? { on: tplAnyProject, set: setTplAnyProject } : undefined}
           shared={tplMode && (canShare(me) || shared) ? { on: shared, set: canShare(me) && !tpl && !shareOnly ? setShared : undefined } : undefined}
-          projectLocked={editing}
+          projectLocked={editing ? "A recurring gig stays in the project it was made in. For another project, make a new recurring gig there (it can use the same template)." : undefined}
           statuses={!repeating && !tplMode ? projectStatuses : undefined}
           startIn={repeating || tplMode ? { value: startCategory, set: setStartCategory } : undefined}
           statusBusy={!statusReady && !statusErr}

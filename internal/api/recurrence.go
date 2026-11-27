@@ -41,12 +41,12 @@ type RecurrenceBody struct {
 	AlwaysRun     bool                   `json:"always_run,omitempty" doc:"Its gigs run whatever the usage budget (needs the always_run permission)"`
 	AllowedTools  []string               `json:"allowed_tools,omitempty" maxItems:"64" doc:"Tool allowlist its gigs get for the runner (permission rules); omit to keep the template's, [] clears. Needs the allowed_tools permission"`
 	Freq          string                 `json:"freq,omitempty" enum:"daily,weekly,monthly," doc:"Required unless schedule_id is given"`
-	Interval      int64                  `json:"interval,omitempty" minimum:"0" maximum:"365" doc:"Every N days/weeks/months (default 1)"`
+	Interval      int64                  `json:"interval,omitempty" minimum:"1" maximum:"365" doc:"Every N days/weeks/months (omit for 1)"`
 	Weekdays      []int                  `json:"weekdays,omitempty" doc:"Weekly: 1=Mon .. 7=Sun"`
 	MonthDay      *int64                 `json:"month_day,omitempty" doc:"Monthly: 1-31, -1 = last day (short months use their last day)"`
 	TZ            string                 `json:"tz,omitempty" doc:"IANA time zone (default: the user's time zone preference, else the instance default GIGG_DEFAULT_TZ)"`
 	WindowStart   string                 `json:"window_start,omitempty" pattern:"^[0-2][0-9]:[0-5][0-9]$" doc:"When the window opens, local HH:MM (default 00:00)"`
-	WindowMinutes int64                  `json:"window_minutes,omitempty" minimum:"0" maximum:"44640" doc:"How long the window stays open (default 1440)"`
+	WindowMinutes int64                  `json:"window_minutes,omitempty" minimum:"5" maximum:"44640" doc:"How long the window stays open, 5 to 44640 minutes (omit for 1440)"`
 	LeadMinutes   int64                  `json:"lead_minutes,omitempty" minimum:"0" maximum:"10080" doc:"Create the gig this long before the window opens"`
 	StartsOn      int64                  `json:"starts_on,omitempty" doc:"Unix ms (default now)"`
 	EndsOn        *int64                 `json:"ends_on,omitempty" doc:"Unix ms"`

@@ -14,6 +14,15 @@ export function splitDateTime(ms: number | null | undefined): { date: string; ti
   return { date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, time: `${pad(d.getHours())}:${pad(d.getMinutes())}` };
 }
 
+// parseHM: a typed 24-hour time as "HH:MM", or null. Takes "9:30", "09:30", "0930", "930", "9.30"
+// and "9" (= 09:00); never wraps an hour or minute that's out of range.
+export function parseHM(v: string): string | null {
+  const m = /^(\d{1,2})(?:[:.h]?(\d{2}))?$/.exec(v.trim());
+  if (!m) return null;
+  const h = Number(m[1]), min = Number(m[2] ?? "0");
+  return h < 24 && min < 60 ? `${pad(h)}:${pad(min)}` : null;
+}
+
 // fillTime: the time to show after the date changed. A new date with no time yet gets the default;
 // clearing the date clears the time.
 export function fillTime(date: string, time: string, defaultTime: string): string {

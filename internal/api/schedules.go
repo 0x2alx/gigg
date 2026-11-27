@@ -18,12 +18,12 @@ import (
 type ScheduleBody struct {
 	Name          string `json:"name,omitempty" maxLength:"80" doc:"Default: described from the rule"`
 	Freq          string `json:"freq" enum:"minutes,hours,daily,weekly,monthly" doc:"minutes and hours: for errands only"`
-	Interval      int64  `json:"interval,omitempty" minimum:"0" maximum:"365" doc:"Every N minutes (1-360), hours (1-24), days, weeks or months (default 1)"`
+	Interval      int64  `json:"interval,omitempty" minimum:"1" maximum:"365" doc:"Every N minutes (1-360), hours (1-24), days, weeks or months (omit for 1)"`
 	Weekdays      []int  `json:"weekdays,omitempty" doc:"Weekly: 1=Mon .. 7=Sun; minutes/hours: only on these days (empty: every day)"`
 	MonthDay      *int64 `json:"month_day,omitempty" doc:"Monthly: 1-31, -1 = last day"`
 	TZ            string `json:"tz,omitempty" doc:"IANA time zone (default: the user's time zone preference, else the instance default GIGG_DEFAULT_TZ)"`
 	WindowStart   string `json:"window_start,omitempty" pattern:"^[0-2][0-9]:[0-5][0-9]$" doc:"When the window opens, local HH:MM (default 00:00)"`
-	WindowMinutes int64  `json:"window_minutes,omitempty" minimum:"0" maximum:"44640" doc:"How long the window stays open (default 1440)"`
+	WindowMinutes int64  `json:"window_minutes,omitempty" minimum:"5" maximum:"44640" doc:"How long the window stays open, 5 to 44640 minutes (omit for 1440)"`
 	LeadMinutes   int64  `json:"lead_minutes,omitempty" minimum:"0" maximum:"10080" doc:"Create the gig this long before the window opens"`
 }
 

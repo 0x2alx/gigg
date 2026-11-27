@@ -341,18 +341,32 @@ export function windowMinutes(s: RepeatState): number {
   return s.allDay ? 1440 : Math.round(s.len * (s.unit === "h" ? 60 : 1));
 }
 
+// The repeat form's number fields hold what was typed (NaN while empty), never a clamped value: a
+// value out of range is reported on its own field (repeatIssue) and the form waits until it's fixed.
+export type RepeatField = "interval" | "weekdays" | "start" | "len" | "lead" | "endDate" | "count";
+
+// numIn: a number input's value as typed (NaN when empty or not a number).
+export function numIn(v: string): number {
+  return v.trim() === "" ? NaN : Number(v);
+}
+
+// repeatIssue: the first thing that stops the form from submitting and the field it's on, or null.
+export function repeatIssue(s: RepeatState): { field: RepeatField; msg: string } | null {
+  if (!s.freq) return null;
+  if (!Number.isInteger(s.interval) || s.interval < 1 || s.interval > 365) return { field: "interval", msg: "Repeat every 1 to 365." };
+  if (s.freq === "weekly" && s.weekdays.length === 0) return { field: "weekdays", msg: "Pick at least one weekday." };
+  if (!s.allDay && !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(s.start)) return { field: "start", msg: "Type a start time, 00:00 to 23:59." };
+  const wm = windowMinutes(s);
+  if (!Number.isFinite(wm) || wm < 5 || wm > 44640) return { field: "len", msg: "The window must be 5 minutes to 31 days long." };
+  if (!Number.isInteger(s.lead) || s.lead < 0 || s.lead > 10080) return { field: "lead", msg: "Create early: 0 to 10080 minutes." };
+  if (s.endMode === "date" && !s.endDate) return { field: "endDate", msg: "Pick an end date." };
+  if (s.endMode === "count" && (!Number.isInteger(s.count) || s.count < 1)) return { field: "count", msg: "End after at least 1 time." };
+  return null;
+}
+
 // repeatProblem: the first thing that stops the form from submitting, or null.
 export function repeatProblem(s: RepeatState): string | null {
-  if (!s.freq) return null;
-  if (!Number.isInteger(s.interval) || s.interval < 1 || s.interval > 365) return "Repeat every 1 to 365.";
-  if (s.freq === "weekly" && s.weekdays.length === 0) return "Pick at least one weekday.";
-  const wm = windowMinutes(s);
-  if (!s.allDay && !/^[0-2][0-9]:[0-5][0-9]$/.test(s.start)) return "Pick a start time.";
-  if (wm < 5 || wm > 44640) return "The window must be 5 minutes to 31 days long.";
-  if (s.lead < 0 || s.lead > 10080) return "Create early: 0 to 10080 minutes.";
-  if (s.endMode === "date" && !s.endDate) return "Pick an end date.";
-  if (s.endMode === "count" && (!Number.isInteger(s.count) || s.count < 1)) return "End after at least 1 time.";
-  return null;
+  return repeatIssue(s)?.msg ?? null;
 }
 
 // repeatRule: the rule fields for the API (fields that don't apply are omitted, never null).
