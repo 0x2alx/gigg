@@ -2027,6 +2027,15 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
 .shortcuts-row dt { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.3rem; }
 .shortcuts-chord { white-space: nowrap; display: inline-flex; align-items: center; gap: 0.15rem; }
 .shortcuts-row dd { margin: 0; }
+/* the avatar crop dialog: a fixed square the picture moves under, a circle showing the avatar's shape */
+.crop { display: flex; flex-direction: column; gap: var(--sp-3); align-items: stretch; }
+.crop-box { position: relative; flex: none; align-self: center; overflow: hidden; border-radius: var(--radius-m); background: var(--low); touch-action: none; user-select: none; cursor: grab; }
+.crop-box:active { cursor: grabbing; }
+.crop-box:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.crop-box img { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; }
+.crop-ring { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.7), 0 0 0 100vmax rgb(0 0 0 / 0.4); pointer-events: none; }
+.crop-zoom { display: flex; align-items: center; gap: var(--sp-2); align-self: center; width: min(280px, 100%); }
+.crop-zoom input[type="range"] { flex: 1; min-width: 0; }
 .modal-head > h2 { flex: 1; min-width: 0; }
 .modal-head > .modal-expand { width: 1.94rem; height: 1.94rem; padding: 0; display: inline-grid; place-items: center; font-size: 0.95rem; flex: none; color: var(--muted); }
 .modal-head > .modal-expand:hover { color: var(--text); }

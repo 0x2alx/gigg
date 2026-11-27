@@ -4,6 +4,7 @@ import { api, ApiError, fmtTime, type Session } from "./api";
 import { useApp } from "./App";
 import { ColorPicker } from "./fields";
 import { Avatar } from "./ui";
+import { AvatarCrop } from "./AvatarCrop";
 import { HelpButton } from "./help";
 import { browserTZ, setPreferredTZ } from "./recurrence";
 import { BELL_SETTINGS, FOLLOW_OWN, prefOn, prefValue } from "./bellPrefs";
@@ -193,21 +194,33 @@ function Picture() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [bust, setBust] = useState(0);
-  const upload = (f: File | undefined) => {
+  // a chosen file opens the crop dialog first; only the cropped 256 px PNG is uploaded
+  const [picked, setPicked] = useState<File | null>(null);
+  const pick = (f: File | undefined) => {
     if (!f) return;
     setErr("");
-    if (f.size > 2 * 1024 * 1024) {
-      setErr("Pictures are up to 2 MB.");
+    if (!f.type.startsWith("image/")) {
+      setErr("Choose a PNG, JPEG, WebP or GIF picture.");
       return;
     }
+    if (f.size > 20 * 1024 * 1024) {
+      setErr("Pictures are up to 20 MB.");
+      return;
+    }
+    setPicked(f);
+  };
+  const upload = (png: Blob) => {
     setBusy(true);
-    api
-      .putAvatar(f)
+    return api
+      .putAvatar(png)
       .then(() => {
+        setPicked(null);
         setBust(Date.now());
         refresh();
       })
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Upload failed."))
+      .catch((e: unknown) => {
+        throw new Error(e instanceof ApiError ? e.message : "Upload failed.");
+      })
       .finally(() => setBusy(false));
   };
   const remove = () => {
@@ -227,7 +240,16 @@ function Picture() {
         <Avatar user={{ ...me.user, version: me.user.version + bust }} size="m" />
         <label className="button secondary file-button">
           {busy ? "Uploading…" : has ? "Change picture" : "Upload a picture"}
-          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => upload(e.target.files?.[0])} disabled={busy} hidden />
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={(e) => {
+              pick(e.target.files?.[0]);
+              e.target.value = ""; // the same file can be chosen again
+            }}
+            disabled={busy}
+            hidden
+          />
         </label>
         {has && (
           <button type="button" className="button danger-button" onClick={remove}>
@@ -235,8 +257,9 @@ function Picture() {
           </button>
         )}
       </div>
-      <p className="muted small">PNG, JPEG, WebP or GIF, up to 2 MB. It's cropped to a square and stored as a 256 px PNG.</p>
+      <p className="muted small">PNG, JPEG, WebP or GIF, up to 20 MB. You choose the square to keep; it's stored as a 256 px PNG.</p>
       {err && <p className="danger">{err}</p>}
+      {picked && <AvatarCrop file={picked} onCancel={() => setPicked(null)} onSave={upload} />}
     </section>
   );
 }
