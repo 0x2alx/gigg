@@ -255,10 +255,13 @@ export const EXIT_MS = 150;
 
 // expandable: a button in the header grows the dialog to the whole page (and back); the choice is
 // remembered on this device for the next expandable dialog.
-export function Modal({ title, onClose, children, wide, xl, help, expandable }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; xl?: boolean; help?: ReactNode; expandable?: boolean }) {
+// tools: small controls of the dialog's own (a counter, a button) between the title and the help.
+export function Modal({ title, onClose, children, wide, xl, help, tools, expandable }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; xl?: boolean; help?: ReactNode; tools?: ReactNode; expandable?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const narrow = useNarrow();
-  const [full, setFull] = useState(() => !!expandable && readFull());
+  // the saved choice is read even when not expandable yet: a dialog that becomes expandable (the
+  // viewer stepping from an image to a text file) opens it as the user left it
+  const [full, setFull] = useState(readFull);
   const toggleFull = () => {
     writeFull(!full);
     setFull(!full);
@@ -307,7 +310,9 @@ export function Modal({ title, onClose, children, wide, xl, help, expandable }: 
     // only the top dialog (the last one opened) answers Esc and keeps the focus
     const top = () => [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].pop() === ref.current;
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && top()) animatedClose.current();
+      // Esc leaves fullscreen (a part of this dialog shown on the whole screen) first; a second Esc closes
+      if (e.key === "Escape" && top() && leaveFullscreen(ref.current)) e.preventDefault();
+      else if (e.key === "Escape" && top()) animatedClose.current();
       else if (e.key === "Tab" && top()) trapTab(e, ref.current);
     };
     document.addEventListener("keydown", esc);
@@ -320,9 +325,10 @@ export function Modal({ title, onClose, children, wide, xl, help, expandable }: 
   // text-align, white-space and weight. It carries the shell's "narrow" itself, for the phone rules.
   return createPortal(
     <div className={"modal-backdrop" + (narrow ? " narrow" : "") + (closing ? " closing" : "") + (reopen ? " reopen" : "")} inert={closing || undefined} onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className={"modal" + (xl ? " modal-xl" : wide ? " modal-wide" : "") + (full ? " modal-full" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
+      <div className={"modal" + (xl ? " modal-xl" : wide ? " modal-wide" : "") + (expandable && full ? " modal-full" : "")} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <div className="modal-head">
           <h2>{title}</h2>
+          {tools}
           {help}
           {expandable && (
             <button type="button" className="icon-button modal-expand" onClick={toggleFull} aria-label={full ? "Back to a dialog" : "Expand to the whole page"} title={full ? "Back to a dialog" : "Expand to the whole page"}>
@@ -338,6 +344,24 @@ export function Modal({ title, onClose, children, wide, xl, help, expandable }: 
     </div>,
     document.body,
   );
+}
+
+// leaveFullscreen: true when this Esc belongs to fullscreen, not to the dialog: something inside the
+// dialog is fullscreen (leave it), or the browser itself just left fullscreen on this Esc and still
+// passed the key on (some do). Then the dialog stays open.
+let fsLeftAt = -1e9;
+if (typeof document !== "undefined") {
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) fsLeftAt = performance.now();
+  });
+}
+function leaveFullscreen(dialog: HTMLElement | null): boolean {
+  const fs = document.fullscreenElement;
+  if (fs && dialog?.contains(fs)) {
+    void document.exitFullscreen().catch(() => undefined);
+    return true;
+  }
+  return !fs && performance.now() - fsLeftAt < 250;
 }
 
 const FULL_KEY = "gigg:modal-full";

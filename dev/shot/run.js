@@ -122,7 +122,7 @@ async function point(page, at) {
             await new Promise((r) => setTimeout(r, 40));
           }
         } else if (step.eval) {
-          rec.value = await page.evaluate(step.eval);
+          rec.value = await page.evaluate(Array.isArray(step.eval) ? step.eval.join("\n") : step.eval);
           if ("expect" in step && JSON.stringify(rec.value) !== JSON.stringify(step.expect)) {
             rec.error = `expected ${JSON.stringify(step.expect)}`;
           }

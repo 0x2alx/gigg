@@ -104,5 +104,10 @@ current UI, on a fresh `e2e.sh` instance since they add gigs. `pass-extra.json` 
 and Make shared dialogs and the errand panel, at 1440 and 390 px in both built-in themes, and logs button sizes and
 overflow checks (read `log.json`). `pass-shared.json` makes one schedule shared and shoots its three-button action row at phone width (run it after `pass-extra`). `pass-metrics.json` takes tall shots of the Metrics page in the same four combinations. Run both
 on a fresh `e2e.sh` instance (the metrics shots want its run); the pages load with `domcontentloaded`, since several workspaces keep
-their event streams open. The
+their event streams open. `viewer.json` checks the attachment viewer: stepping by buttons, keys and swipe
+across images and text files, wheel and pinch zoom, drag pan, double-click and double tap, fullscreen and
+the Esc order, and stepping through a description's images, at 1440 and 390 px; it creates its own gig, so
+it runs on any instance. Besides clicks and keys, a scenario can send real mouse input (`"mouse"`: move,
+down, up, click, dblclick, wheel) and multi-finger touch (`"touch"`: start, move, end); see the top of
+`run.js`. The
 documentation's screenshots come from a demo instance; see `dev/demo/README.md`.

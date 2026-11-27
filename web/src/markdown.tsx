@@ -1,6 +1,7 @@
 // Markdown is stored as source and rendered here: markdown-it without HTML, then DOMPurify with a
 // small allowlist. Links are http(s)/mailto (and an attachment's file) only and open in a new tab;
-// images only from this server (imgsrc.ts). A click on an image opens it in the Lightbox.
+// images only from this server (imgsrc.ts). A click on an image opens it in the Lightbox, which steps
+// through the other images of the same text.
 import { useState, type MouseEvent } from "react";
 import DOMPurify from "dompurify";
 import type { User } from "./api";
@@ -8,7 +9,7 @@ import { splitMentions } from "./items";
 import { mdit as md } from "./mdit";
 import { attachmentHrefOK, attachmentOf, imageSrcOK } from "./imgsrc";
 import { fileURL } from "./attachments";
-import { Lightbox } from "./Lightbox";
+import { Lightbox, type ViewItem } from "./Lightbox";
 import { Icon } from "./icons";
 
 
@@ -82,38 +83,42 @@ export function renderMarkdown(src: string): string {
   return highlightMentions(DOMPurify.sanitize(md.render(src), allowed) as string);
 }
 
+// imageItem: an image of a Markdown text as the Lightbox shows it; an attachment's preview opens its
+// file, with a Download.
+function imageItem(img: HTMLImageElement, n: number): ViewItem {
+  const src = img.getAttribute("src") ?? "";
+  const alt = img.getAttribute("alt") ?? "";
+  const id = attachmentOf(src);
+  return {
+    key: `${n}:${src}`,
+    title: alt || "Image",
+    image: { src: id !== null ? fileURL(id) : src, alt },
+    foot: id !== null && (
+      <div className="att-foot muted small">
+        <span>{alt}</span>
+        <a className="button secondary small" href={fileURL(id, true)} download>
+          <Icon name="download" /> Download
+        </a>
+      </div>
+    ),
+  };
+}
+
 export function Markdown({ source, className }: { source: string; className?: string }) {
-  const [big, setBig] = useState<{ src: string; alt: string; id: number | null } | null>(null);
-  // a click on an image (not one inside a link) opens it full size; an attachment's preview opens its file
+  const [big, setBig] = useState<{ items: ViewItem[]; start: number } | null>(null);
+  // a click on an image (not one inside a link) opens it full size, with the text's other images a
+  // step away
   const click = (e: MouseEvent<HTMLDivElement>) => {
     const t = e.target as HTMLElement;
     if (t.tagName !== "IMG" || t.closest("a")) return;
     e.preventDefault();
-    const src = t.getAttribute("src") ?? "";
-    const id = attachmentOf(src);
-    setBig({ src: id !== null ? fileURL(id) : src, alt: t.getAttribute("alt") ?? "", id });
+    const imgs = [...e.currentTarget.querySelectorAll("img")].filter((i) => !i.closest("a"));
+    setBig({ items: imgs.map(imageItem), start: Math.max(0, imgs.indexOf(t as HTMLImageElement)) });
   };
   return (
     <>
       <div className={"md " + (className ?? "")} onClick={click} dangerouslySetInnerHTML={{ __html: renderMarkdown(source) }} />
-      {big && (
-        <Lightbox
-          src={big.src}
-          title={big.alt || "Image"}
-          alt={big.alt}
-          onClose={() => setBig(null)}
-          foot={
-            big.id !== null && (
-              <div className="att-foot muted small">
-                <span>{big.alt}</span>
-                <a className="button secondary small" href={fileURL(big.id, true)} download>
-                  <Icon name="download" /> Download
-                </a>
-              </div>
-            )
-          }
-        />
-      )}
+      {big && <Lightbox items={big.items} start={big.start} onClose={() => setBig(null)} />}
     </>
   );
 }

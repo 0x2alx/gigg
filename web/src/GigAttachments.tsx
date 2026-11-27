@@ -5,13 +5,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { api, fmtTime, type Attachment, type AttachmentList, type Gig } from "./api";
 import { useApp } from "./App";
-import { attachmentName, canRemove, fileURL, fmtSize, groupAttachments, refKind, shortCommit, shownAs, thumbURL, tileSrc } from "./attachments";
+import { attachmentName, canRemove, fileURL, fmtSize, groupAttachments, refKind, shortCommit, shownAs, thumbURL, tileSrc, type AttachmentGroups } from "./attachments";
 import { errText, Section } from "./GigSections";
 import { Icon } from "./icons";
 import { onActivity } from "./live";
-import { Lightbox } from "./Lightbox";
+import { Lightbox, type ViewItem } from "./Lightbox";
 import { Markdown } from "./markdown";
-import { ConfirmModal, Modal } from "./ui";
+import { ConfirmModal } from "./ui";
 
 interface Busy {
   at: number; // 1-based
@@ -31,7 +31,7 @@ export function AttachmentsSection({ gig, canAdd, canDeleteAny, canDownload, dro
   const [list, setList] = useState<AttachmentList | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState<Busy | null>(null);
-  const [viewing, setViewing] = useState<Attachment | null>(null);
+  const [viewing, setViewing] = useState<number | null>(null); // the attachment the viewer opened on
   const [removing, setRemoving] = useState<Attachment | null>(null);
   const [linking, setLinking] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
@@ -166,6 +166,7 @@ export function AttachmentsSection({ gig, canAdd, canDeleteAny, canDownload, dro
   const items = list?.items ?? [];
   if (!canAdd && items.length === 0) return null; // nothing to see and nothing to do
   const g = groupAttachments(items, canDownload);
+  const views = viewing !== null ? viewItems(g, canDownload) : [];
   const removable = (a: Attachment) => canRemove(a, me.user.id, canAdd, canDeleteAny);
   const who = (a: Attachment) => {
     const u = users.get(a.created_by);
@@ -191,7 +192,7 @@ export function AttachmentsSection({ gig, canAdd, canDeleteAny, canDownload, dro
         <ul className="att-grid" aria-label="Images">
           {g.images.map((a) => (
             <li key={a.id} className="att-tile">
-              <button type="button" className="att-thumb" onClick={() => setViewing(a)} aria-label={`Open ${attachmentName(a)}`} title={`${a.filename ?? ""} · ${fmtSize(a.size)} · ${who(a)}, ${fmtTime(a.created_at)}`}>
+              <button type="button" className="att-thumb" onClick={() => setViewing(a.id)} aria-label={`Open ${attachmentName(a)}`} title={`${a.filename ?? ""} · ${fmtSize(a.size)} · ${who(a)}, ${fmtTime(a.created_at)}`}>
                 <img src={tileSrc(a)} alt="" loading="lazy" />
               </button>
               <span className="att-cap" title={attachmentName(a)}>
@@ -250,7 +251,7 @@ export function AttachmentsSection({ gig, canAdd, canDeleteAny, canDownload, dro
                   {!canDownload ? (
                     <span className="att-name">{attachmentName(a)}</span>
                   ) : viewable ? (
-                    <button type="button" className="link att-name" onClick={() => setViewing(a)}>
+                    <button type="button" className="link att-name" onClick={() => setViewing(a.id)}>
                       {attachmentName(a)}
                     </button>
                   ) : (
@@ -351,10 +352,7 @@ export function AttachmentsSection({ gig, canAdd, canDeleteAny, canDownload, dro
         </>
       )}
 
-      {viewing && shownAs(viewing) === "image" && (
-        <Lightbox src={fileURL(viewing.id)} title={attachmentName(viewing)} alt={viewing.label || viewing.filename || "Attached image"} foot={<FileFoot a={viewing} />} onClose={() => setViewing(null)} />
-      )}
-      {viewing && shownAs(viewing) !== "image" && <TextViewer a={viewing} onClose={() => setViewing(null)} />}
+      {viewing !== null && <Lightbox items={views} start={Math.max(0, views.findIndex((x) => x.key === String(viewing)))} onClose={() => setViewing(null)} />}
       {removing && (
         <ConfirmModal title="Remove the attachment?" confirmLabel="Remove" onConfirm={() => remove(removing)} onCancel={() => setRemoving(null)}>
           <p>
@@ -421,8 +419,22 @@ function AddRef({ onAdd, onCancel }: { onAdd: (value: string, label: string) => 
   );
 }
 
-// TextViewer: a Markdown file rendered like the comments (same renderer and sanitiser), plain text as is.
-function TextViewer({ a, onClose }: { a: Attachment; onClose: () => void }) {
+// viewItems: what the viewer steps through, in the section's order: the images, then the Markdown and
+// text files (the rows that open the viewer). Other files only download, so they are not in it.
+function viewItems(g: AttachmentGroups, canDownload: boolean): ViewItem[] {
+  if (!canDownload) return [];
+  const docs = g.docs.filter((a) => {
+    const s = shownAs(a);
+    return s === "markdown" || s === "text";
+  });
+  return [
+    ...g.images.map((a) => ({ key: String(a.id), title: attachmentName(a), image: { src: fileURL(a.id), alt: a.label || a.filename || "Attached image" }, foot: <FileFoot a={a} /> })),
+    ...docs.map((a) => ({ key: String(a.id), title: attachmentName(a), body: <TextBody a={a} />, foot: <FileFoot a={a} /> })),
+  ];
+}
+
+// TextBody: a Markdown file rendered like the comments (same renderer and sanitiser), plain text as is.
+function TextBody({ a }: { a: Attachment }) {
   const [text, setText] = useState<string | null>(null);
   const [err, setErr] = useState("");
   useEffect(() => {
@@ -436,12 +448,9 @@ function TextViewer({ a, onClose }: { a: Attachment; onClose: () => void }) {
     };
   }, [a.id]);
   return (
-    <Modal title={attachmentName(a)} onClose={onClose} wide expandable>
-      <div className="att-viewer">
-        {err ? <p className="danger">{err}</p> : text === null ? <p className="muted">Loading…</p> : shownAs(a) === "markdown" ? <Markdown source={text} /> : <pre className="att-pre">{text}</pre>}
-      </div>
-      <FileFoot a={a} />
-    </Modal>
+    <div className="att-viewer">
+      {err ? <p className="danger">{err}</p> : text === null ? <p className="muted">Loading…</p> : shownAs(a) === "markdown" ? <Markdown source={text} /> : <pre className="att-pre">{text}</pre>}
+    </div>
   );
 }
 

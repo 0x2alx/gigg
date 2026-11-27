@@ -1070,8 +1070,33 @@ label.check input { width: auto; accent-color: var(--accent); }
   .att-addref { grid-template-columns: minmax(0, 1fr); }
   .att-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
 }
-.att-lightbox { display: grid; place-items: center; min-height: 8rem; }
-.att-lightbox img { display: block; max-width: 100%; max-height: 72vh; object-fit: contain; border-radius: var(--radius-s); background: var(--low); }
+/* the viewer (Lightbox): an image area that zooms and pans inside its own box, ‹ › at the sides */
+.att-lightbox { position: relative; display: grid; place-items: center; min-height: 8rem; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.att-lightbox img { display: block; max-width: 100%; max-height: 72vh; object-fit: contain; border-radius: var(--radius-s); background: var(--low); transform-origin: 0 0; cursor: zoom-in; -webkit-user-drag: none; }
+.att-lightbox.zoomed img { cursor: grab; border-radius: 0; }
+.att-lightbox.zoomed:active img { cursor: grabbing; }
+.att-lightbox:fullscreen { background: #000; width: 100%; height: 100%; }
+.att-lightbox:fullscreen img { max-height: 100dvh; border-radius: 0; background: transparent; }
+.lbx-doc { position: relative; }
+.lbx-many .lbx-doc { padding-inline: 3.1rem; }
+.lbx-arrow {
+  position: absolute; top: 50%; translate: 0 -50%; z-index: 1; display: grid; place-items: center;
+  width: 2.6rem; height: 2.6rem; padding: 0; border-radius: 50%; font-size: 1.25rem; color: var(--text); cursor: pointer;
+  background: color-mix(in srgb, var(--high) 84%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow-pop);
+  transition: background-color 0.12s ease-out;
+}
+.lbx-arrow:hover { background: var(--high); }
+.lbx-prev { left: var(--sp-3); }
+.lbx-next { right: var(--sp-3); }
+.lbx-doc > .lbx-prev { left: 0; }
+.lbx-doc > .lbx-next { right: 0; }
+.lbx-unfull { top: var(--sp-5); right: var(--sp-5); translate: none; }
+.lbx-count { flex: none; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 720px) {
+  .lbx-arrow { width: 44px; height: 44px; } /* a thumb-sized target */
+  .lbx-many .lbx-doc { padding-inline: 0; padding-bottom: 3.4rem; }
+  .lbx-doc > .lbx-arrow { top: auto; bottom: 0; translate: none; } /* under the text, not over it */
+}
 .att-viewer { max-height: 70vh; overflow: auto; min-width: 0; }
 .modal-full .att-viewer { max-height: none; }
 .att-pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-sm); background: var(--low); border-radius: var(--radius-s); padding: var(--sp-5); }
