@@ -221,7 +221,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
             <MenuLink href={tool("recurring")} icon="refresh" label="Recurring" tip="Gigs that come back on a schedule (a template + a schedule)" />
             <MenuLink href={tool("schedules")} icon="clock" label="Schedules" tip="Timings (every day 9:00, every Friday…) that recurring gigs share" />
             {anyTemplates && <MenuLink href={tool("templates")} icon="template" label="Templates" tip="Reusable gig contents: start a gig or a recurring gig from one" />}
-            {canImport && <MenuLink href={tool("import")} icon="copy" label="Import JSON" tip="Make gigs, templates, schedules, errands and recurring gigs from pasted JSON or a file" />}
+            {canImport && <MenuLink href={tool("import")} icon="import" label="Import JSON" tip="Make gigs, templates, schedules, errands and recurring gigs from pasted JSON or a file" />}
             {anyArchive && <MenuLink href={tool("archive")} icon="archive" label="Archive done" tip="Archive the gigs in Done and Cancelled: they leave the board but stay searchable" />}
             <MenuLink href={tool("trash")} icon="trash" label="Trash" tip="Deleted gigs: restore them from here" />
           </MenuSection>

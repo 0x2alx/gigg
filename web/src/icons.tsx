@@ -187,12 +187,15 @@ const P: Record<string, ReactNode> = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  // a page laid out in blocks (a header and two panes): distinct from `copy`, which often sits beside it
   template: (
     <>
-      <rect x="8" y="8" width="13" height="13" rx="2" />
-      <path d="M4 16a2 2 0 0 1-1-1.73V5a2 2 0 0 1 2-2h9.27A2 2 0 0 1 16 4" />
+      <rect x="3.5" y="3.5" width="17" height="17" rx="2" />
+      <path d="M3.5 9h17M10 9v11.5" />
     </>
   ),
+  // an arrow into a tray
+  import: <path d="M12 3v11M7.5 9.5 12 14l4.5-4.5M4 14.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4.5" />,
   trash: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />,
   lock: (
     <>

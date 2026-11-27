@@ -162,7 +162,7 @@ export function ErrandsPage({ open }: { open?: number }) {
         <div className="row">
           {importTargets("errand", tree, me).length + importTargets("errand_template", tree, me).length > 0 && (
             <button type="button" className="button secondary" onClick={() => setImporting(true)} data-tip="Make errands or errand templates from pasted JSON or a file">
-              <Icon name="copy" /> Import JSON
+              <Icon name="import" /> Import JSON
             </button>
           )}
           {canShare(me) && (
