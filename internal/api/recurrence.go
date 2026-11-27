@@ -381,6 +381,38 @@ func (a *API) registerRecurrence() {
 		}
 		return a.recurrenceOut(r), nil
 	})
+	huma.Register(a.h, huma.Operation{OperationID: "make-next-now", Method: "POST", Path: "/recurrences/{id}/make-now", Tags: []string{"recurrence"},
+		Summary: "Make the next occurrence's gig now (its window starts now); the schedule carries on after it", DefaultStatus: 201},
+		func(ctx context.Context, in *idPath) (*gigOut, error) {
+			p, err := me(ctx)
+			if err != nil {
+				return nil, err
+			}
+			r, err := a.recurrence(ctx, p, in.ID)
+			if err != nil {
+				return nil, err
+			}
+			// the same as editing it: it creates a gig in its project, as its owner would
+			if err := requireIn(p, r.WorkspaceID, r.ProjectID, access.Editor, "gigs:write"); err != nil {
+				return nil, err
+			}
+			if err := allowed(p, r.WorkspaceID, "recurring_gigs"); err != nil {
+				return nil, err
+			}
+			if err := allowedIn(p, r.WorkspaceID, r.ProjectID, "create_gigs"); err != nil {
+				return nil, err
+			}
+			var t *store.Gig
+			err = a.tx(ctx, func(tx *sql.Tx) error {
+				var err error
+				t, err = store.MakeNextNow(ctx, tx, p.Actor(), r, store.Now())
+				return err
+			})
+			if err != nil {
+				return nil, err
+			}
+			return &gigOut{ETag: etag(t.Version), Body: t}, nil
+		})
 	huma.Register(a.h, huma.Operation{OperationID: "delete-recurrence", Method: "DELETE", Path: "/recurrences/{id}", Tags: []string{"recurrence"},
 		Summary: "Stop a recurring gig (its gigs stay; its template and schedule too, unless asked)", DefaultStatus: 204,
 		Description: "`template=true` / `schedule=true` also delete its template / schedule, refused (409, nothing deleted) when another recurring gig uses it."},

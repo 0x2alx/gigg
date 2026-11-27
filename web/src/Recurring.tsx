@@ -87,6 +87,20 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
       .finally(() => setBusy(null));
   };
 
+  // Make the next one now: its gig comes at once (window from now), the schedule carries on after it
+  const makeNow = (r: Recurrence) => {
+    setBusy(r.id);
+    setErr("");
+    api
+      .makeNextNow(r.id)
+      .then((g) => {
+        load();
+        onChanged(`Made ${g.key}, the next one of “${r.title}”`);
+      })
+      .catch(fail)
+      .finally(() => setBusy(null));
+  };
+
   const remove = (r: Recurrence) => {
     setBusy(r.id);
     setErr("");
@@ -266,6 +280,18 @@ export function RecurringModal({ initialPlace = "", highlight, onClose, onChange
                         <Icon name={r.paused ? "play" : "pause"} />
                         {r.paused ? "Resume" : "Pause"}
                       </button>
+                      {r.next_at && hasCap(me, "create_gigs", r.workspace_id, r.project_id) && (
+                        <button
+                          type="button"
+                          className="button secondary small"
+                          disabled={busy === r.id}
+                          onClick={() => makeNow(r)}
+                          aria-label={`Make the next one of ${r.title} now`}
+                          data-tip={`Make the gig of ${fmtInstant(r.next_at, tz)} now, its window starting now (to try it without waiting); the schedule carries on after it`}
+                        >
+                          <Icon name="bolt" /> Make next now
+                        </button>
+                      )}
                       <button type="button" className="button secondary small" onClick={() => setEditing(r)} aria-label={`Edit ${r.title}`}>
                         <Icon name="pencil" /> Edit
                       </button>

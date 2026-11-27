@@ -680,6 +680,8 @@ export const api = {
   recurrences: (ws: string | number, project?: number) =>
     call<{ items: Recurrence[] }>("GET", `/workspaces/${ws}/recurrences${project ? `?project=${project}` : ""}`),
   recurrence: (id: number) => call<Recurrence>("GET", `/recurrences/${id}`),
+  // the next occurrence's gig now, its window starting now; the schedule carries on after it
+  makeNextNow: (id: number) => call<Gig>("POST", `/recurrences/${id}/make-now`),
   createRecurrence: (p: number, body: RecurrenceBody) => call<Recurrence>("POST", `/projects/${p}/recurrences`, body),
   putRecurrence: (id: number, body: RecurrenceBody, version?: number) =>
     call<Recurrence>("PUT", `/recurrences/${id}`, body, version ? { "If-Match": `"${version}"` } : undefined),

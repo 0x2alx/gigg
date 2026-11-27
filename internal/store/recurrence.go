@@ -872,19 +872,8 @@ func materialize(ctx context.Context, tx *sql.Tx, r *Recurrence, now int64) (cre
 			skipped++
 			r.SkippedCount++
 		default:
-			start, due := at, end
-			status, err := startStatus(ctx, tx, r.ProjectID, r.StartCategory) // none: the recurring gig is paused (Housekeeping)
+			t, err := makeOccurrence(ctx, tx, sys, r, at, at, end)
 			if err != nil {
-				return created, skipped, err
-			}
-			t, err := CreateGig(ctx, tx, sys, NewGig{ProjectID: r.ProjectID, Title: r.Title, DescriptionMD: r.DescriptionMD, Priority: r.Priority,
-				Color: r.Color, StartAt: &start, DueAt: &due, NotAfter: &due, Labels: r.Labels, Assignees: validAssignees(ctx, tx, r),
-				Followers: whoSee(ctx, tx, r.WorkspaceID, r.ProjectID, r.Followers, MaxFollowers), RecurrenceID: &r.ID, OccurrenceAt: &start, Model: r.Model, Effort: r.Effort, AlwaysRun: r.AlwaysRun,
-				AllowedTools: r.AllowedTools, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout, StatusID: status})
-			if err != nil {
-				return created, skipped, err
-			}
-			if err := templateExtras(ctx, tx, sys, t, r.Checklist, r.Custom, r.Subgigs); err != nil {
 				return created, skipped, err
 			}
 			created++
@@ -901,6 +890,67 @@ func materialize(ctx context.Context, tx *sql.Tx, r *Recurrence, now int64) (cre
 	_, err = tx.ExecContext(ctx, `UPDATE recurrences SET next_at = ?, created_count = ?, skipped_count = ?, last_gig_id = ? WHERE id = ?`,
 		nullInt(r.NextAt), r.CreatedCount, r.SkippedCount, nullInt(r.LastGigID), r.ID)
 	return created, skipped, err
+}
+
+// makeOccurrence creates the gig of r's occurrence occ (its checklist, field values and subgigs too),
+// with the window start..due (the occurrence's own, or one starting now for MakeNextNow).
+func makeOccurrence(ctx context.Context, tx *sql.Tx, sys Actor, r *Recurrence, occ, start, due int64) (*Gig, error) {
+	status, err := startStatus(ctx, tx, r.ProjectID, r.StartCategory) // none: the recurring gig is paused (Housekeeping)
+	if err != nil {
+		return nil, err
+	}
+	t, err := CreateGig(ctx, tx, sys, NewGig{ProjectID: r.ProjectID, Title: r.Title, DescriptionMD: r.DescriptionMD, Priority: r.Priority,
+		Color: r.Color, StartAt: &start, DueAt: &due, NotAfter: &due, Labels: r.Labels, Assignees: validAssignees(ctx, tx, r),
+		Followers: whoSee(ctx, tx, r.WorkspaceID, r.ProjectID, r.Followers, MaxFollowers), RecurrenceID: &r.ID, OccurrenceAt: &occ, Model: r.Model, Effort: r.Effort, AlwaysRun: r.AlwaysRun,
+		AllowedTools: r.AllowedTools, AutoArchive: r.AutoArchive, RunTimeout: r.RunTimeout, StatusID: status})
+	if err != nil {
+		return nil, err
+	}
+	if err := templateExtras(ctx, tx, sys, t, r.Checklist, r.Custom, r.Subgigs); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// MakeNextNow creates the gig of r's next occurrence now instead of at its time ("Make the next one
+// now", e.g. to try a template): its window starts now and is as long as a scheduled one, and the
+// schedule carries on after that occurrence (which is never made twice). The gig is made as the
+// scheduler makes it, by the recurring gig's owner; a, who asked, is in the activity. The overlap rule
+// doesn't apply (it's an explicit request); a paused one may make one too.
+func MakeNextNow(ctx context.Context, tx *sql.Tx, a Actor, r *Recurrence, now int64) (*Gig, error) {
+	if r.NextAt == nil || (r.MaxCount != nil && r.CreatedCount >= *r.MaxCount) {
+		return nil, Invalid("this recurring gig has ended: it has no next occurrence")
+	}
+	if !schedulerMayRun(ctx, tx, r) {
+		return nil, Invalid("its owner can no longer create gigs from it; edit it to take it over")
+	}
+	at := *r.NextAt
+	var made int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM gigs WHERE recurrence_id = ? AND occurrence_at = ?`, r.ID, at).Scan(&made); err != nil {
+		return nil, err
+	}
+	if made > 0 {
+		return nil, Conflict("the next occurrence already has its gig")
+	}
+	t, err := makeOccurrence(ctx, tx, Actor{UserID: r.CreatedBy, Listener: "scheduler"}, r, at, now, now+r.WindowMinutes*60000)
+	if err != nil {
+		return nil, err
+	}
+	r.CreatedCount++
+	r.LastGigID = &t.ID
+	r.NextAt = nil
+	if next, ok := r.NextOccurrence(at + 60_000); ok && (r.MaxCount == nil || r.CreatedCount < *r.MaxCount) {
+		r.NextAt = &next
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE recurrences SET next_at = ?, created_count = ?, last_gig_id = ? WHERE id = ?`,
+		nullInt(r.NextAt), r.CreatedCount, nullInt(r.LastGigID), r.ID); err != nil {
+		return nil, err
+	}
+	if _, err := Activity(ctx, tx, a, &r.WorkspaceID, &r.ProjectID, "recurrence.made_now", "recurrence", r.ID,
+		map[string]any{"gig": t.Key, "occurrence_at": at}); err != nil {
+		return nil, err
+	}
+	return GetGig(ctx, tx, t.ID) // with the checklist and subgigs it got
 }
 
 // autoArchive archives the done or cancelled gigs whose auto-archive delay has passed since they were
