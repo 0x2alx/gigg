@@ -46,16 +46,18 @@ A card is quiet on purpose: the theme's border colour and width, the title first
 - **Foot:** a recurring gig's card shows its schedule (for example "Every Tue all day"); a done gig shows when it was done ("Done 8h ago"; hover for the exact time).
 - **Recurring:** a gig a recurring gig made has a purple-tinted card and border besides its badge, so it stands out in any theme (the hue is the same everywhere; how strong it is follows the theme). **More filters → Recurring** hides them or shows only them.
 - **The gig's colour:** a coloured stripe on the card's left edge appears only when the gig has a colour. A card that is blocked or missed has a red border, and an archived card a dashed one.
-- **Gear** (bottom left, at the start of the foot, always shown): move or reorder the card (see below). On a done card, the archive button follows it.
+- **Gear** (bottom left, at the start of the foot, always shown): the card's menu: **Open**, **Assign to me** (adds you to its assignees), **Copy link** (the gig's address, for a chat or a note), **Copy as JSON**, reorder and move the card (see below). On a done card, the archive button follows it.
 
 | Mark | Meaning |
 |---|---|
 | padlock n (red) | Blocked by n open gigs; agents won't pick it up until they're done |
 | checklist 2/5 | Checklist progress |
 | branches 1/3 | Subgigs done |
+| ↳ KEY-8 (top row) | A subgig: the key of its parent |
 | circling arrows | Made by a recurring gig |
 | clock window / missed (red) | The time window it may be started in; missed if it closed untouched |
 | speech bubble n | Comments |
+| paperclip n | Attachments (files, links and commits) |
 | a robot | An agent has run on the gig (not shown while a run is live). Hover for the last run's outcome (done, needs a person, failed, timed out, interrupted), who ran it and when |
 | $0.42 | What the agent's runs cost so far |
 | a tinted chip | A custom field value (select or checkbox) |

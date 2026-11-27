@@ -494,6 +494,7 @@ or commit id), `filename`, `mime` (the sniffed type), `size`, `width` and `heigh
 |---|---|---|
 | GET | `/workspaces/{ws}/fields` | Custom gig fields. |
 | POST | `/workspaces/{ws}/fields` | Add a custom field. |
+| POST | `/workspaces/{ws}/fields/reorder` | Set the order of the workspace's fields: `{"ids": [...]}`, every field id in the new order. |
 | PUT | `/fields/{id}` | Rename a field or change its options. |
 | DELETE | `/fields/{id}` | Remove a field and its values. |
 | PATCH | `/gigs/{id}/custom` | Set or clear (`null`) a gig's custom values, keyed by field id. |
@@ -517,6 +518,7 @@ or commit id), `filename`, `mime` (the sniffed type), `size`, `width` and `heigh
 | GET | `/workspaces/{ws}/recurrences` | Recurring gigs (each pairs a template with a schedule). |
 | POST | `/projects/{p}/recurrences` | Create a recurring gig. |
 | GET | `/recurrences/{id}` | A recurring gig with its next five occurrences. |
+| POST | `/recurrences/{id}/make-now` | Make the next occurrence's gig now (201, the gig): its window starts now and is as long as a scheduled one; the schedule carries on after it. Same permissions as `PUT`; 422 when it has ended, 409 when that occurrence already has its gig. |
 | PUT | `/recurrences/{id}` | Replace a recurring gig; the next occurrence is recomputed from now (an occurrence already made is never made again). The editor becomes its owner, so this needs `create_gigs` too; new timing changes the shared schedule and needs what `PUT /schedules/{id}` needs. |
 | DELETE | `/recurrences/{id}` | Stop a recurring gig. Its gigs stay; `?template=true` / `?schedule=true` also delete its template / schedule (409 and nothing deleted while another recurring gig uses it). |
 | GET | `/workspaces/{ws}/schedules` | Schedules (named timing; `minutes`/`hours` ones are for errands only). |

@@ -31,6 +31,7 @@ You can also pick an existing **template** and an existing **schedule** in the s
 - When you edit a recurring gig, the form tells you who else uses its template and schedule. You can change them in place for everyone, or switch this recurring gig to another template or schedule.
 - A template or schedule that's in use can't be deleted. Deleting a recurring gig leaves its template and schedule in place, unless you tick **Also delete its template** / **Also delete its schedule** in the confirmation; those are offered only when no other recurring gig uses them.
 - **Pause** on a recurring gig stops new occurrences; the ones already made stay.
+- **Make next now** creates the next occurrence's gig at once, to try a recurring gig without waiting: its window starts now and is as long as a scheduled one, and the schedule carries on after that occurrence (it isn't made again). It counts toward a maximum count, ignores the overlap rule, and works on a paused recurring gig too.
 
 ## Shared templates and schedules
 

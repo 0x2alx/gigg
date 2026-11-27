@@ -4,7 +4,7 @@ Your own gigs: the board's **More filters** › **Assignee** › **Assigned to m
 
 ## The table
 
-**Table** on the board opens the gigs in view as a table (click a row to open the gig's panel over the table; closing it leaves the table as it was): one project's, one workspace's, or every workspace's. The workspace filter (first after the search) moves between them and keeps your other filters; **Clear filters** goes back to every workspace. Across workspaces, each workspace's gigs are fetched and merged (up to 1,000 per workspace, in the order you sort by; the count shows a **+** and a note at the bottom when there are more: narrow the filters, or open that workspace's table to page through all of it). A view saved there covers every workspace.
+**Table** on the board opens the gigs in view as a table (the Title cell shows the marks a card has: 🔒 with the number of open blockers, and "↳ KEY-8" on a subgig; click a row to open the gig's panel over the table; closing it leaves the table as it was): one project's, one workspace's, or every workspace's. The workspace filter (first after the search) moves between them and keeps your other filters; **Clear filters** goes back to every workspace. Across workspaces, each workspace's gigs are fetched and merged (up to 1,000 per workspace, in the order you sort by; the count shows a **+** and a note at the bottom when there are more: narrow the filters, or open that workspace's table to page through all of it). A view saved there covers every workspace.
 
 ![The table view with filters (Daywalker theme)](../images/table-day.png)
 
@@ -18,7 +18,7 @@ Your own gigs: the board's **More filters** › **Assignee** › **Assigned to m
 
 ## The command palette
 
-Press **Ctrl+K** (⌘K on a Mac) anywhere. Type to find a gig by key or title, jump to a workspace or project, or run a command such as *New gig*. Use the arrow keys and Enter to choose, and Esc to close.
+Press **Ctrl+K** (⌘K on a Mac) anywhere. Type to find a gig by key or title, jump to a workspace or project, or run a command such as *New gig*, *Recurring*, *Templates*, *Schedules*, *Errands* or *New errand* (the board's tools open as from the account menu). Use the arrow keys and Enter to choose, and Esc to close.
 
 ![The command palette (Nightwalker theme)](../images/palette-night.png)
 

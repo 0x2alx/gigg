@@ -28,7 +28,7 @@ Everything you add is saved when you click **Create gig** (or **Save**): the sub
 
 ## The gig panel
 
-Click a card to open its panel. Its top line shows the workspace (its owner's picture and name, in its colour), the gig's key, its status and its badges. It opens beside the board; the expand button (two diagonal arrows, top right) widens it to the full view for that gig only. The close button (×), Esc or a click on the board beside it closes it. Every field saves when you change it.
+Click a card to open its panel. Its top line shows the workspace (its owner's picture and name, in its colour), the gig's key, its status and its badges, then **Follow** and **Copy link** (the link icon puts the gig's address on the clipboard, for a chat or a note). It opens beside the board; the expand button (two diagonal arrows, top right) widens it to the full view for that gig only. The close button (×), Esc or a click on the board beside it closes it. Every field saves when you change it.
 
 ![A gig's panel (Daywalker theme)](../images/gig-panel-day.png)
 
@@ -44,7 +44,7 @@ The panel has the same layout as the **New gig** form, each part in its own box,
 - **Where**: workspace, project (move it to another project) and status. **When**: start, due, the time window and, for a recurring gig's gigs, the schedule it came from. **Details**: priority, labels (type to add, × to remove), assignees (click a person to assign or unassign them), colour (the card's left edge), who created it and when it last changed. **Agent run**: the agent's run settings. Fields you can't change (a viewer's) show with a dashed outline.
 - **Checklist**, **Subgigs**, **Dependencies**, **Fields** and **History** are folding sections, folded when a gig opens. A folded section is just its title row: click it (the arrow on the right shows which way it goes) to open it. Its badge (progress, count) shows while it's folded.
   - **Checklist**: add, tick, reorder and remove items.
-  - **Subgigs**: gigs whose parent is this one, each with its **blocks parent** switch. Their progress shows on the parent's card. A subgig's own panel names its parent here, with its switch.
+  - **Subgigs**: gigs whose parent is this one, each with its **blocks parent** switch. Their progress shows on the parent's card, and a subgig's card and table row name the parent ("↳ KEY-8"). A subgig's own panel names its parent here, with its switch. In the New gig form and the template editor, click a subgig's title to rename it, and use ↑ ↓ to reorder.
   - **Dependencies**: "blocks", "blocked by" and "relates to" links between gigs. A blocked gig shows 🔒, and agents leave it alone until its blockers are done. Subgigs that block the gig are listed under "Blocked by" too, tagged *subgig* (switch them off in **Subgigs**).
   - **Fields**: the workspace's custom fields (text, number, date, select, checkbox, link).
   - **History**: who changed what and when, newest first: edits, moves, links, checklist changes, comments and agent runs. It updates live. The admin audit log keeps the rest (which key, from where).
