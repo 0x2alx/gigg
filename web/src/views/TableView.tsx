@@ -5,7 +5,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type CSSProperties } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { fmtDue } from "../dates";
-import { api, canWriteIn, fmtTime, hasCap, priorityNames, type Board, type Category, type Tag, type Gig } from "../api";
+import { api, canWriteIn, fmtTime, hasCap, priorityNames, type Board, type Category, type CustomField, type Tag, type Gig } from "../api";
+import { formatCustom } from "../items";
+import { FieldFilter } from "./FieldFilter";
+import { FILTER_KINDS, fieldParams } from "./fieldFilters";
 import { GigPanel } from "../GigPanel";
 import { RecurringModal } from "../Recurring";
 import { useApp, type WorkspaceTree } from "../App";
@@ -71,11 +74,13 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   const [runFilter, setRunFilter] = useState(initial.alwaysRun);
   const [includeDone, setIncludeDone] = useState(initial.includeDone);
   const [extra, setExtra] = useState<Record<string, string>>(initial.extra);
+  const [fieldFilters, setFieldFilters] = useState<Record<string, string>>(initial.fields);
+  const [cols, setCols] = useState<number[]>(initial.cols);
   const [saving, setSaving] = useState(false);
 
   const filters = useMemo<TableFilters>(
-    () => ({ q, category, label, assignee, prioMin, recurring: recFilter, alwaysRun: runFilter, sort, includeDone, extra }),
-    [q, category, label, assignee, prioMin, recFilter, runFilter, sort, includeDone, extra],
+    () => ({ q, category, label, assignee, prioMin, recurring: recFilter, alwaysRun: runFilter, sort, includeDone, extra, fields: fieldFilters, cols }),
+    [q, category, label, assignee, prioMin, recFilter, runFilter, sort, includeDone, extra, fieldFilters, cols],
   );
   const written = useRef(search);
   // URL -> state when the search changes from outside (a saved view, back/forward)
@@ -94,6 +99,8 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     setRunFilter(f.alwaysRun);
     setIncludeDone(f.includeDone);
     setExtra(f.extra);
+    setFieldFilters(f.fields);
+    setCols(f.cols);
   }, [search, me.user.id]);
   // state -> URL (replace, so filter tweaks don't pile up in the history)
   useEffect(() => {
@@ -154,6 +161,33 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     });
   }, [scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // the custom fields of each workspace in scope (filters and columns); null until they're in
+  const [wsFields, setWsFields] = useState<Map<number, CustomField[]> | null>(null);
+  useEffect(() => {
+    let live = true;
+    Promise.allSettled(scope.map((w) => api.fields(w.id))).then((res) => {
+      if (!live) return;
+      const m = new Map<number, CustomField[]>();
+      res.forEach((r, i) => r.status === "fulfilled" && m.set(scope[i]!.id, r.value.items));
+      setWsFields(m);
+    });
+    return () => {
+      live = false;
+    };
+  }, [scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // every field in scope, the workspace's name after it when the table spans several
+  const allFields = useMemo(() => scope.flatMap((w) => (wsFields?.get(w.id) ?? []).map((f) => ({ f, ws: w }))), [scope, wsFields]);
+  const fieldName = (f: CustomField, w: WorkspaceTree) => (scope.length > 1 ? `${f.name} (${w.name})` : f.name);
+  const colFields = cols.map((id) => allFields.find((x) => x.f.id === id)).filter((x): x is { f: CustomField; ws: WorkspaceTree } => !!x);
+  const setField = (id: number, v: string | undefined) =>
+    setFieldFilters((cur) => {
+      const n = { ...cur };
+      if (v === undefined) delete n[id];
+      else n[id] = v;
+      return n;
+    });
+  const hasFieldFilters = Object.keys(fieldFilters).length > 0;
+
   const query = useMemo<GigQuery>(
     () => ({
       ...(extra as GigQuery),
@@ -181,9 +215,15 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
       setCursor(next);
       setSelected((s) => new Set([...s].filter((id) => items.some((t) => t.id === id))));
     };
+    // field filters name one workspace's fields: across workspaces they wait for the fields to come in,
+    // and a workspace without one of them has no gig that matches
+    if (hasFieldFilters && !wsFields) return;
+    const fieldsOf = (w: WorkspaceTree) => fieldParams(fieldFilters, wsFields?.get(w.id));
     if (ws) {
+      const field = fieldsOf(ws);
+      if (!field) return done([], undefined);
       viewsApi
-        .gigs(ws.slug, query)
+        .gigs(ws.slug, { ...query, field })
         .then((r) => done(r.items, r.next_cursor || undefined))
         .catch((e: unknown) => seq === loadSeq.current && setError(errMsg(e)));
       return;
@@ -191,9 +231,12 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     // every workspace: each one's pages (up to MAX_PAGES), merged and sorted here
     const all = async (w: WorkspaceTree): Promise<{ items: Gig[]; more: boolean }> => {
       const items: Gig[] = [];
+      const field = fieldsOf(w);
+      if (!field) return { items, more: false };
+      const wq = { ...query, field };
       let cur: string | undefined;
       for (let i = 0; i < MAX_PAGES; i++) {
-        const r = await viewsApi.gigs(w.slug, cur ? { ...query, cursor: cur } : query);
+        const r = await viewsApi.gigs(w.slug, cur ? { ...wq, cursor: cur } : wq);
         items.push(...r.items);
         cur = r.next_cursor || undefined;
         if (!cur) return { items, more: false };
@@ -215,7 +258,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
       setCapped(more);
       if (bad.length) setError(`Couldn't load the gigs of ${bad.join(", ")}.`);
     });
-  }, [ws, scopeKey, query, sort]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ws, scopeKey, query, sort, fieldFilters, hasFieldFilters ? wsFields : null]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(load, [load]);
 
   const more = () => {
@@ -223,7 +266,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     const seq = loadSeq.current; // a filter change meanwhile makes this page stale
     setLoadingMore(true);
     viewsApi
-      .gigs(ws.slug, { ...query, cursor })
+      .gigs(ws.slug, { ...query, field: fieldParams(fieldFilters, wsFields?.get(ws.id)) ?? [], cursor })
       .then((r) => {
         if (seq !== loadSeq.current) return;
         setRows((cur) => [...(cur ?? []), ...r.items.filter((t) => !(cur ?? []).some((c) => c.id === t.id))]);
@@ -257,7 +300,8 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     });
 
   const clickSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, desc: !s.desc } : { key, desc: key === "updated" || key === "created" || key === "priority" }));
-  const filtered = text !== "" || category !== "" || label !== "" || assignee !== 0 || prioMin !== 0 || recFilter !== "" || runFilter !== "" || Object.keys(extra).length > 0;
+  const filtered = text !== "" || category !== "" || label !== "" || assignee !== 0 || prioMin !== 0 || recFilter !== "" || runFilter !== "" || Object.keys(extra).length > 0 || hasFieldFilters;
+  // the columns shown aren't a filter: Clear filters keeps them
   const reset = () => {
     setText("");
     setCategory("");
@@ -267,6 +311,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
     setRecFilter("");
     setRunFilter("");
     setExtra({});
+    setFieldFilters({});
   };
   const views = savedViews.filter((v) => v.workspace_id === null || (ws ? v.workspace_id === ws.id : false));
   const here = loc + (search ? "?" + search : "");
@@ -302,8 +347,8 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
             {ws ? <WorkspaceBadge ws={ws} /> : <span className="pill pill-muted">All workspaces</span>}
             {project && <span className="pill pill-key">{project.key}</span>}
             <span className="muted small">
-              {rows === null ? "Loading…" : `${visible.length}${cursor || capped ? "+" : ""} gigs`}
-              {hidden > 0 && ` · ${hidden} done hidden`}
+              {rows === null ? "Loading…" : `${visible.length}${cursor || capped ? "+" : ""} ${visible.length === 1 && !cursor && !capped ? "gig" : "gigs"}`}
+              {hidden > 0 && ` · ${hidden} done or cancelled hidden`}
             </span>
           </div>
           <h1>
@@ -321,7 +366,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
       <div className="vw-filters" role="search" aria-label="Filter gigs">
         <input type="search" className="vw-search" placeholder="Search titles, descriptions, comments…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search" aria-keyshortcuts="/" />
         <PlaceFilter value={place} onChange={goPlace} tree={tree} plain />
-        <MoreFilters count={[category, label, assignee, prioMin, recFilter, runFilter].filter(Boolean).length}>
+        <MoreFilters count={[category, label, assignee, prioMin, recFilter, runFilter].filter(Boolean).length + Object.keys(fieldFilters).length}>
           <FilterField label="Status">
             <select className={on(category)} value={category} onChange={(e) => setCategory(e.target.value as Category | "")}>
               <option value="">Any status</option>
@@ -347,12 +392,40 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           <FilterField label={FLAG_FILTERS.always_run.name}>
             <FlagSelect flag="always_run" className={on(runFilter)} value={runFilter} onChange={setRunFilter} />
           </FilterField>
+          {allFields
+            .filter(({ f }) => FILTER_KINDS.has(f.kind))
+            .map(({ f, ws: w }) =>
+              f.kind === "number" ? (
+                // a comparison and a number: two controls, so a group, not one label
+                <div key={f.id} className="mf-field" role="group" aria-label={fieldName(f, w)}>
+                  <span className="mf-label">{fieldName(f, w)}</span>
+                  <FieldFilter field={f} value={fieldFilters[f.id]} onChange={(v) => setField(f.id, v)} />
+                </div>
+              ) : (
+                <FilterField key={f.id} label={fieldName(f, w)}>
+                  <FieldFilter field={f} value={fieldFilters[f.id]} onChange={(v) => setField(f.id, v)} />
+                </FilterField>
+              ),
+            )}
           <FilterField label="Done">
             <span className="mf-check" data-tip={category !== "" ? "A status is picked: it decides" : "Show done and cancelled gigs too"}>
               <input type="checkbox" checked={includeDone} onChange={(e) => setIncludeDone(e.target.checked)} disabled={category !== ""} />
               Include done
             </span>
           </FilterField>
+          {allFields.length > 0 && (
+            <div className="mf-field" role="group" aria-label="Field columns">
+              <span className="mf-label">Columns</span>
+              <span className="mf-cols">
+                {allFields.map(({ f, ws: w }) => (
+                  <label key={f.id} className="mf-check">
+                    <input type="checkbox" checked={cols.includes(f.id)} onChange={(e) => setCols((c) => (e.target.checked ? [...c, f.id] : c.filter((x) => x !== f.id)))} />
+                    {fieldName(f, w)}
+                  </label>
+                ))}
+              </span>
+            </div>
+          )}
         </MoreFilters>
         {PASSTHROUGH.filter((k) => extra[k]).map((k) => (
           <span key={k} className="pill pill-muted" title="Set by a saved view">
@@ -370,7 +443,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
       {views.length > 0 && (
         <div className="vw-views" role="group" aria-label="Saved views">
           {views.map((v) => (
-            <ViewChip key={v.id} view={v} href={viewHref(tree, v, me.user.id)} active={viewHref(tree, v, me.user.id) === here} onDeleted={reloadSavedViews} />
+            <ViewChip key={v.id} view={v} fields={allFields.map((x) => x.f)} href={viewHref(tree, v, me.user.id)} active={viewHref(tree, v, me.user.id) === here} onDeleted={reloadSavedViews} />
           ))}
         </div>
       )}
@@ -379,6 +452,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
           ws={ws}
           tree={tree}
           query={toQuery(filters, pid)}
+          fields={allFields.map((x) => x.f)}
           existing={views}
           onClose={() => setSaving(false)}
           onSaved={() => {
@@ -422,6 +496,9 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
               <SortTh label="Priority" k="priority" sort={sort} onSort={clickSort} />
               <th>Labels</th>
               <th>Assignees</th>
+              {colFields.map(({ f, ws: w }) => (
+                <th key={f.id}>{fieldName(f, w)}</th>
+              ))}
               <SortTh label="Due" k="due" sort={sort} onSort={clickSort} />
               {!project && <th>Project</th>}
               <SortTh label="Updated" k="updated" sort={sort} onSort={clickSort} />
@@ -469,6 +546,8 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
                 </span>
               );
               const due = t.due_at ? <span className={"vw-due" + (isOverdue(t) ? " overdue" : "")}>{fmtDue(t.due_at)}</span> : null;
+              // the custom field columns: a field of another workspace stays empty
+              const fieldText = (f: CustomField) => (f.workspace_id === t.workspace_id ? formatCustom(f, t.custom?.[String(f.id)]) : "");
               const updated = (
                 <span className="muted small vw-updated" title={fmtTime(t.updated_at)}>
                   {relTime(t.updated_at)}
@@ -495,6 +574,16 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
                         {prio}
                         {chips}
                         {due}
+                        {colFields.map(({ f, ws: w }) => {
+                          const v = fieldText(f);
+                          return (
+                            v && (
+                              <span key={f.id} className="vw-field">
+                                <span className="muted">{fieldName(f, w)}:</span> {v}
+                              </span>
+                            )
+                          );
+                        })}
                       </div>
                       <div className="vw-card-foot">
                         <span className="vw-card-where">
@@ -518,6 +607,11 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
                   <td className="vw-nowrap">{prio}</td>
                   <td>{chips}</td>
                   <td>{people("xs")}</td>
+                  {colFields.map(({ f }) => (
+                    <td key={f.id} className="vw-field-cell">
+                      {fieldText(f)}
+                    </td>
+                  ))}
                   <td className="vw-nowrap">{due}</td>
                   {!project && <td className="vw-nowrap">{p && <ProjectPill project={p} />}</td>}
                   <td className="vw-nowrap" title={fmtTime(t.updated_at)}>
@@ -560,10 +654,10 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
   );
 }
 
-function ViewChip({ view, href, active, onDeleted }: { view: SavedFilter; href: string; active: boolean; onDeleted: () => void }) {
+function ViewChip({ view, fields, href, active, onDeleted }: { view: SavedFilter; fields: CustomField[]; href: string; active: boolean; onDeleted: () => void }) {
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState("");
-  const chips = summary(view.query);
+  const chips = summary(view.query, fields);
   return (
     <span className={"vw-view" + (active ? " on" : "")}>
       <Link href={href} className="vw-view-link" aria-current={active ? "page" : undefined} title={chips.join(" · ") || "No filters"}>
@@ -607,14 +701,14 @@ function ViewChip({ view, href, active, onDeleted }: { view: SavedFilter; href: 
 }
 
 // ws unset: a view across every workspace
-function SaveView({ ws, tree, query, existing, onClose, onSaved }: {
-  ws?: WorkspaceTree; tree: WorkspaceTree[]; query: Record<string, string>; existing: SavedFilter[]; onClose: () => void; onSaved: () => void;
+function SaveView({ ws, tree, query, fields, existing, onClose, onSaved }: {
+  ws?: WorkspaceTree; tree: WorkspaceTree[]; query: Record<string, string>; fields: CustomField[]; existing: SavedFilter[]; onClose: () => void; onSaved: () => void;
 }) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const same = existing.find((v) => v.workspace_id === (ws?.id ?? null) && v.name.trim().toLowerCase() === name.trim().toLowerCase());
-  const chips = summary(query);
+  const chips = summary(query, fields);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const body = { workspace_id: ws?.id ?? null, name: name.trim(), query };

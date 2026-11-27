@@ -528,6 +528,59 @@ func (f *CustomField) normValue(v any) (any, error) {
 	return nil, bad("a value")
 }
 
+// fieldCond: the SQL condition (on gigs t) for one custom field filter, "<field id>:<value>". The
+// value's meaning follows the field: a choice matches exactly; a checkbox takes true or false (false:
+// not ticked, whether set or not); a number takes 5, >=5, <=5, >5 or <5; text and links contain it
+// (ASCII case ignored, like the text search). An empty value matches gigs without a value for it.
+// Dates aren't filtered this way.
+func fieldCond(ctx context.Context, q Q, ws int64, spec string) (string, []any, error) {
+	idStr, val, ok := strings.Cut(spec, ":")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if !ok || err != nil {
+		return "", nil, Invalid("field: filters are <field id>:<value>")
+	}
+	fd, err := GetCustomField(ctx, q, id)
+	if err != nil || fd.WorkspaceID != ws {
+		return "", nil, Invalid("field: no custom field %d in this workspace", id)
+	}
+	const has = "EXISTS (SELECT 1 FROM gig_custom_values cv WHERE cv.gig_id = t.id AND cv.field_id = ?"
+	if val == "" {
+		return "NOT " + has + ")", []any{id}, nil
+	}
+	switch fd.Kind {
+	case "select":
+		return has + " AND cv.value = ?)", []any{id, mustJSON(val)}, nil
+	case "checkbox":
+		switch val {
+		case "true":
+			return has + " AND cv.value = 'true')", []any{id}, nil
+		case "false":
+			return "NOT " + has + " AND cv.value = 'true')", []any{id}, nil
+		}
+		return "", nil, Invalid("field: %s takes true or false", fd.Name)
+	case "number":
+		op, num := "=", val
+		for _, o := range []string{">=", "<=", ">", "<", "="} {
+			if strings.HasPrefix(val, o) {
+				op, num = o, val[len(o):]
+				break
+			}
+		}
+		x, err := strconv.ParseFloat(strings.TrimSpace(num), 64)
+		if err != nil || math.IsNaN(x) || math.IsInf(x, 0) {
+			return "", nil, Invalid("field: %s takes a number, or >=, <=, > or < and a number", fd.Name)
+		}
+		// DOUBLE PRECISION: a float in PostgreSQL, REAL affinity in SQLite
+		return has + " AND CAST(cv.value AS DOUBLE PRECISION) " + op + " ?)", []any{id, x}, nil
+	case "text", "url":
+		// values are stored as JSON strings: match the text as JSON writes it (quotes and escapes)
+		enc := mustJSON(val)
+		like := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(enc[1:len(enc)-1]) + "%"
+		return has + ` AND cv.value LIKE ? ESCAPE '\')`, []any{id, like}, nil
+	}
+	return "", nil, Invalid("field: %s fields can't be filtered", fd.Kind)
+}
+
 // SetCustomValues sets (or, with nil, clears) a gig's custom values; keys are field ids.
 func SetCustomValues(ctx context.Context, q Q, a Actor, t *Gig, vals map[string]any) error {
 	changed := map[string]any{}
@@ -1005,7 +1058,18 @@ func SavedFilters(ctx context.Context, q Q, user int64) ([]*SavedFilter, error) 
 }
 
 var filterKeys = map[string]bool{"q": true, "category": true, "status": true, "label": true, "priority_min": true, "assignee": true,
-	"created_by": true, "due_before": true, "sort": true, "project": true, "archived": true, "blocked": true, "recurring": true, "always_run": true, "mine": true}
+	"created_by": true, "due_before": true, "sort": true, "project": true, "archived": true, "blocked": true, "recurring": true, "always_run": true, "mine": true,
+	"cols": true} // cols: the custom field columns a table shows (field ids, comma-separated)
+
+// filterKey: a key a saved filter may hold: one of filterKeys, or field.<field id> (a custom field
+// filter, its value as the list's field=<id>:<value> takes it).
+func filterKey(k string) bool {
+	if id, ok := strings.CutPrefix(k, "field."); ok {
+		n, err := strconv.ParseInt(id, 10, 64)
+		return err == nil && n > 0 && strconv.FormatInt(n, 10) == id
+	}
+	return filterKeys[k]
+}
 
 // SaveFilter creates (ID 0) or replaces one of the user's views.
 func SaveFilter(ctx context.Context, q Q, user int64, f *SavedFilter) (*SavedFilter, error) {
@@ -1014,7 +1078,7 @@ func SaveFilter(ctx context.Context, q Q, user int64, f *SavedFilter) (*SavedFil
 		return nil, Invalid("name: 1-60 characters")
 	}
 	for k, v := range f.Query {
-		if !filterKeys[k] || len(v) > 200 {
+		if !filterKey(k) || len(v) > 200 {
 			return nil, Invalid("unknown or too long filter parameter %q", k)
 		}
 	}

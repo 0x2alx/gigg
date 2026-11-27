@@ -1,6 +1,7 @@
 // Saved views ("saved filters" in the API): the calls, and the mapping between the table's filter
 // state, the stored query (only the server's allowed keys) and the table URL's search string.
-import type { Category } from "../api";
+import type { Category, CustomField } from "../api";
+import { fieldChip } from "./fieldFilters";
 import type { WorkspaceTree } from "../App";
 import { call } from "../http";
 import { ALL_CATEGORIES } from "./viewsApi";
@@ -34,6 +35,8 @@ export interface TableFilters {
   sort: { key: SortKey; desc: boolean };
   includeDone: boolean; // client-side only: no server key, so it lives in the URL (done=1) but isn't saved
   extra: Record<string, string>; // allowed keys the table has no control for, passed through to the list call
+  fields: Record<string, string>; // custom field filters, field id -> value (key field.<id>; see fieldFilters)
+  cols: number[]; // custom fields shown as columns (key cols, ids comma-separated)
 }
 
 export const DEFAULT_FILTERS: TableFilters = {
@@ -47,7 +50,11 @@ export const DEFAULT_FILTERS: TableFilters = {
   sort: { key: "updated", desc: true },
   includeDone: false,
   extra: {},
+  fields: {},
+  cols: [],
 };
+
+const FIELD_KEY = /^field\.([1-9]\d*)$/;
 
 // keys passed straight to the gig list (the list endpoint understands them; the table has no control)
 export const PASSTHROUGH = ["status", "created_by", "due_before", "archived", "blocked"] as const;
@@ -68,6 +75,8 @@ export function toQuery(f: TableFilters, project?: number): Record<string, strin
   if (!isDefaultSort(f.sort)) o.sort = sortStr(f.sort);
   if (project) o.project = String(project);
   for (const k of PASSTHROUGH) if (f.extra[k]) o[k] = f.extra[k]!;
+  for (const [id, v] of Object.entries(f.fields)) o[`field.${id}`] = v;
+  if (f.cols.length) o.cols = f.cols.join(",");
   return o;
 }
 
@@ -82,7 +91,13 @@ export function toSearch(f: TableFilters): string {
 // unknown or malformed values are dropped.
 export function parse(src: Record<string, string> | URLSearchParams, meId?: number): { filters: TableFilters; project?: number } {
   const get = (k: string): string => (src instanceof URLSearchParams ? (src.get(k) ?? "") : (src[k] ?? ""));
-  const f: TableFilters = { ...DEFAULT_FILTERS, sort: { ...DEFAULT_FILTERS.sort }, extra: {} };
+  const f: TableFilters = { ...DEFAULT_FILTERS, sort: { ...DEFAULT_FILTERS.sort }, extra: {}, fields: {}, cols: [] };
+  const keys = src instanceof URLSearchParams ? [...src.keys()] : Object.keys(src);
+  for (const k of keys) {
+    const m = FIELD_KEY.exec(k);
+    if (m) f.fields[m[1]!] = get(k);
+  }
+  f.cols = [...new Set(get("cols").split(",").map(Number))].filter((n) => Number.isInteger(n) && n > 0);
   f.q = get("q");
   const cat = get("category");
   if ((ALL_CATEGORIES as string[]).includes(cat)) f.category = cat as Category;
@@ -118,8 +133,9 @@ export function viewHref(tree: WorkspaceTree[], v: SavedFilter, meId?: number): 
   return search ? `${base}?${search}` : base;
 }
 
-// summary: the view's filters as short chips ("todo", "label ops", "≥ High"...).
-export function summary(query: Record<string, string>): string[] {
+// summary: the view's filters as short chips ("todo", "label ops", "≥ High", "Size: M"...); fields
+// names the custom fields its field filters use.
+export function summary(query: Record<string, string>, fields: Pick<CustomField, "id" | "name" | "kind">[] = []): string[] {
   const out: string[] = [];
   if (query.q) out.push(`“${query.q}”`);
   if (query.category) out.push(query.category);
@@ -131,5 +147,9 @@ export function summary(query: Record<string, string>): string[] {
   }
   if (query.assignee || query.mine) out.push("assignee");
   for (const k of PASSTHROUGH) if (query[k]) out.push(`${k.replace("_", " ")} ${query[k]}`);
+  for (const [k, v] of Object.entries(query)) {
+    const m = FIELD_KEY.exec(k);
+    if (m) out.push(fieldChip(fields.find((f) => String(f.id) === m[1]), m[1]!, v));
+  }
   return out;
 }

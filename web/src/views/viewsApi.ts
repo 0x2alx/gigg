@@ -33,6 +33,7 @@ export interface GigQuery {
   sort?: string;
   limit?: number;
   cursor?: string;
+  field?: string[]; // custom field filters, <field id>:<value> each (sent as repeated field=)
 }
 
 export interface GigPage {
@@ -44,7 +45,8 @@ function qs(q: GigQuery): string {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(q)) {
     if (v === undefined || v === null || v === "" || v === false || v === 0) continue;
-    p.set(k, String(v));
+    if (Array.isArray(v)) for (const x of v) p.append(k, String(x));
+    else p.set(k, String(v));
   }
   const s = p.toString();
   return s ? "?" + s : "";

@@ -2221,12 +2221,22 @@ h1 > .help-button, h1 > .count { margin-left: 0.5rem; vertical-align: middle; } 
   border: 1px solid var(--line-strong); background-color: var(--surface); color: var(--text);
 }
 .mf-panel select.active, .bf-fields .mf-panel select.active { background-color: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: var(--accent); }
-.mf-check { display: inline-flex; align-items: center; gap: 0.45rem; min-height: var(--ctl-h); font-size: var(--fs-base); color: var(--text); white-space: nowrap; }
+.mf-check { display: inline-flex; flex-direction: row; align-items: center; gap: 0.45rem; min-height: var(--ctl-h); font-size: var(--fs-base); color: var(--text); white-space: nowrap; }
 .mf-check input, .bf-fields .mf-check input { width: auto; height: auto; margin: 0; padding: 0; border: revert; background: revert; }
 .mf-check:has(input:disabled) { color: var(--muted); }
+/* custom field filters: a box for text, a comparison and a number; the field columns to show */
+.mf-panel input[type="text"], .mf-panel input[type="number"] {
+  width: 100%; height: var(--ctl-h); padding: 0 0.6rem; font-size: var(--fs-base);
+  border: 1px solid var(--line-strong); background-color: var(--surface); color: var(--text);
+}
+.mf-panel input.active { background-color: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: var(--accent); }
+.mf-num { display: flex; gap: var(--sp-2); min-width: 0; }
+.mf-panel .mf-num select { width: auto; flex: none; padding-right: 1.6rem; }
+.mf-num input { flex: 1; min-width: 0; }
+.mf-cols { display: flex; flex-wrap: wrap; gap: 0 var(--sp-5); max-width: 24rem; }
 /* phones: 16px pickers, so tapping one doesn't zoom the page (as everywhere else) */
 @media (max-width: 720px) {
-  .mf-panel select, .bf-fields .mf-panel select { font-size: max(16px, 1em); }
+  .mf-panel select, .bf-fields .mf-panel select, .mf-panel input[type="text"], .mf-panel input[type="number"] { font-size: max(16px, 1em); }
 }
 /* Where (the board toolbar): the workspaces and projects as a searchable tree of checkboxes. The button is a
    More filters button; the face is cut short with an ellipsis on a narrow window */

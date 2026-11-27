@@ -334,13 +334,14 @@ type GigFilter struct {
 	UpdatedSince   *int64
 	IncludeDeleted bool
 	OnlyDeleted    bool
-	Archived       string // "" = hide archived, "only", "include"
-	ParentID       *int64 // subgigs of this gig
-	BlockedOnly    bool   // only gigs with an open blocker
-	Recurring      string // "" = all, "hide" = no gig a recurring gig made, "only" = only those
-	AlwaysRun      string // "" = all, "hide" = no always-run gig, "only" = only those
-	SearchComments bool   // q also matches comment text (only for callers who may read comments)
-	Sort           string // board (default), -priority, due, created, -updated, ...
+	Archived       string   // "" = hide archived, "only", "include"
+	ParentID       *int64   // subgigs of this gig
+	BlockedOnly    bool     // only gigs with an open blocker
+	Recurring      string   // "" = all, "hide" = no gig a recurring gig made, "only" = only those
+	AlwaysRun      string   // "" = all, "hide" = no always-run gig, "only" = only those
+	Fields         []string // custom field filters, each "<field id>:<value>" (see fieldCond); all must match
+	SearchComments bool     // q also matches comment text (only for callers who may read comments)
+	Sort           string   // board (default), -priority, due, created, -updated, ...
 	Limit          int
 	AfterID        int64 // cursor: gigs are paged by (sort key, id); for simplicity cursor = offset
 	Offset         int
@@ -538,6 +539,13 @@ func ListGigs(ctx context.Context, q Q, f GigFilter) ([]*Gig, bool, error) {
 			args = append(args, key, n, key, n)
 		}
 		where = append(where, "("+text+")")
+	}
+	for _, spec := range f.Fields {
+		cond, cargs, err := fieldCond(ctx, q, f.WorkspaceID, spec)
+		if err != nil {
+			return nil, false, err
+		}
+		where, args = append(where, cond), append(args, cargs...)
 	}
 	if f.DueBefore != nil {
 		where, args = append(where, "t.due_at IS NOT NULL AND t.due_at < ?"), append(args, *f.DueBefore)
