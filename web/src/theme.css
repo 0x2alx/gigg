@@ -932,6 +932,10 @@ label.check input { width: auto; accent-color: var(--accent); }
 }
 .col-tab.on { background: var(--selected); color: var(--text); border-color: var(--accent); font-weight: var(--weight-strong); }
 .col-tab.drag-over { border-color: var(--accent); background: var(--high); }
+/* under a gig filter: tabs with matches stand out (an accent count), tabs without fade */
+.col-tab.has-match { color: var(--text); }
+.col-tab.has-match .count { background: var(--accent); color: var(--on-accent); font-weight: var(--weight-strong); }
+.col-tab.no-match:not(.on) { opacity: 0.6; }
 .col-tab-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .board-page .page-head { align-items: center; }
 .head-title { min-width: 0; }

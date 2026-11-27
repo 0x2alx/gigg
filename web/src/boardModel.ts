@@ -272,6 +272,19 @@ export function categoryColumns(boards: Board[], f: BoardFilter, me: number): Bo
   });
 }
 
+// pickColumn: the column a phone shows (one at a time, as tabs). A column the user picked under the
+// current filter stays, even when empty. Otherwise the default (the picked one from before the filter
+// changed, else the first To-Do, else the first) holds unless a gig filter leaves it empty while
+// another column has matches: then the first column with matches, so a search never looks like it
+// found nothing.
+export function pickColumn(columns: BoardColumn[], picked: string | null, pickedUnderFilter: boolean, gigFiltered: boolean): BoardColumn | undefined {
+  const chosen = picked !== null ? columns.find((c) => c.key === picked) : undefined;
+  if (chosen && pickedUnderFilter) return chosen;
+  const base = chosen ?? columns.find((c) => c.category === "todo") ?? columns[0];
+  if (gigFiltered && base && base.gigs.length === 0) return columns.find((c) => c.gigs.length > 0) ?? base;
+  return base;
+}
+
 // moveToCategory: the boards after a gig moves to the first status of `category` in its project
 // (what the server does for {category}), or null when it can't (no such status) or nothing changes.
 export function moveToCategory(boards: Map<number, Board>, gigId: number, category: Category): Map<number, Board> | null {

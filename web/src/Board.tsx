@@ -15,6 +15,7 @@ import {
   matches,
   moveToCategory,
   parseFilter,
+  pickColumn,
   removablePlaces,
   scope,
   shortcutProjects,
@@ -106,6 +107,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
   const [drag, setDrag] = useState<number | null>(null);
   const [drop, setDrop] = useState<{ col: string; index: number } | null>(null);
   const [activeCol, setActiveCol] = useState<string | null>(null);
+  const [activeColSig, setActiveColSig] = useState(""); // the gig filter when the tab was picked (pickColumn)
   const [adding, setAdding] = useState<number | null>(null);
   // a column's "+": the new gig starts in that column (its status, or its stage's first status in the picked project)
   const [newIn, setNewIn] = useState<{ category: Category; statusId?: number } | null>(null);
@@ -483,7 +485,12 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
             : categoryColumns(scopeIds.map((id) => boards.get(id)).filter((b): b is Board => !!b), f, me_);
         })(),
       );
-  const active = columns.find((c) => c.key === activeCol) ?? columns.find((c) => c.category === "todo") ?? columns[0];
+  const gigSig = JSON.stringify([filter.a, filter.l, filter.pr, filter.q, filter.rec, filter.run]);
+  const active = pickColumn(columns, activeCol, activeColSig === gigSig, gigFiltered);
+  const pickCol = (key: string) => {
+    setActiveCol(key);
+    setActiveColSig(gigSig);
+  };
   const shown = narrow && active ? [active] : columns;
   // collapsed columns leave the grid and become small chips above it (wide screens; a phone shows one column)
   const openCols = narrow ? shown : shown.filter((c) => !collapsed.includes(c.id));
@@ -704,8 +711,14 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
               type="button"
               role="tab"
               aria-selected={c.key === active?.key}
-              className={"col-tab" + (c.key === active?.key ? " on" : "") + (drag !== null && drop?.col === c.key ? " drag-over" : "")}
-              onClick={() => setActiveCol(c.key)}
+              className={
+                "col-tab" +
+                (c.key === active?.key ? " on" : "") +
+                (gigFiltered ? (c.gigs.length > 0 ? " has-match" : " no-match") : "") +
+                (drag !== null && drop?.col === c.key ? " drag-over" : "")
+              }
+              aria-label={gigFiltered ? `${c.name}: ${c.gigs.length} match${c.gigs.length === 1 ? "" : "es"}` : undefined}
+              onClick={() => pickCol(c.key)}
               onDragOver={(e) => {
                 if (drag === null) return;
                 e.preventDefault();
@@ -821,7 +834,32 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
                   );
                 })}
                 {manualIn(c) && c.statusId !== undefined && line === others.length && <div className="drop-line" aria-hidden="true" />}
-                {c.gigs.length === 0 && (drag !== null || archivedIn(c).length === 0) && <div className="empty">{drag !== null ? "Drop here" : "Nothing here"}</div>}
+                {c.gigs.length === 0 && (drag !== null || archivedIn(c).length === 0) && (
+                  <div className="empty">
+                    {drag !== null ? (
+                      "Drop here"
+                    ) : narrow && gigFiltered && columns.some((o) => o.gigs.length > 0) ? (
+                      // a phone shows one column: say where the filter's matches are
+                      <>
+                        No matches in {c.name}:{" "}
+                        {columns
+                          .filter((o) => o.gigs.length > 0)
+                          .map((o, i) => (
+                            <span key={o.key}>
+                              {i > 0 && ", "}
+                              <button type="button" className="link" onClick={() => pickCol(o.key)}>
+                                {o.gigs.length} in {o.name}
+                              </button>
+                            </span>
+                          ))}
+                      </>
+                    ) : gigFiltered ? (
+                      "No matches"
+                    ) : (
+                      "Nothing here"
+                    )}
+                  </div>
+                )}
                 {addHere && c.category !== "done" && (
                   <button type="button" className="column-add" onClick={() => addIn(c)}>
                     <Icon name="plus" strokeWidth={2} /> New gig

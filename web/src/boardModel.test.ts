@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Category, Project, Gig } from "./api";
 import type { WorkspaceTree } from "./App";
-import { activeFilters, isFiltered, alwaysRunMatches, categoryColumns, EMPTY_FILTER, filterQuery, isMainProject, matches, moveToCategory, parseFilter, placeName, recurringMatches, removablePlaces, scope, shortcutProjects, statusColumns, whereLabel, whereTree } from "./boardModel";
+import { activeFilters, isFiltered, alwaysRunMatches, categoryColumns, EMPTY_FILTER, filterQuery, isMainProject, matches, moveToCategory, parseFilter, pickColumn, placeName, recurringMatches, removablePlaces, scope, shortcutProjects, statusColumns, whereLabel, whereTree, type BoardColumn } from "./boardModel";
 
 const gig = (id: number, x: Partial<Gig> = {}): Gig =>
   ({ id, key: `K-${id}`, title: `gig ${id}`, description_md: "", priority: 0, due_at: null, assignees: [], labels: [], status_id: 0, status_name: "", status_category: "todo", ...x }) as Gig;
@@ -137,6 +137,29 @@ describe("board columns", () => {
     expect(next.get(1)!.statuses.find((s) => s.id === 12)!.gigs.map((t) => t.id)).toEqual([1]);
     expect(moveToCategory(boards, 1, "todo")).toBeNull();
     expect(moveToCategory(boards, 1, "doing")).toBeNull(); // no doing status in that project
+  });
+});
+
+describe("pickColumn (the phone's column tab)", () => {
+  const col = (key: string, category: Category, n: number): BoardColumn => ({ key, id: 0, name: key, color: null, category, gigs: Array.from({ length: n }, (_, i) => gig(i + 1)) });
+  const cols = [col("backlog", "backlog", 0), col("todo", "todo", 0), col("doing", "doing", 0), col("review", "waiting", 1)];
+  it("defaults to the first To-Do column", () => {
+    expect(pickColumn(cols, null, false, false)?.key).toBe("todo");
+    expect(pickColumn([col("a", "doing", 0)], null, false, false)?.key).toBe("a");
+    expect(pickColumn([], null, false, false)).toBeUndefined();
+  });
+  it("under a gig filter, moves off an empty default to the first column with matches", () => {
+    expect(pickColumn(cols, null, false, true)?.key).toBe("review");
+    // a tab picked before the filter changed is a default too
+    expect(pickColumn(cols, "doing", false, true)?.key).toBe("review");
+  });
+  it("keeps a tab picked under the current filter, even when empty", () => {
+    expect(pickColumn(cols, "doing", true, true)?.key).toBe("doing");
+  });
+  it("keeps the default when nothing matches anywhere, or when there's no gig filter", () => {
+    const none = cols.map((c) => ({ ...c, gigs: [] }));
+    expect(pickColumn(none, null, false, true)?.key).toBe("todo");
+    expect(pickColumn(cols, "doing", false, false)?.key).toBe("doing");
   });
 });
 
