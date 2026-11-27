@@ -1487,20 +1487,20 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
               {canReorder && !first && (
                 <>
                   <button type="button" role="menuitem" onClick={() => reorder("top")}>
-                    ⤒ To top
+                    <span className="menu-ico" aria-hidden="true">⤒</span> To top
                   </button>
                   <button type="button" role="menuitem" onClick={() => reorder("up")}>
-                    ↑ Up
+                    <span className="menu-ico" aria-hidden="true">↑</span> Up
                   </button>
                 </>
               )}
               {canReorder && !last && (
                 <>
                   <button type="button" role="menuitem" onClick={() => reorder("down")}>
-                    ↓ Down
+                    <span className="menu-ico" aria-hidden="true">↓</span> Down
                   </button>
                   <button type="button" role="menuitem" onClick={() => reorder("bottom")}>
-                    ⤓ To bottom
+                    <span className="menu-ico" aria-hidden="true">⤓</span> To bottom
                   </button>
                 </>
               )}
@@ -1513,14 +1513,20 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
                   copyJson("gig", gig, users).then((m) => onChanged(m), (e: unknown) => setErr(e instanceof Error ? e.message : "Couldn't copy."));
                 }}
               >
-                <Icon name="copy" /> Copy as JSON
+                <span className="menu-ico">
+                  <Icon name="copy" />
+                </span>{" "}
+                Copy as JSON
               </button>
               <div className="menu-label">Move to</div>
               {statuses
                 .filter((s) => s.id !== gig.status_id)
                 .map((s) => (
                   <button key={s.id} type="button" role="menuitem" onClick={() => move({ status: s.id })}>
-                    <span className="dot" style={{ background: s.color ?? CATEGORY_COLOR[s.category] }} /> {s.name}
+                    <span className="menu-ico">
+                      <span className="dot" style={{ background: s.color ?? CATEGORY_COLOR[s.category] }} />
+                    </span>{" "}
+                    {s.name}
                   </button>
                 ))}
               {ws.projects.filter((p) => p.id !== gig.project_id).length > 0 && <div className="menu-label">Move to project</div>}
@@ -1528,7 +1534,10 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
                 .filter((p) => p.id !== gig.project_id)
                 .map((p) => (
                   <button key={p.id} type="button" role="menuitem" onClick={() => move({ project: p.id })}>
-                    <span className="pill pill-key">{p.key}</span> {p.name}
+                    <span className="menu-ico">
+                      <Icon name="layers" />
+                    </span>{" "}
+                    {p.name} <span className="pill pill-key">{p.key}</span>
                   </button>
                 ))}
             </div>,

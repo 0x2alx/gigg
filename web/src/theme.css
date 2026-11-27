@@ -527,6 +527,8 @@ a.pulse-item:hover { color: var(--text); }
 .menu.menu-up { top: auto; bottom: calc(100% + 0.25rem); }
 .menu button { display: flex; align-items: center; gap: var(--sp-4); background: none; border: 0; color: var(--text); font: inherit; font-size: var(--fs-base); text-align: left; padding: 0.4rem 0.55rem; border-radius: var(--radius-s); cursor: pointer; }
 .menu .ico { color: var(--muted); }
+/* a fixed-width lead column, so labels after glyphs, icons and dots of any width start at one x */
+.menu-ico { flex: 0 0 1.25em; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); line-height: 1; }
 .menu button:hover, .menu button:focus-visible { background: color-mix(in srgb, var(--text) 10%, var(--high)); }
 .menu-label { font-size: var(--fs-xs); text-transform: uppercase; color: var(--muted); padding: 0.3rem 0.5rem 0.1rem; }
 
