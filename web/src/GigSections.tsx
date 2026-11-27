@@ -617,7 +617,12 @@ export function SubgigsDraft({ items, onChange, canGate, note = SUB_NOTE }: { it
     [xs[i], xs[j]] = [xs[j]!, xs[i]!];
     [ids.current[i], ids.current[j]] = [ids.current[j]!, ids.current[i]!];
     onChange(xs);
-    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-sub="${key}"] .ck-${dir < 0 ? "up" : "down"}`)?.focus());
+    // focus stays on the moved row's arrow; at the top or bottom that one is disabled, so the other one
+    requestAnimationFrame(() => {
+      const row = document.querySelector(`[data-sub="${key}"]`);
+      const same = row?.querySelector<HTMLButtonElement>(`.ck-${dir < 0 ? "up" : "down"}`);
+      (same && !same.disabled ? same : row?.querySelector<HTMLButtonElement>(`.ck-${dir < 0 ? "down" : "up"}`))?.focus();
+    });
   };
   return (
     <Section

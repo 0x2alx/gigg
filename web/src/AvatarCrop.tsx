@@ -79,7 +79,8 @@ export function AvatarCrop({ file, onCancel, onSave }: { file: File; onCancel: (
     if (drag.current?.id === e.pointerId) drag.current = null;
   };
   const key = (e: KeyboardEvent<HTMLDivElement>) => {
-    const moves: Record<string, [number, number]> = { ArrowLeft: [STEP, 0], ArrowRight: [-STEP, 0], ArrowUp: [0, STEP], ArrowDown: [0, -STEP] };
+    // the picture moves the way the arrow points, as when dragging it
+    const moves: Record<string, [number, number]> = { ArrowLeft: [-STEP, 0], ArrowRight: [STEP, 0], ArrowUp: [0, -STEP], ArrowDown: [0, STEP] };
     if (moves[e.key]) moveBy(...moves[e.key]!);
     else if (e.key === "+" || e.key === "=") zoomTo((z) => z * 1.1);
     else if (e.key === "-" || e.key === "_") zoomTo((z) => z / 1.1);
