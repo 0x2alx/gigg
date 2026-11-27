@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from "react-dom";
 import { useNarrow } from "./narrow";
 import { avatarURL, priorityNames, type Category, type CustomField, type Tag, type Gig, type User } from "./api";
-import { cardChips } from "./items";
+import { blockedWords, cardChips, progressWords } from "./items";
 import { windowBadge } from "./recurrence";
 import { CATEGORY_COLOR, PRIORITY_COLOR, ALWAYS_RUN_COLOR, SCHEDULE_COLOR, WINDOW_OPEN_COLOR, colorFor, readableOn } from "./theme";
 import { Icon } from "./icons";
@@ -399,19 +399,23 @@ export function GigBadges({ gig, now = Date.now(), items, fields }: {
   const quiet = (done: boolean) => "meta-item" + (done ? " meta-done" : "");
   return (
     <>
+      {/* the numbers are for the eye; screen readers get the same in words */}
       {items && !!gig.blocked_by && (
-        <span className="pill pill-danger" title={`Blocked by ${gig.blocked_by} open gig${gig.blocked_by === 1 ? "" : "s"}: agents won't pick it up`}>
-          <Icon name="lock" strokeWidth={2.2} /> {gig.blocked_by}
+        <span className="pill pill-danger" title={`${blockedWords(gig.blocked_by)}: agents won't pick it up`}>
+          <Icon name="lock" strokeWidth={2.2} /> <span aria-hidden="true">{gig.blocked_by}</span>
+          <span className="sr-only">{blockedWords(gig.blocked_by)}</span>
         </span>
       )}
       {items && ck > 0 && (
         <span className={quiet(gig.checklist_done === ck)} title="Checklist">
-          <Icon name="checklist" /> {gig.checklist_done ?? 0}/{ck}
+          <Icon name="checklist" /> <span aria-hidden="true">{gig.checklist_done ?? 0}/{ck}</span>
+          <span className="sr-only">{progressWords(gig.checklist_done ?? 0, ck, "checklist item")}</span>
         </span>
       )}
       {items && st > 0 && (
         <span className={quiet(gig.subgig_done === st)} title="Subgigs done">
-          <Icon name="subgigs" /> {gig.subgig_done ?? 0}/{st}
+          <Icon name="subgigs" /> <span aria-hidden="true">{gig.subgig_done ?? 0}/{st}</span>
+          <span className="sr-only">{progressWords(gig.subgig_done ?? 0, st, "subgig")}</span>
         </span>
       )}
       {items &&

@@ -41,6 +41,7 @@ import { WherePicker } from "./WherePicker";
 import { HelpButton } from "./help";
 import { Icon } from "./icons";
 import { cardState, elapsed, runWorkedTip, plainText } from "./cardState";
+import { blockedWords } from "./items";
 
 
 
@@ -1446,6 +1447,7 @@ function Card({ gig, statuses, ws, showWs, labels, canWrite, canArchive, canReor
   // the button's name replaces its contents for screen readers: say the agent state there too
   const cardLabel = [
     `${gig.key} ${gig.title}`,
+    gig.blocked_by ? blockedWords(gig.blocked_by) : "",
     state && (running && run?.progress_note ? `${state.label}: ${run.progress_note}` : state.label), // no clock: the name would change every second
     state?.kind === "answer" && gig.question ? plainText(gig.question.text) : "",
   ]

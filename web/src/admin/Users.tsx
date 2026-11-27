@@ -144,6 +144,7 @@ export function UsersPage() {
                     </button>
                     <ConfirmButton
                       label={<SlotLabel show={u.is_admin ? "Revoke admin" : "Make admin"} alts={["Revoke admin", "Make admin"]} />}
+                      name={u.is_admin ? `Revoke admin from ${u.username}` : `Make ${u.username} admin`}
                       danger={u.is_admin}
                       title={u.is_admin ? `Revoke admin from ${u.username}?` : `Make ${u.username} an admin?`}
                       message={
@@ -158,6 +159,7 @@ export function UsersPage() {
                     {u.disabled ? (
                       <ConfirmButton
                         label={<SlotLabel show="Enable" alts={["Disable"]} />}
+                        name={`Enable ${u.username}`}
                         danger={false}
                         title={`Enable ${u.username}?`}
                         message="They can log in and use their keys again."
@@ -167,6 +169,7 @@ export function UsersPage() {
                     ) : (
                       <ConfirmButton
                         label={<SlotLabel show="Disable" alts={["Enable"]} />}
+                        name={`Disable ${u.username}`}
                         title={`Disable ${u.username}?`}
                         message="Their sessions and keys stop working until you enable them again. Their gigs and comments stay."
                         confirmLabel="Disable"

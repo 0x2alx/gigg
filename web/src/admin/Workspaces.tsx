@@ -115,12 +115,13 @@ export function WorkspacesPage() {
                   <td className="num ws-projects" data-label="Projects">{projects ?? "?"}</td>
                   <td className="muted small ws-created" data-label="Created">{fmtDate(ws.created_at)}</td>
                   <td className="admin-actions">
-                    <Link href={`/workspaces/${ws.id}`} className="button secondary small">
+                    <Link href={`/workspaces/${ws.id}`} className="button secondary small" aria-label={`Manage workspace ${ws.name}`}>
                       Manage
                     </Link>
                     {ws.archived ? (
                       <ConfirmButton
                         label="Unarchive"
+                        name={`Unarchive workspace ${ws.name}`}
                         danger={false}
                         title={`Unarchive ${ws.name}?`}
                         message="Its members see it again."
@@ -130,6 +131,7 @@ export function WorkspacesPage() {
                     ) : (
                       <ConfirmButton
                         label="Archive"
+                        name={`Archive workspace ${ws.name}`}
                         title={`Archive ${ws.name}?`}
                         message="The workspace becomes read-only and leaves the sidebar. Nothing is deleted; you can unarchive it."
                         confirmLabel="Archive"
@@ -556,6 +558,7 @@ function Members({ ws, users }: { ws: AdminWorkspace; users: AdminUser[] }) {
               {(m.preset ?? m.role) !== "" && (
                 <ConfirmButton
                   label="Remove"
+                  name={`Remove ${u?.username ?? "member " + m.user_id} from ${ws.name}`}
                   title={`Remove ${u?.username ?? "this member"}?`}
                   message={`Their own rule for ${ws.name} goes; access from groups or all-workspace rules stays. Gigs they can no longer see are unassigned.`}
                   confirmLabel="Remove"
@@ -596,6 +599,7 @@ function Members({ ws, users }: { ws: AdminWorkspace; users: AdminUser[] }) {
                       {pm.preset ? (
                         <ConfirmButton
                           label="Remove"
+                          name={`Remove ${u?.username ?? "member " + m.user_id} from ${name}`}
                           title={`Remove ${u?.username ?? "them"} from ${name}?`}
                           message={`Their own rule for ${name} goes; their workspace access and groups stay. Gigs there they can no longer see are unassigned.`}
                           confirmLabel="Remove"
@@ -731,19 +735,20 @@ function Projects({ ws }: { ws: AdminWorkspace }) {
               </span>
               {p.archived && <span className="pill pill-muted">archived</span>}
               <span className="grow" />
-              <button type="button" className="button secondary small" aria-expanded={open === p.id} onClick={() => setOpen(open === p.id ? null : p.id)}>
+              <button type="button" className="button secondary small" aria-expanded={open === p.id} aria-label={`${open === p.id ? "Hide statuses" : "Statuses"} of project ${p.key}`} onClick={() => setOpen(open === p.id ? null : p.id)}>
                 {open === p.id ? "Hide statuses" : "Statuses"}
               </button>
-              <button type="button" className="button secondary small" onClick={() => setEditing(p)}>
+              <button type="button" className="button secondary small" aria-label={`Edit project ${p.key}`} onClick={() => setEditing(p)}>
                 Edit
               </button>
               {p.archived ? (
-                <button type="button" className="button secondary small" onClick={() => adminApi.patchProject(p, { archived: false }).then(changed, (e: unknown) => setError(errMsg(e)))}>
+                <button type="button" className="button secondary small" aria-label={`Unarchive project ${p.key}`} onClick={() => adminApi.patchProject(p, { archived: false }).then(changed, (e: unknown) => setError(errMsg(e)))}>
                   Unarchive
                 </button>
               ) : (
                 <ConfirmButton
                   label="Archive"
+                  name={`Archive project ${p.key}`}
                   title={`Archive ${p.name}?`}
                   message="The project becomes read-only and leaves the sidebar. You can unarchive it."
                   confirmLabel="Archive"
@@ -752,6 +757,7 @@ function Projects({ ws }: { ws: AdminWorkspace }) {
               )}
               <ConfirmButton
                 label="Delete"
+                name={`Delete project ${p.key}`}
                 title={`Delete ${p.name}?`}
                 message="Only an empty project can be deleted: move or delete its gigs first."
                 confirmLabel="Delete"
@@ -931,15 +937,16 @@ function Statuses({ project }: { project: AdminProject }) {
               )}
               <span className="grow" />
               {!s.is_default && (
-                <button type="button" className="button secondary small" onClick={() => act(adminApi.patchStatus(s, { is_default: true }))} title={`Make it the default for ${s.category}`}>
+                <button type="button" className="button secondary small" aria-label={`Set default: ${s.name}`} onClick={() => act(adminApi.patchStatus(s, { is_default: true }))} title={`Make it the default for ${s.category}`}>
                   Set default
                 </button>
               )}
-              <button type="button" className="button secondary small" onClick={() => setEditId(s.id)}>
+              <button type="button" className="button secondary small" aria-label={`Edit status ${s.name}`} onClick={() => setEditId(s.id)}>
                 Edit
               </button>
               <ConfirmButton
                 label="Delete"
+                name={`Delete status ${s.name}`}
                 title={`Delete status ${s.name}?`}
                 message="Only an empty status can be deleted, and each category keeps at least one status."
                 confirmLabel="Delete"

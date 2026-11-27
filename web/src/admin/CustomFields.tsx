@@ -123,11 +123,12 @@ export function CustomFields({ ws }: { ws: AdminWorkspace }) {
               <span className="grow" />
               {allowed && (
                 <>
-                  <button type="button" className="button secondary small" onClick={() => setEditing(f)}>
+                  <button type="button" className="button secondary small" aria-label={`Edit field ${f.name}`} onClick={() => setEditing(f)}>
                     Edit
                   </button>
                   <ConfirmButton
                     label="Delete"
+                    name={`Delete field ${f.name}`}
                     title={`Delete field ${f.name}?`}
                     message="Its value is removed from every gig. This can't be undone."
                     confirmLabel="Delete field"

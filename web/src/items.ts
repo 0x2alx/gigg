@@ -100,6 +100,16 @@ export function progress(done: number, total: number): number {
   return total > 0 ? Math.round((done / total) * 100) : 0;
 }
 
+// progressWords: a card's "☑ 1/3" said in words, for screen readers ("1 of 3 checklist items done").
+export function progressWords(done: number, total: number, noun: "checklist item" | "subgig"): string {
+  return `${done} of ${total} ${noun}${total === 1 ? "" : "s"} done`;
+}
+
+// blockedWords: what the lock badge means, for its tooltip and the card's accessible name.
+export function blockedWords(n: number): string {
+  return `Blocked by ${n} open gig${n === 1 ? "" : "s"}`;
+}
+
 // ---- custom fields
 
 // formatCustom: a stored value as short text, or "" when unset.

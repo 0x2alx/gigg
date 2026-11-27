@@ -1,7 +1,7 @@
 // Access rules for a user or a group: one level at a time (all workspaces, one workspace, or one
 // project of a workspace: the gig permissions only), a preset and per-permission overrides (Allow / Deny / no override). For users, the effective result
 // per permission and where it comes from. Browser sessions only (keys get 403), which this page is.
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "../App";
 import { accessApi, PROJECT_PRESETS, RULE_ORDER, ruleAt, ruleSummary, sections, sourceText, withOverride, withPreset, type AccessRule, type Decision, type Group, type PermissionsInfo, type RuleBody, type Tri, type UserAccess } from "../access";
 import { CATEGORY_COLOR, readableOn } from "../theme";
@@ -9,22 +9,27 @@ import { Avatar, Modal, Pill } from "../ui";
 import { errMsg, type AdminUser } from "./adminApi";
 import { ErrorLine } from "./common";
 
-export function TriState({ value, onChange, inheritWord = "Inherit", label, disabled }: {
-  value: Tri; onChange: (v: Tri) => void; inheritWord?: string; label: string; disabled?: boolean;
+// TriState: Allow / Deny / no override. With fromPreset, "no override" reads "Preset ✓" (the preset
+// already allows it); screen readers hear "Preset, allows it" rather than a bare check mark.
+export function TriState({ value, onChange, fromPreset, label, disabled }: {
+  value: Tri; onChange: (v: Tri) => void; fromPreset?: boolean; label: string; disabled?: boolean;
 }) {
-  const opts: { v: Tri; text: string }[] = [
-    { v: true, text: "Allow" },
-    { v: false, text: "Deny" },
-    { v: null, text: inheritWord },
+  const opts: { v: Tri; key: string; text: ReactNode; name?: string }[] = [
+    { v: true, key: "allow", text: "Allow" },
+    { v: false, key: "deny", text: "Deny" },
+    fromPreset
+      ? { v: null, key: "inherit", text: <>Preset <span aria-hidden="true">✓</span></>, name: "Preset, allows it" }
+      : { v: null, key: "inherit", text: "Inherit" },
   ];
   return (
     <div className="admin-seg tri" role="radiogroup" aria-label={label}>
       {opts.map((o) => (
         <button
-          key={o.text}
+          key={o.key}
           type="button"
           role="radio"
           aria-checked={value === o.v}
+          aria-label={o.name}
           disabled={disabled}
           className={"admin-seg-btn" + (value === o.v ? " on" + (o.v === true ? " tri-allow" : o.v === false ? " tri-deny" : "") : "")}
           style={value === o.v && o.v === true ? { background: CATEGORY_COLOR.done, color: readableOn(CATEGORY_COLOR.done!) } : undefined}
@@ -143,7 +148,7 @@ function RuleEditor({ info, rule, level, decisions, busy, onSet, who }: {
                   <span className="grow" />
                   <TriState
                     label={`${p.label} for ${who}`}
-                    inheritWord={inPreset.has(p.name) ? "Preset ✓" : "Inherit"}
+                    fromPreset={inPreset.has(p.name)}
                     value={ov === undefined ? null : ov}
                     disabled={busy}
                     onChange={(v) => onSet(withOverride(rule, ws, p.name, v, project))}

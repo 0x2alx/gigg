@@ -63,8 +63,11 @@ export function SlotLabel({ show, alts }: { show: string; alts: string[] }) {
   );
 }
 
+// `name` is the button's accessible name when the visible label doesn't say what it acts on (a row of
+// "Delete" buttons: "Delete project OPS"); it starts with the visible words, so voice control still works.
 export function ConfirmButton({
   label,
+  name,
   title,
   message,
   confirmLabel,
@@ -74,6 +77,7 @@ export function ConfirmButton({
   disabled,
 }: {
   label: ReactNode;
+  name?: string;
   title: string;
   message: ReactNode;
   confirmLabel?: string;
@@ -100,7 +104,7 @@ export function ConfirmButton({
   };
   return (
     <>
-      <button type="button" className={cls} onClick={() => setOpen(true)} disabled={disabled}>
+      <button type="button" className={cls} onClick={() => setOpen(true)} disabled={disabled} aria-label={name}>
         {label}
       </button>
       {open && (

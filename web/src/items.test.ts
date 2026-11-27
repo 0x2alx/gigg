@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { CustomField, Template } from "./api";
-import { activeMention, cardChips, cleanCustom, formatCustom, fromInput, insertMention, matchUsers, moveAfter, reorder, sameAsTemplate, splitLines, splitMentions } from "./items";
+import { activeMention, blockedWords, cardChips, cleanCustom, formatCustom, fromInput, insertMention, matchUsers, moveAfter, progressWords, reorder, sameAsTemplate, splitLines, splitMentions } from "./items";
+
+describe("badge words for screen readers", () => {
+  it("progress reads as words, singular and plural", () => {
+    expect(progressWords(1, 2, "subgig")).toBe("1 of 2 subgigs done");
+    expect(progressWords(0, 1, "subgig")).toBe("0 of 1 subgig done");
+    expect(progressWords(3, 5, "checklist item")).toBe("3 of 5 checklist items done");
+  });
+  it("blocked says how many gigs block it", () => {
+    expect(blockedWords(1)).toBe("Blocked by 1 open gig");
+    expect(blockedWords(2)).toBe("Blocked by 2 open gigs");
+  });
+});
 
 describe("mentions", () => {
   it("finds the @query at the caret", () => {
