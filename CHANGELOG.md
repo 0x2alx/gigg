@@ -89,6 +89,11 @@
   guide covers **Make with AI**.
 - Brand: the wordmark and the link preview's tagline are set in Anta (SIL OFL), bolder, with the
   wordmark centred on the ship; the banner, the link preview and the README header follow.
+- PostgreSQL: someone who views a workspace while project rules hide all of its projects got a 500
+  from the activity list, the change feed, the event stream and the MCP `changes` tool (an empty
+  `IN ()`, which PostgreSQL refuses); they now see an empty list. Every dynamic `IN` list goes
+  through one helper, `dev/check.sh` refuses hand-built ones, and the new `dev/check-pg.sh` runs the
+  store and api tests against a throwaway PostgreSQL.
 
 ## 0.1.0 (2026-11-19)
 

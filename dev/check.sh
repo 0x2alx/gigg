@@ -20,6 +20,11 @@ hits=$(find internal web -name '*.go' ! -name '*_test.go' -exec grep -nE \
   'http\.(Get|Post|PostForm|Head)\(|http\.Client\{|&http\.Client|http\.DefaultClient|net\.Dial|tls\.Dial|http\.NewRequest(WithContext)?\(' {} + ) \
   || [ $? -eq 1 ]   # grep: 1 = no match is fine, 2 = error fails the check
 [ -z "$hits" ] || { echo "outbound client code in internal/:"; echo "$hits"; exit 1; }
+echo "== dynamic IN lists go through store.placeholders"
+# A hand-built "?,?,?" list becomes IN () when it is empty: SQLite takes that, PostgreSQL refuses it.
+# placeholders() (internal/store/db.go, exported as store.Placeholders) turns an empty list into NULL.
+hits=$(grep -rnE --include='*.go' 'Repeat\("(\?,|,\?)"' cmd internal web | grep -v '^internal/store/db.go:') || [ $? -eq 1 ]
+[ -z "$hits" ] || { echo "hand-built IN list (use placeholders / store.Placeholders):"; echo "$hits"; exit 1; }
 echo "== go test"
 go test -count=1 ./...
 echo "== check OK"

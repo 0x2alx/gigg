@@ -172,13 +172,18 @@ func mustJSON(v any) string {
 	return string(b)
 }
 
-// placeholders returns "?,?,?" for n values.
+// placeholders returns "?,?,?" for n values, and "NULL" for none: `x IN (NULL)` matches no row on
+// both databases, while `x IN ()` is a syntax error on PostgreSQL (SQLite takes it). Every dynamic
+// IN list goes through here (dev/check.sh refuses hand-built ones).
 func placeholders(n int) string {
 	if n <= 0 {
 		return "NULL"
 	}
 	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
 }
+
+// Placeholders is placeholders for the packages outside the store.
+func Placeholders(n int) string { return placeholders(n) }
 
 func int64Args(ids []int64) []any {
 	out := make([]any, len(ids))

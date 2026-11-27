@@ -14,6 +14,23 @@ podman run --rm -v "$PWD":/w -w /w/web docker.io/library/node:24-alpine sh -c "n
 
 CI (`.github/workflows/check.yml`) runs these two, in the same pinned images.
 
+The Go tests above run on SQLite. `dev/check-pg.sh` runs the store and api tests against PostgreSQL,
+which catches dialect bugs SQLite lets through (an empty `IN ()`, a text compared with a number).
+Give it a throwaway server on its own network:
+
+```sh
+podman network create gigg-pg
+podman run -d --rm --name gigg-pg --network gigg-pg --network-alias pg --tmpfs /var/lib/postgresql \
+  -e POSTGRES_USER=gigg -e POSTGRES_PASSWORD=gigg-test -e POSTGRES_DB=gigg docker.io/library/postgres:18-alpine
+podman run --rm --network gigg-pg -v "$PWD":/src:ro -v gigg-gomod:/go/pkg/mod -w /src \
+  -e GIGG_TEST_DATABASE_URL='postgres://gigg:gigg-test@pg:5432/gigg?sslmode=disable' \
+  docker.io/library/golang:1.27-alpine sh dev/check-pg.sh
+podman rm -f gigg-pg
+```
+
+It waits for the server to answer, and each test makes its own schema, so one server serves any
+number of runs.
+
 The rest is for when the source is mounted read-only into the container (with a writable tree, plain
 `gofmt -w` and `go mod tidy` do the same): `dev/fmt.sh <out-dir>` gofmts a copy of the tree and
 writes only the changed files to `<out-dir>`; `dev/tidy.sh <out-dir> [module@version ...]` runs

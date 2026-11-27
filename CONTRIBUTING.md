@@ -44,5 +44,8 @@ More detail, including the end-to-end API test and the UI scenario runner, is in
   `ON CONFLICT ... DO NOTHING` rather than `INSERT OR IGNORE`, `lower(x)` rather than
   `COLLATE NOCASE`, `CASE` rather than two-argument `max`/`min`, and a `CAST` on a bare `?` whose
   type PostgreSQL can't infer (`SELECT ?`, `VALUES (?)`). Placeholders, `LIKE`, `json_extract` and
-  `group_concat` are adapted for you (`internal/store/pg.go`). Run the tests on PostgreSQL by setting
+  `group_concat` are adapted for you (`internal/store/pg.go`). Build every dynamic `IN` list with
+  `placeholders()` (`store.Placeholders` outside the store): it turns an empty list into `NULL`,
+  where a hand-built one gives `IN ()`, which PostgreSQL refuses (`dev/check.sh` checks this). Run
+  the tests on PostgreSQL with `dev/check-pg.sh` (see `dev/README.md`), or by setting
   `GIGG_TEST_DATABASE_URL`; each test gets its own schema.

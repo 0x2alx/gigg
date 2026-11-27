@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/0x2alx/gigg/internal/access"
+	"github.com/0x2alx/gigg/internal/store"
 )
 
 // The change feed (GET /workspaces/{ws}/changes) and live updates (GET /workspaces/{ws}/events,
@@ -122,7 +122,7 @@ func (a *API) feedScope(ctx context.Context, p *access.Principal, ref string) (s
 		where += " AND action NOT LIKE 'key.%' AND action NOT LIKE 'member.%' AND action NOT LIKE '%.access'"
 	}
 	if pf := p.ProjectFilter(w.ID); pf != nil {
-		where += " AND project_id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(pf)), ",") + ")"
+		where += " AND project_id IN (" + store.Placeholders(len(pf)) + ")"
 		for _, x := range pf {
 			args = append(args, x)
 		}

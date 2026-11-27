@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"strings"
 )
 
 // touchProgress marks gig as moved forward now (see migration 0022 for what counts).
@@ -32,7 +31,7 @@ func StaleGigs(ctx context.Context, q Q, ws int64, projects []int64, user, cutof
 		if len(projects) == 0 {
 			return []StaleGig{}, 0, nil
 		}
-		where += " AND t.project_id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(projects)), ",") + ")"
+		where += " AND t.project_id IN (" + placeholders(len(projects)) + ")"
 		args = append(args, int64Args(projects)...)
 	}
 	from := ` FROM gigs t JOIN projects p ON p.id = t.project_id JOIN statuses s ON s.id = t.status_id WHERE ` + where

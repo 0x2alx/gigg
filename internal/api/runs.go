@@ -468,7 +468,7 @@ func (a *API) registerRuns() {
 			where += " AND action NOT LIKE 'key.%' AND action NOT LIKE 'member.%' AND action NOT LIKE '%.access'"
 		}
 		if pf := p.ProjectFilter(w.ID); pf != nil {
-			where += " AND project_id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(pf)), ",") + ")"
+			where += " AND project_id IN (" + store.Placeholders(len(pf)) + ")"
 			for _, x := range pf {
 				args = append(args, x)
 			}
