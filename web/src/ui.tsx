@@ -10,11 +10,20 @@ import { CATEGORY_COLOR, PRIORITY_COLOR, ALWAYS_RUN_COLOR, SCHEDULE_COLOR, WINDO
 import { Icon } from "./icons";
 import { FLAG_FILTERS, parseFlag, type FlagFilter, type FlagKey } from "./boardModel";
 
-// ClearFilters: the one "Clear filters" button of every filtered list. Always there, so the bar
-// doesn't jump; greyed out while nothing is filtered.
+// ClearFilters: the one "Clear filters" button of every filtered list. It shows only while something
+// is filtered; otherwise it keeps its place invisibly (and out of the accessibility tree), so the bar
+// doesn't jump when a filter is set.
 export function ClearFilters({ active, onClear, className }: { active: boolean; onClear: () => void; className?: string }) {
   return (
-    <button type="button" className={"link small clear-filters" + (className ? " " + className : "")} disabled={!active} onClick={onClear} aria-label="Clear filters" title={active ? "Show everything again" : "Nothing is filtered"}>
+    <button
+      type="button"
+      className={"link small clear-filters" + (className ? " " + className : "")}
+      disabled={!active}
+      aria-hidden={active ? undefined : true}
+      onClick={onClear}
+      aria-label="Clear filters"
+      title={active ? "Show everything again" : undefined}
+    >
       <Icon name="x" /> <span className="clear-label">Clear filters</span>
     </button>
   );
