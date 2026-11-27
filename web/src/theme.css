@@ -745,6 +745,8 @@ a.pulse-item:hover { color: var(--text); }
 .profile { max-width: 46rem; display: flex; flex-direction: column; gap: var(--sp-6); }
 .profile .row { align-items: center; gap: 0.8rem; }
 .profile-about { margin: 0; font-size: var(--fs-sm); text-align: center; }
+.profile-status { margin: 0; min-height: 1.3em; font-size: var(--fs-sm); } /* "Saved." after each field saves */
+.profile h2 .muted { font-weight: 400; margin-left: var(--sp-3); }
 .session { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; padding: var(--sp-4) 0; border-top: 1px solid var(--line); font-size: var(--fs-base); }
 .session-ua { flex: 1; min-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

@@ -4,7 +4,9 @@ Point at or click your picture in the top-right corner, then **Profile**.
 
 ![The profile page (Nightwalker theme)](../images/profile-night.png)
 
-- **Picture**: upload an image (up to 2 MB) and crop it. People without a picture get their initials on their colour. Agents are drawn as a rounded square with a small robot mark (on the smallest avatars, on the board cards, the square shape alone says it).
+Every field saves as you change it: the colour when you click one, the name and description when you leave the field or press Enter, the other settings as you pick them.
+
+- **Picture**: upload an image (up to 2 MB). It's cut to a square around its centre, so put what matters in the middle. People without a picture get their initials on their colour. Agents are drawn as a rounded square with a small robot mark (on the smallest avatars, on the board cards, the square shape alone says it).
 - **Display name**, **description** and **colour**: how you appear on cards, comments and mentions. The colour fills your initials, or rings your picture when you have one.
 - **Launch animation**: after you create a gig or an errand, a few ships fly past and take off (about three seconds; clicks go through). Untick it to turn it off; it is skipped anyway when your system asks for less motion.
 - **Time zone**: the zone your new recurring gigs and schedules start in (each one keeps its own zone afterwards), and the zone their times are shown in. Empty: your browser's zone. Over the API and MCP, a schedule that names no zone takes this one too, else the instance default.

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
 import { launchOn } from "./launchPref";
 import { api, ApiError, fmtTime, type Session } from "./api";
 import { useApp } from "./App";
@@ -15,16 +15,33 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
   const [color, setColor] = useState<string | null>(me.user.color);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
-  const save = (e: FormEvent) => {
-    e.preventDefault();
+  // every field saves as you go, like the time zone and the launch animation below: the colour on a
+  // click, the name and description when you leave the field or press Enter
+  const commit = (patch: Record<string, unknown>) => {
     setMsg("");
+    setErr("");
     api
-      .patchMe({ display_name: name, description: desc, color })
+      .patchMe(patch)
       .then(() => {
         setMsg("Saved.");
         refresh();
       })
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : "Couldn't save."));
+  };
+  const textChanges = () => ({
+    ...(name !== me.user.display_name ? { display_name: name } : {}),
+    ...(desc !== (me.user.description ?? "") ? { description: desc } : {}),
+  });
+  const saveText = () => {
+    const patch = textChanges();
+    if (Object.keys(patch).length) commit(patch);
+  };
+  const save = (e: FormEvent) => e.preventDefault(); // no submit: each field saves itself
+  const onEnter = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveText();
+    }
   };
   const preview = { ...me.user, display_name: name, color };
   return (
@@ -51,28 +68,32 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
       </header>
       <Picture />
       <form className="card form-grid" onSubmit={save} aria-label="Profile">
-        <h2 className="span2">Profile</h2>
+        <h2 className="span2">
+          Profile <span className="muted small">changes save as you make them</span>
+        </h2>
         <label>
           Display name
-          <input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
+          <input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} onBlur={saveText} onKeyDown={onEnter} />
         </label>
         <label>
           About
-          <input value={desc} maxLength={200} onChange={(e) => setDesc(e.target.value)} placeholder="One line" />
+          <input value={desc} maxLength={200} onChange={(e) => setDesc(e.target.value)} onBlur={saveText} onKeyDown={onEnter} placeholder="One line" />
         </label>
         <div className="field span2">
           <span className="field-label">Colour (your avatar)</span>
-          <ColorPicker value={color} onChange={setColor} />
+          <ColorPicker
+            value={color}
+            onChange={(c) => {
+              setColor(c);
+              if (c !== me.user.color) commit({ color: c });
+            }}
+          />
         </div>
         <TimeZoneField />
         <LaunchField />
-        {err && <p className="danger span2">{err}</p>}
-        {msg && <p className="accent span2">{msg}</p>}
-        <div className="row end span2">
-          <button className="button" type="submit">
-            Save
-          </button>
-        </div>
+        <p className="span2 profile-status" role="status">
+          {err ? <span className="danger">{err}</span> : msg ? <span className="accent">{msg}</span> : null}
+        </p>
       </form>
       <BellCard />
       <Password onLogout={onLogout} />
@@ -275,9 +296,7 @@ function TimeZoneField() {
   const list = current && !base.includes(current) ? [current, ...base] : base;
   return (
     <label className="span2" data-tip="Recurring gigs and schedules you create start in this zone (each keeps its own afterwards), and their times are shown in it.">
-      <span>
-        Time zone <span className="muted small">saved as soon as you pick it</span>
-      </span>
+      <span>Time zone</span>
       <select
         value={current}
         onChange={(e) => {
