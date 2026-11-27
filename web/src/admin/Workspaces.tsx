@@ -5,6 +5,7 @@ import { fmtDate, type Category, type User } from "../api";
 import { useApp } from "../App";
 import { ColorPicker } from "../fields";
 import { colorFor } from "../theme";
+import { CATEGORY_LABEL } from "../boardModel";
 import { fmtSize } from "../attachments";
 import { Avatar, Modal } from "../ui";
 import {
@@ -932,13 +933,13 @@ function Statuses({ project }: { project: AdminProject }) {
               <span className="admin-name">{s.name}</span>
               <CategoryPill category={s.category} />
               {s.is_default && (
-                <span className="pill pill-accent" title={`New ${s.category} gigs land here`}>
+                <span className="pill pill-accent" title={`New ${CATEGORY_LABEL[s.category]} gigs land here`}>
                   default
                 </span>
               )}
               <span className="grow" />
               {!s.is_default && (
-                <button type="button" className="button secondary small" aria-label={`Set default: ${s.name}`} onClick={() => act(adminApi.patchStatus(s, { is_default: true }))} title={`Make it the default for ${s.category}`}>
+                <button type="button" className="button secondary small" aria-label={`Set default: ${s.name}`} onClick={() => act(adminApi.patchStatus(s, { is_default: true }))} title={`Make it the default for ${CATEGORY_LABEL[s.category]}`}>
                   Set default
                 </button>
               )}
@@ -978,7 +979,7 @@ function CategorySelect({ value, onChange }: { value: Category; onChange: (c: Ca
       <select value={value} onChange={(e) => onChange(e.target.value as Category)}>
         {CATEGORIES.map((c) => (
           <option key={c} value={c}>
-            {c}
+            {CATEGORY_LABEL[c]}
           </option>
         ))}
       </select>

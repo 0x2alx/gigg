@@ -377,7 +377,7 @@ function CreateKey({
           <select value={userId} onChange={(e) => setUserId(Number(e.target.value))} required>
             {active.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.username}
+                {u.display_name && u.display_name !== u.username ? `${u.display_name} (${u.username})` : u.username}
                 {u.kind === "agent" ? " · agent" : ""}
                 {u.is_admin ? " · admin" : ""}
               </option>
@@ -431,7 +431,7 @@ function CreateKey({
             </button>
             {unseen.length > 0 && (
               <p className="danger small">
-                {user?.username} can't see {unseen.map((pl) => placeText({ workspace_id: pl.ws, project_id: pl.project || undefined }, new Map(workspaces.map((w) => [w.id, w])), projects)).join(", ")}; give them access first (Workspaces or Users).
+                {user ? user.display_name || user.username : ""} can't see {unseen.map((pl) => placeText({ workspace_id: pl.ws, project_id: pl.project || undefined }, new Map(workspaces.map((w) => [w.id, w])), projects)).join(", ")}; give them access first (Workspaces or Users).
               </p>
             )}
           </div>

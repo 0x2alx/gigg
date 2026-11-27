@@ -2,6 +2,7 @@
 import { cloneElement, useId, useState, type ReactElement, type ReactNode } from "react";
 import type { Category } from "../api";
 import { CATEGORY_COLOR, PRIORITY_COLOR, colorFor } from "../theme";
+import { CATEGORY_LABEL } from "../boardModel";
 import { Modal, Pill } from "../ui";
 import { errMsg, type Role } from "./adminApi";
 import "./admin.css";
@@ -133,13 +134,13 @@ export function RolePill({ role }: { role: Role | string }) {
 }
 
 export function CategoryDot({ category }: { category: Category }) {
-  return <span className="dot" style={{ background: CATEGORY_COLOR[category] }} title={category} aria-hidden="true" />;
+  return <span className="dot" style={{ background: CATEGORY_COLOR[category] }} title={CATEGORY_LABEL[category] ?? category} aria-hidden="true" />;
 }
 
 export function CategoryPill({ category }: { category: Category }) {
   return (
     <Pill color={CATEGORY_COLOR[category] ?? colorFor(category)} outline>
-      {category}
+      {CATEGORY_LABEL[category] ?? category}
     </Pill>
   );
 }
