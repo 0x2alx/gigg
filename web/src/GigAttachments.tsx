@@ -327,7 +327,13 @@ export function AttachmentsSection({ gig, canAdd, canDeleteAny, canDownload, dro
                 {busy.name}…
               </span>
             ) : (
-              list && list.quota > 0 && <span className="muted small att-usage">{fmtSize(list.used)} of {fmtSize(list.quota)} used</span>
+              // the quota is the workspace's, not this gig's: say so, or it reads as what this gig holds
+              list &&
+              list.quota > 0 && (
+                <span className="muted small att-usage" data-tip="Every gig's attachments in this workspace count toward its storage">
+                  Workspace: {fmtSize(list.used)} of {fmtSize(list.quota)}
+                </span>
+              )
             )}
           </div>
           {items.length === 0 && !busy && !linking && <p className="muted small att-hint">Drop files on the panel to attach them.</p>}

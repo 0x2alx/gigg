@@ -46,7 +46,7 @@ Each workspace has two limits, set by an admin in **Admin → Workspaces** (see 
 - the largest file: 10 MB by default, 50 MB at most;
 - the total of all its attachments: 1 GB by default.
 
-An upload over either is refused with a message saying which limit it hit. The total is what the workspace's attachments take on disk: an image's preview counts with it, and the same file attached twice in a workspace is stored once and counts once (another workspace with the same file counts it too).
+An upload over either is refused with a message saying which limit it hit. The total is what the workspace's attachments take on disk: an image's preview counts with it, and the same file attached twice in a workspace is stored once and counts once (another workspace with the same file counts it too). The **Attachments** section of every gig shows how much of the workspace's total is used ("Workspace: 109 KB of 1 GB").
 
 ## Archive, trash and removal
 
