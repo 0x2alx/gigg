@@ -349,6 +349,16 @@ label { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(
 .board-rows .cards > .drop-line { flex: none; align-self: stretch; width: 3px; height: auto; margin: 0 0 0 calc(var(--card-gap) / -2); }
 .board-rows .empty { align-self: center; padding: var(--sp-3) var(--sp-4); }
 .board-rows .column-add { flex: none; align-self: center; margin-top: 0; white-space: nowrap; }
+/* a lane with cards past its right edge: the edge fades and a "+N" button scrolls on */
+.board-rows .column { position: relative; }
+.board-rows .column.lane-more .cards { mask-image: linear-gradient(to right, #000 calc(100% - 4.5rem), transparent); }
+.lane-more-button {
+  position: absolute; right: var(--sp-3); top: 50%; transform: translateY(-50%); z-index: 2;
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums;
+  padding: 0.25rem 0.6rem; border-radius: 999px; cursor: pointer;
+  background: var(--high); color: var(--text); border: 1px solid var(--line-strong); box-shadow: var(--shadow-pop);
+}
+.lane-more-button:hover, .lane-more-button:focus-visible { border-color: var(--accent); }
 .layout-switch .vs-item { display: inline-flex; align-items: center; padding-inline: 0.5rem; font-size: 1rem; }
 
 /* collapsed columns: small chips above the board (stage, name, count); click one to bring the column back */

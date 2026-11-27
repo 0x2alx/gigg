@@ -32,6 +32,22 @@ interface Sort {
   desc: boolean;
 }
 
+// the phone's Sort select: each column sort the header offers, both ways ("-" = descending)
+const PHONE_SORTS: [string, string][] = [
+  ["-updated", "Updated, newest first"],
+  ["updated", "Updated, oldest first"],
+  ["-priority", "Priority, highest first"],
+  ["priority", "Priority, lowest first"],
+  ["due", "Due, soonest first"],
+  ["-due", "Due, latest first"],
+  ["-number", "Key, newest first"],
+  ["number", "Key, oldest first"],
+  ["title", "Title, A to Z"],
+  ["-title", "Title, Z to A"],
+  ["-created", "Created, newest first"],
+  ["created", "Created, oldest first"],
+];
+
 const PAGE = 200;
 const MAX_PAGES = 5; // all workspaces: at most this many pages each (1000 gigs), then "+" says there are more
 
@@ -484,6 +500,31 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
         </p>
       )}
 
+      {narrow && (
+        // a phone hides the header row with its sort buttons and Select all: the same two controls here
+        <div className="vw-phone-bar">
+          {canWrite && (
+            <label className="vw-toggle">
+              <input type="checkbox" checked={allOn} onChange={toggleAll} disabled={selectable.length === 0} />
+              Select all
+            </label>
+          )}
+          <label className="vw-phone-sort">
+            <span className="muted small">Sort</span>
+            <select
+              value={(sort.desc ? "-" : "") + sort.key}
+              onChange={(e) => setSort({ key: e.target.value.replace(/^-/, "") as SortKey, desc: e.target.value.startsWith("-") })}
+              aria-label="Sort by"
+            >
+              {PHONE_SORTS.map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       <div className="card vw-table-card">
         <table className="vw-table">
           <thead>

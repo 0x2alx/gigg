@@ -449,6 +449,42 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
       cancelAnimationFrame(frame);
     };
   }, [measure, loaded]);
+  // rows layout: how many cards of each lane sit (even partly) past its right edge, for the lane's
+  // fade and "+N" (lanes scroll sideways and a hidden scrollbar gave no hint that more exist)
+  const [rowMore, setRowMore] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const root = boardRef.current;
+    if (!rows || !root) {
+      setRowMore((cur) => (Object.keys(cur).length ? {} : cur));
+      return;
+    }
+    let frame = 0;
+    const count = () => {
+      const next: Record<string, number> = {};
+      for (const col of root.querySelectorAll<HTMLElement>(".column[data-col]")) {
+        const cards = col.querySelector<HTMLElement>(".cards");
+        if (!cards) continue;
+        const edge = cards.getBoundingClientRect().right - 4;
+        let n = 0;
+        for (const s of cards.querySelectorAll<HTMLElement>(":scope > .card-slot")) if (s.getBoundingClientRect().right > edge) n++;
+        if (n) next[col.dataset.col!] = n;
+      }
+      setRowMore((cur) => (JSON.stringify(cur) === JSON.stringify(next) ? cur : next));
+    };
+    const soon = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(count);
+    };
+    soon();
+    root.addEventListener("scroll", soon, true); // capture: the lanes scroll, the board doesn't
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(soon);
+    ro?.observe(root);
+    return () => {
+      root.removeEventListener("scroll", soon, true);
+      ro?.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [rows, boards, filter, collapsed, loaded]);
   if (tree.every((w) => w.projects.length === 0)) return <p className="muted">No projects yet.</p>;
   if (!loaded) return <p className="muted">Loading…</p>;
 
@@ -784,7 +820,7 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
           return (
             <section
               key={c.key}
-              className={"column" + (drop?.col === c.key ? " drag-over" : "")}
+              className={"column" + (drop?.col === c.key ? " drag-over" : "") + (rows && rowMore[c.key] ? " lane-more" : "")}
               data-col={c.key}
               aria-label={c.name}
               role={narrow ? "tabpanel" : undefined}
@@ -862,6 +898,20 @@ export function BoardPage({ gigPid, gigKey }: { gigPid?: number; gigKey?: string
                   </button>
                 )}
               </div>
+              {rows && rowMore[c.key] ? (
+                <button
+                  type="button"
+                  className="lane-more-button"
+                  aria-label={`${rowMore[c.key]} more in ${c.name}: scroll right`}
+                  data-tip="More cards past the edge: scroll right"
+                  onClick={(e) => {
+                    const cards = e.currentTarget.parentElement?.querySelector<HTMLElement>(".cards");
+                    cards?.scrollBy({ left: cards.clientWidth * 0.8, behavior: reducedMotion() ? "auto" : "smooth" });
+                  }}
+                >
+                  +{rowMore[c.key]}
+                </button>
+              ) : null}
             </section>
           );
         })}

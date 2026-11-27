@@ -37,6 +37,11 @@
 .vw-errors { list-style: none; margin: 0; padding: 0; max-height: 8rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.2rem; }
 .vw-errors li { display: flex; align-items: center; gap: 0.4rem; background: var(--surface); padding: 0.15rem 0.4rem; border-radius: var(--radius-s); }
 
+/* a phone: Select all and a Sort select above the cards (the header row is hidden there) */
+.vw-phone-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3) var(--sp-5); margin-bottom: var(--sp-4); }
+.vw-phone-sort { display: inline-flex; align-items: center; gap: var(--sp-3); flex-direction: row; margin-left: auto; }
+.vw-phone-sort select { width: auto; height: var(--ctl-h); font-size: var(--fs-sm); padding: 0 1.9rem 0 0.6rem; }
+
 /* table: 36px rows, small uppercase headers, quiet cells (status a dot, key and dates plain text) */
 .vw-table-card { padding: 0; overflow-x: auto; }
 .vw-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
