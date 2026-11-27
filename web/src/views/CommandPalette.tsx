@@ -5,7 +5,8 @@ import { useLocation } from "wouter";
 import { api, type Gig } from "../api";
 import { useApp, type WorkspaceTree } from "../App";
 import { colorFor } from "../theme";
-import { Pill, PriorityBadge, StatusBadge, rememberOpener } from "../ui";
+import { Kbd, Pill, PriorityBadge, StatusBadge, rememberOpener } from "../ui";
+import { OPEN_PALETTE, openShortcuts } from "../keyboard";
 import { summary, viewHref } from "./savedViews";
 import { errMsg, fromHere, fuzzy, gigHref, gigsAcross } from "./viewsApi";
 import "./views.css";
@@ -33,8 +34,14 @@ export function CommandPalette() {
         setOpen((o) => !o);
       }
     };
+    // the / shortcut opens it from pages without a search field of their own (keyboard.tsx)
+    const onOpen = () => setOpen(true);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(OPEN_PALETTE, onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_PALETTE, onOpen);
+    };
   }, []);
   return open ? <Palette onClose={() => setOpen(false)} /> : null;
 }
@@ -182,6 +189,7 @@ function Palette({ onClose }: { onClose: () => void }) {
     cmds.push({ id: "c-profile", group: "Commands", icon: "☺", label: "Profile", run: () => go("/profile") });
     if (me.admin) cmds.push({ id: "c-admin", group: "Commands", icon: "⚙", label: "Admin", run: () => go("/admin") });
     if (me.admin) cmds.push({ id: "c-groups", group: "Commands", icon: "⛭", label: "Groups", hint: <span className="muted small">admin</span>, run: () => go("/admin/groups") });
+    cmds.push({ id: "c-keys", group: "Commands", icon: "⌨", label: "Keyboard shortcuts", hint: <Kbd>?</Kbd>, run: () => openShortcuts() });
     const cmdItems = cmds
       .map((c) => ({ c, s: fuzzy(q, String(c.label)) }))
       .filter((x) => x.s !== null)
@@ -377,8 +385,4 @@ function Palette({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
-}
-
-function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="cp-kbd">{children}</kbd>;
 }

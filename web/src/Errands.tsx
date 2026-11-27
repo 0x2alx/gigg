@@ -206,7 +206,7 @@ export function ErrandsPage({ open }: { open?: number }) {
             </button>
           ))}
         </div>
-        <input type="search" className="errand-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find an errand, command or agent" aria-label="Find" />
+        <input type="search" className="errand-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find an errand, command or agent" aria-label="Find" aria-keyshortcuts="/" />
         <ClearFilters active={place !== "" || state !== "" || q !== ""} onClear={() => (setPlace(""), setState(""), setQ(""))} />
       </div>
       {items === null && !err && <p className="muted">Loading…</p>}

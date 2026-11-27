@@ -1004,7 +1004,7 @@ function BoardFilters({ filter, setFilter, tree, labelNames, people, narrow, end
             <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
             <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          <input type="search" aria-label="Search gigs" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
+          <input type="search" aria-label="Search gigs" aria-keyshortcuts="/" placeholder="Search key, title, description" value={text} onChange={(e) => setText(e.target.value)} />
         </span>
         {choose && <WherePicker tree={tree} filter={filter} users={users} onWs={toggleWs} onProject={toggleP} onAll={() => setFilter({ ...filter, ws: [], p: [] })} />}
         <MoreFilters count={[filter.a, filter.l, filter.pr, filter.rec, filter.run, filter.arch].filter(Boolean).length}>

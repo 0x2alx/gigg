@@ -14,6 +14,7 @@ import { ProfilePage } from "./Profile";
 import { ThemesPage } from "./Themes";
 import { AdminRoutes } from "./admin/AdminRoutes";
 import { CommandPalette } from "./views/CommandPalette";
+import { KeyboardShortcuts, SkipLink } from "./keyboard";
 import { TableView } from "./views/TableView";
 import { savedViewsApi, type SavedFilter } from "./views/savedViews";
 import { BUILTINS, applyTheme, findTheme, initialTheme, rememberTheme, sane, type Theme } from "./theme";
@@ -349,11 +350,12 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
   return (
     <Ctx.Provider value={ctx}>
       <div className={"shell" + (narrow ? " narrow" : "")}>
+        <SkipLink />
         {/* one bar across the top (pages, New, messages, your account menu); the page scrolls under it */}
         <AppBar inboxCount={inboxCount} onLogout={onLogout} />
         <LiveBanner live={live} onBack={refresh} />
         <LaunchOverlay />
-        <main className="content">
+        <main className="content" id="main" tabIndex={-1}>
           {/* a page change fades the new page in (keyed by the section, so a gig opening on the board or a
               tab inside Admin doesn't replay it) */}
           <div className="page-anim" key={loc.split("/")[1] ?? ""}>
@@ -405,6 +407,7 @@ function Shell({ me: initialMe, onLogout }: { me: Me; onLogout: () => void }) {
           </div>
         </main>
         <CommandPalette />
+        <KeyboardShortcuts />
       </div>
     </Ctx.Provider>
   );

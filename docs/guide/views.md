@@ -18,3 +18,15 @@ Your own gigs: the board's **More filters** › **Assignee** › **Assigned to m
 Press **Ctrl+K** (⌘K on a Mac) anywhere. Type to find a gig by key or title, jump to a workspace or project, or run a command such as *New gig*. Use the arrow keys and Enter to choose, and Esc to close.
 
 ![The command palette (Nightwalker theme)](../images/palette-night.png)
+
+## Keyboard
+
+Press **?** anywhere for the list of keyboard shortcuts (it's also the palette's *Keyboard shortcuts* command). Besides Ctrl+K:
+
+- **/** puts the cursor in the page's search field (the board's, the table's, the errands'); when the page has none in view, for example with the board's filters folded, it opens the command palette.
+- **N** starts a new gig, like **+ New gig**.
+- **Esc** closes a dialog, the gig panel or a menu; closing a dialog puts the focus back on the button that opened it (or on the menu button, when it came from a menu).
+
+Single keys don't fire while you type in a field or the editor, or while a dialog is open.
+
+The first Tab on any page reaches a **Skip to board** link (**Skip to content** on other pages), which jumps past the top bar and the filters to the first card. Rows of colour swatches (gig and template colours, the theme editor) are one Tab stop each: the arrow keys pick the previous or next colour, Home and End the first and last. In the theme editor, Esc leaves like Cancel; with unsaved changes it asks once first.

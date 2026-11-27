@@ -1,0 +1,426 @@
+{
+ "base": "https://gigg-dev:8443",
+ "waitUntil": "domcontentloaded",
+ "viewport": [
+  1440,
+  900
+ ],
+ "steps": [
+  {
+   "wait": 3000
+  },
+  {
+   "goto": "/"
+  },
+  {
+   "wait": "input[autocomplete=username]"
+  },
+  {
+   "type": [
+    "input[autocomplete=username]",
+    "ada"
+   ]
+  },
+  {
+   "type": [
+    "input[autocomplete=current-password]",
+    "gigg-dev-password"
+   ]
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "wait": ".board"
+  },
+  {
+   "eval": "(async () => { const H = {'Content-Type':'application/json','X-Gigg-CSRF':'1'}; const j = async (m,u,b) => { const r = await fetch('/api/v1'+u,{method:m,headers:H,body:b?JSON.stringify(b):undefined}); return r.json().catch(()=>null); }; const ps = await j('GET','/workspaces/scout/projects'); const p = ps.items[0].id; const a = await j('POST',`/projects/${p}/gigs`,{title:'Keys parent',checklist:['one','two']}); const b = await j('POST',`/projects/${p}/gigs`,{title:'Keys blocked'}); await j('POST',`/gigs/${b.key}/relations`,{gig:a.key,direction:'blocked_by'}); await j('POST',`/projects/${p}/gigs`,{title:'Keys child',parent_id:a.id}); return 'ok'; })()",
+   "expect": "ok"
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board .card-open"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "(() => { const card = [...document.querySelectorAll('.card-title')].find(t => t.textContent === 'Keys blocked').closest('.gig-card'); return card.querySelector('.card-open').getAttribute('aria-label').replace(/^\\S+ /, ''); })()",
+   "expect": "Keys blocked. Blocked by 1 open gig"
+  },
+  {
+   "eval": "(() => { const card = [...document.querySelectorAll('.card-title')].find(t => t.textContent === 'Keys parent').closest('.gig-card'); return [...card.querySelectorAll('.meta .sr-only')].map(s => s.textContent); })()",
+   "expect": [
+    "0 of 2 checklist items done",
+    "0 of 1 subgig done"
+   ]
+  },
+  {
+   "eval": "(() => { const card = [...document.querySelectorAll('.card-title')].find(t => t.textContent === 'Keys blocked').closest('.gig-card'); return card.querySelector('.meta .pill-danger .sr-only').textContent; })()",
+   "expect": "Blocked by 1 open gig"
+  },
+  {
+   "comment": "skip link: the first Tab stop, shown while focused; Enter lands on the first card",
+   "eval": "(document.activeElement.blur(), document.body.focus(), true)",
+   "expect": true
+  },
+  {
+   "press": "Tab"
+  },
+  {
+   "eval": "[document.activeElement.className, document.activeElement.textContent]",
+   "expect": [
+    "skip-link",
+    "Skip to board"
+   ]
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "skip-link-1440",
+   "full": false
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "eval": "document.activeElement.classList.contains('card-open')",
+   "expect": true
+  },
+  {
+   "comment": "? opens the overlay; Esc closes it and the focus goes back to the card",
+   "press": "?"
+  },
+  {
+   "wait": "[role=dialog][aria-label='Keyboard shortcuts']"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "shot": "shortcuts-1440",
+   "full": false
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 500
+  },
+  {
+   "eval": "[!!document.querySelector('[aria-label=\"Keyboard shortcuts\"]'), document.activeElement.classList.contains('card-open')]",
+   "expect": [
+    false,
+    true
+   ]
+  },
+  {
+   "comment": "folded filters (the default): / opens the command palette; Esc closes it",
+   "press": "/"
+  },
+  {
+   "wait": "[role=dialog][aria-label='Command palette']"
+  },
+  {
+   "eval": "document.activeElement.getAttribute('aria-label')",
+   "expect": "Command"
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "[!!document.querySelector('[aria-label=\"Command palette\"]'), document.activeElement.classList.contains('card-open')]",
+   "expect": [
+    false,
+    true
+   ]
+  },
+  {
+   "comment": "filters shown: / focuses the board search; n typed there stays text; n elsewhere opens New gig",
+   "click": ".bf-fold"
+  },
+  {
+   "wait": "input[aria-label='Search gigs']"
+  },
+  {
+   "press": "/"
+  },
+  {
+   "eval": "[document.activeElement.getAttribute('aria-label'), document.activeElement.value]",
+   "expect": [
+    "Search gigs",
+    ""
+   ]
+  },
+  {
+   "press": "n"
+  },
+  {
+   "eval": "[document.activeElement.value, location.search.includes('new=1')]",
+   "expect": [
+    "n",
+    false
+   ]
+  },
+  {
+   "press": "Backspace"
+  },
+  {
+   "eval": "(document.activeElement.blur(), true)",
+   "expect": true
+  },
+  {
+   "press": "n"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "document.querySelector('[role=dialog][aria-modal=true]')?.getAttribute('aria-label')",
+   "expect": "New gig"
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "!!document.querySelector('[role=dialog][aria-modal=true]')",
+   "expect": false
+  },
+  {
+   "comment": "a dialog opened from the account menu gives the focus back to the menu's button",
+   "click": ".account-button"
+  },
+  {
+   "wait": ".account-menu"
+  },
+  {
+   "click": ".account-menu a[href*='tool=recurring']"
+  },
+  {
+   "wait": "[role=dialog][aria-label='Recurring gigs']"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "[!!document.querySelector('[aria-label=\"Recurring gigs\"]'), document.activeElement.classList.contains('account-button')]",
+   "expect": [
+    false,
+    true
+   ]
+  },
+  {
+   "comment": "the theme editor: one radio group per colour role, arrows pick, Esc asks once then leaves",
+   "goto": "/themes"
+  },
+  {
+   "wait": ".tg-create"
+  },
+  {
+   "click": ".tg-create .button:not(.secondary)"
+  },
+  {
+   "wait": ".theme-editor .swatch-group"
+  },
+  {
+   "eval": "(() => { const gs = [...document.querySelectorAll('.theme-editor .swatch-group[role=radiogroup]')]; return gs.length > 10 && gs.every(g => g.querySelectorAll('[role=radio][tabindex=\"0\"]').length === 1 && !!document.getElementById(g.getAttribute('aria-labelledby'))?.textContent); })()",
+   "expect": true
+  },
+  {
+   "eval": "[...document.querySelectorAll('.theme-editor button, .theme-editor input, .theme-editor select')].filter(e => e.tabIndex >= 0 && !e.disabled).length"
+  },
+  {
+   "eval": "(document.querySelector('.theme-editor .swatch-group [role=radio][tabindex=\"0\"]').focus(), document.activeElement.getAttribute('aria-checked'))",
+   "expect": "true"
+  },
+  {
+   "press": "ArrowRight"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "(() => { const a = document.activeElement; window.__first = a.dataset.id; return [a.getAttribute('role'), a.getAttribute('aria-checked'), a.tabIndex]; })()",
+   "expect": [
+    "radio",
+    "true",
+    0
+   ]
+  },
+  {
+   "press": "ArrowRight"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "(() => { const a = document.activeElement; const g = a.closest('.swatch-group'); return [a.getAttribute('aria-checked'), a.dataset.id !== window.__first, g.querySelectorAll('[aria-checked=true]').length]; })()",
+   "expect": [
+    "true",
+    true,
+    1
+   ]
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "theme-swatches-1440",
+   "el": ".theme-editor .editor-rows",
+   "margin": 8
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 200
+  },
+  {
+   "eval": "document.querySelector('.theme-editor [role=alert]')?.textContent",
+   "expect": "You have unsaved changes. Press Esc again to discard them, or Save."
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "eval": "[!!document.querySelector('.theme-editor'), !!document.querySelector('.tg-create')]",
+   "expect": [
+    false,
+    true
+   ]
+  },
+  {
+   "comment": "admin rows name their target; the permission preset option reads as words",
+   "goto": "/admin/users"
+  },
+  {
+   "wait": "button[aria-label='Make scout admin']"
+  },
+  {
+   "eval": "[!!document.querySelector('button[aria-label=\"Disable scout\"]'), !!document.querySelector('button[aria-label=\"Revoke admin from ada\"]')]",
+   "expect": [
+    true,
+    true
+   ]
+  },
+  {
+   "click": "button[aria-label='Permissions scout']"
+  },
+  {
+   "wait": ".acc-levels"
+  },
+  {
+   "eval": "([...document.querySelectorAll('.acc-level')].find(b => b.querySelector('.acc-level-name').textContent.trim() === 'Scout').click(), true)",
+   "expect": true
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "(() => { const r = [...document.querySelectorAll('.acc-editor [role=radio][aria-label=\"Preset, allows it\"]')]; return r.length > 0 && r.every(b => b.textContent === 'Preset ✓'); })()",
+   "expect": true
+  },
+  {
+   "press": "Escape"
+  },
+  {
+   "wait": 600
+  },
+  {
+   "eval": "document.activeElement.getAttribute('aria-label')",
+   "expect": "Permissions scout"
+  },
+  {
+   "goto": "/admin/workspaces"
+  },
+  {
+   "wait": "a[aria-label='Manage workspace Scout']"
+  },
+  {
+   "click": "a[aria-label='Manage workspace Scout']"
+  },
+  {
+   "wait": "button[aria-label='Delete project GIG']"
+  },
+  {
+   "eval": "['Edit project GIG', 'Archive project GIG', 'Statuses of project GIG'].map(n => !!document.querySelector(`button[aria-label=\"${n}\"]`))",
+   "expect": [
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "comment": "phone width: the skip link and the overlay",
+   "viewport": [
+    390,
+    844
+   ]
+  },
+  {
+   "goto": "/board"
+  },
+  {
+   "wait": ".board .card-open"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "eval": "(document.activeElement.blur(), true)",
+   "expect": true
+  },
+  {
+   "press": "Tab"
+  },
+  {
+   "eval": "document.activeElement.textContent",
+   "expect": "Skip to board"
+  },
+  {
+   "wait": 300
+  },
+  {
+   "shot": "skip-link-390",
+   "full": false
+  },
+  {
+   "press": "Enter"
+  },
+  {
+   "eval": "document.activeElement.classList.contains('card-open') && document.activeElement.getClientRects().length > 0",
+   "expect": true
+  },
+  {
+   "press": "?"
+  },
+  {
+   "wait": "[role=dialog][aria-label='Keyboard shortcuts']"
+  },
+  {
+   "wait": 400
+  },
+  {
+   "shot": "shortcuts-390",
+   "full": false
+  }
+ ]
+}

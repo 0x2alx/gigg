@@ -16,16 +16,24 @@ import { useNarrow } from "./narrow";
 import { Avatar, MoreMenu } from "./ui";
 import { Icon } from "./icons";
 
+// useNewGigHref: where New gig goes (null when you can't make gigs anywhere). On the board it keeps
+// the filters, so the new gig starts in the project in view. The app bar and the N shortcut use it.
+export function useNewGigHref(): string | null {
+  const { me, tree } = useApp();
+  const [loc] = useLocation();
+  const search = useSearch();
+  if (gigChoices(me, tree).length === 0) return null;
+  const onBoard = loc === "/board" || loc.startsWith("/board/");
+  return onBoard ? withParam(loc, search, "new", "1") : "/board?new=1";
+}
+
 export function AppBar({ inboxCount, onLogout }: { inboxCount: number; onLogout: () => void }) {
   const { me, tree } = useApp();
   const narrow = useNarrow();
-  const [loc] = useLocation();
-  const search = useSearch();
-  const canGig = gigChoices(me, tree).length > 0;
+  const newGigHref = useNewGigHref();
+  const canGig = newGigHref !== null;
+  const newGig = newGigHref ?? "";
   const canErrand = errandMakers(me, tree).length > 0;
-  // on the board, New gig keeps its filters (the new gig starts in the project in view)
-  const onBoard = loc === "/board" || loc.startsWith("/board/");
-  const newGig = onBoard ? withParam(loc, search, "new", "1") : "/board?new=1";
   const newErrand = "/errands?new=1";
   return (
     <header className="appbar">
@@ -65,7 +73,7 @@ export function AppBar({ inboxCount, onLogout }: { inboxCount: number; onLogout:
         : (
             <>
               {canGig && (
-                <Link href={newGig} className="button appbar-button">
+                <Link href={newGig} className="button appbar-button" aria-keyshortcuts="n">
                   <Icon name="plus" strokeWidth={2.2} /> New gig
                 </Link>
               )}

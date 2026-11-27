@@ -319,7 +319,7 @@ function Table({ ws, pid, users, memberIds }: { ws?: WorkspaceTree; pid?: number
       </header>
 
       <div className="vw-filters" role="search" aria-label="Filter gigs">
-        <input type="search" className="vw-search" placeholder="Search titles, descriptions, comments…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search" />
+        <input type="search" className="vw-search" placeholder="Search titles, descriptions, comments…" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search" aria-keyshortcuts="/" />
         <PlaceFilter value={place} onChange={goPlace} tree={tree} plain />
         <MoreFilters count={[category, label, assignee, prioMin, recFilter, runFilter].filter(Boolean).length}>
           <FilterField label="Status">
